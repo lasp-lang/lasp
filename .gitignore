@@ -1,0 +1,7 @@
+*.beam
+.eunit
+deps/*
+ebin/*
+rel/derflowdis
+dev
+apps/derflowdis/src/*

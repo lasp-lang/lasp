@@ -1,0 +1,17 @@
+%% -*- mode: erlang;erlang-indent-level: 4;indent-tabs-mode: nil -*-
+%% ex: ft=erlang ts=4 sw=4 et
+
+%%
+%% etc/app.config
+%%
+{ring_state_dir,    "data/ring"}.
+{web_ip,            "127.0.0.1"}.
+{web_port,          @WEBPORT@}.
+{handoff_port,      @HANDOFFPORT@}.
+
+%%
+%% etc/vm.args
+%%
+{node,         "@NODE@"}.
+{cookie, "derflowdis"}.
+

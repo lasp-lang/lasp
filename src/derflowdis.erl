@@ -20,28 +20,18 @@
 %    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, derflowdis_vnode_master).
 	
 bind(Id, Value) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(now())}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
-    [{IndexNode, _Type}] = PrefList,
-    derflowdis_vnode:bind(IndexNode, Id, Value).
+    derflowdis_vnode:bind(Id, Value).
 
 bind(Id, Function, Args) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(now())}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
-    [{IndexNode, _Type}] = PrefList,
-    derflowdis_vnode:bind(IndexNode, Id, Function, Args).
+    derflowdis_vnode:bind(Id, Function, Args).
 
 read(Id) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(now())}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
-    [{IndexNode, _Type}] = PrefList,
-    derflowdis_vnode:read(IndexNode, Id).
+    derflowdis_vnode:read(Id).
 
 declare() ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(now())}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
-    [{IndexNode, _Type}] = PrefList,
-    derflowdis_vnode:declare(IndexNode).
+    Id = derflowdis_vnode:get_new_id(),
+    derflowdis_vnode:declare(Id).
+    
 
 thread(Module, Function, Args) ->
     spawn(Module, Function, Args).
@@ -55,7 +45,10 @@ async_print_stream(Stream)->
 	{nil, _} -> {ok, stream_read};
 	{Value, Next} -> 
 	    io:format("~w~n",[Value]),
-	    async_print_stream(Next)
+	    async_print_stream(Next);
+	 Any ->
+	    io:format("Stream any: ~w~n",[Any])
+		
     end.
     
 %Internal functions

@@ -2,8 +2,9 @@
 -export([test1/0, producer/3, consumer/3]).
 
 test1() ->
-    {id, S1}=derflow:declare(),
+    {id, S1}=derflowdis:declare(),
     derflowdis:thread(prod_cons,producer,[0,10,S1]),
+    %derflowdis:thread(derflowdis,async_print_stream,[S1]).
     {id, S2}=derflowdis:declare(),
     derflowdis:thread(prod_cons,consumer,[S1,fun(X) -> X + 5 end,S2]),
     derflowdis:async_print_stream(S2).

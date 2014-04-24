@@ -2,12 +2,13 @@
 -behaviour(riak_core_vnode).
 -include("derflowdis.hrl").
 
--export([bind/3,
-         bind/4,
-         read/2,
+-export([bind/2,
+         bind/3,
+         read/1,
          declare/1,
-	 put/3,
-	 execute_and_put/4]).
+	 get_new_id/0,
+	 put/4,
+	 execute_and_put/5]).
 
 -export([start_vnode/1,
          init/1,
@@ -28,53 +29,77 @@
              start_vnode/1
              ]).
 
--record(state, {partition, clock}).
+-record(state, {partition, clock, table}).
 -record(dv, {value, next, waitingThreads = [], bounded = false}). 
 
 %% Extrenal API
-bind(IndexNode, Id, Value) -> 
+bind(Id, Value) -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id, Value}, derflowdis_vnode_master).
 
-bind(IndexNode, Id, Function, Args) -> 
+bind(Id, Function, Args) -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id, Function, Args}, derflowdis_vnode_master).
 
-read(IndexNode, Id) -> 
+read(Id) -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {read, Id}, derflowdis_vnode_master).
 
-declare(IndexNode) -> 
-    riak_core_vnode_master:sync_spawn_command(IndexNode, declare, derflowdis_vnode_master).
+declare(Id) -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {declare, Id}, derflowdis_vnode_master).
+
+get_new_id() -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(now())}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
+    riak_core_vnode_master:sync_spawn_command(IndexNode, get_new_id, derflowdis_vnode_master).
 
 %% API
 start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
 init([Partition]) ->
-    ets:new(dvstore, [set, named_table, public, {write_concurrency, true}]),
-    {ok, #state { partition=Partition, clock=0 }}.
+    Table=string:concat(integer_to_list(Partition), "dvstore"),
+    Table_atom=list_to_atom(Table),
+    ets:new(Table_atom, [set, named_table, public, {write_concurrency, true}]),
+    {ok, #state { partition=Partition, clock=0, table=Table_atom }}.
 
-%% Sample command: respond to a ping
-handle_command({declare}, _From, State) ->
+handle_command(get_new_id, _From, State=#state{partition=Partition}) ->
     Clock = State#state.clock +1,
+    {reply, {Clock,Partition}, State#state{clock=Clock}};
+
+handle_command({declare, Id}, _From, State=#state{table=Table}) ->
     V = #dv{value=empty, next=empty},
-    ets:insert(dvstore, {Clock, V}),
-    {reply, {id, Clock}, State#state{clock=Clock}};
+    ets:insert(Table, {Id, V}),
+    {reply, {id, Id}, State};
 
-handle_command({bind, Id, F, Arg}, _From, State) ->
-    io:format("Bind request~n"),
+handle_command({bind, Id, F, Arg}, _From, State=#state{partition=Partition, table=Table}) ->
     Next = State#state.clock+1,
-    ets:insert(dvstore, {Next, #dv{value=empty, next=empty}}),
-    spawn(derflow_server, execute_and_put, [F, Arg, Next, Id]),
-    {reply, {id, Next}, State#state{clock=Next}};
+    NextKey={Next, Partition},
+    declare(NextKey),
+    %ets:insert(Table, {Next, #dv{value=empty, next=empty}}),
+    spawn(derflowdis_vnode, execute_and_put, [F, Arg, NextKey, Id, Table]),
+    {reply, {id, NextKey}, State#state{clock=Next}};
 
-handle_command({bind,Id, Value}, _From, State) ->
-    io:format("Bind request~n"),
+handle_command({bind,Id, Value}, _From, State=#state{partition=Partition, table=Table}) ->
     Next = State#state.clock+1,
-    ets:insert(dvstore, {Next, #dv{value=empty, next=empty}}),
-    spawn(derflow_server, put, [Value, Next, Id]),
-    {reply, {id, Next}, State#state{clock=Next}};
+    NextKey={Next, Partition},
+    declare(NextKey),
+    %ets:insert(Table, {Next, #dv{value=empty, next=empty}}),
+    spawn(derflowdis_vnode, put, [Value, NextKey, Id, Table]),
+    {reply, {id, NextKey}, State#state{clock=Next}};
 %%%What if the Key does not exist in the map?%%%
-handle_command({read,X}, From, State) ->
-    [{_Key,V}] = ets:lookup(dvstore, X),
+handle_command({read,X}, From, State=#state{table=Table}) ->
+    [{_Key,V}] = ets:lookup(Table, X),
     Value = V#dv.value,
     Bounded = V#dv.bounded,
     %%%Need to distinguish that value is not calculated or is the end of a list%%%
@@ -83,8 +108,8 @@ handle_command({read,X}, From, State) ->
     true ->
 	WT = lists:append(V#dv.waitingThreads, [From]),
 	V1 = V#dv{waitingThreads=WT},
-	ets:delete(dvstore, X),
-	ets:insert(dvstore, {X, V1}),
+	ets:delete(Table, X),
+	ets:insert(Table, {X, V1}),
 	{noreply, State}
     end;
 
@@ -127,25 +152,26 @@ terminate(_Reason, _State) ->
 
 %Internal functions
 
-put(Value, Next, Key) ->
-    [{_Key,V}] = ets:lookup(dvstore, Key),
+put(Value, Next, Key, Table) ->
+    [{_Key,V}] = ets:lookup(Table, Key),
     Threads = V#dv.waitingThreads,
     V1 = #dv{value= Value, next =Next, bounded= true},
-    ets:insert(dvstore, {Key, V1}),
-    replyToAll(Threads, Value, Next).
+    ets:insert(Table, {Key, V1}),
+    replyToAll(Threads, Value, Next, Key).
 
-execute_and_put(F, Arg, Next, Key) ->
-    [{_Key,V}] = ets:lookup(dvstore, Key),
+execute_and_put(F, Arg, Next, Key, Table) ->
+    [{_Key,V}] = ets:lookup(Table, Key),
     Threads = V#dv.waitingThreads,
     Value = F(Arg),
     V1 = #dv{value= Value, next =Next, bounded= true},
-    ets:insert(dvstore, {Key, V1}),
-    replyToAll(Threads, Value, Next).
+    ets:insert(Table, {Key, V1}),
+    replyToAll(Threads, Value, Next, Key).
 
-replyToAll([], _Value, _Next) ->
+replyToAll([], _Value, _Nexti, _Id) ->
     ok;
 
-replyToAll([H|T], Value, Next) ->
-    gen_server:reply(H,{Value,Next}),
-    replyToAll(T, Value, Next).
+replyToAll([H|T], Value, Next, Id) ->
+    {server, undefined,{Address, Ref}} = H,
+    gen_server:reply({Address, Ref},{Value,Next}),
+    replyToAll(T, Value, Next, Id).
 

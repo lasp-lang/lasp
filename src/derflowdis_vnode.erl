@@ -5,6 +5,7 @@
 -export([bind/2,
          bind/3,
          read/1,
+	 waitNeeded/1,
          declare/1,
 	 get_new_id/0,
 	 put/4,
@@ -30,7 +31,7 @@
              ]).
 
 -record(state, {partition, clock, table}).
--record(dv, {value, next, waitingThreads = [], bounded = false}). 
+-record(dv, {value, next, waitingThreads = [], creator, lazy= false, bounded = false}). 
 
 %% Extrenal API
 bind(Id, Value) -> 
@@ -62,6 +63,12 @@ get_new_id() ->
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, get_new_id, derflowdis_vnode_master).
+
+waitNeeded(Id) -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {waitNeeded, Id}, derflowdis_vnode_master).
 
 %% API
 start_vnode(I) ->
@@ -98,20 +105,57 @@ handle_command({bind,Id, Value}, _From, State=#state{partition=Partition, table=
     spawn(derflowdis_vnode, put, [Value, NextKey, Id, Table]),
     {reply, {id, NextKey}, State#state{clock=Next}};
 %%%What if the Key does not exist in the map?%%%
-handle_command({read,X}, From, State=#state{table=Table}) ->
-    [{_Key,V}] = ets:lookup(Table, X),
-    Value = V#dv.value,
-    Bounded = V#dv.bounded,
+%handle_command({read,X}, From, State=#state{table=Table}) ->
+%    [{_Key,V}] = ets:lookup(Table, X),
+%    Value = V#dv.value,
+%    Bounded = V#dv.bounded,
     %%%Need to distinguish that value is not calculated or is the end of a list%%%
-    if Bounded == true ->
-	{reply, {Value, V#dv.next}, State};
-    true ->
-	WT = lists:append(V#dv.waitingThreads, [From]),
-	V1 = V#dv{waitingThreads=WT},
-	ets:delete(Table, X),
-	ets:insert(Table, {X, V1}),
-	{noreply, State}
+%    if Bounded == true ->
+%	{reply, {Value, V#dv.next}, State};
+%    true ->
+%	WT = lists:append(V#dv.waitingThreads, [From]),
+%	V1 = V#dv{waitingThreads=WT},
+%	ets:delete(Table, X),
+%	ets:insert(Table, {X, V1}),
+%	{noreply, State}
+%    end;
+
+handle_command({waitNeeded, Id}, From, State=#state{table=Table}) ->
+    [{_Key,V}] = ets:lookup(Table, Id),
+    case V#dv.waitingThreads of [_H|_T] ->
+        {reply, ok, State};
+        _ ->
+        ets:insert(Table, {Id, V#dv{lazy=true, creator=From}}),
+        {noreply, State}
     end;
+
+
+handle_command({read,X}, From, State=#state{table=Table}) ->
+        [{_Key,V}] = ets:lookup(Table, X),
+        Value = V#dv.value,
+        Bounded = V#dv.bounded,
+        Creator = V#dv.creator,
+        Lazy = V#dv.lazy,
+        %%%Need to distinguish that value is not calculated or is the end of a list%%%
+        if Bounded == true ->
+          {reply, {Value, V#dv.next}, State};
+         true ->
+          if Lazy == true ->
+                WT = lists:append(V#dv.waitingThreads, [From]),
+                V1 = V#dv{waitingThreads=WT},
+                ets:insert(Table, {X, V1}),
+                gen_server:reply(Creator, ok),
+                {noreply, State};
+          true ->
+                WT = lists:append(V#dv.waitingThreads, [From]),
+                V1 = V#dv{waitingThreads=WT},
+                ets:insert(Table, {X, V1}),
+                {noreply, State}
+          end
+        end;
+
+
+
 
 handle_command(Message, _Sender, State) ->
     ?PRINT({unhandled_command, Message}),
@@ -155,7 +199,7 @@ terminate(_Reason, _State) ->
 put(Value, Next, Key, Table) ->
     [{_Key,V}] = ets:lookup(Table, Key),
     Threads = V#dv.waitingThreads,
-    V1 = #dv{value= Value, next =Next, bounded= true},
+    V1 = #dv{value= Value, next =Next, lazy=false, bounded= true},
     ets:insert(Table, {Key, V1}),
     replyToAll(Threads, Value, Next, Key).
 
@@ -163,7 +207,7 @@ execute_and_put(F, Arg, Next, Key, Table) ->
     [{_Key,V}] = ets:lookup(Table, Key),
     Threads = V#dv.waitingThreads,
     Value = F(Arg),
-    V1 = #dv{value= Value, next =Next, bounded= true},
+    V1 = #dv{value= Value, next =Next, lazy=false,bounded= true},
     ets:insert(Table, {Key, V1}),
     replyToAll(Threads, Value, Next, Key).
 

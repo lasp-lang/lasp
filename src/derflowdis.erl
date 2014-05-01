@@ -8,6 +8,7 @@
 	 read/1,
 	 declare/0,
 	 thread/3,
+	 waitNeeded/1,
 	 get_stream/1,
 	 async_print_stream/1]).
 
@@ -31,6 +32,9 @@ read(Id) ->
 declare() ->
     Id = derflowdis_vnode:get_new_id(),
     derflowdis_vnode:declare(Id).
+
+waitNeeded(Id) ->
+    derflow_server:waitNeeded(Id).
     
 
 thread(Module, Function, Args) ->

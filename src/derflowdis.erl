@@ -57,13 +57,13 @@ get_stream(Stream)->
 
 async_print_stream(Stream)->
     %io:format("Stream: ~w~n", [Stream]),
-    io:format("Before read async print~n"),
+    %io:format("Before read async print~n"),
     case read(Stream) of
 	{nil, _} ->
-	    io:format("After read async print: nil~n"), 
+	    %io:format("After read async print: nil~n"), 
 	    {ok, stream_read};
 	{Value, Next} ->
-	    io:format("After read async print: ~w~n",[Value]), 
+	    %io:format("After read async print: ~w~n",[Value]), 
 	    io:format("~w~n",[Value]),
 	    async_print_stream(Next);
 	 Any ->

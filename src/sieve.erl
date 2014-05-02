@@ -17,44 +17,44 @@ test_opt(Max) ->
     derflowdis:async_print_stream(S2).
 
 sieve(S1, S2) ->
-    io:format("Before read sieve~n"),
+    %io:format("Before read sieve~n"),
     case derflowdis:read(S1) of
     {nil, _} ->
-        io:format("After read sieve: nil~n"),
-        derflowdis:bind(S2, nil);
+        %io:format("After read sieve: nil~n"),
+        derflowdis:syncBind(S2, nil);
     {Value, Next} ->
-        io:format("After read sieve: ~w~n",[Value]),
+        %io:format("After read sieve: ~w~n",[Value]),
         {id, SN}=derflowdis:declare(),
 	derflowdis:thread(sieve, filter, [Next, fun(Y) -> Y rem Value =/= 0 end, SN]),
     	io:format("Sieve created: ~w~n",[Value]),
-        {id, NextOutput} = derflowdis:bind(S2, Value),
+        {id, NextOutput} = derflowdis:syncBind(S2, Value),
     	io:format("Sieve created 2: ~w~n",[Value]),
         sieve(SN, NextOutput)
     end.    
 
 filter(S1, F, S2) ->
-    io:format("Before read filter~n"),
+    %io:format("Before read filter~n"),
     case derflowdis:read(S1) of
     {nil, _} ->
-        io:format("After read filter: nil~n"),
-        derflowdis:bind(S2, nil);
+        %io:format("After read filter: nil~n"),
+        derflowdis:syncBind(S2, nil);
     {Value, Next} ->
-        io:format("After read filter: ~w~n",[Value]),
+        %io:format("After read filter: ~w~n",[Value]),
 	case F(Value) of
 	false ->
 	    filter(Next, F, S2);
 	true->
-            {id, NextOutput} = derflowdis:bind(S2, Value),
+            {id, NextOutput} = derflowdis:syncBind(S2, Value),
 	    filter(Next, F, NextOutput) 
 	end
     end.    
 
 generate(Init, N, Output) ->
     if (Init=<N) ->
-        {id, Next} = derflowdis:bind(Output, Init),
+        {id, Next} = derflowdis:syncBind(Output, Init),
         generate(Init + 1, N,  Next);
     true ->
-        derflowdis:bind(Output, nil)
+        derflowdis:syncBind(Output, nil)
     end.
 
 sieve_opt(S1, M, S2) ->
@@ -62,15 +62,15 @@ sieve_opt(S1, M, S2) ->
     case derflowdis:read(S1) of
     {nil, _} ->
         io:format("After read: nil~n"),
-        derflowdis:bind(S2, nil);
+        derflowdis:syncBind(S2, nil);
     {Value, Next} ->
         io:format("After read: ~w~n",[Value]),
         {id, SN}=derflowdis:declare(),
 	if Value=<M ->
 	    derflowdis:thread(sieve, filter, [Next, fun(Y) -> Y rem Value =/= 0 end, SN]);
 	true->
-	    derflowdis:bind(SN, {id, Next})
+	    derflowdis:syncBind(SN, {id, Next})
 	end,
-        {id, NextOutput} = derflowdis:bind(S2, Value),
+        {id, NextOutput} = derflowdis:syncBind(S2, Value),
         sieve_opt(SN, M, NextOutput)
     end.

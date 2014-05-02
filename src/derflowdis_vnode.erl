@@ -127,6 +127,7 @@ handle_command({bind, Id, F, Arg}, _From, State=#state{partition=Partition, tabl
 
 handle_command({bind,Id, Value}, _From, State=#state{partition=Partition, table=Table}) ->
     [{_Key,V}] = ets:lookup(Table, Id),
+    io:format("Binding ~w~n",[Id]),
     PrevNextKey = V#dv.next,
     if PrevNextKey == empty -> 
 	Next = State#state.clock+1,
@@ -154,6 +155,7 @@ handle_command({syncBind, Id, F, Arg}, _From, State=#state{partition=Partition, 
     {reply, {id, NextKey}, State#state{clock=Next}};
 
 handle_command({syncBind,Id, Value}, _From, State=#state{partition=Partition, table=Table}) ->
+    io:format("Binding ~w~n",[Id]),
     [{_Key,V}] = ets:lookup(Table, Id),
     PrevNextKey = V#dv.next,
     if PrevNextKey == empty -> 
@@ -200,6 +202,7 @@ handle_command({read,X}, From, State=#state{table=Table}) ->
         Lazy = V#dv.lazy,
         %%%Need to distinguish that value is not calculated or is the end of a list%%%
         if Bounded == true ->
+	  io:format("Process: ~w read for ~w~n",[From, X]),
           {reply, {Value, V#dv.next}, State};
          true ->
           if Lazy == true ->
@@ -209,6 +212,7 @@ handle_command({read,X}, From, State=#state{table=Table}) ->
 		replyToAll([Creator],ok),
                 {noreply, State};
           true ->
+		io:format("Process: ~w waiting for ~w~n",[From, X]),
                 WT = lists:append(V#dv.waitingThreads, [From]),
                 V1 = V#dv{waitingThreads=WT},
                 ets:insert(Table, {X, V1}),

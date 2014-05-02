@@ -5,7 +5,10 @@
 -export([
 	 bind/2,
 	 bind/3,
+	 syncBind/2,
+	 syncBind/3,
 	 read/1,
+	 touch/1,
 	 declare/0,
 	 thread/3,
 	 waitNeeded/1,
@@ -26,8 +29,17 @@ bind(Id, Value) ->
 bind(Id, Function, Args) ->
     derflowdis_vnode:bind(Id, Function, Args).
 
+syncBind(Id, Value) ->
+    derflowdis_vnode:syncBind(Id, Value).
+
+syncBind(Id, Function, Args) ->
+    derflowdis_vnode:syncBind(Id, Function, Args).
+
 read(Id) ->
     derflowdis_vnode:read(Id).
+
+touch(Id) ->
+    derflowdis_vnode:touch(Id).
 
 declare() ->
     Id = derflowdis_vnode:get_new_id(),

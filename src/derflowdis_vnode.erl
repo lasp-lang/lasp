@@ -1,10 +1,14 @@
 -module(derflowdis_vnode).
 -behaviour(riak_core_vnode).
 -include("derflowdis.hrl").
+-include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([bind/2,
          bind/3,
+	 syncBind/2,
+	 syncBind/3,
          read/1,
+	 touch/1,
 	 waitNeeded/1,
          declare/1,
 	 get_new_id/0,
@@ -31,7 +35,7 @@
              ]).
 
 -record(state, {partition, clock, table}).
--record(dv, {value, next, waitingThreads = [], creator, lazy= false, bounded = false}). 
+-record(dv, {value, next = empty, waitingThreads = [], creator, lazy= false, bounded = false}). 
 
 %% Extrenal API
 bind(Id, Value) -> 
@@ -46,11 +50,29 @@ bind(Id, Function, Args) ->
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id, Function, Args}, derflowdis_vnode_master).
 
+syncBind(Id, Value) -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {syncBind, Id, Value}, derflowdis_vnode_master).
+
+syncBind(Id, Function, Args) -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {syncBind, Id, Function, Args}, derflowdis_vnode_master).
+
 read(Id) -> 
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {read, Id}, derflowdis_vnode_master).
+
+touch(Id) -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {touch, Id}, derflowdis_vnode_master).
 
 declare(Id) -> 
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
@@ -85,24 +107,64 @@ handle_command(get_new_id, _From, State=#state{partition=Partition}) ->
     {reply, {Clock,Partition}, State#state{clock=Clock}};
 
 handle_command({declare, Id}, _From, State=#state{table=Table}) ->
-    V = #dv{value=empty, next=empty},
+    V = #dv{value=empty},
     ets:insert(Table, {Id, V}),
     {reply, {id, Id}, State};
 
 handle_command({bind, Id, F, Arg}, _From, State=#state{partition=Partition, table=Table}) ->
-    Next = State#state.clock+1,
-    NextKey={Next, Partition},
-    declare(NextKey),
-    %ets:insert(Table, {Next, #dv{value=empty, next=empty}}),
+    [{_Key, V}] = ets:lookup(Table, Id),
+    PrevNextKey = V#dv.next,
+    if PrevNextKey == empty -> 
+	Next = State#state.clock+1,
+    	NextKey={Next, Partition},
+    	declare(NextKey);
+	true ->
+	{Next, _} = PrevNextKey,
+	NextKey= PrevNextKey
+    end,
     spawn(derflowdis_vnode, execute_and_put, [F, Arg, NextKey, Id, Table]),
     {reply, {id, NextKey}, State#state{clock=Next}};
 
 handle_command({bind,Id, Value}, _From, State=#state{partition=Partition, table=Table}) ->
-    Next = State#state.clock+1,
-    NextKey={Next, Partition},
-    declare(NextKey),
-    %ets:insert(Table, {Next, #dv{value=empty, next=empty}}),
+    [{_Key,V}] = ets:lookup(Table, Id),
+    PrevNextKey = V#dv.next,
+    if PrevNextKey == empty -> 
+	Next = State#state.clock+1,
+    	NextKey={Next, Partition},
+    	declare(NextKey);
+	true ->
+	{Next, _} = PrevNextKey,
+	NextKey= PrevNextKey
+    end,
     spawn(derflowdis_vnode, put, [Value, NextKey, Id, Table]),
+    {reply, {id, NextKey}, State#state{clock=Next}};
+
+handle_command({syncBind, Id, F, Arg}, _From, State=#state{partition=Partition, table=Table}) ->
+    [{_Key, V}] = ets:lookup(Table, Id),
+    PrevNextKey = V#dv.next,
+    if PrevNextKey == empty -> 
+	Next = State#state.clock+1,
+    	NextKey={Next, Partition},
+    	declare(NextKey);
+	true ->
+	{Next, _} = PrevNextKey,
+	NextKey= PrevNextKey
+    end,
+    execute_and_put(F, Arg, NextKey, Id, Table),
+    {reply, {id, NextKey}, State#state{clock=Next}};
+
+handle_command({syncBind,Id, Value}, _From, State=#state{partition=Partition, table=Table}) ->
+    [{_Key,V}] = ets:lookup(Table, Id),
+    PrevNextKey = V#dv.next,
+    if PrevNextKey == empty -> 
+	Next = State#state.clock+1,
+    	NextKey={Next, Partition},
+    	declare(NextKey);
+	true ->
+	{Next, _} = PrevNextKey,
+	NextKey= PrevNextKey
+    end,
+    put(Value, NextKey, Id, Table),
     {reply, {id, NextKey}, State#state{clock=Next}};
 %%%What if the Key does not exist in the map?%%%
 %handle_command({read,X}, From, State=#state{table=Table}) ->
@@ -154,15 +216,38 @@ handle_command({read,X}, From, State=#state{table=Table}) ->
           end
         end;
 
-
-
+handle_command({touch,X}, _From, State=#state{partition=Partition,clock=Clock, table=Table}) ->
+        [{_Key,V}] = ets:lookup(Table, X),
+        Value = V#dv.value,
+        Bounded = V#dv.bounded,
+        Creator = V#dv.creator,
+        Lazy = V#dv.lazy,
+        %%%Need to distinguish that value is not calculated or is the end of a list%%%
+        if Bounded == true ->
+          {reply, {Value, V#dv.next}, State};
+         true ->
+	  Next = Clock+1,
+	  NextKey = {Next, Partition},
+    	  declare(NextKey),
+          V1 = V#dv{next=NextKey},
+          ets:insert(Table, {X, V1}),
+          if Lazy == true ->
+		replyToAll([Creator],ok),
+                {reply, NextKey, State#state{clock=Next}};
+          true ->
+                {reply, NextKey, State#state{clock=Next}}
+          end
+        end;
 
 handle_command(Message, _Sender, State) ->
     ?PRINT({unhandled_command, Message}),
     {noreply, State}.
 
-handle_handoff_command(_Message, _Sender, State) ->
-    {noreply, State}.
+handle_handoff_command(?FOLD_REQ{foldfun=FoldFun, acc0=Acc0}, _Sender,
+                       #state{table=Table}=State) ->
+    F = fun({Key, Operation}, Acc) -> FoldFun(Key, Operation, Acc) end,
+    Acc = ets:foldl(F, Acc0, Table),
+    {reply, Acc, State}.
 
 handoff_starting(_TargetNode, State) ->
     {true, State}.
@@ -173,11 +258,13 @@ handoff_cancelled(State) ->
 handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
-handle_handoff_data(_Data, State) ->
-    {reply, ok, State}.
+handle_handoff_data(Data, #state{table=Table}=State) ->
+    {Key, Operation} = binary_to_term(Data),
+    Response = dets:insert_new(Table, {Key, Operation}),
+    {reply, Response, State}.
 
-encode_handoff_item(_ObjectName, _ObjectValue) ->
-    <<>>.
+encode_handoff_item(Key, Operation) ->
+    term_to_binary({Key, Operation}).
 
 is_empty(State) ->
     {true, State}.

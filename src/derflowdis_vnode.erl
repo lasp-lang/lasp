@@ -144,7 +144,7 @@ handle_command({read,X}, From, State=#state{table=Table}) ->
                 WT = lists:append(V#dv.waitingThreads, [From]),
                 V1 = V#dv{waitingThreads=WT},
                 ets:insert(Table, {X, V1}),
-                gen_server:reply(Creator, ok),
+		replyToAll([Creator],ok),
                 {noreply, State};
           true ->
                 WT = lists:append(V#dv.waitingThreads, [From]),
@@ -201,7 +201,7 @@ put(Value, Next, Key, Table) ->
     Threads = V#dv.waitingThreads,
     V1 = #dv{value= Value, next =Next, lazy=false, bounded= true},
     ets:insert(Table, {Key, V1}),
-    replyToAll(Threads, Value, Next, Key).
+    replyToAll(Threads, {Value,Next}).
 
 execute_and_put(F, Arg, Next, Key, Table) ->
     [{_Key,V}] = ets:lookup(Table, Key),
@@ -209,13 +209,13 @@ execute_and_put(F, Arg, Next, Key, Table) ->
     Value = F(Arg),
     V1 = #dv{value= Value, next =Next, lazy=false,bounded= true},
     ets:insert(Table, {Key, V1}),
-    replyToAll(Threads, Value, Next, Key).
+    replyToAll(Threads, {Value, Next}).
 
-replyToAll([], _Value, _Nexti, _Id) ->
+replyToAll([], _Result) ->
     ok;
 
-replyToAll([H|T], Value, Next, Id) ->
+replyToAll([H|T], Result) ->
     {server, undefined,{Address, Ref}} = H,
-    gen_server:reply({Address, Ref},{Value,Next}),
-    replyToAll(T, Value, Next, Id).
+    gen_server:reply({Address, Ref}, Result),
+    replyToAll(T, Result).
 

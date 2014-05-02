@@ -34,7 +34,7 @@ declare() ->
     derflowdis_vnode:declare(Id).
 
 waitNeeded(Id) ->
-    derflow_server:waitNeeded(Id).
+    derflowdis_vnode:waitNeeded(Id).
     
 
 thread(Module, Function, Args) ->

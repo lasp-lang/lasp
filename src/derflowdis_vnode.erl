@@ -11,6 +11,7 @@
 	 touch/1,
 	 waitNeeded/1,
          declare/1,
+         declare/2,
 	 get_new_id/0,
 	 put/4,
 	 execute_and_put/5]).
@@ -74,6 +75,13 @@ touch(Id) ->
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {touch, Id}, derflowdis_vnode_master).
 
+declare(Id, Partition) -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
+    io:format("I am gonna send it to ~w and my partition is ~w~n",[IndexNode, Partition]),
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {declare, Id}, derflowdis_vnode_master).
+
 declare(Id) -> 
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
@@ -107,8 +115,10 @@ handle_command(get_new_id, _From, State=#state{partition=Partition}) ->
     {reply, {Clock,Partition}, State#state{clock=Clock}};
 
 handle_command({declare, Id}, _From, State=#state{table=Table}) ->
+    %io:format("Procces ~w declaring ~w~n",[From, Id]),
     V = #dv{value=empty},
     ets:insert(Table, {Id, V}),
+    %io:format("End process ~w declaring ~w~n",[From, Id]),
     {reply, {id, Id}, State};
 
 handle_command({bind, Id, F, Arg}, _From, State=#state{partition=Partition, table=Table}) ->
@@ -127,7 +137,6 @@ handle_command({bind, Id, F, Arg}, _From, State=#state{partition=Partition, tabl
 
 handle_command({bind,Id, Value}, _From, State=#state{partition=Partition, table=Table}) ->
     [{_Key,V}] = ets:lookup(Table, Id),
-    io:format("Binding ~w~n",[Id]),
     PrevNextKey = V#dv.next,
     if PrevNextKey == empty -> 
 	Next = State#state.clock+1,
@@ -155,19 +164,22 @@ handle_command({syncBind, Id, F, Arg}, _From, State=#state{partition=Partition, 
     {reply, {id, NextKey}, State#state{clock=Next}};
 
 handle_command({syncBind,Id, Value}, _From, State=#state{partition=Partition, table=Table}) ->
-    io:format("Binding ~w~n",[Id]),
+    %io:format("Process ~w binding ~w~n",[From, Id]),
     [{_Key,V}] = ets:lookup(Table, Id),
     PrevNextKey = V#dv.next,
     if PrevNextKey == empty -> 
-	Next = State#state.clock+1,
-    	NextKey={Next, Partition},
+	NextClock = get_next_key(State#state.clock, Partition),
+    	NextKey={NextClock, Partition},
     	declare(NextKey);
-	true ->
-	{Next, _} = PrevNextKey,
+    true ->
+        %io:format("Very WEIRD binding case ~w~n",[Id]),
+	NextClock = State#state.clock,
+	%{Next, _} = PrevNextKey,
 	NextKey= PrevNextKey
     end,
     put(Value, NextKey, Id, Table),
-    {reply, {id, NextKey}, State#state{clock=Next}};
+    %io:format("End process ~w binding ~w~n",[From, Id]),
+    {reply, {id, NextKey}, State#state{clock=NextClock}};
 %%%What if the Key does not exist in the map?%%%
 %handle_command({read,X}, From, State=#state{table=Table}) ->
 %    [{_Key,V}] = ets:lookup(Table, X),
@@ -202,7 +214,7 @@ handle_command({read,X}, From, State=#state{table=Table}) ->
         Lazy = V#dv.lazy,
         %%%Need to distinguish that value is not calculated or is the end of a list%%%
         if Bounded == true ->
-	  io:format("Process: ~w read for ~w~n",[From, X]),
+	  %io:format("Process: ~w read for ~w~n",[From, X]),
           {reply, {Value, V#dv.next}, State};
          true ->
           if Lazy == true ->
@@ -216,6 +228,7 @@ handle_command({read,X}, From, State=#state{table=Table}) ->
                 WT = lists:append(V#dv.waitingThreads, [From]),
                 V1 = V#dv{waitingThreads=WT},
                 ets:insert(Table, {X, V1}),
+	  	%io:format("End process: ~w waiting for ~w~n",[From, X]),
                 {noreply, State}
           end
         end;
@@ -307,6 +320,17 @@ replyToAll([], _Result) ->
 
 replyToAll([H|T], Result) ->
     {server, undefined,{Address, Ref}} = H,
+    io:format("Notifying ~w reply ~w~n", [H, Result]),
     gen_server:reply({Address, Ref}, Result),
     replyToAll(T, Result).
 
+get_next_key(Clock, Partition) ->
+    NextKey={NextClock=Clock+1, Partition},
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(NextKey)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{{Index, _Node}, _Type}] = PrefList,
+    if Index==Partition ->
+	get_next_key(NextClock, Partition);
+    true ->
+	NextClock
+    end.

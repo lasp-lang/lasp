@@ -3,9 +3,12 @@
 
 test(Max) ->
     {id, S1}=derflowdis:declare(),
+    %sieve:generate(2, Max, S1).
     derflowdis:thread(sieve,generate,[2,Max,S1]),
     {id, S2}=derflowdis:declare(),
     derflowdis:thread(sieve,sieve,[S1,S2]),
+    %sieve:sieve(S1,S2),
+    %io:format("Main: ~w, generate: ~w and sieve: ~n",[PIDM,PIDG]).
     derflowdis:async_print_stream(S2).
 
 test_opt(Max) ->
@@ -51,6 +54,7 @@ filter(S1, F, S2) ->
 
 generate(Init, N, Output) ->
     if (Init=<N) ->
+	timer:sleep(250),
         {id, Next} = derflowdis:syncBind(Output, Init),
         generate(Init + 1, N,  Next);
     true ->

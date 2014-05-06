@@ -9,6 +9,8 @@
 	 syncBind/3,
 	 read/1,
 	 touch/1,
+	 next/1,
+	 isDet/1,
 	 declare/0,
 	 thread/3,
 	 waitNeeded/1,
@@ -40,6 +42,12 @@ read(Id) ->
 
 touch(Id) ->
     derflowdis_vnode:touch(Id).
+
+next(Id) ->
+    derflowdis_vnode:next(Id).
+
+isDet(Id) ->
+    derflowdis_vnode:isDet(Id).
 
 declare() ->
     Id = derflowdis_vnode:get_new_id(),

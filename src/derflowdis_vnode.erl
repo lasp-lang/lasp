@@ -9,6 +9,8 @@
 	 syncBind/3,
          read/1,
 	 touch/1,
+	 next/1,
+	 isDet/1,
 	 waitNeeded/1,
          declare/1,
          declare/2,
@@ -74,6 +76,18 @@ touch(Id) ->
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {touch, Id}, derflowdis_vnode_master).
+
+next(Id) -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {next, Id}, derflowdis_vnode_master).
+
+isDet(Id) -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {isDet, Id}, derflowdis_vnode_master).
 
 declare(Id, Partition) -> 
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
@@ -255,6 +269,27 @@ handle_command({touch,X}, _From, State=#state{partition=Partition,clock=Clock, t
                 {reply, NextKey, State#state{clock=Next}}
           end
         end;
+
+handle_command({next,X}, _From, State=#state{partition=Partition,clock=Clock,table=Table}) ->
+        [{_Key,V}] = ets:lookup(Table, X),
+        PrevNextKey = V#dv.next,
+	if PrevNextKey == empty ->
+	  Next = Clock+1,
+	  NextKey = {Next, Partition},
+    	  declare(NextKey),
+          V1 = V#dv{next=NextKey},
+          ets:insert(Table, {X, V1}),
+	  {reply, NextKey, State#state{clock=Next}}; 
+	true ->
+	   {reply, PrevNextKey, State}
+	end;
+
+handle_command({isDet,Id}, _From, State=#state{table=Table}) ->
+        [{_Key,V}] = ets:lookup(Table, Id),
+        Bounded = V#dv.bounded,
+	{reply, Bounded, State};
+
+	
 
 handle_command(Message, _Sender, State) ->
     ?PRINT({unhandled_command, Message}),

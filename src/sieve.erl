@@ -3,12 +3,9 @@
 
 test(Max) ->
     {id, S1}=derflowdis:declare(),
-    %sieve:generate(2, Max, S1).
     derflowdis:thread(sieve,generate,[2,Max,S1]),
     {id, S2}=derflowdis:declare(),
     derflowdis:thread(sieve,sieve,[S1,S2]),
-    %sieve:sieve(S1,S2),
-    %io:format("Main: ~w, generate: ~w and sieve: ~n",[PIDM,PIDG]).
     derflowdis:async_print_stream(S2).
 
 test_opt(Max) ->
@@ -29,9 +26,7 @@ sieve(S1, S2) ->
         %io:format("After read sieve: ~w~n",[Value]),
         {id, SN}=derflowdis:declare(),
 	derflowdis:thread(sieve, filter, [Next, fun(Y) -> Y rem Value =/= 0 end, SN]),
-    	io:format("Sieve created: ~w~n",[Value]),
         {id, NextOutput} = derflowdis:syncBind(S2, Value),
-    	io:format("Sieve created 2: ~w~n",[Value]),
         sieve(SN, NextOutput)
     end.    
 
@@ -62,13 +57,10 @@ generate(Init, N, Output) ->
     end.
 
 sieve_opt(S1, M, S2) ->
-    io:format("Before read~n"),
     case derflowdis:read(S1) of
     {nil, _} ->
-        io:format("After read: nil~n"),
         derflowdis:syncBind(S2, nil);
     {Value, Next} ->
-        io:format("After read: ~w~n",[Value]),
         {id, SN}=derflowdis:declare(),
 	if Value=<M ->
 	    derflowdis:thread(sieve, filter, [Next, fun(Y) -> Y rem Value =/= 0 end, SN]);

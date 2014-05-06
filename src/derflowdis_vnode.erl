@@ -180,21 +180,6 @@ handle_command({syncBind,Id, Value}, _From, State=#state{partition=Partition, ta
     put(Value, NextKey, Id, Table),
     %io:format("End process ~w binding ~w~n",[From, Id]),
     {reply, {id, NextKey}, State#state{clock=NextClock}};
-%%%What if the Key does not exist in the map?%%%
-%handle_command({read,X}, From, State=#state{table=Table}) ->
-%    [{_Key,V}] = ets:lookup(Table, X),
-%    Value = V#dv.value,
-%    Bounded = V#dv.bounded,
-    %%%Need to distinguish that value is not calculated or is the end of a list%%%
-%    if Bounded == true ->
-%	{reply, {Value, V#dv.next}, State};
-%    true ->
-%	WT = lists:append(V#dv.waitingThreads, [From]),
-%	V1 = V#dv{waitingThreads=WT},
-%	ets:delete(Table, X),
-%	ets:insert(Table, {X, V1}),
-%	{noreply, State}
-%    end;
 
 handle_command({waitNeeded, Id}, From, State=#state{table=Table}) ->
     [{_Key,V}] = ets:lookup(Table, Id),

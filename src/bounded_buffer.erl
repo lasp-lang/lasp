@@ -27,7 +27,7 @@ loop(S1, S2, End) ->
     {PS1, _} = S1,
     {PS2, _} = S2,
     io:format("Buff:Bound for consumer ~w-> ~w ~w~n",[PS1,PS2,Value1]),
-    case derflowdis:touch(End) of {nil, _} ->
+    case derflowdis:next(End) of {nil, _} ->
 	loop(S1Next, S2Next, End);
 	EndNext ->
        loop(S1Next, S2Next, EndNext)    
@@ -42,7 +42,7 @@ drop_list(S, Size) ->
     if Size == 0 ->
 	S;
       true ->
-       	Next=derflowdis:touch(S),
+       	Next=derflowdis:next(S),
 	io:format("Drop next ~w ~n",[S]),
     	drop_list(Next, Size-1)
     end.

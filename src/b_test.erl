@@ -1,12 +1,47 @@
--module(bounded_buffer).
--export([test1/0,  producer/3, buffer/3, consumer/3]).
+-module(b_test).
+-export([test/0, test1/0, test2/0, bindVar/2, bindValue/2, producer/3, buffer/3, consumer/3]).
+
+test() ->
+    {id, S1}=derflowdis:declare(),
+    {id, S2}=derflowdis:declare(),
+    {id, S3}=derflowdis:declare(),
+    {id, S4}=derflowdis:declare(),
+    derflowdis:thread(b_test,bindVar, [S1, S2]),
+    derflowdis:thread(b_test,bindValue, [S2, 100]),
+    derflowdis:thread(b_test,bindValue, [S4, 20]),
+    derflowdis:thread(b_test,bindVar, [S3, S4]).
+
 
 test1() ->
     {id, S1}=derflowdis:declare(),
-    derflowdis:thread(bounded_buffer,producer,[0,10,S1]),
     {id, S2}=derflowdis:declare(),
-    derflowdis:thread(bounded_buffer,buffer, [S1,2,S2]),
-    consumer(S2, 5, fun(X) -> X*2 end).
+    {id, S3}=derflowdis:declare(),
+    derflowdis:thread(b_test,bindVar, [S2, S3]),
+    derflowdis:thread(b_test,bindVar, [S1, S3]),
+    derflowdis:thread(b_test,bindValue, [S3, 100]).
+
+test2() ->
+    {id, S1}=derflowdis:declare(),
+    {id, S2}=derflowdis:declare(),
+    {id, S3}=derflowdis:declare(),
+    derflowdis:thread(b_test,bindVar, [S2, S3]),
+    derflowdis:thread(b_test,bindVar, [S1, S2]),
+    derflowdis:thread(b_test,bindValue, [S3, 100]).
+
+bindVar(X1, Y1) ->
+   Next = derflowdis_vnode:bind(X1, {id,Y1}),
+   io:format("Bind finished ~w ~w Next ~w ~n", [X1, Y1,Next]),
+   X2=derflowdis_vnode:read(X1),
+   %Y2=derflowdis_vnode:read(Y1),
+   io:format("Value of ~w: ~w~n", [X1,X2]).
+
+
+bindValue(Y1, V) ->
+   receive
+   after 100 -> io:format("~n")
+   end,
+   _X = derflowdis_vnode:bind(Y1, V),
+   io:format("Bind Value finished ~w ~w ~n",[Y1,V]).
 
 producer(Value, N, Output) ->
     if (N>0) ->

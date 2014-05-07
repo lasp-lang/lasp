@@ -1,5 +1,5 @@
 -module(getminimum).
--export([test/0, insert/3, insort/2]).
+-export([test/0, insert/3, insort/3]).
 
 test() ->
     List = [1,0],
@@ -14,14 +14,14 @@ insert(X, S, Out) ->
     %derflowdis:waitNeeded(Out),
     case derflowdis:read(S) of 
 	{nil,_} -> io:format("Reading end ~w~n",[X]), 
-		   derflowdis:syncBind(Out,X); 
+		   derflowdis:bind(Out,X); 
 	{V, SNext} ->
 		    io:format("The head is ~w, to insert is ~w ~n",[V, X]),
 		if X<V ->
-			{id, NextKey} = derflowdis:syncBind(Out,X), 
+			{id, NextKey} = derflowdis:bind(Out,X), 
 			copyList(NextKey, S);
 		 true -> 
-			{id,Next} = derflowdis:syncBind(Out,V),
+			{id,Next} = derflowdis:bind(Out,V),
 			insert(X, SNext, Next)
 		 end
     end.
@@ -29,16 +29,16 @@ insert(X, S, Out) ->
 insort(List, TS, S) ->
     case List of [H|T] ->
 	   io:format("insort ~w~n",[H]),
-	   insort(T, TS),
+	   insort(T, TS, S),
 	   insert(H, TS, S);
 	[] ->
-	   derflowdis:syncBind(TS,nil)
+	   derflowdis:bind(TS,nil)
     end.
 
 copyList(Out, List) ->
    case List of [H|T] ->
 	%derflowdis:waitNeeded(Out),
-	{id,NextKey} = derflowdis:syncBind(Out,H),
+	{id,NextKey} = derflowdis:bind(Out,H),
 	copyList(NextKey, T)
    end.
 

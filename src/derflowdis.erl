@@ -3,10 +3,10 @@
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
+	 asyncBind/2,
+	 asyncBind/3,
 	 bind/2,
 	 bind/3,
-	 syncBind/2,
-	 syncBind/3,
 	 read/1,
 	 touch/1,
 	 next/1,
@@ -25,17 +25,17 @@
 %    [{IndexNode, _Type}] = PrefList,
 %    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, derflowdis_vnode_master).
 	
+asyncBind(Id, Value) ->
+    derflowdis_vnode:asyncBind(Id, Value).
+
+asyncBind(Id, Function, Args) ->
+    derflowdis_vnode:asyncBind(Id, Function, Args).
+
 bind(Id, Value) ->
     derflowdis_vnode:bind(Id, Value).
 
 bind(Id, Function, Args) ->
     derflowdis_vnode:bind(Id, Function, Args).
-
-syncBind(Id, Value) ->
-    derflowdis_vnode:syncBind(Id, Value).
-
-syncBind(Id, Function, Args) ->
-    derflowdis_vnode:syncBind(Id, Function, Args).
 
 read(Id) ->
     derflowdis_vnode:read(Id).

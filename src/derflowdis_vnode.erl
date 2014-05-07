@@ -3,10 +3,10 @@
 -include("derflowdis.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
--export([bind/2,
-         bind/3,
-	 syncBind/2,
-	 syncBind/3,
+-export([asyncBind/2,
+         asyncBind/3,
+	 bind/2,
+	 bind/3,
          read/1,
 	 touch/1,
 	 next/1,
@@ -41,6 +41,18 @@
 -record(dv, {value, next = empty, waitingThreads = [], creator, lazy= false, bounded = false}). 
 
 %% Extrenal API
+asyncBind(Id, Value) -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {asyncBind, Id, Value}, derflowdis_vnode_master).
+
+asyncBind(Id, Function, Args) -> 
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    [{IndexNode, _Type}] = PrefList,
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {asyncBind, Id, Function, Args}, derflowdis_vnode_master).
+
 bind(Id, Value) -> 
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
@@ -52,18 +64,6 @@ bind(Id, Function, Args) ->
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id, Function, Args}, derflowdis_vnode_master).
-
-syncBind(Id, Value) -> 
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {syncBind, Id, Value}, derflowdis_vnode_master).
-
-syncBind(Id, Function, Args) -> 
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {syncBind, Id, Function, Args}, derflowdis_vnode_master).
 
 read(Id) -> 
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
@@ -135,7 +135,7 @@ handle_command({declare, Id}, _From, State=#state{table=Table}) ->
     %io:format("End process ~w declaring ~w~n",[From, Id]),
     {reply, {id, Id}, State};
 
-handle_command({bind, Id, F, Arg}, _From, State=#state{partition=Partition, table=Table}) ->
+handle_command({asyncBind, Id, F, Arg}, _From, State=#state{partition=Partition, table=Table}) ->
     [{_Key, V}] = ets:lookup(Table, Id),
     PrevNextKey = V#dv.next,
     if PrevNextKey == empty -> 
@@ -149,7 +149,7 @@ handle_command({bind, Id, F, Arg}, _From, State=#state{partition=Partition, tabl
     spawn(derflowdis_vnode, execute_and_put, [F, Arg, NextKey, Id, Table]),
     {reply, {id, NextKey}, State#state{clock=Next}};
 
-handle_command({bind,Id, Value}, _From, State=#state{partition=Partition, table=Table}) ->
+handle_command({asyncBind,Id, Value}, _From, State=#state{partition=Partition, table=Table}) ->
     [{_Key,V}] = ets:lookup(Table, Id),
     PrevNextKey = V#dv.next,
     if PrevNextKey == empty -> 
@@ -163,7 +163,7 @@ handle_command({bind,Id, Value}, _From, State=#state{partition=Partition, table=
     spawn(derflowdis_vnode, put, [Value, NextKey, Id, Table]),
     {reply, {id, NextKey}, State#state{clock=Next}};
 
-handle_command({syncBind, Id, F, Arg}, _From, State=#state{partition=Partition, table=Table}) ->
+handle_command({bind, Id, F, Arg}, _From, State=#state{partition=Partition, table=Table}) ->
     [{_Key, V}] = ets:lookup(Table, Id),
     PrevNextKey = V#dv.next,
     if PrevNextKey == empty -> 
@@ -177,8 +177,8 @@ handle_command({syncBind, Id, F, Arg}, _From, State=#state{partition=Partition, 
     execute_and_put(F, Arg, NextKey, Id, Table),
     {reply, {id, NextKey}, State#state{clock=Next}};
 
-handle_command({syncBind,Id, Value}, _From, State=#state{partition=Partition, table=Table}) ->
-    %io:format("Process ~w binding ~w~n",[From, Id]),
+handle_command({bind,Id, Value}, _From, State=#state{partition=Partition, table=Table}) ->
+    %io:format("Process ~w asyncBinding ~w~n",[From, Id]),
     [{_Key,V}] = ets:lookup(Table, Id),
     PrevNextKey = V#dv.next,
     if PrevNextKey == empty -> 
@@ -186,13 +186,13 @@ handle_command({syncBind,Id, Value}, _From, State=#state{partition=Partition, ta
     	NextKey={NextClock, Partition},
     	declare(NextKey);
     true ->
-        %io:format("Very WEIRD binding case ~w~n",[Id]),
+        %io:format("Very WEIRD asyncBinding case ~w~n",[Id]),
 	NextClock = State#state.clock,
 	%{Next, _} = PrevNextKey,
 	NextKey= PrevNextKey
     end,
     put(Value, NextKey, Id, Table),
-    %io:format("End process ~w binding ~w~n",[From, Id]),
+    %io:format("End process ~w asyncBinding ~w~n",[From, Id]),
     {reply, {id, NextKey}, State#state{clock=NextClock}};
 
 handle_command({waitNeeded, Id}, From, State=#state{table=Table}) ->

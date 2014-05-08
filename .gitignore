@@ -4,4 +4,5 @@ deps/*
 ebin/*
 rel/derflowdis
 dev
+src/*.swp
 apps/derflowdis/src/*

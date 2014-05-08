@@ -250,11 +250,15 @@ handle_command({notifyValue, Id, Value}, _From, State=#state{table=Table}) ->
 
 handle_command({waitNeeded, Id}, From, State=#state{table=Table}) ->
     [{_Key,V}] = ets:lookup(Table, Id),
-    case V#dv.waitingThreads of [_H|_T] ->
-        {reply, ok, State};
-        _ ->
-        ets:insert(Table, {Id, V#dv{lazy=true, creator=From}}),
-        {noreply, State}
+    if V#dv.bounded == true ->
+	{reply, ok, State};
+     true ->
+    	case V#dv.waitingThreads of [_H|_T] ->
+        	{reply, ok, State};
+       		 _ ->
+        	ets:insert(Table, {Id, V#dv{lazy=true, creator=From}}),
+       		{noreply, State}
+    	end
     end;
 
 

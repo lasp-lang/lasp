@@ -108,7 +108,6 @@ fetch(Id, FromId, FromP) ->
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:command(IndexNode, {fetch, Id, FromId, FromP}, derflowdis_vnode_master).
 
-
 replyFetch(Id, FromP, DV) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),

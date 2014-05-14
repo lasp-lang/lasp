@@ -29,7 +29,10 @@ dcs_monitor(Input, Output, State) ->
     {{computer_down, Identifier}, NextInput} ->
 	NewState = register_comfailure(Identifier, State),
 	{id, NextOutput} = derflowdis:bind(Output, NewState),
-	dcs_monitor(NextInput, NextOutput, NewState)
+	dcs_monitor(NextInput, NextOutput, NewState);
+    {_, NextInput} ->
+	%ignore
+	dcs_monitor(NextInput, Output, State)
     end.
 
 register_comfailure(Identifier, State) ->

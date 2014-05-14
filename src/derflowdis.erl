@@ -12,6 +12,7 @@
 	 next/1,
 	 isDet/1,
 	 declare/0,
+	 thread_mon/4,
 	 thread/3,
 	 waitNeeded/1,
 	 get_stream/1,
@@ -56,6 +57,9 @@ declare() ->
 waitNeeded(Id) ->
     derflowdis_vnode:waitNeeded(Id).
     
+thread_mon(Supervisor, Module, Function, Args) ->
+    PID = spawn(Module, Function, Args),
+    Supervisor ! {'SUPERVISE', PID, Module, Function, Args}. 
 
 thread(Module, Function, Args) ->
     spawn(Module, Function, Args).

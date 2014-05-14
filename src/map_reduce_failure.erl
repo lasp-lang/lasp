@@ -1,4 +1,4 @@
--module(map_reduce).
+-module(map_reduce_failure).
 -export([test/0, test_1/0, jobtracker/5, spawnmap/5, wordCntMap/2, wordCntReduce/3, supervisor/1]).
 
 test() ->

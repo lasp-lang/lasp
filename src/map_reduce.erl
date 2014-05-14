@@ -1,43 +1,47 @@
 -module(map_reduce).
--export([test/0, test_1/0, jobtracker/5, spawnmap/5, wordCntMap/2, wordCntReduce/3, supervisor/1]).
+-export([supervisor/1, init/0, jobtracker/2, jobproxy/1, sendTask/5, spawnmap/5, wordCntMap/2, wordCntReduce/3]).
 
-test() ->
-    Map = [{map_reduce, wordCntMap}],
-    Reduce = [{map_reduce, wordCntReduce}],
-    Input = [[[haha,good,bad],[stupid,good,bold],[stupid,good,good]]],
+init() ->
+    Map = {map_reduce, wordCntMap},
+    Reduce = {map_reduce, wordCntReduce},
+    Input = [[haha,good,bad],[stupid,good,bold],[stupid,good,good]],
     {id, Output} = derflowdis:declare(),
+    {id, TaskStream} = derflowdis:declare(),
+    Port = derflowdis:thread(map_reduce, jobproxy, [TaskStream]),
     Supervisor = derflowdis:thread(map_reduce, supervisor, [dict:new()]),
-    jobtracker(Supervisor, Map, Reduce, Input, [Output]),
-    io:format("Final out ~w~n", [Output]),
-    derflowdis:async_print_stream(Output).
-test_1() ->
-    Map = [{map_reduce, wordCntMap}],
-    Reduce = [{map_reduce, wordCntReduce}],
-    Input = [[[haha,good,bad],[stupid,good,bold],[stupid,good,good]]],
-    {id, Output} = derflowdis:declare(),
-    derflowdis:thread(derflowdis,async_print_stream,[Output]),
-    Supervisor = derflowdis:thread(map_reduce, supervisor, [dict:new()]),
-    jobtracker(Supervisor, Map, Reduce, Input, [Output]).
+    derflowdis:thread(map_reduce, jobtracker, [Supervisor, TaskStream]),
+    receive
+     after 1000 -> io:format("Waited~n")
+    end,
+    sendTask(Port, Map, Reduce, Input, Output).
 
+sendTask(Port, Map, Reduce, Input, Output) ->
+    Port ! {Map, Reduce, Input, Output}.
 
-jobtracker(Supervisor, MapTasks, ReduceTasks, Inputs, Outputs) ->
-    case MapTasks of [MapTask|MT] ->
-	[ReduceTask|RT] = ReduceTasks,
-	[Input|IT] = Inputs,
-	[Output|OT] = Outputs,
+jobproxy(TaskStream) ->
+    receive Task ->
+	{id, Next} = derflowdis:bind(TaskStream, Task),
+	jobproxy(Next)
+    end.
+
+jobtracker(Supervisor, Tasks) -> %MapTasks, ReduceTasks, Inputs, Outputs) ->
+    case derflowdis:read(Tasks)  %[MapTask|MT] ->
+	of {nil, _} ->
+	 io:format("All jobfinished!");
+	{Value, Next} ->
+	{MapTask, ReduceTask, Input, Output} = Value,
     	{Module, MapFun} = MapTask,
     	{Module2, ReduceFun} = ReduceTask,
     	MapOut = spawnmap(Supervisor, Input, Module, MapFun, []),
     	derflowdis:thread_mon(Supervisor, Module2, ReduceFun, [MapOut, [], Output]),
-	jobtracker(Supervisor, MT, RT, IT, OT);
-	[] ->
-	 io:format("All jobfinished!~n")
+        derflowdis:async_print_stream(Output),
+	jobtracker(Supervisor, Next)
     end.
 
 spawnmap(Supervisor, Inputs, Mod, Fun, Outputs) ->
     case Inputs of [H|T] ->
     	{id, S} = derflowdis:declare(),
-    	derflowdis:thread_mon(Supervisor, Mod, Fun, [H, S]),
+    	derflowdis:thread_mon(Supervisor,Mod, Fun, [H, S]),
     	spawnmap(Supervisor, T, Mod, Fun, lists:append(Outputs,[S]));
 	[] ->
 	Outputs

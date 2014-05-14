@@ -353,7 +353,7 @@ handoff_finished(_TargetNode, State) ->
 
 handle_handoff_data(Data, #state{table=Table}=State) ->
     {Key, Operation} = binary_to_term(Data),
-    Response = dets:insert_new(Table, {Key, Operation}),
+    Response = ets:insert_new(Table, {Key, Operation}),
     {reply, Response, State}.
 
 encode_handoff_item(Key, Operation) ->

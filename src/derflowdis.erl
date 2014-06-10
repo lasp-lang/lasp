@@ -3,8 +3,8 @@
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
-	 asyncBind/2,
-	 asyncBind/3,
+	 async_bind/2,
+	 async_bind/3,
 	 bind/2,
 	 bind/3,
 	 read/1,
@@ -20,17 +20,11 @@
 
 %% Public API
 
-%ping() ->
-%    DocIdx = riak_core_util:chash_key({<<"ping">>, term_to_binary(now())}),
-%    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
-%    [{IndexNode, _Type}] = PrefList,
-%    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, derflowdis_vnode_master).
-	
-asyncBind(Id, Value) ->
-    derflowdis_vnode:asyncBind(Id, Value).
+async_bind(Id, Value) ->
+    derflowdis_vnode:async_bind(Id, Value).
 
-asyncBind(Id, Function, Args) ->
-    derflowdis_vnode:asyncBind(Id, Function, Args).
+async_bind(Id, Function, Args) ->
+    derflowdis_vnode:async_bind(Id, Function, Args).
 
 bind(Id, Value) ->
     derflowdis_vnode:bind(Id, Value).
@@ -68,14 +62,10 @@ get_stream(Stream)->
     internal_get_stream(Stream, []).
 
 async_print_stream(Stream)->
-    %io:format("Stream: ~w~n", [Stream]),
-    %io:format("Before read async print~n"),
     case read(Stream) of
 	{nil, _} ->
-	    %io:format("After read async print: nil~n"), 
 	    {ok, stream_read};
 	{Value, Next} ->
-	    %io:format("After read async print: ~w~n",[Value]), 
 	    io:format("~w~n",[Value]),
 	    async_print_stream(Next);
 	 Any ->

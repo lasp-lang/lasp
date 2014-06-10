@@ -2,7 +2,8 @@
 .eunit
 deps/*
 ebin/*
-rel/derflowdis
+rel/derflow
 dev
 src/*.swp
-apps/derflowdis/src/*
+apps/derflow/src/*
+.local_dialyzer_plt

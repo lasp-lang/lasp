@@ -1,16 +1,20 @@
 REBAR = $(shell pwd)/rebar
 .PHONY: rel deps test
 
-all: deps compile test
+all: deps compile test compile-riak-test
 
 compile: deps
 	$(REBAR) compile
+
+compile-riak-test: compile
+	$(REBAR) skip_deps=true riak_test_compile
 
 deps:
 	$(REBAR) get-deps
 
 clean:
 	$(REBAR) clean
+	rm -rf riak_test/ebin
 
 distclean: clean devclean relclean
 	$(REBAR) delete-deps

@@ -10,7 +10,7 @@
          read/1,
          touch/1,
          next/1,
-         isDet/1,
+         is_det/1,
          wait_needed/1,
          declare/1,
          declare/2,
@@ -92,11 +92,11 @@ next(Id) ->
     riak_core_vnode_master:sync_spawn_command(IndexNode, {next, Id},
                                               derflow_vnode_master).
 
-isDet(Id) ->
+is_det(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {isDet, Id},
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {is_det, Id},
                                               derflow_vnode_master).
 
 declare(Id, Partition) ->
@@ -339,7 +339,7 @@ handle_command({next,X}, _From, State=#state{partition=Partition,clock=Clock,tab
 	   {reply, PrevNextKey, State}
 	end;
 
-handle_command({isDet,Id}, _From, State=#state{table=Table}) ->
+handle_command({is_det, Id}, _From, State=#state{table=Table}) ->
         [{_Key,V}] = ets:lookup(Table, Id),
         Bounded = V#dv.bounded,
 	{reply, Bounded, State};

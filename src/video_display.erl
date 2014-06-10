@@ -21,7 +21,7 @@ skip1(Input, Output) ->
     {nil, _} ->
 	derflow:bind(Output, nil);
     {_Value, Next} ->
-	Bound = derflow:isDet(Next),
+	Bound = derflow:is_det(Next),
 	if Bound ->
 	    skip1(Next, Output);
 	true ->

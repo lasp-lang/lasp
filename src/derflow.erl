@@ -10,7 +10,7 @@
 	 read/1,
 	 touch/1,
 	 next/1,
-	 isDet/1,
+	 is_det/1,
 	 declare/0,
 	 thread_mon/4,
 	 thread/3,
@@ -41,8 +41,8 @@ touch(Id) ->
 next(Id) ->
     derflow_vnode:next(Id).
 
-isDet(Id) ->
-    derflow_vnode:isDet(Id).
+is_det(Id) ->
+    derflow_vnode:is_det(Id).
 
 declare() ->
     Id = derflow_vnode:get_new_id(),

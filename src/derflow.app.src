@@ -1,7 +1,7 @@
 %% -*- erlang -*-
 {application, derflow,
  [
-  {description, ""},
+  {description, "Distributed deterministic dataflow programming for Erlang"},
   {vsn, "1"},
   {registered, []},
   {applications, [

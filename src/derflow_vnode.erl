@@ -13,7 +13,6 @@
          is_det/1,
          wait_needed/1,
          declare/1,
-         declare/2,
          get_new_id/0,
          put/4,
          execute_and_put/5]).
@@ -43,111 +42,85 @@ async_bind(Id, Value) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {async_bind,
-                                                          Id, Value},
-                                              derflow_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {async_bind, Id, Value}, derflow_vnode_master).
 
 async_bind(Id, Function, Args) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {async_bind,
-                                                          Id, Function,
-                                                          Args}, derflow_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {async_bind, Id, Function, Args}, derflow_vnode_master).
 
 bind(Id, Value) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id,
-                                                          Value},
-                                              derflow_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id, Value}, derflow_vnode_master).
 
 bind(Id, Function, Args) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id,
-                                                          Function,
-                                                          Args}, derflow_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id, Function, Args}, derflow_vnode_master).
 
 read(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {read, Id},
-                                              derflow_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {read, Id}, derflow_vnode_master).
 
 touch(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {touch, Id},
-                                              derflow_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {touch, Id}, derflow_vnode_master).
 
 next(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {next, Id},
-                                              derflow_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {next, Id}, derflow_vnode_master).
 
 is_det(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {is_det, Id},
-                                              derflow_vnode_master).
-
-declare(Id, Partition) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    io:format("I am gonna send it to ~w and my partition is ~w~n",[IndexNode, Partition]),
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {declare, Id},
-                                              derflow_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {is_det, Id}, derflow_vnode_master).
 
 declare(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {declare, Id},
-                                              derflow_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {declare, Id}, derflow_vnode_master).
 
 fetch(Id, FromId, FromP) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:command(IndexNode, {fetch, Id, FromId,
-                                               FromP}, derflow_vnode_master).
+    riak_core_vnode_master:command(IndexNode, {fetch, Id, FromId, FromP}, derflow_vnode_master).
 
-replyFetch(Id, FromP, DV) ->
+reply_fetch(Id, FromP, DV) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:command(IndexNode, {replyFetch, Id, FromP,
-                                               DV}, derflow_vnode_master).
+    riak_core_vnode_master:command(IndexNode, {reply_fetch, Id, FromP, DV}, derflow_vnode_master).
 
-notifyValue(Id, Value) ->
+notify_value(Id, Value) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:command(IndexNode, {notifyValue, Id, Value},
-                                   derflow_vnode_master).
+    riak_core_vnode_master:command(IndexNode, {notify_value, Id, Value}, derflow_vnode_master).
 
 get_new_id() ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(now())}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, get_new_id,
-                                              derflow_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, get_new_id, derflow_vnode_master).
 
 wait_needed(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {wait_needed,
-                                                          Id}, derflow_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {wait_needed, Id}, derflow_vnode_master).
 
 %% API
 start_vnode(I) ->
@@ -157,194 +130,204 @@ init([Partition]) ->
     Table = string:concat(integer_to_list(Partition), "dvstore"),
     TableAtom = list_to_atom(Table),
     TableAtom = ets:new(TableAtom, [set, named_table, public, {write_concurrency, true}]),
-    {ok, #state { partition=Partition, clock=0, table=TableAtom }}.
+    {ok, #state {partition=Partition, clock=0, table=TableAtom}}.
 
-handle_command(get_new_id, _From, State=#state{partition=Partition}) ->
-    Clock = State#state.clock +1,
+handle_command(get_new_id, _From,
+               State=#state{clock=Clock0, partition=Partition}) ->
+    Clock = Clock0 + 1,
     {reply, {Clock,Partition}, State#state{clock=Clock}};
 
 handle_command({declare, Id}, _From, State=#state{table=Table}) ->
-    %io:format("Procces ~w declaring ~w~n",[From, Id]),
-    V = #dv{value=empty},
-    ets:insert(Table, {Id, V}),
-    %io:format("End process ~w declaring ~w~n",[From, Id]),
-    {reply, {id, Id}, State};
+    true = ets:insert(Table, {Id, #dv{value=empty}}),
+    {reply, {ok, Id}, State};
 
-handle_command({async_bind, Id, F, Arg}, _From, State=#state{partition=Partition, table=Table}) ->
+handle_command({async_bind, Id, F, Arg}, _From,
+               State=#state{partition=Partition, table=Table}) ->
     [{_Key, V}] = ets:lookup(Table, Id),
     PrevNextKey = V#dv.next,
-    if PrevNextKey == empty -> 
-	Next = State#state.clock+1,
-    	NextKey={Next, Partition},
-    	declare(NextKey);
-	true ->
-	{Next, _} = PrevNextKey,
-	NextKey= PrevNextKey
-    end,
+    if
+        PrevNextKey == empty ->
+            Next = State#state.clock + 1,
+            NextKey = {Next, Partition},
+            declare(NextKey);
+        true ->
+            {Next, _} = PrevNextKey,
+            NextKey= PrevNextKey
+        end,
     spawn(derflow_vnode, execute_and_put, [F, Arg, NextKey, Id, Table]),
-    {reply, {id, NextKey}, State#state{clock=Next}};
+    {reply, {ok, NextKey}, State#state{clock=Next}};
 
-handle_command({async_bind,Id, Value}, _From, State=#state{partition=Partition, table=Table}) ->
+handle_command({async_bind, Id, Value}, _From,
+               State=#state{partition=Partition, table=Table}) ->
     [{_Key,V}] = ets:lookup(Table, Id),
     PrevNextKey = V#dv.next,
-    if PrevNextKey == empty -> 
-	Next = State#state.clock+1,
-    	NextKey={Next, Partition},
-    	declare(NextKey);
-	true ->
-	{Next, _} = PrevNextKey,
-	NextKey= PrevNextKey
+    if
+        PrevNextKey == empty ->
+            Next = State#state.clock + 1,
+            NextKey={Next, Partition},
+            declare(NextKey);
+        true ->
+            {Next, _} = PrevNextKey,
+            NextKey= PrevNextKey
     end,
     spawn(derflow_vnode, put, [Value, NextKey, Id, Table]),
-    {reply, {id, NextKey}, State#state{clock=Next}};
+    {reply, {ok, NextKey}, State#state{clock=Next}};
 
-handle_command({bind, Id, F, Arg}, _From, State=#state{partition=Partition, table=Table}) ->
+handle_command({bind, Id, Fun, Arg}, _From,
+               State=#state{partition=Partition, table=Table}) ->
     [{_Key, V}] = ets:lookup(Table, Id),
-    {NextClock, NextKey} = nextKey(V#dv.next, State#state.clock, Partition),
-    execute_and_put(F, Arg, NextKey, Id, Table),
-    {reply, {id, NextKey}, State#state{clock=NextClock}};
+    {NextClock, NextKey} = next_key(V#dv.next, State#state.clock, Partition),
+    execute_and_put(Fun, Arg, NextKey, Id, Table),
+    {reply, {ok, NextKey}, State#state{clock=NextClock}};
 
-handle_command({bind,Id, Value}, From, State=#state{partition=Partition, table=Table}) ->
-    %io:format("Process ~w async_bind ~w~n",[From, Id]),
-    case Value of {id, DVId} ->
-	ets:insert(Table, {Id, #dv{value={id,DVId}}}),
-	fetch(DVId, Id, From),
-	{noreply, State};
-	_ ->
-    	[{_Key,V}] = ets:lookup(Table, Id),
-    	{NextClock, NextKey} = nextKey(V#dv.next, State#state.clock, Partition),
-    	put(Value, NextKey, Id, Table),
-    	%io:format("End process ~w async_bind ~w~n",[From, Id]),
-    	{reply, {id, NextKey}, State#state{clock=NextClock}}
+handle_command({bind, Id, Value}, From,
+               State=#state{partition=Partition, table=Table}) ->
+    case Value of
+        {id, DVId} ->
+            ets:insert(Table, {Id, #dv{value={id,DVId}}}),
+            fetch(DVId, Id, From),
+            {noreply, State};
+        _ ->
+            [{_Key,V}] = ets:lookup(Table, Id),
+            {NextClock, NextKey} = next_key(V#dv.next,
+                                            State#state.clock,
+                                            Partition),
+            put(Value, NextKey, Id, Table),
+            {reply, {ok, NextKey}, State#state{clock=NextClock}}
+        end;
+
+handle_command({fetch, TargetId, FromId, FromP}, _From,
+               State=#state{partition=Partition,clock= Clock, table=Table}) ->
+    [{_, DV}] = ets:lookup(Table, TargetId),
+    if
+        DV#dv.bounded == true ->
+            reply_fetch(FromId, FromP, DV),
+            {noreply, State};
+        true ->
+            case DV#dv.value of
+                {id, BindId} ->
+                    fetch(BindId, FromId, FromP),
+                    {noreply, State};
+                _ ->
+                    {NextClock, NextKey} = next_key(DV#dv.next, Clock, Partition),
+                    BindingList = lists:append(DV#dv.binding_list, [FromId]),
+                    DV1 = DV#dv{binding_list=BindingList, next=NextKey},
+                    true = ets:insert(Table, {TargetId, DV1}),
+                    reply_fetch(FromId, FromP, DV1),
+                    {noreply, State#state{clock=NextClock}}
+                end
     end;
 
-handle_command({fetch, TargetId, FromId, FromP}, _From, State=#state{partition=Partition,clock= Clock, table=Table}) ->
-    [{_,DV}] = ets:lookup(Table, TargetId),
-    io:format("In fetch~w~w DV ~w ~n",[FromId, TargetId, DV]),
-    if DV#dv.bounded == true ->
-	  io:format("DV Bounded~n"),
-	  replyFetch(FromId, FromP, DV),
-          {noreply, State};
-	true ->
-	  case DV#dv.value of {id, BindId} ->
-	    	fetch(BindId, FromId, FromP),
-	    	{noreply, State};
-	   _ ->
-	  	{NextClock, NextKey} = nextKey(DV#dv.next, Clock, Partition), 
-	  	io:format("Adding to binding list ~w ~n",[FromId]),
-         	BindingList = lists:append(DV#dv.binding_list, [FromId]),
-	  	DV1 = DV#dv{binding_list=BindingList, next=NextKey},
-	  	ets:insert(Table, {TargetId, DV1}),
-	  	replyFetch(FromId, FromP, DV1),
-	  	{noreply, State#state{clock=NextClock}}
-    	  end
-     end;
+handle_command({reply_fetch, FromId, FromP, FetchDV}, _From,
+               State=#state{table=Table}) ->
+      if
+        FetchDV#dv.bounded == true ->
+            Value = FetchDV#dv.value,
+            Next = FetchDV#dv.next,
+            put(Value, Next, FromId, Table),
+            reply_to_all([FromP], {id, Next});
+        true ->
+            [{_,DV}] = ets:lookup(Table, FromId),
+            DV1 = DV#dv{next= FetchDV#dv.next},
+            ets:insert(Table, {FromId, DV1}),
+            reply_to_all([FromP], {id, FetchDV#dv.next})
+      end,
+      {noreply, State};
 
-handle_command({replyFetch, FromId, FromP, FetchDV}, _From, State=#state{table=Table}) ->
-    	if FetchDV#dv.bounded == true ->
-		Value = FetchDV#dv.value,
-		Next = FetchDV#dv.next,
-        	put(Value, Next, FromId, Table),
-		replyToAll([FromP], {id, Next});
-		true ->
-    	        [{_,DV}] = ets:lookup(Table, FromId),
-		DV1 = DV#dv{next= FetchDV#dv.next},
-		ets:insert(Table, {FromId, DV1}),
-		replyToAll([FromP], {id, FetchDV#dv.next})
-    	end,
-    	{noreply, State};
+handle_command({notify_value, Id, Value}, _From,
+               State=#state{table=Table}) ->
+    [{_, DV}] = ets:lookup(Table, Id),
+    Next = DV#dv.next,
+    put(Value, Next, Id, Table),
+    {noreply, State};
 
-handle_command({notifyValue, Id, Value}, _From, State=#state{table=Table}) ->
-    	[{_,DV}] = ets:lookup(Table, Id),
-	Next = DV#dv.next,
-        put(Value, Next, Id, Table),
-    	{noreply, State};
+handle_command({wait_needed, Id}, From,
+               State=#state{table=Table}) ->
+    [{_Key, V}] = ets:lookup(Table, Id),
+    if
+        V#dv.bounded == true ->
+            {reply, ok, State};
+        true ->
+            case V#dv.waiting_threads of
+                [_H|_T] ->
+                    {reply, ok, State};
+                _ ->
+                    true = ets:insert(Table, {Id, V#dv{lazy=true, creator=From}}),
+                    {noreply, State}
+                end
+    end;
 
+handle_command({read, X}, From,
+               State=#state{table=Table}) ->
+    [{_Key, V}] = ets:lookup(Table, X),
+    Value = V#dv.value,
+    Bounded = V#dv.bounded,
+    Creator = V#dv.creator,
+    Lazy = V#dv.lazy,
+    if
+        Bounded == true ->
+            {reply, {ok, Value, V#dv.next}, State};
+        true ->
+            if
+                Lazy == true ->
+                    WT = lists:append(V#dv.waiting_threads, [From]),
+                    V1 = V#dv{waiting_threads=WT},
+                    true = ets:insert(Table, {X, V1}),
+                    reply_to_all([Creator],ok),
+                    {noreply, State};
+                true ->
+                    WT = lists:append(V#dv.waiting_threads, [From]),
+                    V1 = V#dv{waiting_threads=WT},
+                    true = ets:insert(Table, {X, V1}),
+                    {noreply, State}
+            end
+    end;
 
-handle_command({wait_needed, Id}, From, State=#state{table=Table}) ->
+handle_command({touch, X}, _From,
+               State=#state{partition=Partition,clock=Clock, table=Table}) ->
+    [{_Key, V}] = ets:lookup(Table, X),
+    Value = V#dv.value,
+    Bounded = V#dv.bounded,
+    Creator = V#dv.creator,
+    Lazy = V#dv.lazy,
+    if
+        Bounded == true ->
+            {reply, {Value, V#dv.next}, State};
+        true ->
+            Next = Clock + 1,
+            NextKey = {Next, Partition},
+            declare(NextKey),
+            V1 = V#dv{next=NextKey},
+            true = ets:insert(Table, {X, V1}),
+            if
+                Lazy == true ->
+                    reply_to_all([Creator], ok),
+                    {reply, NextKey, State#state{clock=Next}};
+                true ->
+                    {reply, NextKey, State#state{clock=Next}}
+            end
+    end;
+
+handle_command({next, X}, _From,
+               State = #state{partition = Partition,clock = Clock,table = Table}) ->
+    [{_Key,V}] = ets:lookup(Table, X),
+    PrevNextKey = V#dv.next,
+    if
+        PrevNextKey == empty ->
+            Next = Clock+1,
+            NextKey = {Next, Partition},
+            declare(NextKey),
+            V1 = V#dv{next=NextKey},
+            true = ets:insert(Table, {X, V1}),
+            {reply, NextKey, State#state{clock=Next}};
+        true ->
+           {reply, PrevNextKey, State}
+  end;
+
+handle_command({is_det, Id}, _From, State = #state{table = Table}) ->
     [{_Key,V}] = ets:lookup(Table, Id),
-    if V#dv.bounded == true ->
-	{reply, ok, State};
-     true ->
-    	case V#dv.waiting_threads of [_H|_T] ->
-        	{reply, ok, State};
-       		 _ ->
-        	ets:insert(Table, {Id, V#dv{lazy=true, creator=From}}),
-       		{noreply, State}
-    	end
-    end;
-
-
-handle_command({read,X}, From, State=#state{table=Table}) ->
-        [{_Key,V}] = ets:lookup(Table, X),
-        Value = V#dv.value,
-        Bounded = V#dv.bounded,
-        Creator = V#dv.creator,
-        Lazy = V#dv.lazy,
-        %%%Need to distinguish that value is not calculated or is the end of a list%%%
-        if Bounded == true ->
-	  %io:format("Process: ~w read for ~w~n",[From, X]),
-          {reply, {Value, V#dv.next}, State};
-         true ->
-          if Lazy == true ->
-                WT = lists:append(V#dv.waiting_threads, [From]),
-                V1 = V#dv{waiting_threads=WT},
-                ets:insert(Table, {X, V1}),
-		replyToAll([Creator],ok),
-                {noreply, State};
-          true ->
-		io:format("Process: ~w waiting for ~w~n",[From, X]),
-                WT = lists:append(V#dv.waiting_threads, [From]),
-                V1 = V#dv{waiting_threads=WT},
-                ets:insert(Table, {X, V1}),
-	  	%io:format("End process: ~w waiting for ~w~n",[From, X]),
-                {noreply, State}
-          end
-        end;
-
-handle_command({touch,X}, _From, State=#state{partition=Partition,clock=Clock, table=Table}) ->
-        [{_Key,V}] = ets:lookup(Table, X),
-        Value = V#dv.value,
-        Bounded = V#dv.bounded,
-        Creator = V#dv.creator,
-        Lazy = V#dv.lazy,
-        %%%Need to distinguish that value is not calculated or is the end of a list%%%
-        if Bounded == true ->
-          {reply, {Value, V#dv.next}, State};
-         true ->
-	  Next = Clock+1,
-	  NextKey = {Next, Partition},
-    	  declare(NextKey),
-          V1 = V#dv{next=NextKey},
-          ets:insert(Table, {X, V1}),
-          if Lazy == true ->
-		replyToAll([Creator],ok),
-                {reply, NextKey, State#state{clock=Next}};
-          true ->
-                {reply, NextKey, State#state{clock=Next}}
-          end
-        end;
-
-handle_command({next,X}, _From, State=#state{partition=Partition,clock=Clock,table=Table}) ->
-        [{_Key,V}] = ets:lookup(Table, X),
-        PrevNextKey = V#dv.next,
-	if PrevNextKey == empty ->
-	  Next = Clock+1,
-	  NextKey = {Next, Partition},
-    	  declare(NextKey),
-          V1 = V#dv{next=NextKey},
-          ets:insert(Table, {X, V1}),
-	  {reply, NextKey, State#state{clock=Next}}; 
-	true ->
-	   {reply, PrevNextKey, State}
-	end;
-
-handle_command({is_det, Id}, _From, State=#state{table=Table}) ->
-        [{_Key,V}] = ets:lookup(Table, Id),
-        Bounded = V#dv.bounded,
-	{reply, Bounded, State};
-
-	
+    Bounded = V#dv.bounded,
+    {reply, Bounded, State};
 
 handle_command(Message, _Sender, State) ->
     ?PRINT({unhandled_command, Message}),
@@ -388,65 +371,64 @@ handle_exit(_Pid, _Reason, State) ->
 terminate(_Reason, _State) ->
     ok.
 
-%Internal functions
+%% Internal functions
 
 put(Value, Next, Key, Table) ->
     [{_Key,V}] = ets:lookup(Table, Key),
     Threads = V#dv.waiting_threads,
     BindingList = V#dv.binding_list,
     V1 = #dv{value= Value, next =Next, lazy=false, bounded= true},
-    ets:insert(Table, {Key, V1}),
-    notifyAll(BindingList, Value),
-    replyToAll(Threads, {Value,Next}).
+    true = ets:insert(Table, {Key, V1}),
+    notify_all(BindingList, Value),
+    reply_to_all(Threads, {Value,Next}).
 
 execute_and_put(F, Arg, Next, Key, Table) ->
     [{_Key,V}] = ets:lookup(Table, Key),
     Threads = V#dv.waiting_threads,
     BindingList = V#dv.binding_list,
     Value = F(Arg),
-    V1 = #dv{value= Value, next =Next, lazy=false,bounded= true},
-    ets:insert(Table, {Key, V1}),
-    notifyAll(BindingList, Value),
-    replyToAll(Threads, {Value, Next}).
+    V1 = #dv{value = Value, next = Next, lazy = false, bounded = true},
+    true = ets:insert(Table, {Key, V1}),
+    notify_all(BindingList, Value),
+    reply_to_all(Threads, {Value, Next}).
 
-nextKey(PrevNextKey, Clock, Partition) ->
-    if PrevNextKey == empty ->
-        NextClock = get_next_key(Clock, Partition),
-        NextKey={NextClock, Partition},
-        declare(NextKey);
-    true ->
-        %io:format("Very WEIRD async_bind case ~w~n",[Id]),
-        NextClock = Clock,
-        %{Next, _} = PrevNextKey,
-        NextKey= PrevNextKey
+next_key(PrevNextKey, Clock, Partition) ->
+    if
+        PrevNextKey == empty ->
+            NextClock = get_next_key(Clock, Partition),
+            NextKey={NextClock, Partition},
+            declare(NextKey);
+        true ->
+            NextClock = Clock,
+            NextKey = PrevNextKey
     end,
-   {NextClock, NextKey}.
+    {NextClock, NextKey}.
 
-replyToAll([], _Result) ->
+reply_to_all([], _Result) ->
     ok;
 
-replyToAll([H|T], Result) ->
+reply_to_all([H|T], Result) ->
     {server, undefined,{Address, Ref}} = H,
-    io:format("Replying ~w reply ~w~n", [H, Result]),
     gen_server:reply({Address, Ref}, Result),
-    replyToAll(T, Result).
+    reply_to_all(T, Result).
 
-notifyAll(L, Value) ->
-    case L of [H|T] ->
-    	notifyValue(H, Value),
-        io:format("Notifying ~w~n", [H]),
-	notifyAll(T, Value);
-	[] ->
-	ok
+notify_all(L, Value) ->
+    case L of
+        [H|T] ->
+            notify_value(H, Value),
+            notify_all(T, Value);
+        [] ->
+            ok
     end.
-	
+
 get_next_key(Clock, Partition) ->
-    NextKey={NextClock=Clock+1, Partition},
+    NextKey = {NextClock = Clock + 1, Partition},
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(NextKey)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{{Index, _Node}, _Type}] = PrefList,
-    if Index==Partition ->
-	get_next_key(NextClock, Partition);
-    true ->
-	NextClock
+    if
+        Index == Partition ->
+            get_next_key(NextClock, Partition);
+        true ->
+            NextClock
     end.

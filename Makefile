@@ -1,16 +1,20 @@
 REBAR = $(shell pwd)/rebar
-.PHONY: deps
+.PHONY: rel deps test
 
-all: deps compile
+all: deps compile test compile-riak-test
 
-compile:
+compile: deps
 	$(REBAR) compile
+
+compile-riak-test: compile
+	$(REBAR) skip_deps=true riak_test_compile
 
 deps:
 	$(REBAR) get-deps
 
 clean:
 	$(REBAR) clean
+	rm -rf riak_test/ebin
 
 distclean: clean devclean relclean
 	$(REBAR) delete-deps
@@ -19,15 +23,11 @@ rel: all
 	$(REBAR) generate
 
 relclean:
-	rm -rf rel/derflowdis
-
-xref: all
-	$(REBAR) skip_deps=true xref
+	rm -rf rel/derflow
 
 stage : rel
-	$(foreach dep,$(wildcard deps/*), rm -rf rel/derflowdis/lib/$(shell basename $(dep))-* && ln -sf $(abspath $(dep)) rel/derflowdis/lib;)
-	$(foreach app,$(wildcard apps/*), rm -rf rel/derflowdis/lib/$(shell basename $(app))-* && ln -sf $(abspath $(app)) rel/derflowdis/lib;)
-
+	$(foreach dep,$(wildcard deps/*), rm -rf rel/derflow/lib/$(shell basename $(dep))-* && ln -sf $(abspath $(dep)) rel/derflow/lib;)
+	$(foreach app,$(wildcard apps/*), rm -rf rel/derflow/lib/$(shell basename $(app))-* && ln -sf $(abspath $(app)) rel/derflow/lib;)
 
 ##
 ## Developer targets
@@ -41,7 +41,7 @@ stage : rel
 ##    make stagedevrel DEVNODES=68
 
 .PHONY : stagedevrel devrel
-DEVNODES ?= 4
+DEVNODES ?= 6
 
 # 'seq' is not available on all *BSD, so using an alternate in awk
 SEQ = $(shell awk 'BEGIN { for (i = 1; i < '$(DEVNODES)'; i++) printf("%i ", i); print i ;exit(0);}')
@@ -60,3 +60,11 @@ stagedev% : dev%
 
 devclean: clean
 	rm -rf dev
+
+DIALYZER_APPS = kernel stdlib sasl erts ssl tools os_mon runtime_tools crypto inets \
+	xmerl webtool eunit syntax_tools compiler mnesia public_key snmp
+
+include tools.mk
+
+typer:
+	typer --annotate -I ../ --plt $(PLT) -r src

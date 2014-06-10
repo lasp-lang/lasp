@@ -1,5 +1,5 @@
 %% -*- erlang -*-
-{application, derflowdis,
+{application, derflow,
  [
   {description, ""},
   {vsn, "1"},
@@ -9,6 +9,6 @@
                   stdlib,
                   riak_core
                  ]},
-  {mod, { derflowdis_app, []}},
+  {mod, { derflow_app, []}},
   {env, []}
  ]}.

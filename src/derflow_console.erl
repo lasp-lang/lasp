@@ -1,5 +1,5 @@
 %% @doc Interface for riak_searchng-admin commands.
--module(derflowdis_console).
+-module(derflow_console).
 -export([staged_join/1,
          down/1,
          ringready/1]).

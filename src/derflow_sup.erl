@@ -1,4 +1,4 @@
--module(derflowdis_sup).
+-module(derflow_sup).
 
 -behaviour(supervisor).
 
@@ -20,8 +20,8 @@ start_link() ->
 %% ===================================================================
 
 init(_Args) ->
-    VMaster = { derflowdis_vnode_master,
-                  {riak_core_vnode_master, start_link, [derflowdis_vnode]},
+    VMaster = { derflow_vnode_master,
+                  {riak_core_vnode_master, start_link, [derflow_vnode]},
                   permanent, 5000, worker, [riak_core_vnode_master]},
 
     { ok,

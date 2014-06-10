@@ -5,11 +5,11 @@ init() ->
     Map = {map_reduce, wordCntMap},
     Reduce = {map_reduce, wordCntReduce},
     Input = [[haha,good,bad],[stupid,good,bold],[stupid,good,good]],
-    {id, Output} = derflowdis:declare(),
-    {id, TaskStream} = derflowdis:declare(),
-    Port = derflowdis:thread(map_reduce, jobproxy, [TaskStream]),
-    Supervisor = derflowdis:thread(map_reduce, supervisor, [dict:new()]),
-    derflowdis:thread(map_reduce, jobtracker, [Supervisor, TaskStream]),
+    {id, Output} = derflow:declare(),
+    {id, TaskStream} = derflow:declare(),
+    Port = derflow:thread(map_reduce, jobproxy, [TaskStream]),
+    Supervisor = derflow:thread(map_reduce, supervisor, [dict:new()]),
+    derflow:thread(map_reduce, jobtracker, [Supervisor, TaskStream]),
     receive
      after 1000 -> io:format("Waited~n")
     end,
@@ -20,12 +20,12 @@ sendTask(Port, Map, Reduce, Input, Output) ->
 
 jobproxy(TaskStream) ->
     receive Task ->
-	{id, Next} = derflowdis:bind(TaskStream, Task),
+	{id, Next} = derflow:bind(TaskStream, Task),
 	jobproxy(Next)
     end.
 
 jobtracker(Supervisor, Tasks) -> %MapTasks, ReduceTasks, Inputs, Outputs) ->
-    case derflowdis:read(Tasks)  %[MapTask|MT] ->
+    case derflow:read(Tasks)  %[MapTask|MT] ->
 	of {nil, _} ->
 	 io:format("All jobfinished!");
 	{Value, Next} ->
@@ -33,15 +33,15 @@ jobtracker(Supervisor, Tasks) -> %MapTasks, ReduceTasks, Inputs, Outputs) ->
     	{Module, MapFun} = MapTask,
     	{Module2, ReduceFun} = ReduceTask,
     	MapOut = spawnmap(Supervisor, Input, Module, MapFun, []),
-    	derflowdis:thread_mon(Supervisor, Module2, ReduceFun, [MapOut, [], Output]),
-        derflowdis:async_print_stream(Output),
+    	derflow:thread_mon(Supervisor, Module2, ReduceFun, [MapOut, [], Output]),
+        derflow:async_print_stream(Output),
 	jobtracker(Supervisor, Next)
     end.
 
 spawnmap(Supervisor, Inputs, Mod, Fun, Outputs) ->
     case Inputs of [H|T] ->
-    	{id, S} = derflowdis:declare(),
-    	derflowdis:thread_mon(Supervisor,Mod, Fun, [H, S]),
+    	{id, S} = derflow:declare(),
+    	derflow:thread_mon(Supervisor,Mod, Fun, [H, S]),
     	spawnmap(Supervisor, T, Mod, Fun, lists:append(Outputs,[S]));
 	[] ->
 	Outputs
@@ -52,14 +52,14 @@ supervisor(Dict) ->
 	{'DOWN', Ref, process, _, noproc} ->
 	    case dict:find(Ref, Dict) of
 	    {ok, {Module, Function, Args}} ->
-		derflowdis:thread_mon(self(), Module, Function, Args);
+		derflow:thread_mon(self(), Module, Function, Args);
 	    error ->
 		supervisor(Dict)
 	    end;
 	{'DOWN', Ref, process, _, noconnection} ->
 	    case dict:find(Ref, Dict) of
 	    {ok, {Module, Function, Args}} ->
-		derflowdis:thread_mon(self(), Module, Function, Args);
+		derflow:thread_mon(self(), Module, Function, Args);
 	    error ->
 		supervisor(Dict)
 	    end;
@@ -67,7 +67,7 @@ supervisor(Dict) ->
 	    io:format("Process killed, reference ~w, reason ~w,~n",[Ref, Reason]),
 	    case dict:find(Ref, Dict) of
 	    {ok, {Module, Function, Args}} ->
-		derflowdis:thread_mon(self(), Module, Function, Args);
+		derflow:thread_mon(self(), Module, Function, Args);
 	    error ->
 		supervisor(Dict)
 	    end;
@@ -82,10 +82,10 @@ wordCntMap(Input, Output) ->
    io:format("MAP ~p~n",[self()]),
    timer:sleep(20000),
    case Input of [H|T] ->
-	{id,Next} = derflowdis:bind(Output, H),
+	{id,Next} = derflow:bind(Output, H),
 	wordCntMap(T, Next);
 	[] ->
-	 derflowdis:bind(Output, nil)
+	 derflow:bind(Output, nil)
    end.
        
 wordCntReduce(Input, Tempout, Output) ->
@@ -94,15 +94,15 @@ wordCntReduce(Input, Tempout, Output) ->
 	  wordCntReduce(T, AddedOutput, Output);
 	[] ->
 	  case Tempout of [H|T] ->
-	  	{id, Next} = derflowdis:bind(Output, H),
+	  	{id, Next} = derflow:bind(Output, H),
 		wordCntReduce([], T, Next);
 		[] ->
-		derflowdis:bind(Output, nil)
+		derflow:bind(Output, nil)
 	 end
    end.
 
 loop(Elem, Output) ->
-	case  derflowdis:read(Elem) of 
+	case  derflow:read(Elem) of 
 	{nil, _} ->
 		Output;
 	{Value, Next} ->

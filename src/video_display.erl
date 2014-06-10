@@ -2,38 +2,38 @@
 -export([display/1, test/0, sender/3]).
 
 test()->
-    {id, S1}=derflowdis:declare(),
-    derflowdis:thread(video_display,sender,[0,10,S1]),
+    {id, S1}=derflow:declare(),
+    derflow:thread(video_display,sender,[0,10,S1]),
     video_display:display(S1).
 
 sender(Init, N, Output) ->
     if (N>0) ->
         timer:sleep(500),
-        {id, Next} = derflowdis:bind(Output, Init),
+        {id, Next} = derflow:bind(Output, Init),
         sender(Init + 1, N-1,  Next);
     true ->
         timer:sleep(500),
-        derflowdis:bind(Output, Init)
+        derflow:bind(Output, Init)
     end.
 
 skip1(Input, Output) ->
-    case derflowdis:read(Input) of
+    case derflow:read(Input) of
     {nil, _} ->
-	derflowdis:bind(Output, nil);
+	derflow:bind(Output, nil);
     {_Value, Next} ->
-	Bound = derflowdis:isDet(Next),
+	Bound = derflow:isDet(Next),
 	if Bound ->
 	    skip1(Next, Output);
 	true ->
-	    derflowdis:bind(Output, {id, Input})
+	    derflow:bind(Output, {id, Input})
 	end
     end.
 
 display(Input) ->
     timer:sleep(1500),
-    {id, Output} = derflowdis:declare(),
+    {id, Output} = derflow:declare(),
     skip1(Input, Output),
-    case derflowdis:read(Output) of
+    case derflow:read(Output) of
     {Value, Next} ->
 	display_frame(Value),
 	display(Next)

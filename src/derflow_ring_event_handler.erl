@@ -14,7 +14,7 @@
 
 %% Copyright (c) 2007-2011 Basho Technologies, Inc.  All Rights Reserved.
 
--module(derflowdis_ring_event_handler).
+-module(derflow_ring_event_handler).
 -behaviour(gen_event).
 
 %% gen_event callbacks

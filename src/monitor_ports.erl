@@ -2,19 +2,19 @@
 -export([run_port/1, sensor/2, dcs_monitor/3, test/0, register_comfailure/2, acc_register_comfailure/3]).
 
 test()->
-    {id, S1}=derflowdis:declare(),
-    Port = derflowdis:thread(monitor_ports,run_port,[S1]),
-    derflowdis:thread(monitor_ports,sensor,[Port, dc_1]),
-    derflowdis:thread(monitor_ports,sensor,[Port, dc_2]),
-    derflowdis:thread(monitor_ports,sensor,[Port, dc_3]),
-    {id, S2}=derflowdis:declare(),
-    derflowdis:thread(monitor_ports,dcs_monitor,[S1,S2,[]]),
-    derflowdis:async_print_stream(S2).
+    {id, S1}=derflow:declare(),
+    Port = derflow:thread(monitor_ports,run_port,[S1]),
+    derflow:thread(monitor_ports,sensor,[Port, dc_1]),
+    derflow:thread(monitor_ports,sensor,[Port, dc_2]),
+    derflow:thread(monitor_ports,sensor,[Port, dc_3]),
+    {id, S2}=derflow:declare(),
+    derflow:thread(monitor_ports,dcs_monitor,[S1,S2,[]]),
+    derflow:async_print_stream(S2).
 
 run_port(Stream) ->
     receive
 	{Message, From} ->
-	    {id, Next} = derflowdis:bind(Stream, {Message, From}),
+	    {id, Next} = derflow:bind(Stream, {Message, From}),
 	    run_port(Next)
     end.
 
@@ -25,10 +25,10 @@ sensor(Port, Identifier) ->
     sensor(Port, Identifier).
 
 dcs_monitor(Input, Output, State) ->
-    case derflowdis:read(Input) of
+    case derflow:read(Input) of
     {{computer_down, Identifier}, NextInput} ->
 	NewState = register_comfailure(Identifier, State),
-	{id, NextOutput} = derflowdis:bind(Output, NewState),
+	{id, NextOutput} = derflow:bind(Output, NewState),
 	dcs_monitor(NextInput, NextOutput, NewState);
     {_, NextInput} ->
 	%ignore

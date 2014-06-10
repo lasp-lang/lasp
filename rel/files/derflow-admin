@@ -99,7 +99,7 @@ cluster_admin()
                 exit 1
             fi
             ensure_node_running
-            $NODETOOL rpc derflowdis_console staged_join "$2"
+            $NODETOOL rpc derflow_console staged_join "$2"
             ;;
         leave)
             if [ $# -eq 1 ]; then
@@ -195,7 +195,7 @@ case "$1" in
         fi
 
         shift
-        $NODETOOL rpc derflowdis_console down $@
+        $NODETOOL rpc derflow_console down $@
         ;;
 
      ringready)
@@ -212,7 +212,7 @@ case "$1" in
         fi
         shift
 
-        $NODETOOL rpc derflowdis_console ringready $@
+        $NODETOOL rpc derflow_console ringready $@
         ;;
 
     member[_-]status)

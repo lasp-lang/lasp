@@ -1,5 +1,5 @@
--module(derflowdis).
--include("derflowdis.hrl").
+-module(derflow).
+-include("derflow.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
@@ -21,35 +21,35 @@
 %% Public API
 
 async_bind(Id, Value) ->
-    derflowdis_vnode:async_bind(Id, Value).
+    derflow_vnode:async_bind(Id, Value).
 
 async_bind(Id, Function, Args) ->
-    derflowdis_vnode:async_bind(Id, Function, Args).
+    derflow_vnode:async_bind(Id, Function, Args).
 
 bind(Id, Value) ->
-    derflowdis_vnode:bind(Id, Value).
+    derflow_vnode:bind(Id, Value).
 
 bind(Id, Function, Args) ->
-    derflowdis_vnode:bind(Id, Function, Args).
+    derflow_vnode:bind(Id, Function, Args).
 
 read(Id) ->
-    derflowdis_vnode:read(Id).
+    derflow_vnode:read(Id).
 
 touch(Id) ->
-    derflowdis_vnode:touch(Id).
+    derflow_vnode:touch(Id).
 
 next(Id) ->
-    derflowdis_vnode:next(Id).
+    derflow_vnode:next(Id).
 
 isDet(Id) ->
-    derflowdis_vnode:isDet(Id).
+    derflow_vnode:isDet(Id).
 
 declare() ->
-    Id = derflowdis_vnode:get_new_id(),
-    derflowdis_vnode:declare(Id).
+    Id = derflow_vnode:get_new_id(),
+    derflow_vnode:declare(Id).
 
 wait_needed(Id) ->
-    derflowdis_vnode:wait_needed(Id).
+    derflow_vnode:wait_needed(Id).
 
 thread_mon(Supervisor, Module, Function, Args) ->
     PID = spawn(Module, Function, Args),

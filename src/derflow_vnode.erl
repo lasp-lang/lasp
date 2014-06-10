@@ -1,6 +1,6 @@
--module(derflowdis_vnode).
+-module(derflow_vnode).
 -behaviour(riak_core_vnode).
--include("derflowdis.hrl").
+-include("derflow.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([async_bind/2,
@@ -41,94 +41,113 @@
 %% Extrenal API
 async_bind(Id, Value) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {async_bind, Id, Value}, derflowdis_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {async_bind,
+                                                          Id, Value},
+                                              derflow_vnode_master).
 
 async_bind(Id, Function, Args) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {async_bind, Id, Function, Args}, derflowdis_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {async_bind,
+                                                          Id, Function,
+                                                          Args}, derflow_vnode_master).
 
 bind(Id, Value) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id, Value}, derflowdis_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id,
+                                                          Value},
+                                              derflow_vnode_master).
 
 bind(Id, Function, Args) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id, Function, Args}, derflowdis_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id,
+                                                          Function,
+                                                          Args}, derflow_vnode_master).
 
 read(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {read, Id}, derflowdis_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {read, Id},
+                                              derflow_vnode_master).
 
 touch(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {touch, Id}, derflowdis_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {touch, Id},
+                                              derflow_vnode_master).
 
 next(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {next, Id}, derflowdis_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {next, Id},
+                                              derflow_vnode_master).
 
 isDet(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {isDet, Id}, derflowdis_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {isDet, Id},
+                                              derflow_vnode_master).
 
 declare(Id, Partition) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
     io:format("I am gonna send it to ~w and my partition is ~w~n",[IndexNode, Partition]),
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {declare, Id}, derflowdis_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {declare, Id},
+                                              derflow_vnode_master).
 
 declare(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {declare, Id}, derflowdis_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {declare, Id},
+                                              derflow_vnode_master).
 
 fetch(Id, FromId, FromP) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:command(IndexNode, {fetch, Id, FromId, FromP}, derflowdis_vnode_master).
+    riak_core_vnode_master:command(IndexNode, {fetch, Id, FromId,
+                                               FromP}, derflow_vnode_master).
 
 replyFetch(Id, FromP, DV) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:command(IndexNode, {replyFetch, Id, FromP, DV}, derflowdis_vnode_master).
+    riak_core_vnode_master:command(IndexNode, {replyFetch, Id, FromP,
+                                               DV}, derflow_vnode_master).
 
 notifyValue(Id, Value) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:command(IndexNode, {notifyValue, Id, Value}, derflowdis_vnode_master).
+    riak_core_vnode_master:command(IndexNode, {notifyValue, Id, Value},
+                                   derflow_vnode_master).
 
 get_new_id() ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(now())}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, get_new_id, derflowdis_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, get_new_id,
+                                              derflow_vnode_master).
 
 wait_needed(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {wait_needed, Id}, derflowdis_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {wait_needed,
+                                                          Id}, derflow_vnode_master).
 
 %% API
 start_vnode(I) ->
@@ -162,7 +181,7 @@ handle_command({async_bind, Id, F, Arg}, _From, State=#state{partition=Partition
 	{Next, _} = PrevNextKey,
 	NextKey= PrevNextKey
     end,
-    spawn(derflowdis_vnode, execute_and_put, [F, Arg, NextKey, Id, Table]),
+    spawn(derflow_vnode, execute_and_put, [F, Arg, NextKey, Id, Table]),
     {reply, {id, NextKey}, State#state{clock=Next}};
 
 handle_command({async_bind,Id, Value}, _From, State=#state{partition=Partition, table=Table}) ->
@@ -176,7 +195,7 @@ handle_command({async_bind,Id, Value}, _From, State=#state{partition=Partition, 
 	{Next, _} = PrevNextKey,
 	NextKey= PrevNextKey
     end,
-    spawn(derflowdis_vnode, put, [Value, NextKey, Id, Table]),
+    spawn(derflow_vnode, put, [Value, NextKey, Id, Table]),
     {reply, {id, NextKey}, State#state{clock=Next}};
 
 handle_command({bind, Id, F, Arg}, _From, State=#state{partition=Partition, table=Table}) ->
@@ -424,7 +443,7 @@ notifyAll(L, Value) ->
 get_next_key(Clock, Partition) ->
     NextKey={NextClock=Clock+1, Partition},
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(NextKey)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
     [{{Index, _Node}, _Type}] = PrefList,
     if Index==Partition ->
 	get_next_key(NextClock, Partition);

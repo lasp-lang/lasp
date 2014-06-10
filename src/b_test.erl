@@ -2,37 +2,37 @@
 -export([test/0, test1/0, test2/0, bindVar/2, bindValue/2, producer/3, buffer/3, consumer/3]).
 
 test() ->
-    {id, S1}=derflowdis:declare(),
-    {id, S2}=derflowdis:declare(),
-    {id, S3}=derflowdis:declare(),
-    {id, S4}=derflowdis:declare(),
-    derflowdis:thread(b_test,bindVar, [S1, S2]),
-    derflowdis:thread(b_test,bindValue, [S2, 100]),
-    derflowdis:thread(b_test,bindValue, [S4, 20]),
-    derflowdis:thread(b_test,bindVar, [S3, S4]).
+    {id, S1}=derflow:declare(),
+    {id, S2}=derflow:declare(),
+    {id, S3}=derflow:declare(),
+    {id, S4}=derflow:declare(),
+    derflow:thread(b_test,bindVar, [S1, S2]),
+    derflow:thread(b_test,bindValue, [S2, 100]),
+    derflow:thread(b_test,bindValue, [S4, 20]),
+    derflow:thread(b_test,bindVar, [S3, S4]).
 
 
 test1() ->
-    {id, S1}=derflowdis:declare(),
-    {id, S2}=derflowdis:declare(),
-    {id, S3}=derflowdis:declare(),
-    derflowdis:thread(b_test,bindVar, [S2, S3]),
-    derflowdis:thread(b_test,bindVar, [S1, S3]),
-    derflowdis:thread(b_test,bindValue, [S3, 100]).
+    {id, S1}=derflow:declare(),
+    {id, S2}=derflow:declare(),
+    {id, S3}=derflow:declare(),
+    derflow:thread(b_test,bindVar, [S2, S3]),
+    derflow:thread(b_test,bindVar, [S1, S3]),
+    derflow:thread(b_test,bindValue, [S3, 100]).
 
 test2() ->
-    {id, S1}=derflowdis:declare(),
-    {id, S2}=derflowdis:declare(),
-    {id, S3}=derflowdis:declare(),
-    derflowdis:thread(b_test,bindVar, [S2, S3]),
-    derflowdis:thread(b_test,bindVar, [S1, S2]),
-    derflowdis:thread(b_test,bindValue, [S3, 100]).
+    {id, S1}=derflow:declare(),
+    {id, S2}=derflow:declare(),
+    {id, S3}=derflow:declare(),
+    derflow:thread(b_test,bindVar, [S2, S3]),
+    derflow:thread(b_test,bindVar, [S1, S2]),
+    derflow:thread(b_test,bindValue, [S3, 100]).
 
 bindVar(X1, Y1) ->
-   Next = derflowdis_vnode:bind(X1, {id,Y1}),
+   Next = derflow_vnode:bind(X1, {id,Y1}),
    io:format("Bind finished ~w ~w Next ~w ~n", [X1, Y1,Next]),
-   X2=derflowdis_vnode:read(X1),
-   %Y2=derflowdis_vnode:read(Y1),
+   X2=derflow_vnode:read(X1),
+   %Y2=derflow_vnode:read(Y1),
    io:format("Value of ~w: ~w~n", [X1,X2]).
 
 
@@ -40,26 +40,26 @@ bindValue(Y1, V) ->
    receive
    after 100 -> io:format("~n")
    end,
-   _X = derflowdis_vnode:bind(Y1, V),
+   _X = derflow_vnode:bind(Y1, V),
    io:format("Bind Value finished ~w ~w ~n",[Y1,V]).
 
 producer(Value, N, Output) ->
     if (N>0) ->
-        derflowdis:wait_needed(Output),
-	{id,Next} = derflowdis:bind(Output, Value),
+        derflow:wait_needed(Output),
+	{id,Next} = derflow:bind(Output, Value),
         producer(Value+1, N-1,  Next);
     true ->
-        derflowdis:bind(Output, nil)
+        derflow:bind(Output, nil)
     end.
 
 loop(S1, S2, End) ->
-    derflowdis:wait_needed(S2),
-    {S1Value, S1Next} = derflowdis:read(S1),
-    {id, S2Next} = derflowdis:bind(S2, S1Value),
+    derflow:wait_needed(S2),
+    {S1Value, S1Next} = derflow:read(S1),
+    {id, S2Next} = derflow:bind(S2, S1Value),
     {PS1, _} = S1,
     {PS2, _} = S2,
     io:format("Buff:Bound for consumer ~w-> ~w ~w~n",[PS1,PS2,S1Value]),
-    case derflowdis:next(End) of {nil, _} ->
+    case derflow:next(End) of {nil, _} ->
         ok;	
 	EndNext ->
        loop(S1Next, S2Next, EndNext)    
@@ -74,7 +74,7 @@ drop_list(S, Size) ->
     if Size == 0 ->
 	S;
       true ->
-       	Next = derflowdis:next(S),
+       	Next = derflow:next(S),
 	io:format("Drop next ~w ~n",[S]),
     	drop_list(Next, Size-1)
     end.
@@ -83,7 +83,7 @@ consumer(S2, Size, F) ->
     if Size == 0 ->
 	io:format("Finished~n");
 	true ->
-	    case derflowdis:read(S2) of
+	    case derflow:read(S2) of
 		{nil, _} ->
 	   	io:format("Cons:Reading end~n");
 		{Value, Next} ->

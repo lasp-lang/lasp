@@ -16,7 +16,7 @@ NUMBER=${NAME##dev}
 BASE=$((10000 + 10 * $NUMBER))
 WEBPORT=$(($BASE + 8))
 HANDOFFPORT=$(($BASE + 9))
-NODENAME="derflowdis$NUMBER@127.0.0.1"
+NODENAME="derflow$NUMBER@127.0.0.1"
 
 echo "Generating $NAME - node='$NODENAME' http=$WEBPORT handoff=$HANDOFFPORT"
 sed -e "s/@NODE@/$NODENAME/" \

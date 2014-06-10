@@ -45,7 +45,7 @@ bindValue(Y1, V) ->
 
 producer(Value, N, Output) ->
     if (N>0) ->
-        derflowdis:waitNeeded(Output),
+        derflowdis:wait_needed(Output),
 	{id,Next} = derflowdis:bind(Output, Value),
         producer(Value+1, N-1,  Next);
     true ->
@@ -53,7 +53,7 @@ producer(Value, N, Output) ->
     end.
 
 loop(S1, S2, End) ->
-    derflowdis:waitNeeded(S2),
+    derflowdis:wait_needed(S2),
     {S1Value, S1Next} = derflowdis:read(S1),
     {id, S2Next} = derflowdis:bind(S2, S1Value),
     {PS1, _} = S1,

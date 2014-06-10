@@ -11,7 +11,7 @@
 	 touch/1,
 	 next/1,
 	 isDet/1,
-	 waitNeeded/1,
+	 wait_needed/1,
          declare/1,
          declare/2,
 	 get_new_id/0,
@@ -129,11 +129,11 @@ get_new_id() ->
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, get_new_id, derflowdis_vnode_master).
 
-waitNeeded(Id) -> 
+wait_needed(Id) -> 
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {waitNeeded, Id}, derflowdis_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, {wait_needed, Id}, derflowdis_vnode_master).
 
 %% API
 start_vnode(I) ->
@@ -247,7 +247,7 @@ handle_command({notifyValue, Id, Value}, _From, State=#state{table=Table}) ->
     	{noreply, State};
 
 
-handle_command({waitNeeded, Id}, From, State=#state{table=Table}) ->
+handle_command({wait_needed, Id}, From, State=#state{table=Table}) ->
     [{_Key,V}] = ets:lookup(Table, Id),
     if V#dv.bounded == true ->
 	{reply, ok, State};

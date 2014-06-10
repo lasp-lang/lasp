@@ -13,7 +13,7 @@ insert(X, In, Out) ->
     [{Id, C}] =ets:lookup(haha, count),
     ets:insert(haha,{Id,C+1}),
     io:format("Insert ~w ~n",[C+1]),
-    derflowdis:waitNeeded(Out),
+    derflowdis:wait_needed(Out),
     case derflowdis:read(In) of 
 	{nil,_} -> %io:format("Reading end ~w~n",[X]), 
 		   {id,Next} = derflowdis:bind(Out,X),
@@ -42,7 +42,7 @@ copyList(Out, In) ->
    case derflowdis:read(In) of {nil,_} ->
 	derflowdis:bind(Out,nil);
 	{Value, Next} ->
-	derflowdis:waitNeeded(Out),
+	derflowdis:wait_needed(Out),
         io:format("Got value ~w ~n",[Value]),
 	{id, NextKey} = derflowdis:bind(Out,Value),
 	copyList(NextKey, Next)

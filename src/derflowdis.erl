@@ -14,7 +14,7 @@
 	 declare/0,
 	 thread_mon/4,
 	 thread/3,
-	 waitNeeded/1,
+	 wait_needed/1,
 	 get_stream/1,
 	 async_print_stream/1]).
 
@@ -54,12 +54,12 @@ declare() ->
     Id = derflowdis_vnode:get_new_id(),
     derflowdis_vnode:declare(Id).
 
-waitNeeded(Id) ->
-    derflowdis_vnode:waitNeeded(Id).
-    
+wait_needed(Id) ->
+    derflowdis_vnode:wait_needed(Id).
+
 thread_mon(Supervisor, Module, Function, Args) ->
     PID = spawn(Module, Function, Args),
-    Supervisor ! {'SUPERVISE', PID, Module, Function, Args}. 
+    Supervisor ! {'SUPERVISE', PID, Module, Function, Args}.
 
 thread(Module, Function, Args) ->
     spawn(Module, Function, Args).
@@ -80,7 +80,7 @@ async_print_stream(Stream)->
 	    async_print_stream(Next);
 	 Any ->
 	    io:format("Stream any: ~w~n",[Any])
-		
+
     end.
     
 %Internal functions

@@ -154,10 +154,10 @@ start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
 init([Partition]) ->
-    Table=string:concat(integer_to_list(Partition), "dvstore"),
-    Table_atom=list_to_atom(Table),
-    ets:new(Table_atom, [set, named_table, public, {write_concurrency, true}]),
-    {ok, #state { partition=Partition, clock=0, table=Table_atom }}.
+    Table = string:concat(integer_to_list(Partition), "dvstore"),
+    TableAtom = list_to_atom(Table),
+    TableAtom = ets:new(TableAtom, [set, named_table, public, {write_concurrency, true}]),
+    {ok, #state { partition=Partition, clock=0, table=TableAtom }}.
 
 handle_command(get_new_id, _From, State=#state{partition=Partition}) ->
     Clock = State#state.clock +1,

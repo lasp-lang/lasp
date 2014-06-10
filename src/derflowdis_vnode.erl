@@ -5,18 +5,18 @@
 
 -export([asyncBind/2,
          asyncBind/3,
-	 bind/2,
-	 bind/3,
+         bind/2,
+         bind/3,
          read/1,
-	 touch/1,
-	 next/1,
-	 isDet/1,
-	 wait_needed/1,
+         touch/1,
+         next/1,
+         isDet/1,
+         wait_needed/1,
          declare/1,
          declare/2,
-	 get_new_id/0,
-	 put/4,
-	 execute_and_put/5]).
+         get_new_id/0,
+         put/4,
+         execute_and_put/5]).
 
 -export([start_vnode/1,
          init/1,
@@ -33,70 +33,68 @@
          handle_coverage/4,
          handle_exit/3]).
 
--ignore_xref([
-             start_vnode/1
-             ]).
+-ignore_xref([start_vnode/1]).
 
 -record(state, {partition, clock, table}).
--record(dv, {value, next = empty, waiting_threads = [], bindingList = [], creator, lazy= false, bounded = false}). 
+-record(dv, {value, next = empty, waiting_threads = [], binding_list = [], creator, lazy= false, bounded = false}).
 
 %% Extrenal API
-asyncBind(Id, Value) -> 
+asyncBind(Id, Value) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {asyncBind, Id, Value}, derflowdis_vnode_master).
 
-asyncBind(Id, Function, Args) -> 
+asyncBind(Id, Function, Args) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {asyncBind, Id, Function, Args}, derflowdis_vnode_master).
 
-bind(Id, Value) -> 
+bind(Id, Value) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id, Value}, derflowdis_vnode_master).
 
-bind(Id, Function, Args) -> 
+bind(Id, Function, Args) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id, Function, Args}, derflowdis_vnode_master).
 
-read(Id) -> 
+read(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {read, Id}, derflowdis_vnode_master).
 
-touch(Id) -> 
+touch(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {touch, Id}, derflowdis_vnode_master).
 
-next(Id) -> 
+next(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {next, Id}, derflowdis_vnode_master).
 
-isDet(Id) -> 
+isDet(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, {isDet, Id}, derflowdis_vnode_master).
 
-declare(Id, Partition) -> 
+declare(Id, Partition) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     io:format("I am gonna send it to ~w and my partition is ~w~n",[IndexNode, Partition]),
     riak_core_vnode_master:sync_spawn_command(IndexNode, {declare, Id}, derflowdis_vnode_master).
 
-declare(Id) -> 
+declare(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
@@ -114,22 +112,19 @@ replyFetch(Id, FromP, DV) ->
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:command(IndexNode, {replyFetch, Id, FromP, DV}, derflowdis_vnode_master).
 
-
 notifyValue(Id, Value) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:command(IndexNode, {notifyValue, Id, Value}, derflowdis_vnode_master).
-	
 
-
-get_new_id() -> 
+get_new_id() ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(now())}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, get_new_id, derflowdis_vnode_master).
 
-wait_needed(Id) -> 
+wait_needed(Id) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflowdis),
     [{IndexNode, _Type}] = PrefList,
@@ -218,8 +213,8 @@ handle_command({fetch, TargetId, FromId, FromP}, _From, State=#state{partition=P
 	   _ ->
 	  	{NextClock, NextKey} = nextKey(DV#dv.next, Clock, Partition), 
 	  	io:format("Adding to binding list ~w ~n",[FromId]),
-         	BindingList = lists:append(DV#dv.bindingList, [FromId]),
-	  	DV1 = DV#dv{bindingList=BindingList, next=NextKey},
+         	BindingList = lists:append(DV#dv.binding_list, [FromId]),
+	  	DV1 = DV#dv{binding_list=BindingList, next=NextKey},
 	  	ets:insert(Table, {TargetId, DV1}),
 	  	replyFetch(FromId, FromP, DV1),
 	  	{noreply, State#state{clock=NextClock}}
@@ -379,7 +374,7 @@ terminate(_Reason, _State) ->
 put(Value, Next, Key, Table) ->
     [{_Key,V}] = ets:lookup(Table, Key),
     Threads = V#dv.waiting_threads,
-    BindingList = V#dv.bindingList,
+    BindingList = V#dv.binding_list,
     V1 = #dv{value= Value, next =Next, lazy=false, bounded= true},
     ets:insert(Table, {Key, V1}),
     notifyAll(BindingList, Value),
@@ -388,7 +383,7 @@ put(Value, Next, Key, Table) ->
 execute_and_put(F, Arg, Next, Key, Table) ->
     [{_Key,V}] = ets:lookup(Table, Key),
     Threads = V#dv.waiting_threads,
-    BindingList = V#dv.bindingList,
+    BindingList = V#dv.binding_list,
     Value = F(Arg),
     V1 = #dv{value= Value, next =Next, lazy=false,bounded= true},
     ets:insert(Table, {Key, V1}),

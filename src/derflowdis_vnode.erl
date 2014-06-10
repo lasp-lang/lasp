@@ -38,7 +38,7 @@
              ]).
 
 -record(state, {partition, clock, table}).
--record(dv, {value, next = empty, waitingThreads = [], bindingList = [], creator, lazy= false, bounded = false}). 
+-record(dv, {value, next = empty, waiting_threads = [], bindingList = [], creator, lazy= false, bounded = false}). 
 
 %% Extrenal API
 asyncBind(Id, Value) -> 
@@ -252,7 +252,7 @@ handle_command({wait_needed, Id}, From, State=#state{table=Table}) ->
     if V#dv.bounded == true ->
 	{reply, ok, State};
      true ->
-    	case V#dv.waitingThreads of [_H|_T] ->
+    	case V#dv.waiting_threads of [_H|_T] ->
         	{reply, ok, State};
        		 _ ->
         	ets:insert(Table, {Id, V#dv{lazy=true, creator=From}}),
@@ -273,15 +273,15 @@ handle_command({read,X}, From, State=#state{table=Table}) ->
           {reply, {Value, V#dv.next}, State};
          true ->
           if Lazy == true ->
-                WT = lists:append(V#dv.waitingThreads, [From]),
-                V1 = V#dv{waitingThreads=WT},
+                WT = lists:append(V#dv.waiting_threads, [From]),
+                V1 = V#dv{waiting_threads=WT},
                 ets:insert(Table, {X, V1}),
 		replyToAll([Creator],ok),
                 {noreply, State};
           true ->
 		io:format("Process: ~w waiting for ~w~n",[From, X]),
-                WT = lists:append(V#dv.waitingThreads, [From]),
-                V1 = V#dv{waitingThreads=WT},
+                WT = lists:append(V#dv.waiting_threads, [From]),
+                V1 = V#dv{waiting_threads=WT},
                 ets:insert(Table, {X, V1}),
 	  	%io:format("End process: ~w waiting for ~w~n",[From, X]),
                 {noreply, State}
@@ -378,7 +378,7 @@ terminate(_Reason, _State) ->
 
 put(Value, Next, Key, Table) ->
     [{_Key,V}] = ets:lookup(Table, Key),
-    Threads = V#dv.waitingThreads,
+    Threads = V#dv.waiting_threads,
     BindingList = V#dv.bindingList,
     V1 = #dv{value= Value, next =Next, lazy=false, bounded= true},
     ets:insert(Table, {Key, V1}),
@@ -387,7 +387,7 @@ put(Value, Next, Key, Table) ->
 
 execute_and_put(F, Arg, Next, Key, Table) ->
     [{_Key,V}] = ets:lookup(Table, Key),
-    Threads = V#dv.waitingThreads,
+    Threads = V#dv.waiting_threads,
     BindingList = V#dv.bindingList,
     Value = F(Arg),
     V1 = #dv{value= Value, next =Next, lazy=false,bounded= true},

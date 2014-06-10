@@ -55,9 +55,6 @@ down([Node]) ->
             ok ->
                 io:format("Success: ~p marked as down~n", [Node]),
                 ok;
-            {error, legacy_mode} ->
-                io:format("Cluster is currently in legacy mode~n"),
-                ok;
             {error, is_up} ->
                 io:format("Failed: ~s is up~n", [Node]),
                 error;

@@ -14,11 +14,16 @@ load(Nodes) when is_list(Nodes) ->
     _ = [ok = load(Node) || Node <- Nodes],
     ok;
 load(Node) ->
-    TestGlob = "/Users/cmeiklejohn/SyncFree/derflow/riak_test/*.erl",
-    Tests = filelib:wildcard(TestGlob),
-    lager:info("Found the following tests: ~p", [Tests]),
-    [ok = remote_compile_and_load(Node, Test) || Test <- Tests],
-    ok.
+    TestGlob = rt_config:get(tests_to_remote_load, undefined),
+    case TestGlob of
+        undefined ->
+            ok;
+        TestGlob ->
+            Tests = filelib:wildcard(TestGlob),
+            lager:info("Found the following tests: ~p", [Tests]),
+            [ok = remote_compile_and_load(Node, Test) || Test <- Tests],
+            ok
+    end.
 
 %% @doc Remotely compile and load a test on a given node.
 remote_compile_and_load(Node, F) ->

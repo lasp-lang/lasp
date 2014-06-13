@@ -185,7 +185,7 @@ handle_command({bind, Id, Value}, From,
                State=#state{partition=Partition, table=Table}) ->
     case Value of
         {id, DVId} ->
-            ets:insert(Table, {Id, #dv{value={id,DVId}}}),
+            true = ets:insert(Table, {Id, #dv{value={id,DVId}}}),
             fetch(DVId, Id, From),
             {noreply, State};
         _ ->

@@ -226,12 +226,12 @@ handle_command({reply_fetch, FromId, FromP, FetchDV}, _From,
             Value = FetchDV#dv.value,
             Next = FetchDV#dv.next,
             put(Value, Next, FromId, Table),
-            reply_to_all([FromP], {id, Next});
+            reply_to_all([FromP], {ok, Next});
         true ->
             [{_,DV}] = ets:lookup(Table, FromId),
             DV1 = DV#dv{next= FetchDV#dv.next},
             ets:insert(Table, {FromId, DV1}),
-            reply_to_all([FromP], {id, FetchDV#dv.next})
+            reply_to_all([FromP], {ok, FetchDV#dv.next})
       end,
       {noreply, State};
 

@@ -274,7 +274,7 @@ handle_command({read, X}, From,
                     WT = lists:append(V#dv.waiting_threads, [From]),
                     V1 = V#dv{waiting_threads=WT},
                     true = ets:insert(Table, {X, V1}),
-                    reply_to_all([Creator],ok),
+                    reply_to_all([Creator], ok),
                     {noreply, State};
                 true ->
                     WT = lists:append(V#dv.waiting_threads, [From]),

@@ -12,12 +12,12 @@ confirm() ->
 
     Node = hd(Nodes),
 
-    {ok, Id} = rpc:call(Node, derflow, declare, []),
+    {ok, Id} = derflow_helpers:declare(Node),
 
-    {ok, NextId} = rpc:call(Node, derflow, bind, [Id, 1]),
+    {ok, NextId} = derflow_helpers:bind(Node, Id, 1),
     lager:info("NextId: ~p", [NextId]),
 
-    {ok, Value, NextId} = rpc:call(Node, derflow, read, [Id]),
+    {ok, Value, NextId} = derflow_helpers:read(Node, Id),
     lager:info("Value: ~p", [Value]),
 
     ?assertEqual(1, Value),

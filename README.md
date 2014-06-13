@@ -1,13 +1,14 @@
-derflow: A Riak Core Application
-======================================
+derflow: Distributed deterministic dataflow programming
+=======================================================
 
-Application Structure
----------------------
+To build:
 
-This is a blank riak core application. To get started, you'll want to edit the
-following files:
+* `make devrel`: Build six development releases.
+* `make stagedevrel`: Build six development releases, symlinked to the same source.
 
-* `src/riak_derflow_vnode.erl`
-  * Implementation of the riak_core_vnode behaviour
-* `src/derflow.erl`
-  * Public API for interacting with your vnode
+To configure for `riak_test`:
+
+* Build development releases: `make stagedevrel`
+* Run the setup utility, once: `riak_test/bin/derflow-setup.sh`
+* As you modify your code, run `make && riak_test/bin/derflow-current.sh`; this will rebuild your local source and then configure `riak_test` to use the latest version.
+

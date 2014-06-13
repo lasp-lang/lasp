@@ -38,6 +38,7 @@
 -record(dv, {value, next = empty, waiting_threads = [], binding_list = [], creator, lazy= false, bounded = false}).
 
 %% Extrenal API
+
 async_bind(Id, Value) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),

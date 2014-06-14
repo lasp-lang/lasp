@@ -3,8 +3,9 @@
 -module(derflow_get_minimum_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--export([insort/3,
-         insert/4]).
+-export([test/0,
+         insort/2,
+         insert/3]).
 
 -define(TABLE, minimum).
 
@@ -17,7 +18,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 confirm() ->
-    [Nodes] = rt:build_clusters([1]), %% TODO: changeme
+    [Nodes] = rt:build_clusters([3]),
     lager:info("Nodes: ~p", [Nodes]),
     Node = hd(Nodes),
 
@@ -25,55 +26,48 @@ confirm() ->
     ok = derflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
-    lager:info("Declaring new dataflow variable."),
-    {ok, S1} = derflow_test_helpers:declare(Node),
-
-    Pids = rpc:call(Node, erlang, processes, []),
-    EtsOwner = hd(Pids),
-
-    lager:info("Creating ets table on node ~p owned by pid ~p", [Node, EtsOwner]),
-    EtsOptions = [set, named_table, public,
-                  {write_concurrency, true}, {heir, EtsOwner, undefined}],
-    ?TABLE = rpc:call(Node, ets, new, [?TABLE, EtsOptions]),
-
-    true = rpc:call(Node, ets, insert, [?TABLE, {count, 0}]),
-
-    derflow_test_helpers:thread(Node,
-                                derflow_get_minimum_test,
-                                insort, [Node, [1,2,3,4], S1]),
-
-    {ok, Value} = derflow_test_helpers:read(Node, S1),
-    lager:info("Retrieved value: ~p", [Value]),
+    lager:info("Remotely executing the get minimum test."),
+    pass = rpc:call(Node, derflow_get_minimum_test, test, []),
 
     pass.
 
 -endif.
 
-insert(Node, X, In, Out) ->
-    [{Id, C}] = rpc:call(Node, ets, lookup, [?TABLE, count]),
-    true = rpc:call(Node, ets, insert, [?TABLE, {Id, C+1}]),
-    ok = derflow:wait_needed(Out),
-    case derflow:read(In) of
-        {ok, nil, _} ->
-            {id, Next} = derflow:bind(Out, X),
-            derflow:bind(Next, nil);
-        {ok, V, SNext} ->
-            if
-                X < V ->
-                    {id, Next} = derflow:bind(Out, X),
-                    derflow:bind(Next, In);
-                true ->
-                    {id,Next} = derflow:bind(Out,V),
-                    insert(Node, X, SNext, Next)
-            end
-    end.
+test() ->
+    List = [1,2,3,4,5],
+    {ok, S1} = derflow:declare(),
+    ?TABLE = ets:new(?TABLE, [set, named_table, public, {write_concurrency, true}]),
+    true = ets:insert(?TABLE, {count, 0}),
+    derflow:thread(derflow_get_minimum_test, insort, [List, S1]),
+    {V, _} = derflow:read(S1),
+    lager:info("Minimum: ~p", [V]),
+    pass.
 
-insort(Node, List, S) ->
+insort(List, S) ->
     case List of
         [H|T] ->
             {ok, OutS} = derflow:declare(),
-            insort(Node, T, OutS),
-            derflow:thread(derflow_get_minimum_test, insert, [Node, H, OutS, S]);
+            insort(T, OutS),
+            derflow:thread(derflow_get_minimum_test, insert, [H, OutS, S]);
         [] ->
             derflow:bind(S, nil)
+    end.
+
+insert(X, In, Out) ->
+    [{Id, C}] = ets:lookup(?TABLE, count),
+    true = ets:insert(?TABLE, {Id, C+1}),
+    ok = derflow:wait_needed(Out),
+    case derflowdis:read(In) of
+        {ok, {nil, _}} ->
+            {ok, Next} = derflow:bind(Out, X),
+            derflow:bind(Next, nil);
+        {ok, {V, SNext}} ->
+            if
+                X < V ->
+                    {ok, Next} = derflowdis:bind(Out, X),
+                    derflowdis:bind(Next, In);
+                true ->
+                    {ok, Next} = derflowdis:bind(Out, V),
+                    insert(X, SNext, Next)
+            end
     end.

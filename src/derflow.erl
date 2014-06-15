@@ -62,9 +62,9 @@ get_stream(Stream)->
 
 async_print_stream(Stream)->
     case read(Stream) of
-        {nil, _} ->
+        {ok, nil, _} ->
             {ok, stream_read};
-        {Value, Next} ->
+        {ok, Value, Next} ->
             io:format("~w~n", [Value]),
             async_print_stream(Next);
          Any ->
@@ -75,8 +75,8 @@ async_print_stream(Stream)->
 
 internal_get_stream(Head, Output) ->
     case read(Head) of
-        {nil, _} ->
+        {ok, nil, _} ->
             Output;
-        {Value, Next} ->
+        {ok, Value, Next} ->
             internal_get_stream(Next, lists:append(Output, [Value]))
     end.

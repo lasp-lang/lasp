@@ -35,7 +35,7 @@
 -ignore_xref([start_vnode/1]).
 
 -record(state, {partition, clock, table}).
--record(dv, {value, next = empty, waiting_threads = [], binding_list = [], creator, lazy= false, bounded = false}).
+-record(dv, {value, next = undefined, waiting_threads = [], binding_list = [], creator, lazy= false, bounded = false}).
 
 %% Extrenal API
 
@@ -139,7 +139,7 @@ handle_command(get_new_id, _From,
     {reply, {Clock,Partition}, State#state{clock=Clock}};
 
 handle_command({declare, Id}, _From, State=#state{table=Table}) ->
-    true = ets:insert(Table, {Id, #dv{value=empty}}),
+    true = ets:insert(Table, {Id, #dv{value=undefined}}),
     {reply, {ok, Id}, State};
 
 handle_command({async_bind, Id, F, Arg}, _From,
@@ -147,13 +147,13 @@ handle_command({async_bind, Id, F, Arg}, _From,
     [{_Key, V}] = ets:lookup(Table, Id),
     PrevNextKey = V#dv.next,
     if
-        PrevNextKey == empty ->
+        PrevNextKey == undefined ->
             Next = State#state.clock + 1,
             NextKey = {Next, Partition},
             declare(NextKey);
         true ->
             {Next, _} = PrevNextKey,
-            NextKey= PrevNextKey
+            NextKey = PrevNextKey
         end,
     spawn(derflow_vnode, execute_and_put, [F, Arg, NextKey, Id, Table]),
     {reply, {ok, NextKey}, State#state{clock=Next}};
@@ -163,13 +163,13 @@ handle_command({async_bind, Id, Value}, _From,
     [{_Key,V}] = ets:lookup(Table, Id),
     PrevNextKey = V#dv.next,
     if
-        PrevNextKey == empty ->
+        PrevNextKey == undefined ->
             Next = State#state.clock + 1,
             NextKey={Next, Partition},
             declare(NextKey);
         true ->
             {Next, _} = PrevNextKey,
-            NextKey= PrevNextKey
+            NextKey = PrevNextKey
     end,
     spawn(derflow_vnode, put, [Value, NextKey, Id, Table]),
     {reply, {ok, NextKey}, State#state{clock=Next}};
@@ -310,19 +310,19 @@ handle_command({touch, X}, _From,
     end;
 
 handle_command({next, X}, _From,
-               State = #state{partition = Partition,clock = Clock,table = Table}) ->
+               State = #state{partition = Partition, clock = Clock, table = Table}) ->
     [{_Key,V}] = ets:lookup(Table, X),
     PrevNextKey = V#dv.next,
     if
-        PrevNextKey == empty ->
-            Next = Clock+1,
+        PrevNextKey == undefined ->
+            Next = Clock + 1,
             NextKey = {Next, Partition},
             declare(NextKey),
             V1 = V#dv{next=NextKey},
             true = ets:insert(Table, {X, V1}),
-            {reply, NextKey, State#state{clock=Next}};
+            {reply, {ok, NextKey}, State#state{clock=Next}};
         true ->
-           {reply, PrevNextKey, State}
+            {reply, {ok, PrevNextKey}, State}
   end;
 
 handle_command({is_det, Id}, _From, State = #state{table = Table}) ->
@@ -395,9 +395,9 @@ execute_and_put(F, Arg, Next, Key, Table) ->
 
 next_key(PrevNextKey, Clock, Partition) ->
     if
-        PrevNextKey == empty ->
+        PrevNextKey == undefined ->
             NextClock = get_next_key(Clock, Partition),
-            NextKey={NextClock, Partition},
+            NextKey = {NextClock, Partition},
             declare(NextKey);
         true ->
             NextClock = Clock,

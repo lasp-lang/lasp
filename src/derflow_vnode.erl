@@ -381,7 +381,7 @@ put(Value, Next, Key, Table) ->
     V1 = #dv{value= Value, next =Next, lazy=false, bounded= true},
     true = ets:insert(Table, {Key, V1}),
     notify_all(BindingList, Value),
-    reply_to_all(Threads, {Value,Next}).
+    reply_to_all(Threads, {ok, Value, Next}).
 
 execute_and_put(F, Arg, Next, Key, Table) ->
     [{_Key,V}] = ets:lookup(Table, Key),
@@ -391,7 +391,7 @@ execute_and_put(F, Arg, Next, Key, Table) ->
     V1 = #dv{value = Value, next = Next, lazy = false, bounded = true},
     true = ets:insert(Table, {Key, V1}),
     notify_all(BindingList, Value),
-    reply_to_all(Threads, {Value, Next}).
+    reply_to_all(Threads, {ok, Value, Next}).
 
 next_key(PrevNextKey, Clock, Partition) ->
     if

@@ -18,7 +18,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 confirm() ->
-    [Nodes] = rt:build_clusters([3]),
+    [Nodes] = rt:build_clusters([1]),
     lager:info("Nodes: ~p", [Nodes]),
     Node = hd(Nodes),
 

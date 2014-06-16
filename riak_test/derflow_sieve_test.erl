@@ -26,7 +26,7 @@ confirm() ->
     lager:info("Remote code loading complete."),
 
     lager:info("Remotely executing the test."),
-    Result = rpc:call(Node, derflow_sieve_test, test, [100]),
+    Result = rpc:call(Node, ?MODULE, test, [100]),
     ?assertEqual([2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,
                  61,67,71,73,79,83,89,97], Result),
     pass.

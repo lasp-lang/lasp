@@ -27,7 +27,7 @@ confirm() ->
     lager:info("Remote code loading complete."),
 
     lager:info("Remotely executing the test."),
-    Result = rpc:call(Node, derflow_get_minimum_test, test, [[1,2,3,4,5]]),
+    Result = rpc:call(Node, ?MODULE, test, [[1,2,3,4,5]]),
     ?assertEqual(1, Result),
     pass.
 

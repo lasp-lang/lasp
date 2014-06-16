@@ -26,7 +26,7 @@ confirm() ->
     lager:info("Remote code loading complete."),
 
     lager:info("Remotely executing the test."),
-    rpc:call(Node, derflow_bounded_buffer_test, test, []),
+    rpc:call(Node, ?MODULE, test, []),
 
     %% It's possible this test is written incorrectly, given the
     %% consumer function takes a function which is supposed to double

@@ -3,6 +3,9 @@
 -include("derflow.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
+-define(N, 1).
+-define(VNODE_MASTER, derflow_vnode_master).
+
 -export([async_bind/2,
          async_bind/3,
          bind/2,
@@ -47,88 +50,93 @@
 %% Extrenal API
 
 async_bind(Id, Value) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {async_bind, Id, Value}, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {async_bind, Id, Value},
+                                              ?VNODE_MASTER).
 
 async_bind(Id, Function, Args) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {async_bind, Id, Function, Args}, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {async_bind, Id, Function, Args},
+                                              ?VNODE_MASTER).
 
 bind(Id, Value) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id, Value}, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {bind, Id, Value},
+                                              ?VNODE_MASTER).
 
 bind(Id, Function, Args) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {bind, Id, Function, Args}, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {bind, Id, Function, Args},
+                                              ?VNODE_MASTER).
 
 read(Id) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {read, Id}, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {read, Id},
+                                              ?VNODE_MASTER).
 
 touch(Id) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {touch, Id}, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {touch, Id},
+                                              ?VNODE_MASTER).
 
 next(Id) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {next, Id}, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {next, Id},
+                                              ?VNODE_MASTER).
 
 is_det(Id) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {is_det, Id}, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {is_det, Id},
+                                              ?VNODE_MASTER).
 
 declare(Id) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {declare, Id}, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {declare, Id},
+                                              ?VNODE_MASTER).
 
 fetch(Id, FromId, FromP) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:command(IndexNode, {fetch, Id, FromId, FromP}, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:command(IndexNode,
+                                   {fetch, Id, FromId, FromP},
+                                   ?VNODE_MASTER).
 
 reply_fetch(Id, FromP, DV) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:command(IndexNode, {reply_fetch, Id, FromP, DV}, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:command(IndexNode,
+                                   {reply_fetch, Id, FromP, DV},
+                                   ?VNODE_MASTER).
 
 notify_value(Id, Value) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:command(IndexNode, {notify_value, Id, Value}, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:command(IndexNode,
+                                   {notify_value, Id, Value},
+                                   ?VNODE_MASTER).
 
 get_new_id() ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(now())}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, get_new_id, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, now()),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              get_new_id,
+                                              ?VNODE_MASTER).
 
 wait_needed(Id) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Id)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, {wait_needed, Id}, derflow_vnode_master).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {wait_needed, Id},
+                                              ?VNODE_MASTER).
+
+%% @doc Generate a preference list for a given N value and data item.
+generate_preference_list(NVal, Param) ->
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Param)}),
+    riak_core_apl:get_primary_apl(DocIdx, NVal, derflow).
 
 %% API
 start_vnode(I) ->

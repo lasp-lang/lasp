@@ -145,8 +145,7 @@ start_vnode(I) ->
 init([Partition]) ->
     Table = string:concat(integer_to_list(Partition), "dvstore"),
     TableAtom = list_to_atom(Table),
-    TableAtom = ets:new(TableAtom, [set, named_table, public,
-                                    {write_concurrency, true}]),
+    TableAtom = ets:new(TableAtom, [set, named_table, public, {write_concurrency, true}]),
     {ok, #state {partition=Partition, clock=0, table=TableAtom}}.
 
 handle_command(get_new_id, _From,
@@ -155,7 +154,7 @@ handle_command(get_new_id, _From,
     {reply, {Clock,Partition}, State#state{clock=Clock}};
 
 handle_command({declare, Id}, _From, State=#state{table=Table}) ->
-    declare_by_id(Id, Table),
+    true = ets:insert(Table, {Id, #dv{value=undefined}}),
     {reply, {ok, Id}, State};
 
 handle_command({async_bind, Id, F, Arg}, _From,
@@ -166,7 +165,7 @@ handle_command({async_bind, Id, F, Arg}, _From,
         NextKey0 == undefined ->
             Next = State#state.clock + 1,
             NextKey = {Next, Partition},
-            declare_by_id(NextKey, Table);
+            declare(NextKey);
         true ->
             {Next, _} = NextKey0,
             NextKey = NextKey0
@@ -182,7 +181,7 @@ handle_command({async_bind, Id, Value}, _From,
         NextKey0 == undefined ->
             Next = State#state.clock + 1,
             NextKey={Next, Partition},
-            declare_by_id(NextKey, Table);
+            declare(NextKey);
         true ->
             {Next, _} = NextKey0,
             NextKey = NextKey0
@@ -193,7 +192,7 @@ handle_command({async_bind, Id, Value}, _From,
 handle_command({bind, Id, Fun, Arg}, _From,
                State=#state{partition=Partition, table=Table}) ->
     [{_Key, V}] = ets:lookup(Table, Id),
-    {NextClock, NextKey} = next_key(V#dv.next, State#state.clock, Partition, Table),
+    {NextClock, NextKey} = next_key(V#dv.next, State#state.clock, Partition),
     execute_and_put(Fun, Arg, NextKey, Id, Table),
     {reply, {ok, NextKey}, State#state{clock=NextClock}};
 
@@ -208,8 +207,7 @@ handle_command({bind, Id, Value}, From,
             [{_Key,V}] = ets:lookup(Table, Id),
             {NextClock, NextKey} = next_key(V#dv.next,
                                             State#state.clock,
-                                            Partition,
-                                            Table),
+                                            Partition),
             put(Value, NextKey, Id, Table),
             {reply, {ok, NextKey}, State#state{clock=NextClock}}
         end;
@@ -227,7 +225,7 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
                     fetch(BindId, FromId, FromP),
                     {noreply, State};
                 _ ->
-                    {NextClock, NextKey} = next_key(DV#dv.next, Clock, Partition, Table),
+                    {NextClock, NextKey} = next_key(DV#dv.next, Clock, Partition),
                     BindingList = lists:append(DV#dv.binding_list, [FromId]),
                     DV1 = DV#dv{binding_list=BindingList, next=NextKey},
                     true = ets:insert(Table, {TargetId, DV1}),
@@ -314,7 +312,7 @@ handle_command({touch, X}, _From,
         true ->
             Next = Clock + 1,
             NextKey = {Next, Partition},
-            declare_by_id(NextKey, Table),
+            declare(NextKey),
             V1 = V#dv{next=NextKey},
             true = ets:insert(Table, {X, V1}),
             if
@@ -334,7 +332,7 @@ handle_command({next, X}, _From,
         NextKey0 == undefined ->
             Next = Clock + 1,
             NextKey = {Next, Partition},
-            declare_by_id(NextKey, Table),
+            declare(NextKey),
             V1 = V#dv{next=NextKey},
             true = ets:insert(Table, {X, V1}),
             {reply, {ok, NextKey}, State#state{clock=Next}};
@@ -410,12 +408,12 @@ execute_and_put(F, Arg, Next, Key, Table) ->
     notify_all(BindingList, Value),
     reply_to_all(Threads, {ok, Value, Next}).
 
-next_key(NextKey0, Clock, Partition, Table) ->
+next_key(NextKey0, Clock, Partition) ->
     if
         NextKey0 == undefined ->
             NextClock = get_next_key(Clock, Partition),
             NextKey = {NextClock, Partition},
-            declare_by_id(NextKey, Table);
+            declare(NextKey);
         true ->
             NextClock = Clock,
             NextKey = NextKey0
@@ -450,6 +448,3 @@ get_next_key(Clock, Partition) ->
         true ->
             NextClock
     end.
-
-declare_by_id(Id, Table) ->
-    true = ets:insert(Table, {Id, #dv{value=undefined}}).

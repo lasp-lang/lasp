@@ -66,7 +66,6 @@ loop(S1, S2, End) ->
 
 buffer(S1, Size, S2) ->
     End = drop_list(S1, Size),
-    End = Size,
     loop(S1, S2, End).
 
 drop_list(S, Size) ->

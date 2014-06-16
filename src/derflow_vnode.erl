@@ -35,7 +35,14 @@
 -ignore_xref([start_vnode/1]).
 
 -record(state, {partition, clock, table}).
--record(dv, {value, next = undefined, waiting_threads = [], binding_list = [], creator, lazy= false, bounded = false}).
+
+-record(dv, {value,
+             next = undefined,
+             waiting_threads = [],
+             binding_list = [],
+             creator,
+             lazy = false,
+             bounded = false}).
 
 %% Extrenal API
 

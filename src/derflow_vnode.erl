@@ -145,15 +145,15 @@ handle_command({declare, Id}, _From, State=#state{table=Table}) ->
 handle_command({async_bind, Id, F, Arg}, _From,
                State=#state{partition=Partition, table=Table}) ->
     [{_Key, V}] = ets:lookup(Table, Id),
-    PrevNextKey = V#dv.next,
+    NextKey0 = V#dv.next,
     if
-        PrevNextKey == undefined ->
+        NextKey0 == undefined ->
             Next = State#state.clock + 1,
             NextKey = {Next, Partition},
             declare(NextKey);
         true ->
-            {Next, _} = PrevNextKey,
-            NextKey = PrevNextKey
+            {Next, _} = NextKey0,
+            NextKey = NextKey0
         end,
     spawn(derflow_vnode, execute_and_put, [F, Arg, NextKey, Id, Table]),
     {reply, {ok, NextKey}, State#state{clock=Next}};
@@ -161,15 +161,15 @@ handle_command({async_bind, Id, F, Arg}, _From,
 handle_command({async_bind, Id, Value}, _From,
                State=#state{partition=Partition, table=Table}) ->
     [{_Key,V}] = ets:lookup(Table, Id),
-    PrevNextKey = V#dv.next,
+    NextKey0 = V#dv.next,
     if
-        PrevNextKey == undefined ->
+        NextKey0 == undefined ->
             Next = State#state.clock + 1,
             NextKey={Next, Partition},
             declare(NextKey);
         true ->
-            {Next, _} = PrevNextKey,
-            NextKey = PrevNextKey
+            {Next, _} = NextKey0,
+            NextKey = NextKey0
     end,
     spawn(derflow_vnode, put, [Value, NextKey, Id, Table]),
     {reply, {ok, NextKey}, State#state{clock=Next}};
@@ -312,9 +312,9 @@ handle_command({touch, X}, _From,
 handle_command({next, X}, _From,
                State = #state{partition = Partition, clock = Clock, table = Table}) ->
     [{_Key,V}] = ets:lookup(Table, X),
-    PrevNextKey = V#dv.next,
+    NextKey0 = V#dv.next,
     if
-        PrevNextKey == undefined ->
+        NextKey0 == undefined ->
             Next = Clock + 1,
             NextKey = {Next, Partition},
             declare(NextKey),
@@ -322,7 +322,7 @@ handle_command({next, X}, _From,
             true = ets:insert(Table, {X, V1}),
             {reply, {ok, NextKey}, State#state{clock=Next}};
         true ->
-            {reply, {ok, PrevNextKey}, State}
+            {reply, {ok, NextKey0}, State}
   end;
 
 handle_command({is_det, Id}, _From, State = #state{table = Table}) ->
@@ -393,15 +393,15 @@ execute_and_put(F, Arg, Next, Key, Table) ->
     notify_all(BindingList, Value),
     reply_to_all(Threads, {ok, Value, Next}).
 
-next_key(PrevNextKey, Clock, Partition) ->
+next_key(NextKey0, Clock, Partition) ->
     if
-        PrevNextKey == undefined ->
+        NextKey0 == undefined ->
             NextClock = get_next_key(Clock, Partition),
             NextKey = {NextClock, Partition},
             declare(NextKey);
         true ->
             NextClock = Clock,
-            NextKey = PrevNextKey
+            NextKey = NextKey0
     end,
     {NextClock, NextKey}.
 

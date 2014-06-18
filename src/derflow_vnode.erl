@@ -421,7 +421,7 @@ notify_all(L, Value) ->
     end.
 
 declare_next()->
-    derflow_declare_coord:start_link(self()),
+    derflow_declare_sup:start_child([self()]),
         receive
             {ok, Id} ->
                 {ok, Id}

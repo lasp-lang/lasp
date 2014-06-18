@@ -1,6 +1,6 @@
 %% @doc coordination of Derflow declare requests
 
--module(derflow_declare_coord).
+-module(derflow_declare_fsm).
 
 -behaviour(gen_fsm).
 
@@ -43,11 +43,12 @@ execute(timeout, StateData) ->
     derflow_vnode:declare(Id),
     {next_state, await_responses, StateData#state{key=Id}}.
 
-await_responses({ok, Id}, StateData=#state{results=Results0}) ->
+await_responses({ok, Id}, StateData=#state{from=Pid, results=Results0}) ->
     Results = [Id | Results0],
     case length(Results) of
         ?W ->
-            client_reply(StateData#state{results=Results});
+            Pid ! {ok, Id},
+            {stop, normal, StateData};
         _ ->
             {next_state, await_responses, StateData#state{results=Results}}
     end.
@@ -76,8 +77,3 @@ code_change(_OldVsn, StateName, State, _Extra) -> {ok, StateName, State}.
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
-
-%% Send a reply
-client_reply(StateData = #state{from = Pid, key=Id}) ->
-    Pid ! {ok, Id},
-    {stop, normal, StateData}.

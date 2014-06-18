@@ -1,4 +1,4 @@
--module(derflow_declare_sup).
+-module(derflow_declare_fsm_sup).
 -author('Manuel Bravo <manuelbravogestoso@gmail.com>').
 
 -behaviour(supervisor).

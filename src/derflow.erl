@@ -35,8 +35,7 @@ is_det(Id) ->
     derflow_vnode:is_det(Id).
 
 declare() ->
-    lager:info("declare derflow.erl"),
-    derflow_declare_sup:start_child([self()]),
+    _ = derflow_declare_sup:start_child([self()]),
     receive
         {ok, Id} ->
             {ok, Id}

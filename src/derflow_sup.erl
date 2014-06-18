@@ -25,9 +25,9 @@ init(_Args) ->
                   {riak_core_vnode_master, start_link, [derflow_vnode]},
                   permanent, 5000, worker, [riak_core_vnode_master]},
 
-     DeclareFSM = {derflow_declare_sup,
-               {derflow_declare_sup, start_link, []},
-                permanent, infinity, supervisor, [derflow_declare_sup]},
+     DeclareFSM = {derflow_declare_fsm_sup,
+               {derflow_declare_fsm_sup, start_link, []},
+                permanent, infinity, supervisor, [derflow_declare_fsm_sup]},
 
     { ok,
         { {one_for_one, 5, 10},

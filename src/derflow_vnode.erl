@@ -85,8 +85,7 @@ is_det(Id) ->
 
 declare(Id) ->
     Preflist = generate_preference_list(3, Id),
-    Preflist2 = [IndexNode || {IndexNode,_Type} <- Preflist],
-    lager:info("Preflist: ~w",[Preflist2]),
+    Preflist2 = [IndexNode || {IndexNode, _Type} <- Preflist],
     riak_core_vnode_master:command(Preflist2,
                                    {declare, Id},
                                    {fsm, undefined, self()},
@@ -363,13 +362,13 @@ reply_to_all([H|T], Result) ->
     reply_to_all(T, Result).
 
 next_key(NextKey0) ->
-    if
-        NextKey0 == undefined ->
-            {ok, NextKey} = declare_next();
-        true ->
-            NextKey = NextKey0
-    end,
-    NextKey.
+    case NextKey0 of
+        undefined ->
+            {ok, NextKey} = declare_next(),
+            NextKey;
+        _ ->
+            NextKey0
+    end.
 
 notify_all(L, Value) ->
     case L of
@@ -382,7 +381,7 @@ notify_all(L, Value) ->
 
 declare_next()->
     _ = derflow_declare_fsm_sup:start_child([self()]),
-        receive
-            {ok, Id} ->
-                {ok, Id}
-        end.
+    receive
+        {ok, Id} ->
+            {ok, Id}
+    end.

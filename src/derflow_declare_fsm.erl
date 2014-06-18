@@ -31,15 +31,11 @@ start_link(From) ->
 
 %% @private
 init(From) ->
-    StateData = #state{from = From},
-    %% Move to state prepare at once (0 timeout) and trigger
-    %% prepare's `timeout' event.
-    {ok, execute, StateData, 0}.
+    {ok, execute, #state{from=From}, 0}.
 
 %% @private
 execute(timeout, StateData) ->
     Id = druuid:v4(),
-    lager:info("The unique id generated is: ~w",[Id]),
     derflow_vnode:declare(Id),
     {next_state, await_responses, StateData#state{key=Id}}.
 
@@ -55,24 +51,25 @@ await_responses({ok, Id}, StateData=#state{from=Pid, results=Results0}) ->
 
 %% @private
 handle_event(_Event, _StateName, StateData) ->
-    {stop,badmsg,StateData}.
+    {stop, badmsg, StateData}.
 
 %% @private
 handle_sync_event(_Event, _From, _StateName, StateData) ->
-    {stop,badmsg,StateData}.
+    {stop, badmsg, StateData}.
 
 %% @private
 handle_info(request_timeout, StateName, StateData) ->
     ?MODULE:StateName(request_timeout, StateData);
 handle_info(_Info, _StateName, StateData) ->
-    {stop,badmsg,StateData}.
+    {stop, badmsg, StateData}.
 
 %% @private
 terminate(Reason, _StateName, _State) ->
     Reason.
 
 %% @private
-code_change(_OldVsn, StateName, State, _Extra) -> {ok, StateName, State}.
+code_change(_OldVsn, StateName, State, _Extra) ->
+    {ok, StateName, State}.
 
 %% ====================================================================
 %% Internal functions

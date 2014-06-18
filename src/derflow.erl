@@ -35,7 +35,7 @@ is_det(Id) ->
     derflow_vnode:is_det(Id).
 
 declare() ->
-    _ = derflow_declare_sup:start_child([self()]),
+    _ = derflow_declare_fsm_sup:start_child([self()]),
     receive
         {ok, Id} ->
             {ok, Id}

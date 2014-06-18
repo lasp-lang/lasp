@@ -381,7 +381,7 @@ notify_all(L, Value) ->
     end.
 
 declare_next()->
-    _ = derflow_declare_sup:start_child([self()]),
+    _ = derflow_declare_fsm_sup:start_child([self()]),
         receive
             {ok, Id} ->
                 {ok, Id}

@@ -3,8 +3,8 @@
 -include("derflow.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
--define(N, 1).
 -define(VNODE_MASTER, derflow_vnode_master).
+-define(N, 1).
 
 -export([bind/2,
          bind/3,
@@ -35,7 +35,7 @@
 
 -ignore_xref([start_vnode/1]).
 
--record(state, {partition, clock, table}).
+-record(state, {partition, table}).
 
 -record(dv, {value,
              next = undefined,
@@ -84,10 +84,13 @@ is_det(Id) ->
                                               ?VNODE_MASTER).
 
 declare(Id) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {declare, Id},
-                                              ?VNODE_MASTER).
+    Preflist = generate_preference_list(3, Id),
+    Preflist2 = [IndexNode || {IndexNode,_Type} <- Preflist],
+    lager:info("Preflist: ~w",[Preflist2]),
+    riak_core_vnode_master:command(Preflist2,
+                                   {declare, Id},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
 fetch(Id, FromId, FromP) ->
     [{IndexNode, _Type}] = generate_preference_list(?N, Id),
@@ -132,26 +135,21 @@ init([Partition]) ->
     Table = string:concat(integer_to_list(Partition), "dvstore"),
     TableAtom = list_to_atom(Table),
     TableAtom = ets:new(TableAtom, [set, named_table, public, {write_concurrency, true}]),
-    {ok, #state {partition=Partition, clock=0, table=TableAtom}}.
-
-handle_command(get_new_id, _From,
-               State=#state{clock=Clock0, partition=Partition}) ->
-    Clock = Clock0 + 1,
-    {reply, {Clock,Partition}, State#state{clock=Clock}};
+    {ok, #state {partition=Partition, table=TableAtom}}.
 
 handle_command({declare, Id}, _From, State=#state{table=Table}) ->
     true = ets:insert(Table, {Id, #dv{value=undefined}}),
     {reply, {ok, Id}, State};
 
 handle_command({bind, Id, Fun, Arg}, _From,
-               State=#state{partition=Partition, table=Table}) ->
+               State=#state{table=Table}) ->
     [{_Key, V}] = ets:lookup(Table, Id),
-    {NextClock, NextKey} = next_key(V#dv.next, State#state.clock, Partition),
+    NextKey = next_key(V#dv.next),
     execute_and_put(Fun, Arg, NextKey, Id, Table),
-    {reply, {ok, NextKey}, State#state{clock=NextClock}};
+    {reply, {ok, NextKey}, State};
 
 handle_command({bind, Id, Value}, From,
-               State=#state{partition=Partition, table=Table}) ->
+               State=#state{table=Table}) ->
     case Value of
         {id, DVId} ->
             true = ets:insert(Table, {Id, #dv{value={id,DVId}}}),
@@ -159,15 +157,13 @@ handle_command({bind, Id, Value}, From,
             {noreply, State};
         _ ->
             [{_Key,V}] = ets:lookup(Table, Id),
-            {NextClock, NextKey} = next_key(V#dv.next,
-                                            State#state.clock,
-                                            Partition),
+            NextKey = next_key(V#dv.next),
             put(Value, NextKey, Id, Table),
-            {reply, {ok, NextKey}, State#state{clock=NextClock}}
+            {reply, {ok, NextKey}, State}
         end;
 
 handle_command({fetch, TargetId, FromId, FromP}, _From,
-               State=#state{partition=Partition,clock= Clock, table=Table}) ->
+               State=#state{table=Table}) ->
     [{_, DV}] = ets:lookup(Table, TargetId),
     if
         DV#dv.bounded == true ->
@@ -179,12 +175,12 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
                     fetch(BindId, FromId, FromP),
                     {noreply, State};
                 _ ->
-                    {NextClock, NextKey} = next_key(DV#dv.next, Clock, Partition),
+                    NextKey = next_key(DV#dv.next),
                     BindingList = lists:append(DV#dv.binding_list, [FromId]),
                     DV1 = DV#dv{binding_list=BindingList, next=NextKey},
                     true = ets:insert(Table, {TargetId, DV1}),
                     reply_fetch(FromId, FromP, DV1),
-                    {noreply, State#state{clock=NextClock}}
+                    {noreply, State}
                 end
     end;
 
@@ -254,7 +250,7 @@ handle_command({read, X}, From,
     end;
 
 handle_command({touch, X}, _From,
-               State=#state{partition=Partition,clock=Clock, table=Table}) ->
+               State=#state{table=Table}) ->
     [{_Key, V}] = ets:lookup(Table, X),
     Value = V#dv.value,
     Bounded = V#dv.bounded,
@@ -264,32 +260,28 @@ handle_command({touch, X}, _From,
         Bounded == true ->
             {reply, {Value, V#dv.next}, State};
         true ->
-            Next = Clock + 1,
-            NextKey = {Next, Partition},
-            declare(NextKey),
+            {ok, NextKey} = declare_next(),
             V1 = V#dv{next=NextKey},
             true = ets:insert(Table, {X, V1}),
             if
                 Lazy == true ->
                     reply_to_all([Creator], ok),
-                    {reply, NextKey, State#state{clock=Next}};
+                    {reply, NextKey, State};
                 true ->
-                    {reply, NextKey, State#state{clock=Next}}
+                    {reply, NextKey, State}
             end
     end;
 
 handle_command({next, X}, _From,
-               State = #state{partition = Partition, clock = Clock, table = Table}) ->
+               State = #state{table = Table}) ->
     [{_Key,V}] = ets:lookup(Table, X),
     NextKey0 = V#dv.next,
     if
         NextKey0 == undefined ->
-            Next = Clock + 1,
-            NextKey = {Next, Partition},
-            declare(NextKey),
+            {ok, NextKey} = declare_next(),
             V1 = V#dv{next=NextKey},
             true = ets:insert(Table, {X, V1}),
-            {reply, {ok, NextKey}, State#state{clock=Next}};
+            {reply, {ok, NextKey}, State};
         true ->
             {reply, {ok, NextKey0}, State}
   end;
@@ -362,18 +354,6 @@ execute_and_put(F, Arg, Next, Key, Table) ->
     notify_all(BindingList, Value),
     reply_to_all(Threads, {ok, Value, Next}).
 
-next_key(NextKey0, Clock, Partition) ->
-    if
-        NextKey0 == undefined ->
-            NextClock = get_next_key(Clock, Partition),
-            NextKey = {NextClock, Partition},
-            declare(NextKey);
-        true ->
-            NextClock = Clock,
-            NextKey = NextKey0
-    end,
-    {NextClock, NextKey}.
-
 reply_to_all([], _Result) ->
     ok;
 
@@ -381,6 +361,15 @@ reply_to_all([H|T], Result) ->
     {server, undefined,{Address, Ref}} = H,
     gen_server:reply({Address, Ref}, Result),
     reply_to_all(T, Result).
+
+next_key(NextKey0) ->
+    if
+        NextKey0 == undefined ->
+            {ok, NextKey} = declare_next();
+        true ->
+            NextKey = NextKey0
+    end,
+    NextKey.
 
 notify_all(L, Value) ->
     case L of
@@ -391,14 +380,9 @@ notify_all(L, Value) ->
             ok
     end.
 
-get_next_key(Clock, Partition) ->
-    NextKey = {NextClock = Clock + 1, Partition},
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(NextKey)}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, derflow),
-    [{{Index, _Node}, _Type}] = PrefList,
-    if
-        Index == Partition ->
-            get_next_key(NextClock, Partition);
-        true ->
-            NextClock
-    end.
+declare_next()->
+    _ = derflow_declare_fsm_sup:start_child([self()]),
+        receive
+            {ok, Id} ->
+                {ok, Id}
+        end.

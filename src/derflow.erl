@@ -35,8 +35,11 @@ is_det(Id) ->
     derflow_vnode:is_det(Id).
 
 declare() ->
-    Id = derflow_vnode:get_new_id(),
-    derflow_vnode:declare(Id).
+    _ = derflow_declare_fsm_sup:start_child([self()]),
+    receive
+        {ok, Id} ->
+            {ok, Id}
+    end.
 
 wait_needed(Id) ->
     derflow_vnode:wait_needed(Id).

@@ -2,9 +2,7 @@
 -include("derflow.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
--export([async_bind/2,
-         async_bind/3,
-         bind/2,
+-export([bind/2,
          bind/3,
          read/1,
          touch/1,
@@ -14,16 +12,9 @@
          thread_mon/4,
          thread/3,
          wait_needed/1,
-         get_stream/1,
-         async_print_stream/1]).
+         get_stream/1]).
 
 %% Public API
-
-async_bind(Id, Value) ->
-    derflow_vnode:async_bind(Id, Value).
-
-async_bind(Id, Function, Args) ->
-    derflow_vnode:async_bind(Id, Function, Args).
 
 bind(Id, Value) ->
     derflow_vnode:bind(Id, Value).
@@ -59,17 +50,6 @@ thread(Module, Function, Args) ->
 
 get_stream(Stream)->
     internal_get_stream(Stream, []).
-
-async_print_stream(Stream)->
-    case read(Stream) of
-        {ok, nil, _} ->
-            {ok, stream_read};
-        {ok, Value, Next} ->
-            io:format("~w~n", [Value]),
-            async_print_stream(Next);
-         Any ->
-            io:format("~w~n", [Any])
-    end.
 
 %% Internal functions
 

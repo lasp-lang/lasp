@@ -40,8 +40,7 @@ test() ->
     {id, Output} = derflow:declare(),
     Supervisor = derflow:thread(map_reduce, supervisor, [dict:new()]),
     jobtracker(Supervisor, Map, Reduce, Input, [Output]),
-    io:format("Final out ~w~n", [Output]),
-    derflow:async_print_stream(Output).
+    io:format("Final out ~w~n", [Output]).
 
 jobtracker(Supervisor, MapTasks, ReduceTasks, Inputs, Outputs) ->
     case MapTasks of

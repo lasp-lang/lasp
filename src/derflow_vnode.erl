@@ -6,9 +6,7 @@
 -define(VNODE_MASTER, derflow_vnode_master).
 -define(N, 1).
 
--export([async_bind/2,
-         async_bind/3,
-         bind/2,
+-export([bind/2,
          bind/3,
          read/1,
          touch/1,
@@ -48,18 +46,6 @@
              bounded = false}).
 
 %% Extrenal API
-
-async_bind(Id, Value) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {async_bind, Id, Value},
-                                              ?VNODE_MASTER).
-
-async_bind(Id, Function, Args) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {async_bind, Id, Function, Args},
-                                              ?VNODE_MASTER).
 
 bind(Id, Value) ->
     [{IndexNode, _Type}] = generate_preference_list(?N, Id),
@@ -154,32 +140,6 @@ init([Partition]) ->
 handle_command({declare, Id}, _From, State=#state{table=Table}) ->
     true = ets:insert(Table, {Id, #dv{value=undefined}}),
     {reply, {ok, Id}, State};
-
-handle_command({async_bind, Id, F, Arg}, _From,
-               State=#state{table=Table}) ->
-    [{_Key, V}] = ets:lookup(Table, Id),
-    NextKey0 = V#dv.next,
-    if
-        NextKey0 == undefined ->
-            {ok, NextKey} = declare_next();
-        true ->
-            NextKey = NextKey0
-        end,
-    spawn(derflow_vnode, execute_and_put, [F, Arg, NextKey, Id, Table]),
-    {reply, {ok, NextKey}, State};
-
-handle_command({async_bind, Id, Value}, _From,
-               State=#state{table=Table}) ->
-    [{_Key,V}] = ets:lookup(Table, Id),
-    NextKey0 = V#dv.next,
-    if
-        NextKey0 == undefined ->
-            {ok, NextKey} = declare_next();
-        true ->
-            NextKey = NextKey0
-    end,
-    spawn(derflow_vnode, put, [Value, NextKey, Id, Table]),
-    {reply, {ok, NextKey}, State};
 
 handle_command({bind, Id, Fun, Arg}, _From,
                State=#state{table=Table}) ->

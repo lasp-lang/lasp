@@ -40,8 +40,7 @@ test()->
     derflow:thread(?MODULE, sensor, [Port, dc_2]),
     derflow:thread(?MODULE, sensor, [Port, dc_3]),
     {ok, S2} = derflow:declare(),
-    derflow:thread(?MODULE, dcs_monitor, [S1, S2, []]),
-    derflow:async_print_stream(S2).
+    derflow:thread(?MODULE, dcs_monitor, [S1, S2, []]).
 
 run_port(Stream) ->
     receive

@@ -65,7 +65,6 @@ jobtracker(Supervisor, Tasks) ->
             MapOut = spawnmap(Supervisor, Input, MapMod, MapFun, []),
             derflow:thread_mon(Supervisor, ReduceMod, ReduceFun,
                                [MapOut, [], Output]),
-            derflow:async_print_stream(Output),
             jobtracker(Supervisor, Next)
     end.
 

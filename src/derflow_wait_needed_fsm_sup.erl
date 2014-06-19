@@ -1,4 +1,4 @@
--module(derflow_declare_fsm_sup).
+-module(derflow_wait_needed_fsm_sup).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -behaviour(supervisor).
@@ -33,8 +33,8 @@ terminate_child(Supervisor, Pid) ->
 
 %% @doc supervisor callback.
 init([]) ->
-    Spec = {derflow_declare_fsm,
-            {derflow_declare_fsm, start_link, []},
-             transient, 5000, worker, [derflow_declare_fsm]},
+    Spec = {derflow_wait_needed_fsm,
+            {derflow_wait_needed_fsm, start_link, []},
+             transient, 5000, worker, [derflow_wait_needed_fsm]},
 
     {ok, {{simple_one_for_one, 10, 10}, [Spec]}}.

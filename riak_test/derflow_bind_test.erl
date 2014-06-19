@@ -24,7 +24,13 @@ confirm() ->
 
     {ok, Value, NextId} = derflow_test_helpers:read(Node, Id),
     lager:info("Value: ~p", [Value]),
+    ?assertEqual(1, Value),
 
+    {ok, NextId} = derflow_test_helpers:bind(Node, Id, 2),
+    lager:info("NextId: ~p", [NextId]),
+
+    {ok, Value, NextId} = derflow_test_helpers:read(Node, Id),
+    lager:info("Value: ~p", [Value]),
     ?assertEqual(1, Value),
 
     pass.

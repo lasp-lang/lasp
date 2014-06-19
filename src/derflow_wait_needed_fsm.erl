@@ -1,4 +1,4 @@
--module(derflow_declare_fsm).
+-module(derflow_wait_needed_fsm).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -behaviour(gen_fsm).
@@ -19,38 +19,35 @@
 
 -record(state, {from :: pid(),
                 key :: term(),
-                next_key :: term(),
-                type :: term(),
+                id :: term(),
                 results = []}).
 
 %% ===================================================================
 %% Public API
 %% ===================================================================
 
-start_link([From, Type]) ->
-    gen_fsm:start_link(?MODULE, [From, Type], []).
+start_link([From, Id]) ->
+    gen_fsm:start_link(?MODULE, [From, Id], []).
 
 %% ====================================================================
 %% gen_fsm callbacks
 %% ====================================================================
 
 %% @private
-init([From, Type]) ->
-    {ok, execute, #state{type=Type, from=From}, 0}.
+init([From, Id]) ->
+    {ok, execute, #state{from=From, id=Id}, 0}.
 
 %% @private
-execute(timeout, State=#state{type=Type}) ->
-    Key = druuid:v4(),
-    NextKey = druuid:v4(),
-    derflow_vnode:declare(Key, NextKey, Type),
-    {next_state, await_responses, State#state{key=Key, next_key=NextKey}}.
+execute(timeout, State=#state{id=Id}) ->
+    derflow_vnode:wait_needed(Id),
+    {next_state, await_responses, State#state{key=Id}}.
 
-await_responses(Result={ok, Id},
+await_responses(Result=ok,
                 State=#state{from=Pid, results=Results0}) ->
     Results = [Result | Results0],
     case length(Results) of
         ?W ->
-            Pid ! {ok, Id},
+            Pid ! ok,
             {stop, normal, State};
         _ ->
             {next_state, await_responses, State#state{results=Results}}

@@ -4,19 +4,16 @@
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -define(VNODE_MASTER, derflow_vnode_master).
--define(N, 1).
+-define(N, 3).
 
 -export([bind/2,
-         bind/3,
          read/1,
          touch/1,
          next/1,
          is_det/1,
          wait_needed/1,
-         declare/1,
-         get_new_id/0,
-         put/4,
-         execute_and_put/5]).
+         declare/3,
+         put/4]).
 
 -export([start_vnode/1,
          init/1,
@@ -38,93 +35,91 @@
 -record(state, {partition, table}).
 
 -record(dv, {value,
-             next = undefined,
+             next,
              waiting_threads = [],
              binding_list = [],
+             type,
              creator,
              lazy = false,
-             bounded = false}).
+             bound = false}).
 
 %% Extrenal API
 
 bind(Id, Value) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {bind, Id, Value},
-                                              ?VNODE_MASTER).
-
-bind(Id, Function, Args) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {bind, Id, Function, Args},
-                                              ?VNODE_MASTER).
+    Preflist2 = generate_preflist2(?N, Id),
+    riak_core_vnode_master:command(Preflist2,
+                                   {bind, Id, Value},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
 read(Id) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {read, Id},
-                                              ?VNODE_MASTER).
+    Preflist2 = generate_preflist2(?N, Id),
+    riak_core_vnode_master:command(Preflist2,
+                                   {read, Id},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
 touch(Id) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {touch, Id},
-                                              ?VNODE_MASTER).
+    Preflist2 = generate_preflist2(?N, Id),
+    riak_core_vnode_master:command(Preflist2,
+                                   {touch, Id},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
 next(Id) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {next, Id},
-                                              ?VNODE_MASTER).
+    Preflist2 = generate_preflist2(?N, Id),
+    riak_core_vnode_master:command(Preflist2,
+                                   {next, Id},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
 is_det(Id) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {is_det, Id},
-                                              ?VNODE_MASTER).
-
-declare(Id) ->
-    Preflist = generate_preference_list(3, Id),
-    Preflist2 = [IndexNode || {IndexNode, _Type} <- Preflist],
+    Preflist2 = generate_preflist2(?N, Id),
     riak_core_vnode_master:command(Preflist2,
-                                   {declare, Id},
+                                   {is_det, Id},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
+
+declare(Id, NextId, Type) ->
+    Preflist2 = generate_preflist2(?N, Id),
+    riak_core_vnode_master:command(Preflist2,
+                                   {declare, Id, NextId, Type},
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
 fetch(Id, FromId, FromP) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:command(IndexNode,
+    Preflist2 = generate_preflist2(?N, Id),
+    riak_core_vnode_master:command(Preflist2,
                                    {fetch, Id, FromId, FromP},
+                                   {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
 reply_fetch(Id, FromP, DV) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:command(IndexNode,
+    Preflist2 = generate_preflist2(?N, Id),
+    riak_core_vnode_master:command(Preflist2,
                                    {reply_fetch, Id, FromP, DV},
+                                   {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
 notify_value(Id, Value) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:command(IndexNode,
+    Preflist2 = generate_preflist2(?N, Id),
+    riak_core_vnode_master:command(Preflist2,
                                    {notify_value, Id, Value},
+                                   {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
-get_new_id() ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, now()),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              get_new_id,
-                                              ?VNODE_MASTER).
-
 wait_needed(Id) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {wait_needed, Id},
-                                              ?VNODE_MASTER).
+    Preflist2 = generate_preflist2(?N, Id),
+    riak_core_vnode_master:command(Preflist2,
+                                   {wait_needed, Id},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
 %% @doc Generate a preference list for a given N value and data item.
-generate_preference_list(NVal, Param) ->
+generate_preflist2(NVal, Param) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Param)}),
-    riak_core_apl:get_primary_apl(DocIdx, NVal, derflow).
+    Preflist = riak_core_apl:get_primary_apl(DocIdx, NVal, derflow),
+    [IndexNode || {IndexNode, _Type} <- Preflist].
 
 %% API
 start_vnode(I) ->
@@ -133,31 +128,42 @@ start_vnode(I) ->
 init([Partition]) ->
     Table = string:concat(integer_to_list(Partition), "dvstore"),
     TableAtom = list_to_atom(Table),
-    TableAtom = ets:new(TableAtom, [set, named_table, public, {write_concurrency, true}]),
+    TableAtom = ets:new(TableAtom, [set, named_table, public,
+                                    {write_concurrency, true}]),
     {ok, #state {partition=Partition, table=TableAtom}}.
 
-handle_command({declare, Id}, _From, State=#state{table=Table}) ->
-    true = ets:insert(Table, {Id, #dv{value=undefined}}),
+handle_command({declare, Id, NextId, Type}, _From, State=#state{table=Table}) ->
+    Record = case Type of
+        undefined ->
+            %% Undefined represents a single assignment variable, which
+            %% means that we start it off in the undefined state, as
+            %% unbound.
+            #dv{type=Type, value=undefined, next=NextId, bound = false};
+        Type ->
+            %% Given we have another type, for now, assume this is one
+            %% of the riak_dt types.
+            #dv{type=Type, value=Type:new(), next=NextId, bound = true}
+    end,
+    true = ets:insert(Table, {Id, Record}),
     {reply, {ok, Id}, State};
-
-handle_command({bind, Id, Fun, Arg}, _From,
-               State=#state{table=Table}) ->
-    [{_Key, V}] = ets:lookup(Table, Id),
-    NextKey = next_key(V#dv.next),
-    execute_and_put(Fun, Arg, NextKey, Id, Table),
-    {reply, {ok, NextKey}, State};
 
 handle_command({bind, Id, Value}, From,
                State=#state{table=Table}) ->
     case Value of
         {id, DVId} ->
-            true = ets:insert(Table, {Id, #dv{value={id,DVId}}}),
+            true = ets:insert(Table, {Id, #dv{value={id, DVId}}}),
             fetch(DVId, Id, From),
             {noreply, State};
         _ ->
-            [{_Key,V}] = ets:lookup(Table, Id),
+            [{_Key, V}] = ets:lookup(Table, Id),
             NextKey = next_key(V#dv.next),
-            put(Value, NextKey, Id, Table),
+            case V#dv.bound of
+                true ->
+                    ok;
+                false ->
+                    put(Value, NextKey, Id, Table),
+                    ok
+            end,
             {reply, {ok, NextKey}, State}
         end;
 
@@ -165,7 +171,7 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
                State=#state{table=Table}) ->
     [{_, DV}] = ets:lookup(Table, TargetId),
     if
-        DV#dv.bounded == true ->
+        DV#dv.bound == true ->
             reply_fetch(FromId, FromP, DV),
             {noreply, State};
         true ->
@@ -186,13 +192,13 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
 handle_command({reply_fetch, FromId, FromP, FetchDV}, _From,
                State=#state{table=Table}) ->
       if
-        FetchDV#dv.bounded == true ->
+        FetchDV#dv.bound == true ->
             Value = FetchDV#dv.value,
             Next = FetchDV#dv.next,
             put(Value, Next, FromId, Table),
             reply_to_all([FromP], {ok, Next});
         true ->
-            [{_,DV}] = ets:lookup(Table, FromId),
+            [{_, DV}] = ets:lookup(Table, FromId),
             DV1 = DV#dv{next= FetchDV#dv.next},
             ets:insert(Table, {FromId, DV1}),
             reply_to_all([FromP], {ok, FetchDV#dv.next})
@@ -210,7 +216,7 @@ handle_command({wait_needed, Id}, From,
                State=#state{table=Table}) ->
     [{_Key, V}] = ets:lookup(Table, Id),
     if
-        V#dv.bounded == true ->
+        V#dv.bound == true ->
             {reply, ok, State};
         true ->
             case V#dv.waiting_threads of
@@ -226,11 +232,11 @@ handle_command({read, X}, From,
                State=#state{table=Table}) ->
     [{_Key, V}] = ets:lookup(Table, X),
     Value = V#dv.value,
-    Bounded = V#dv.bounded,
+    Bound = V#dv.bound,
     Creator = V#dv.creator,
     Lazy = V#dv.lazy,
     if
-        Bounded == true ->
+        Bound == true ->
             {reply, {ok, Value, V#dv.next}, State};
         true ->
             if
@@ -252,12 +258,12 @@ handle_command({touch, X}, _From,
                State=#state{table=Table}) ->
     [{_Key, V}] = ets:lookup(Table, X),
     Value = V#dv.value,
-    Bounded = V#dv.bounded,
+    Bound = V#dv.bound,
     Creator = V#dv.creator,
     Lazy = V#dv.lazy,
     if
-        Bounded == true ->
-            {reply, {Value, V#dv.next}, State};
+        Bound == true ->
+            {reply, {ok, Value, V#dv.next}, State};
         true ->
             {ok, NextKey} = declare_next(),
             V1 = V#dv{next=NextKey},
@@ -265,15 +271,15 @@ handle_command({touch, X}, _From,
             if
                 Lazy == true ->
                     reply_to_all([Creator], ok),
-                    {reply, NextKey, State};
+                    {reply, {ok, NextKey}, State};
                 true ->
-                    {reply, NextKey, State}
+                    {reply, {ok, NextKey}, State}
             end
     end;
 
 handle_command({next, X}, _From,
                State = #state{table = Table}) ->
-    [{_Key,V}] = ets:lookup(Table, X),
+    [{_Key, V}] = ets:lookup(Table, X),
     NextKey0 = V#dv.next,
     if
         NextKey0 == undefined ->
@@ -286,9 +292,9 @@ handle_command({next, X}, _From,
   end;
 
 handle_command({is_det, Id}, _From, State = #state{table = Table}) ->
-    [{_Key,V}] = ets:lookup(Table, Id),
-    Bounded = V#dv.bounded,
-    {reply, Bounded, State};
+    [{_Key, V}] = ets:lookup(Table, Id),
+    Bound = V#dv.bound,
+    {reply, {ok, Bound}, State};
 
 handle_command(Message, _Sender, State) ->
     ?PRINT({unhandled_command, Message}),
@@ -334,22 +340,16 @@ terminate(_Reason, _State) ->
 
 %% Internal functions
 
+put({Mod, Fun, Args}, Next, Key, Table) ->
+    put(Mod:Fun(Args), Next, Key, Table);
 put(Value, Next, Key, Table) ->
-    [{_Key,V}] = ets:lookup(Table, Key),
+    [{_Key, V}] = ets:lookup(Table, Key),
     Threads = V#dv.waiting_threads,
     BindingList = V#dv.binding_list,
-    V1 = #dv{value= Value, next =Next, lazy=false, bounded= true},
+    Lazy = V#dv.lazy,
+    V1 = #dv{value = Value, next = Next, lazy = Lazy, bound = true},
     true = ets:insert(Table, {Key, V1}),
-    notify_all(BindingList, Value),
-    reply_to_all(Threads, {ok, Value, Next}).
-
-execute_and_put(F, Arg, Next, Key, Table) ->
-    [{_Key,V}] = ets:lookup(Table, Key),
-    Threads = V#dv.waiting_threads,
-    BindingList = V#dv.binding_list,
-    Value = F(Arg),
-    V1 = #dv{value = Value, next = Next, lazy = false, bounded = true},
-    true = ets:insert(Table, {Key, V1}),
+    [{_Key, V1}] = ets:lookup(Table, Key),
     notify_all(BindingList, Value),
     reply_to_all(Threads, {ok, Value, Next}).
 
@@ -361,14 +361,13 @@ reply_to_all([H|T], Result) ->
     gen_server:reply({Address, Ref}, Result),
     reply_to_all(T, Result).
 
-next_key(NextKey0) ->
-    case NextKey0 of
-        undefined ->
-            {ok, NextKey} = declare_next(),
-            NextKey;
-        _ ->
-            NextKey0
-    end.
+next_key(undefined) ->
+    druuid:v4();
+next_key(Key) ->
+    Key.
+
+declare_next() ->
+    druuid:v4().
 
 notify_all(L, Value) ->
     case L of
@@ -377,11 +376,4 @@ notify_all(L, Value) ->
             notify_all(T, Value);
         [] ->
             ok
-    end.
-
-declare_next()->
-    _ = derflow_declare_fsm_sup:start_child([self()]),
-    receive
-        {ok, Id} ->
-            {ok, Id}
     end.

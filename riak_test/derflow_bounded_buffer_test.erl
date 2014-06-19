@@ -6,7 +6,7 @@
 -export([test/0,
          buffer/3,
          producer/3,
-         consumer/3]).
+         consumer/4]).
 
 -ifdef(TEST).
 
@@ -26,22 +26,20 @@ confirm() ->
     lager:info("Remote code loading complete."),
 
     lager:info("Remotely executing the test."),
-    rpc:call(Node, ?MODULE, test, []),
-
-    %% It's possible this test is written incorrectly, given the
-    %% consumer function takes a function which is supposed to double
-    %% values and never returns anything.
-    fail.
+    Result = rpc:call(Node, ?MODULE, test, []),
+    ?assertEqual([0,2,4], Result),
+    pass.
 
 -endif.
 
 test() ->
     {ok, S1} = derflow:declare(),
-    spawn(derflow_bounded_buffer_test, producer, [0, 10, S1]),
+    spawn(derflow_bounded_buffer_test, producer, [0, 3, S1]),
     {ok, S2} = derflow:declare(),
     spawn(derflow_bounded_buffer_test, buffer, [S1, 2, S2]),
-    consumer(S2, 5, fun(X) -> X*2 end),
-    derflow:get_stream(S2).
+    {ok, S3} = derflow:declare(),
+    consumer(S2, 5, fun(X) -> X*2 end, S3),
+    derflow:get_stream(S3).
 
 producer(Value, N, Output) ->
     if
@@ -77,15 +75,16 @@ drop_list(S, Size) ->
             drop_list(Next, Size - 1)
     end.
 
-consumer(S2, Size, F) ->
+consumer(S2, Size, F, Output) ->
     case Size of
         0 ->
             ok;
         _ ->
             case derflow:consume(S2) of
                 {ok, nil, _} ->
-                    ok;
-                {ok, _Value, Next} ->
-                    consumer(Next, Size - 1, F)
+                    derflow:bind(Output, nil);
+                {ok, Value, Next} ->
+                    {ok, NextOutput} = derflow:produce(Output, F(Value)),
+                    consumer(Next, Size - 1, F, NextOutput)
             end
     end.

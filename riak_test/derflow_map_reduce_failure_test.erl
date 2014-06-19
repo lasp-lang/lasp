@@ -98,7 +98,6 @@ supervisor(Dict) ->
           end.
 
 word_count_map(Input, Output) ->
-   %timer:sleep(20000),
    case Input of
         [H|T] ->
             {ok, Next} = derflow:produce(Output, H),

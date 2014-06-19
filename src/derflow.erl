@@ -74,7 +74,7 @@ get_stream(Stream)->
 %% Internal functions
 
 internal_get_stream(Head, Output) ->
-    case read(Head) of
+    case consume(Head) of
         {ok, nil, _} ->
             Output;
         {ok, Value, Next} ->

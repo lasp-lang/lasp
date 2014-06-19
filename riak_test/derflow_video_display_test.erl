@@ -73,4 +73,4 @@ display(Input) ->
     end.
 
 display_frame(X) ->
-    lager:info("Frame: ~w~n",[X]).
+    io:format("Frame: ~w~n",[X]).

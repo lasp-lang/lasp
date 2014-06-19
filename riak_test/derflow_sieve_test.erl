@@ -35,25 +35,25 @@ confirm() ->
 
 test(Max) ->
     {ok, S1} = derflow:declare(),
-    derflow:thread(derflow_sieve_test, generate, [2, Max, S1]),
+    spawn(derflow_sieve_test, generate, [2, Max, S1]),
     {ok, S2} = derflow:declare(),
-    derflow:thread(derflow_sieve_test, sieve, [S1, S2]),
+    spawn(derflow_sieve_test, sieve, [S1, S2]),
     derflow:get_stream(S2).
 
 sieve(S1, S2) ->
-    case derflow:read(S1) of
+    case derflow:consume(S1) of
         {ok, nil, _} ->
             derflow:bind(S2, nil);
         {ok, Value, Next} ->
             {ok, SN} = derflow:declare(),
-            derflow:thread(derflow_sieve_test, filter,
+            spawn(derflow_sieve_test, filter,
                            [Next, fun(Y) -> Y rem Value =/= 0 end, SN]),
-            {ok, NextOutput} = derflow:bind(S2, Value),
+            {ok, NextOutput} = derflow:produce(S2, Value),
             sieve(SN, NextOutput)
     end.
 
 filter(S1, F, S2) ->
-    case derflow:read(S1) of
+    case derflow:consume(S1) of
         {ok, nil, _} ->
             derflow:bind(S2, nil);
         {ok, Value, Next} ->
@@ -61,7 +61,7 @@ filter(S1, F, S2) ->
                 false ->
                     filter(Next, F, S2);
                 true->
-                    {ok, NextOutput} = derflow:bind(S2, Value),
+                    {ok, NextOutput} = derflow:produce(S2, Value),
                     filter(Next, F, NextOutput)
             end
     end.
@@ -70,7 +70,7 @@ generate(Init, N, Output) ->
     if
         (Init =< N) ->
             timer:sleep(250),
-            {ok, Next} = derflow:bind(Output, Init),
+            {ok, Next} = derflow:produce(Output, Init),
             generate(Init + 1, N,  Next);
         true ->
             derflow:bind(Output, nil)

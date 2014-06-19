@@ -37,7 +37,7 @@ test(List) ->
     {ok, S1} = derflow:declare(),
     ?TABLE = ets:new(?TABLE, [set, named_table, public, {write_concurrency, true}]),
     true = ets:insert(?TABLE, {count, 0}),
-    derflow:thread(derflow_get_minimum_test, insort, [List, S1]),
+    spawn(derflow_get_minimum_test, insort, [List, S1]),
     {ok, V, _} = derflow:read(S1),
     V.
 
@@ -46,7 +46,7 @@ insort(List, S) ->
         [H|T] ->
             {ok, OutS} = derflow:declare(),
             insort(T, OutS),
-            derflow:thread(derflow_get_minimum_test, insert, [H, OutS, S]);
+            spawn(derflow_get_minimum_test, insert, [H, OutS, S]);
         [] ->
             derflow:bind(S, nil)
     end.
@@ -57,15 +57,15 @@ insert(X, In, Out) ->
     ok = derflow:wait_needed(Out),
     case derflow:read(In) of
         {ok, nil, _} ->
-            {ok, Next} = derflow:bind(Out, X),
+            {ok, Next} = derflow:produce(Out, X),
             derflow:bind(Next, nil);
         {ok, V, SNext} ->
             if
                 X < V ->
-                    {ok, Next} = derflow:bind(Out, X),
+                    {ok, Next} = derflow:produce(Out, X),
                     derflow:bind(Next, In);
                 true ->
-                    {ok, Next} = derflow:bind(Out, V),
+                    {ok, Next} = derflow:produce(Out, V),
                     insert(X, SNext, Next)
             end
     end.

@@ -41,9 +41,9 @@ test() ->
     Input = [[haha,good,bad], [stupid,good,bold], [stupid,good,good]],
     {ok, Output} = derflow:declare(),
     {ok, TaskStream} = derflow:declare(),
-    Port = derflow:thread(map_reduce, jobproxy, [TaskStream]),
-    Supervisor = derflow:thread(map_reduce, supervisor, [dict:new()]),
-    derflow:thread(map_reduce, jobtracker, [Supervisor, TaskStream]),
+    Port = spawn(map_reduce, jobproxy, [TaskStream]),
+    Supervisor = spawn(map_reduce, supervisor, [dict:new()]),
+    spawn(map_reduce, jobtracker, [Supervisor, TaskStream]),
     timer:sleep(1000),
     send_task(Port, Map, Reduce, Input, Output).
 
@@ -53,17 +53,17 @@ send_task(Port, Map, Reduce, Input, Output) ->
 jobproxy(TaskStream) ->
     receive
         Task ->
-            {ok, Next} = derflow:bind(TaskStream, Task),
+            {ok, Next} = derflow:produce(TaskStream, Task),
             jobproxy(Next)
     end.
 
 jobtracker(Supervisor, Tasks) ->
-    case derflow:read(Tasks) of
+    case derflow:consume(Tasks) of
         {ok, nil, _} ->
             io:format("All jobs finished!");
         {ok, {{MapMod, MapFun}, {ReduceMod, ReduceFun}, Input, Output}, Next} ->
             MapOut = spawnmap(Supervisor, Input, MapMod, MapFun, []),
-            derflow:thread_mon(Supervisor, ReduceMod, ReduceFun,
+            derflow:spawn_mon(Supervisor, ReduceMod, ReduceFun,
                                [MapOut, [], Output]),
             jobtracker(Supervisor, Next)
     end.
@@ -72,7 +72,7 @@ spawnmap(Supervisor, Inputs, Mod, Fun, Outputs) ->
     case Inputs of
         [H|T] ->
             {ok, S} = derflow:declare(),
-            derflow:thread_mon(Supervisor, Mod, Fun, [H, S]),
+            derflow:spawn_mon(Supervisor, Mod, Fun, [H, S]),
             spawnmap(Supervisor, T, Mod, Fun, lists:append(Outputs, [S]));
         [] ->
             Outputs
@@ -83,21 +83,21 @@ supervisor(Dict) ->
         {'DOWN', Ref, process, _, noproc} ->
             case dict:find(Ref, Dict) of
                 {ok, {Module, Function, Args}} ->
-                    derflow:thread_mon(self(), Module, Function, Args);
+                    derflow:spawn_mon(self(), Module, Function, Args);
                 error ->
                     supervisor(Dict)
             end;
         {'DOWN', Ref, process, _, noconnection} ->
             case dict:find(Ref, Dict) of
                 {ok, {Module, Function, Args}} ->
-                    derflow:thread_mon(self(), Module, Function, Args);
+                    derflow:spawn_mon(self(), Module, Function, Args);
                 error ->
                     supervisor(Dict)
             end;
         {'DOWN', Ref, process, _, _Reason} ->
             case dict:find(Ref, Dict) of
                 {ok, {Module, Function, Args}} ->
-                    derflow:thread_mon(self(), Module, Function, Args);
+                    derflow:spawn_mon(self(), Module, Function, Args);
                 error ->
                     supervisor(Dict)
             end;
@@ -111,7 +111,7 @@ word_count_map(Input, Output) ->
    timer:sleep(20000),
    case Input of
         [H|T] ->
-            {ok, Next} = derflow:bind(Output, H),
+            {ok, Next} = derflow:produce(Output, H),
             word_count_map(T, Next);
         [] ->
             derflow:bind(Output, nil)
@@ -125,7 +125,7 @@ word_count_reduce(Input, Tempout, Output) ->
         [] ->
             case Tempout of
                 [H|T] ->
-                    {ok, Next} = derflow:bind(Output, H),
+                    {ok, Next} = derflow:produce(Output, H),
                     word_count_reduce([], T, Next);
                 [] ->
                     derflow:bind(Output, nil)
@@ -133,7 +133,7 @@ word_count_reduce(Input, Tempout, Output) ->
     end.
 
 loop(Elem, Output) ->
-  case derflow:read(Elem) of
+  case derflow:consume(Elem) of
         {ok, nil, _} ->
             Output;
         {ok, Value, Next} ->

@@ -37,9 +37,9 @@ confirm() ->
 
 test() ->
     {ok, S1} = derflow:declare(),
-    derflow:thread(derflow_bounded_buffer_test, producer, [0, 10, S1]),
+    spawn(derflow_bounded_buffer_test, producer, [0, 10, S1]),
     {ok, S2} = derflow:declare(),
-    derflow:thread(derflow_bounded_buffer_test, buffer, [S1, 2, S2]),
+    spawn(derflow_bounded_buffer_test, buffer, [S1, 2, S2]),
     consumer(S2, 5, fun(X) -> X*2 end),
     derflow:get_stream(S2).
 
@@ -47,7 +47,7 @@ producer(Value, N, Output) ->
     if
         (N > 0) ->
             ok = derflow:wait_needed(Output),
-            {ok, Next} = derflow:bind(Output, Value),
+            {ok, Next} = derflow:produce(Output, Value),
             producer(Value + 1, N - 1,  Next);
         true ->
             derflow:bind(Output, nil)
@@ -55,9 +55,9 @@ producer(Value, N, Output) ->
 
 loop(S1, S2, End) ->
     ok = derflow:wait_needed(S2),
-    {ok, S1Value, S1Next} = derflow:read(S1),
-    {ok, S2Next} = derflow:bind(S2, S1Value),
-    case derflow:next(End) of
+    {ok, S1Value, S1Next} = derflow:consume(S1),
+    {ok, S2Next} = derflow:produce(S2, S1Value),
+    case derflow:extend(End) of
         {ok, {nil, _}} ->
             ok;
         {ok, EndNext} ->
@@ -73,7 +73,7 @@ drop_list(S, Size) ->
         Size == 0 ->
             S;
         true ->
-            {ok, Next} = derflow:next(S),
+            {ok, Next} = derflow:extend(S),
             drop_list(Next, Size - 1)
     end.
 
@@ -82,7 +82,7 @@ consumer(S2, Size, F) ->
         0 ->
             ok;
         _ ->
-            case derflow:read(S2) of
+            case derflow:consume(S2) of
                 {ok, nil, _} ->
                     ok;
                 {ok, _Value, Next} ->

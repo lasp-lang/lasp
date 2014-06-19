@@ -33,10 +33,10 @@ confirm() ->
 
 test() ->
     {ok, S1} = derflow:declare(),
-    derflow:thread(derflow_producer_consumer_test, producer,
+    spawn(derflow_producer_consumer_test, producer,
                    [0, 10, S1]),
     {ok, S2} = derflow:declare(),
-    derflow:thread(derflow_producer_consumer_test, consumer,
+    spawn(derflow_producer_consumer_test, consumer,
                    [S1, fun(X) -> X + 5 end, S2]),
     derflow:get_stream(S2).
 
@@ -44,17 +44,17 @@ producer(Init, N, Output) ->
     if
         (N > 0) ->
             timer:sleep(1000),
-            {ok, Next} = derflow:bind(Output, Init),
+            {ok, Next} = derflow:produce(Output, Init),
             producer(Init + 1, N-1,  Next);
         true ->
             derflow:bind(Output, nil)
     end.
 
 consumer(S1, F, S2) ->
-    case derflow:read(S1) of
+    case derflow:consume(S1) of
         {ok, nil, _} ->
             derflow:bind(S2, nil);
         {ok, Value, Next} ->
-            {ok, NextOutput} = derflow:bind(S2, F, Value),
+            {ok, NextOutput} = derflow:produce(S2, F, Value),
             consumer(Next, F, NextOutput)
     end.

@@ -19,10 +19,10 @@ confirm() ->
 
     {ok, Id} = derflow_test_helpers:declare(Node),
 
-    {ok, NextId} = derflow_test_helpers:bind(Node, Id, 1),
-    lager:info("NextId: ~p", [NextId]),
+    ok = derflow_test_helpers:bind(Node, Id, 1),
+    lager:info("Successful bind"),
 
-    {ok, Value, NextId} = derflow_test_helpers:read(Node, Id),
+    {ok, Value} = derflow_test_helpers:read(Node, Id),
     lager:info("Value: ~p", [Value]),
 
     ?assertEqual(1, Value),

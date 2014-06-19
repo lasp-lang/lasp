@@ -28,19 +28,20 @@ confirm() ->
     lager:info("Remote code loading complete."),
 
     lager:info("Remotely executing the test."),
-    rpc:call(Node, ?MODULE, test, []),
+    Result = rpc:call(Node, ?MODULE, test, []),
+    ?assertEqual([{haha,1},{good,4},{bad,1},{stupid,2},{bold,1}], Result),
     pass.
 
 -endif.
 
 test() ->
-    Map = [{map_reduce, word_count_map}],
-    Reduce = [{map_reduce, word_count_reduce}],
+    Map = [{?MODULE, word_count_map}],
+    Reduce = [{?MODULE, word_count_reduce}],
     Input = [[[haha,good,bad], [stupid,good,bold], [stupid,good,good]]],
-    {id, Output} = derflow:declare(),
-    Supervisor = spawn(map_reduce, supervisor, [dict:new()]),
+    {ok, Output} = derflow:declare(),
+    Supervisor = spawn(?MODULE, supervisor, [dict:new()]),
     jobtracker(Supervisor, Map, Reduce, Input, [Output]),
-    lager:info("Final out ~w~n", [Output]).
+    derflow:get_stream(Output).
 
 jobtracker(Supervisor, MapTasks, ReduceTasks, Inputs, Outputs) ->
     case MapTasks of
@@ -54,7 +55,7 @@ jobtracker(Supervisor, MapTasks, ReduceTasks, Inputs, Outputs) ->
             derflow:spawn_mon(Supervisor, Module2, ReduceFun, [MapOut, [], Output]),
             jobtracker(Supervisor, MT, RT, IT, OT);
         [] ->
-            lager:info("All jobs finished!~n")
+            io:format("All jobs finished!~n")
     end.
 
 spawnmap(Supervisor, Inputs, Mod, Fun, Outputs) ->
@@ -97,7 +98,7 @@ supervisor(Dict) ->
           end.
 
 word_count_map(Input, Output) ->
-   timer:sleep(20000),
+   %timer:sleep(20000),
    case Input of
         [H|T] ->
             {ok, Next} = derflow:produce(Output, H),

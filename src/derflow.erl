@@ -46,10 +46,6 @@ produce(Id, Function, Args) ->
 consume(Id) ->
     derflow_vnode:read(Id).
 
-%%Not sure whether this is used or not
-%touch(Id) ->
-%    derflow_vnode:touch(Id).
-
 extend(Id) ->
     derflow_vnode:next(Id).
 
@@ -58,8 +54,6 @@ is_det(Id) ->
 
 wait_needed(Id) ->
     derflow_vnode:wait_needed(Id).
-
-%%TODO: Missing monitor and kill primitives
 
 %% The rest of primitives are not in the paper. They are just utilities.
 %% maybe we should just remove them

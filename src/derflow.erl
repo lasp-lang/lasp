@@ -7,7 +7,7 @@
          bind/4,
          read/1,
          produce/2,
-         produce/3,
+         produce/4,
          consume/1,
          extend/1,
          is_det/1,
@@ -43,8 +43,9 @@ read(Id) ->
 produce(Id, Value) ->
     derflow_vnode:bind(Id, Value).
 
-produce(Id, Function, Args) ->
-    derflow_vnode:bind(Id, Function, Args).
+produce(Id, Module, Function, Args) ->
+    Value = Module:Function(Args),
+    derflow_vnode:bind(Id, Value).
 
 consume(Id) ->
     derflow_vnode:read(Id).

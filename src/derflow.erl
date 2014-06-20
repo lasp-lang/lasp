@@ -9,7 +9,6 @@
          produce/2,
          produce/3,
          consume/1,
-         %%touch/1,
          extend/1,
          is_det/1,
          wait_needed/1,

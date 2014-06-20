@@ -4,7 +4,7 @@
 
 -export([declare/0,
          bind/2,
-         bind/3,
+         bind/4,
          read/1,
          produce/2,
          produce/3,
@@ -32,9 +32,9 @@ bind(Id, Value) ->
             error
     end.
 
-bind(Id, Function, Args) ->
-    {ok, _} = derflow_vnode:bind(Id, Function, Args),
-    ok.
+bind(Id, Module, Function, Args) ->
+    Value = Module:Function(Args),
+    bind(Id, Value).
 
 read(Id) ->
     {ok, Value, _Next}= derflow_vnode:read(Id),

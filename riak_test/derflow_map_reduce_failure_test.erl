@@ -28,19 +28,20 @@ confirm() ->
     lager:info("Remote code loading complete."),
 
     lager:info("Remotely executing the test."),
-    rpc:call(Node, ?MODULE, test, []),
+    Result = rpc:call(Node, ?MODULE, test, []),
+    ?assertEqual([{haha,1},{good,4},{bad,1},{stupid,2},{bold,1}], Result),
     pass.
 
 -endif.
 
 test() ->
-    Map = [{map_reduce, word_count_map}],
-    Reduce = [{map_reduce, word_count_reduce}],
+    Map = [{?MODULE, word_count_map}],
+    Reduce = [{?MODULE, word_count_reduce}],
     Input = [[[haha,good,bad], [stupid,good,bold], [stupid,good,good]]],
-    {id, Output} = derflow:declare(),
-    Supervisor = derflow:thread(map_reduce, supervisor, [dict:new()]),
+    {ok, Output} = derflow:declare(),
+    Supervisor = spawn(?MODULE, supervisor, [dict:new()]),
     jobtracker(Supervisor, Map, Reduce, Input, [Output]),
-    io:format("Final out ~w~n", [Output]).
+    derflow:get_stream(Output).
 
 jobtracker(Supervisor, MapTasks, ReduceTasks, Inputs, Outputs) ->
     case MapTasks of
@@ -51,7 +52,7 @@ jobtracker(Supervisor, MapTasks, ReduceTasks, Inputs, Outputs) ->
             {Module, MapFun} = MapTask,
             {Module2, ReduceFun} = ReduceTask,
             MapOut = spawnmap(Supervisor, Input, Module, MapFun, []),
-            derflow:thread_mon(Supervisor, Module2, ReduceFun, [MapOut, [], Output]),
+            derflow:spawn_mon(Supervisor, Module2, ReduceFun, [MapOut, [], Output]),
             jobtracker(Supervisor, MT, RT, IT, OT);
         [] ->
             io:format("All jobs finished!~n")
@@ -61,7 +62,7 @@ spawnmap(Supervisor, Inputs, Mod, Fun, Outputs) ->
     case Inputs of
         [H|T] ->
             {ok, S} = derflow:declare(),
-            derflow:thread_mon(Supervisor, Mod, Fun, [H, S]),
+            derflow:spawn_mon(Supervisor, Mod, Fun, [H, S]),
             spawnmap(Supervisor, T, Mod, Fun, lists:append(Outputs,[S]));
         [] ->
             Outputs
@@ -72,21 +73,21 @@ supervisor(Dict) ->
         {'DOWN', Ref, process, _, noproc} ->
             case dict:find(Ref, Dict) of
                 {ok, {Module, Function, Args}} ->
-                    derflow:thread_mon(self(), Module, Function, Args);
+                    derflow:spawn_mon(self(), Module, Function, Args);
                 error ->
                     supervisor(Dict)
             end;
         {'DOWN', Ref, process, _, noconnection} ->
             case dict:find(Ref, Dict) of
                 {ok, {Module, Function, Args}} ->
-                    derflow:thread_mon(self(), Module, Function, Args);
+                    derflow:spawn_mon(self(), Module, Function, Args);
                 error ->
                     supervisor(Dict)
             end;
         {'DOWN', Ref, process, _, _Reason} ->
             case dict:find(Ref, Dict) of
                 {ok, {Module, Function, Args}} ->
-                    derflow:thread_mon(self(), Module, Function, Args);
+                    derflow:spawn_mon(self(), Module, Function, Args);
                 error ->
                     supervisor(Dict)
             end;
@@ -97,10 +98,9 @@ supervisor(Dict) ->
           end.
 
 word_count_map(Input, Output) ->
-   timer:sleep(20000),
    case Input of
         [H|T] ->
-            {ok, Next} = derflow:bind(Output, H),
+            {ok, Next} = derflow:produce(Output, H),
             word_count_map(T, Next);
         [] ->
          derflow:bind(Output, nil)
@@ -114,7 +114,7 @@ word_count_reduce(Input, Tempout, Output) ->
         [] ->
             case Tempout of
                 [H|T] ->
-                    {ok, Next} = derflow:bind(Output, H),
+                    {ok, Next} = derflow:produce(Output, H),
                     word_count_reduce([], T, Next);
                 [] ->
                     derflow:bind(Output, nil)
@@ -122,7 +122,7 @@ word_count_reduce(Input, Tempout, Output) ->
     end.
 
 loop(Elem, Output) ->
-    case derflow:read(Elem) of
+    case derflow:consume(Elem) of
         {ok, nil, _} ->
             Output;
         {ok, Value, Next} ->

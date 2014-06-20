@@ -32,7 +32,7 @@ confirm() ->
 
 test() ->
     {ok, S1} = derflow:declare(),
-    derflow:thread(derflow_video_display_test, sender, [0, 10, S1]),
+    spawn(derflow_video_display_test, sender, [0, 10, S1]),
     display(S1),
     derflow:get_stream(S1).
 
@@ -40,7 +40,7 @@ sender(Init, N, Output) ->
     if
         N >= 0 ->
             timer:sleep(500),
-            {ok, Next} = derflow:bind(Output, Init),
+            {ok, Next} = derflow:produce(Output, Init),
             sender(Init + 1, N - 1,  Next);
         true ->
             timer:sleep(500),
@@ -48,7 +48,7 @@ sender(Init, N, Output) ->
     end.
 
 skip1(Input, Output) ->
-    case derflow:read(Input) of
+    case derflow:consume(Input) of
         {ok, nil, _} ->
             derflow:bind(Output, nil);
         {ok, _Value, Next} ->
@@ -64,7 +64,7 @@ display(Input) ->
     timer:sleep(1500),
     {ok, Output} = derflow:declare(),
     skip1(Input, Output),
-    case derflow:read(Output) of
+    case derflow:consume(Output) of
         {ok, nil, _} ->
             ok;
         {ok, Value, Next} ->

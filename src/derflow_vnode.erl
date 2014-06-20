@@ -9,7 +9,6 @@
 -export([bind/2,
          bind/3,
          read/1,
-         touch/1,
          next/1,
          is_det/1,
          wait_needed/1,
@@ -63,12 +62,6 @@ read(Id) ->
     [{IndexNode, _Type}] = generate_preference_list(?N, Id),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {read, Id},
-                                              ?VNODE_MASTER).
-
-touch(Id) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {touch, Id},
                                               ?VNODE_MASTER).
 
 next(Id) ->
@@ -245,29 +238,6 @@ handle_command({read, X}, From,
                     V1 = V#dv{waiting_threads=WT},
                     true = ets:insert(Table, {X, V1}),
                     {noreply, State}
-            end
-    end;
-
-handle_command({touch, X}, _From,
-               State=#state{table=Table}) ->
-    [{_Key, V}] = ets:lookup(Table, X),
-    Value = V#dv.value,
-    Bounded = V#dv.bounded,
-    Creator = V#dv.creator,
-    Lazy = V#dv.lazy,
-    if
-        Bounded == true ->
-            {reply, {Value, V#dv.next}, State};
-        true ->
-            {ok, NextKey} = declare_next(),
-            V1 = V#dv{next=NextKey},
-            true = ets:insert(Table, {X, V1}),
-            if
-                Lazy == true ->
-                    reply_to_all([Creator], ok),
-                    {reply, NextKey, State};
-                true ->
-                    {reply, NextKey, State}
             end
     end;
 

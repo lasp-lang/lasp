@@ -35,17 +35,17 @@ confirm() ->
 
 test()->
     {ok, S1} = derflow:declare(),
-    Port = derflow:thread(?MODULE, run_port ,[S1]),
-    derflow:thread(?MODULE, sensor, [Port, dc_1]),
-    derflow:thread(?MODULE, sensor, [Port, dc_2]),
-    derflow:thread(?MODULE, sensor, [Port, dc_3]),
+    Port = spawn(?MODULE, run_port ,[S1]),
+    spawn(?MODULE, sensor, [Port, dc_1]),
+    spawn(?MODULE, sensor, [Port, dc_2]),
+    spawn(?MODULE, sensor, [Port, dc_3]),
     {ok, S2} = derflow:declare(),
-    derflow:thread(?MODULE, dcs_monitor, [S1, S2, []]).
+    spawn(?MODULE, dcs_monitor, [S1, S2, []]).
 
 run_port(Stream) ->
     receive
         {Message, From} ->
-            {ok, Next} = derflow:bind(Stream, {Message, From}),
+            {ok, Next} = derflow:produce(Stream, {Message, From}),
             run_port(Next)
     end.
 
@@ -56,10 +56,10 @@ sensor(Port, Identifier) ->
     sensor(Port, Identifier).
 
 dcs_monitor(Input, Output, State) ->
-    case derflow:read(Input) of
+    case derflow:consume(Input) of
         {ok, {computer_down, Identifier}, NextInput} ->
             NewState = register_comfailure(Identifier, State),
-            {ok, NextOutput} = derflow:bind(Output, NewState),
+            {ok, NextOutput} = derflow:produce(Output, NewState),
             dcs_monitor(NextInput, NextOutput, NewState);
         {ok, _, NextInput} ->
             dcs_monitor(NextInput, Output, State)

@@ -150,8 +150,18 @@ handle_command({bind, Id, Value}, From,
         _ ->
             [{_Key,V}] = ets:lookup(Table, Id),
             NextKey = next_key(V#dv.next),
-            put(Value, NextKey, Id, Table),
-            {reply, {ok, NextKey}, State}
+            case V#dv.bounded of
+                true ->
+                    case V#dv.value of
+                        Value ->
+                            {reply, {ok, NextKey}, State};
+                        _ ->
+                            {reply, error, State}
+                    end;
+                false ->
+                    put(Value, NextKey, Id, Table),
+                    {reply, {ok, NextKey}, State}
+            end
         end;
 
 handle_command({fetch, TargetId, FromId, FromP}, _From,

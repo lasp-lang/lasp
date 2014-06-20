@@ -26,8 +26,12 @@ declare() ->
     end.
 
 bind(Id, Value) ->
-    {ok, _} = derflow_vnode:bind(Id, Value),
-    ok.
+    case derflow_vnode:bind(Id, Value) of
+        {ok, _} ->
+            ok;
+        error ->
+            error
+    end.
 
 bind(Id, Function, Args) ->
     {ok, _} = derflow_vnode:bind(Id, Function, Args),

@@ -7,15 +7,13 @@
 -define(N, 1).
 
 -export([bind/2,
-         bind/3,
          read/1,
          next/1,
          is_det/1,
          wait_needed/1,
          declare/1,
          get_new_id/0,
-         put/4,
-         execute_and_put/5]).
+         put/4]).
 
 -export([start_vnode/1,
          init/1,
@@ -50,12 +48,6 @@ bind(Id, Value) ->
     [{IndexNode, _Type}] = generate_preference_list(?N, Id),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {bind, Id, Value},
-                                              ?VNODE_MASTER).
-
-bind(Id, Function, Args) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {bind, Id, Function, Args},
                                               ?VNODE_MASTER).
 
 read(Id) ->
@@ -132,13 +124,6 @@ init([Partition]) ->
 handle_command({declare, Id}, _From, State=#state{table=Table}) ->
     true = ets:insert(Table, {Id, #dv{value=undefined}}),
     {reply, {ok, Id}, State};
-
-handle_command({bind, Id, Fun, Arg}, _From,
-               State=#state{table=Table}) ->
-    [{_Key, V}] = ets:lookup(Table, Id),
-    NextKey = next_key(V#dv.next),
-    execute_and_put(Fun, Arg, NextKey, Id, Table),
-    {reply, {ok, NextKey}, State};
 
 handle_command({bind, Id, Value}, From,
                State=#state{table=Table}) ->
@@ -319,16 +304,6 @@ put(Value, Next, Key, Table) ->
     Threads = V#dv.waiting_threads,
     BindingList = V#dv.binding_list,
     V1 = #dv{value= Value, next =Next, lazy=false, bounded= true},
-    true = ets:insert(Table, {Key, V1}),
-    notify_all(BindingList, Value),
-    reply_to_all(Threads, {ok, Value, Next}).
-
-execute_and_put(F, Arg, Next, Key, Table) ->
-    [{_Key,V}] = ets:lookup(Table, Key),
-    Threads = V#dv.waiting_threads,
-    BindingList = V#dv.binding_list,
-    Value = F(Arg),
-    V1 = #dv{value = Value, next = Next, lazy = false, bounded = true},
     true = ets:insert(Table, {Key, V1}),
     notify_all(BindingList, Value),
     reply_to_all(Threads, {ok, Value, Next}).

@@ -55,6 +55,6 @@ consumer(S1, F, S2) ->
         {ok, nil, _} ->
             derflow:bind(S2, nil);
         {ok, Value, Next} ->
-            {ok, NextOutput} = derflow:produce(S2, F, Value),
+            {ok, NextOutput} = derflow:produce(S2, F(Value)),
             consumer(Next, F, NextOutput)
     end.

@@ -18,11 +18,9 @@
 %% Public API
 
 declare() ->
-    _ = derflow_declare_fsm_sup:start_child([self()]),
-    receive
-        {ok, Id} ->
-            {ok, Id}
-    end.
+    Id = druuid:v4(),
+    {ok, Id} = derflow_vnode:declare(Id),
+    {ok, Id}.
 
 bind(Id, Value) ->
     case derflow_vnode:bind(Id, Value) of

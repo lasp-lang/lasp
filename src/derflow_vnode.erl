@@ -69,12 +69,10 @@ is_det(Id) ->
                                               ?VNODE_MASTER).
 
 declare(Id) ->
-    Preflist = generate_preference_list(3, Id),
-    Preflist2 = [IndexNode || {IndexNode, _Type} <- Preflist],
-    riak_core_vnode_master:command(Preflist2,
-                                   {declare, Id},
-                                   {fsm, undefined, self()},
-                                   ?VNODE_MASTER).
+    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {declare, Id},
+                                              ?VNODE_MASTER).
 
 fetch(Id, FromId, FromP) ->
     [{IndexNode, _Type}] = generate_preference_list(?N, Id),
@@ -335,8 +333,6 @@ notify_all(L, Value) ->
     end.
 
 declare_next()->
-    _ = derflow_declare_fsm_sup:start_child([self()]),
-    receive
-        {ok, Id} ->
-            {ok, Id}
-    end.
+    Id = druuid:v4(),
+    {ok, Id} = declare(Id),
+    {ok, Id}.

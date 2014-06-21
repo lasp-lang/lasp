@@ -3,6 +3,7 @@
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([declare/0,
+         declare/1,
          bind/2,
          bind/4,
          read/1,
@@ -18,8 +19,11 @@
 %% Public API
 
 declare() ->
+    declare(undefined).
+
+declare(Type) ->
     Id = druuid:v4(),
-    {ok, Id} = derflow_vnode:declare(Id),
+    {ok, Id} = derflow_vnode:declare(Id, Type),
     {ok, Id}.
 
 bind(Id, Value) ->

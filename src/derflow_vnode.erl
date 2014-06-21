@@ -11,7 +11,7 @@
          next/1,
          is_det/1,
          wait_needed/1,
-         declare/1,
+         declare/2,
          get_new_id/0,
          put/4]).
 
@@ -39,6 +39,7 @@
              waiting_threads = [],
              binding_list = [],
              creator,
+             type,
              lazy = false,
              bounded = false}).
 
@@ -68,10 +69,10 @@ is_det(Id) ->
                                               {is_det, Id},
                                               ?VNODE_MASTER).
 
-declare(Id) ->
+declare(Id, Type) ->
     [{IndexNode, _Type}] = generate_preference_list(?N, Id),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {declare, Id},
+                                              {declare, Id, Type},
                                               ?VNODE_MASTER).
 
 fetch(Id, FromId, FromP) ->
@@ -119,8 +120,14 @@ init([Partition]) ->
     TableAtom = ets:new(TableAtom, [set, named_table, public, {write_concurrency, true}]),
     {ok, #state {partition=Partition, table=TableAtom}}.
 
-handle_command({declare, Id}, _From, State=#state{table=Table}) ->
-    true = ets:insert(Table, {Id, #dv{value=undefined}}),
+handle_command({declare, Id, Type}, _From, State=#state{table=Table}) ->
+    Record = case Type of
+        undefined ->
+            #dv{value=undefined, type=undefined, bounded=false};
+        Type ->
+            #dv{value=Type:new(), type=Type, bounded=true}
+    end,
+    true = ets:insert(Table, {Id, Record}),
     {reply, {ok, Id}, State};
 
 handle_command({bind, Id, Value}, From,
@@ -132,7 +139,7 @@ handle_command({bind, Id, Value}, From,
             {noreply, State};
         _ ->
             [{_Key,V}] = ets:lookup(Table, Id),
-            NextKey = next_key(V#dv.next),
+            NextKey = next_key(V#dv.next, V#dv.type),
             case V#dv.bounded of
                 true ->
                     case V#dv.value of
@@ -160,7 +167,7 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
                     fetch(BindId, FromId, FromP),
                     {noreply, State};
                 _ ->
-                    NextKey = next_key(DV#dv.next),
+                    NextKey = next_key(DV#dv.next, DV#dv.type),
                     BindingList = lists:append(DV#dv.binding_list, [FromId]),
                     DV1 = DV#dv{binding_list=BindingList, next=NextKey},
                     true = ets:insert(Table, {TargetId, DV1}),
@@ -240,7 +247,7 @@ handle_command({next, X}, _From,
     NextKey0 = V#dv.next,
     if
         NextKey0 == undefined ->
-            {ok, NextKey} = declare_next(),
+            {ok, NextKey} = declare_next(V#dv.type),
             V1 = V#dv{next=NextKey},
             true = ets:insert(Table, {X, V1}),
             {reply, {ok, NextKey}, State};
@@ -314,10 +321,10 @@ reply_to_all([H|T], Result) ->
     gen_server:reply({Address, Ref}, Result),
     reply_to_all(T, Result).
 
-next_key(NextKey0) ->
+next_key(NextKey0, Type) ->
     case NextKey0 of
         undefined ->
-            {ok, NextKey} = declare_next(),
+            {ok, NextKey} = declare_next(Type),
             NextKey;
         _ ->
             NextKey0
@@ -332,7 +339,7 @@ notify_all(L, Value) ->
             ok
     end.
 
-declare_next()->
+declare_next(Type)->
     Id = druuid:v4(),
-    {ok, Id} = declare(Id),
+    {ok, Id} = declare(Id, Type),
     {ok, Id}.

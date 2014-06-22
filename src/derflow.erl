@@ -14,6 +14,7 @@
          is_det/1,
          wait_needed/1,
          spawn_mon/4,
+         thread/3,
          get_stream/1]).
 
 %% Public API
@@ -39,7 +40,7 @@ bind(Id, Module, Function, Args) ->
     bind(Id, Value).
 
 read(Id) ->
-    {ok, Value, _Next}= derflow_vnode:read(Id),
+    {ok, Value, _Next} = derflow_vnode:read(Id),
     {ok, Value}.
 
 produce(Id, Value) ->
@@ -58,6 +59,10 @@ extend(Id) ->
 is_det(Id) ->
     derflow_vnode:is_det(Id).
 
+thread(Module, Function, Args) ->
+    {ok, Pid} = derflow_vnode:thread(Module, Function, Args),
+    {ok, Pid}.
+
 wait_needed(Id) ->
     derflow_vnode:wait_needed(Id).
 
@@ -65,7 +70,7 @@ wait_needed(Id) ->
 %% maybe we should just remove them
 
 spawn_mon(Supervisor, Module, Function, Args) ->
-    Pid = spawn(Module, Function, Args),
+    {ok, Pid} = thread(Module, Function, Args),
     Supervisor ! {'SUPERVISE', Pid, Module, Function, Args}.
 
 get_stream(Stream)->

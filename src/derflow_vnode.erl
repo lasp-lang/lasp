@@ -13,7 +13,8 @@
          wait_needed/1,
          declare/2,
          get_new_id/0,
-         write/5]).
+         write/5,
+         thread/3]).
 
 -export([start_vnode/1,
          init/1,
@@ -55,6 +56,12 @@ read(Id) ->
     [{IndexNode, _Type}] = generate_preference_list(?N, Id),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {read, Id},
+                                              ?VNODE_MASTER).
+
+thread(Module, Function, Args) ->
+    [{IndexNode, _Type}] = generate_preference_list(?N, {Module, Function, Args}),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {thread, Module, Function, Args},
                                               ?VNODE_MASTER).
 
 next(Id) ->
@@ -207,6 +214,10 @@ handle_command({notify_value, Id, Value}, _From,
     Type = DV#dv.type,
     write(Type, Value, Next, Id, Table),
     {noreply, State};
+
+handle_command({thread, Module, Function, Args}, _From, State) ->
+    Pid = spawn(Module, Function, Args),
+    {reply, {ok, Pid}, State};
 
 handle_command({wait_needed, Id}, From,
                State=#state{table=Table}) ->

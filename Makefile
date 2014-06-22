@@ -29,6 +29,10 @@ stage : rel
 	$(foreach dep,$(wildcard deps/*), rm -rf rel/derflow/lib/$(shell basename $(dep))-* && ln -sf $(abspath $(dep)) rel/derflow/lib;)
 	$(foreach app,$(wildcard apps/*), rm -rf rel/derflow/lib/$(shell basename $(app))-* && ln -sf $(abspath $(app)) rel/derflow/lib;)
 
+riak-test: stagedevrel
+	riak_test/bin/derflow-current.sh
+	../riak_test/riak_test -v -c derflow -t derflow_lattice_test
+
 ##
 ## Developer targets
 ##
@@ -41,7 +45,7 @@ stage : rel
 ##    make stagedevrel DEVNODES=68
 
 .PHONY : stagedevrel devrel
-DEVNODES ?= 6
+DEVNODES ?= 1
 
 # 'seq' is not available on all *BSD, so using an alternate in awk
 SEQ = $(shell awk 'BEGIN { for (i = 1; i < '$(DEVNODES)'; i++) printf("%i ", i); print i ;exit(0);}')

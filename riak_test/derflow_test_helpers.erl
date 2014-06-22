@@ -28,7 +28,9 @@ load(Node) ->
 %% @doc Remotely compile and load a test on a given node.
 remote_compile_and_load(Node, F) ->
     lager:info("Compiling and loading file ~s on node ~s", [F, Node]),
-    {ok, _, Bin} = rpc:call(Node, compile, file, [F, [binary]]),
+    {ok, _, Bin} = rpc:call(Node, compile, file,
+                            [F, [binary,
+                                 {parse_transform, lager_transform}]]),
     ModName = list_to_atom(filename:basename(F, ".erl")),
     {module, _} = rpc:call(Node, code, load_binary, [ModName, F, Bin]),
     ok.

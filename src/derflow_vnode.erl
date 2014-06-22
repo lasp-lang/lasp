@@ -13,7 +13,7 @@
          wait_needed/1,
          declare/2,
          get_new_id/0,
-         put/4]).
+         put/5]).
 
 -export([start_vnode/1,
          init/1,
@@ -117,7 +117,8 @@ start_vnode(I) ->
 init([Partition]) ->
     Table = string:concat(integer_to_list(Partition), "dvstore"),
     TableAtom = list_to_atom(Table),
-    TableAtom = ets:new(TableAtom, [set, named_table, public, {write_concurrency, true}]),
+    TableAtom = ets:new(TableAtom, [set, named_table, public,
+                                    {write_concurrency, true}]),
     {ok, #state {partition=Partition, table=TableAtom}}.
 
 handle_command({declare, Id, Type}, _From, State=#state{table=Table}) ->
@@ -134,11 +135,11 @@ handle_command({bind, Id, Value}, From,
                State=#state{table=Table}) ->
     case Value of
         {id, DVId} ->
-            true = ets:insert(Table, {Id, #dv{value={id,DVId}}}),
+            true = ets:insert(Table, {Id, #dv{value={id, DVId}}}),
             fetch(DVId, Id, From),
             {noreply, State};
         _ ->
-            [{_Key,V}] = ets:lookup(Table, Id),
+            [{_Key, V}] = ets:lookup(Table, Id),
             NextKey = next_key(V#dv.next, V#dv.type),
             case V#dv.bounded of
                 true ->
@@ -146,10 +147,16 @@ handle_command({bind, Id, Value}, From,
                         Value ->
                             {reply, {ok, NextKey}, State};
                         _ ->
-                            {reply, error, State}
+                            case is_inflation(V#dv.type, V#dv.value, Value) of
+                                true ->
+                                    put(V#dv.type, Value, NextKey, Id, Table),
+                                    {reply, {ok, NextKey}, State};
+                                false ->
+                                    {reply, error, State}
+                            end
                     end;
                 false ->
-                    put(Value, NextKey, Id, Table),
+                    put(V#dv.type, Value, NextKey, Id, Table),
                     {reply, {ok, NextKey}, State}
             end
         end;
@@ -182,7 +189,8 @@ handle_command({reply_fetch, FromId, FromP, FetchDV}, _From,
         FetchDV#dv.bounded == true ->
             Value = FetchDV#dv.value,
             Next = FetchDV#dv.next,
-            put(Value, Next, FromId, Table),
+            Type = FetchDV#dv.type,
+            put(Type, Value, Next, FromId, Table),
             reply_to_all([FromP], {ok, Next});
         true ->
             [{_,DV}] = ets:lookup(Table, FromId),
@@ -196,7 +204,8 @@ handle_command({notify_value, Id, Value}, _From,
                State=#state{table=Table}) ->
     [{_, DV}] = ets:lookup(Table, Id),
     Next = DV#dv.next,
-    put(Value, Next, Id, Table),
+    Type = DV#dv.type,
+    put(Type, Value, Next, Id, Table),
     {noreply, State};
 
 handle_command({wait_needed, Id}, From,
@@ -304,11 +313,11 @@ terminate(_Reason, _State) ->
 
 %% Internal functions
 
-put(Value, Next, Key, Table) ->
+put(Type, Value, Next, Key, Table) ->
     [{_Key,V}] = ets:lookup(Table, Key),
     Threads = V#dv.waiting_threads,
     BindingList = V#dv.binding_list,
-    V1 = #dv{value= Value, next =Next, lazy=false, bounded= true},
+    V1 = #dv{type=Type, value=Value, next=Next, lazy=false, bounded=true},
     true = ets:insert(Table, {Key, V1}),
     notify_all(BindingList, Value),
     reply_to_all(Threads, {ok, Value, Next}).
@@ -343,3 +352,16 @@ declare_next(Type)->
     Id = druuid:v4(),
     {ok, Id} = declare(Id, Type),
     {ok, Id}.
+
+%% @doc Determine if `NewValue` is an inflation of `Value`.
+is_inflation(Type, Value, NewValue) ->
+    case Type of
+        riak_dt_gcounter ->
+            Value =< NewValue;
+        riak_dt_gset ->
+            OldSet = riak_dt_gset:value(Value),
+            NewSet = riak_dt_gset:value(NewValue),
+            length(OldSet) =< length(NewSet);
+        _ ->
+            false
+    end.

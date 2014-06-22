@@ -6,7 +6,7 @@
 
 -include("derflow.hrl").
 
--export([start_link/1]).
+-export([start_link/2]).
 %% gen_fsm callbacks
 -export([init/1, handle_event/3, handle_sync_event/4,
          handle_info/3, terminate/3, code_change/4]).
@@ -15,6 +15,7 @@
 
 -record(state, {from :: pid(),
                 key,
+                type,
                 results=[] %% success responses
                }).
 
@@ -22,21 +23,21 @@
 %% Public API
 %% ===================================================================
 
-start_link(From) ->
-    gen_fsm:start_link(?MODULE, From, []).
+start_link(From, Type) ->
+    gen_fsm:start_link(?MODULE, [From, Type], []).
 
 %% ====================================================================
 %% gen_fsm callbacks
 %% ====================================================================
 
 %% @private
-init(From) ->
-    {ok, execute, #state{from=From}, 0}.
+init([From, Type]) ->
+    {ok, execute, #state{from=From, type=Type}, 0}.
 
 %% @private
-execute(timeout, StateData) ->
+execute(timeout, StateData=#state{type=Type}) ->
     Id = druuid:v4(),
-    derflow_vnode:declare(Id),
+    derflow_vnode:declare(Id, Type),
     {next_state, await_responses, StateData#state{key=Id}}.
 
 await_responses({ok, Id}, StateData=#state{from=Pid, results=Results0}) ->

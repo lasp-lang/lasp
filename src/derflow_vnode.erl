@@ -33,7 +33,7 @@
 
 -ignore_xref([start_vnode/1]).
 
--record(state, {partition, table}).
+-record(state, {partition, variables}).
 
 -record(dv, {value,
              next = undefined,
@@ -122,31 +122,32 @@ start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
 init([Partition]) ->
-    Table = string:concat(integer_to_list(Partition), "dvstore"),
-    TableAtom = list_to_atom(Table),
-    TableAtom = ets:new(TableAtom, [set, named_table, public,
-                                    {write_concurrency, true}]),
-    {ok, #state {partition=Partition, table=TableAtom}}.
+    Variables = string:concat(integer_to_list(Partition), "dvstore"),
+    VariableAtom = list_to_atom(Variables),
+    VariableAtom = ets:new(VariableAtom, [set, named_table, public,
+                                          {write_concurrency, true}]),
+    {ok, #state {partition=Partition, variables=VariableAtom}}.
 
-handle_command({declare, Id, Type}, _From, State=#state{table=Table}) ->
+handle_command({declare, Id, Type}, _From,
+               State=#state{variables=Variables}) ->
     Record = case Type of
         undefined ->
             #dv{value=undefined, type=undefined, bounded=false};
         Type ->
             #dv{value=Type:new(), type=Type, bounded=true}
     end,
-    true = ets:insert(Table, {Id, Record}),
+    true = ets:insert(Variables, {Id, Record}),
     {reply, {ok, Id}, State};
 
 handle_command({bind, Id, Value}, From,
-               State=#state{table=Table}) ->
+               State=#state{variables=Variables}) ->
     case Value of
         {id, DVId} ->
-            true = ets:insert(Table, {Id, #dv{value={id, DVId}}}),
+            true = ets:insert(Variables, {Id, #dv{value={id, DVId}}}),
             fetch(DVId, Id, From),
             {noreply, State};
         _ ->
-            [{_Key, V}] = ets:lookup(Table, Id),
+            [{_Key, V}] = ets:lookup(Variables, Id),
             NextKey = next_key(V#dv.next, V#dv.type),
             case V#dv.bounded of
                 true ->
@@ -156,21 +157,21 @@ handle_command({bind, Id, Value}, From,
                         _ ->
                             case is_inflation(V#dv.type, V#dv.value, Value) of
                                 true ->
-                                    write(V#dv.type, Value, NextKey, Id, Table),
+                                    write(V#dv.type, Value, NextKey, Id, Variables),
                                     {reply, {ok, NextKey}, State};
                                 false ->
                                     {reply, error, State}
                             end
                     end;
                 false ->
-                    write(V#dv.type, Value, NextKey, Id, Table),
+                    write(V#dv.type, Value, NextKey, Id, Variables),
                     {reply, {ok, NextKey}, State}
             end
         end;
 
 handle_command({fetch, TargetId, FromId, FromP}, _From,
-               State=#state{table=Table}) ->
-    [{_, DV}] = ets:lookup(Table, TargetId),
+               State=#state{variables=Variables}) ->
+    [{_, DV}] = ets:lookup(Variables, TargetId),
     if
         DV#dv.bounded == true ->
             reply_fetch(FromId, FromP, DV),
@@ -184,35 +185,35 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
                     NextKey = next_key(DV#dv.next, DV#dv.type),
                     BindingList = lists:append(DV#dv.binding_list, [FromId]),
                     DV1 = DV#dv{binding_list=BindingList, next=NextKey},
-                    true = ets:insert(Table, {TargetId, DV1}),
+                    true = ets:insert(Variables, {TargetId, DV1}),
                     reply_fetch(FromId, FromP, DV1),
                     {noreply, State}
                 end
     end;
 
 handle_command({reply_fetch, FromId, FromP, FetchDV}, _From,
-               State=#state{table=Table}) ->
+               State=#state{variables=Variables}) ->
       if
         FetchDV#dv.bounded == true ->
             Value = FetchDV#dv.value,
             Next = FetchDV#dv.next,
             Type = FetchDV#dv.type,
-            write(Type, Value, Next, FromId, Table),
+            write(Type, Value, Next, FromId, Variables),
             reply_to_all([FromP], {ok, Next});
         true ->
-            [{_,DV}] = ets:lookup(Table, FromId),
+            [{_,DV}] = ets:lookup(Variables, FromId),
             DV1 = DV#dv{next= FetchDV#dv.next},
-            ets:insert(Table, {FromId, DV1}),
+            ets:insert(Variables, {FromId, DV1}),
             reply_to_all([FromP], {ok, FetchDV#dv.next})
       end,
       {noreply, State};
 
 handle_command({notify_value, Id, Value}, _From,
-               State=#state{table=Table}) ->
-    [{_, DV}] = ets:lookup(Table, Id),
+               State=#state{variables=Variables}) ->
+    [{_, DV}] = ets:lookup(Variables, Id),
     Next = DV#dv.next,
     Type = DV#dv.type,
-    write(Type, Value, Next, Id, Table),
+    write(Type, Value, Next, Id, Variables),
     {noreply, State};
 
 handle_command({thread, Module, Function, Args}, _From, State) ->
@@ -220,8 +221,8 @@ handle_command({thread, Module, Function, Args}, _From, State) ->
     {reply, {ok, Pid}, State};
 
 handle_command({wait_needed, Id}, From,
-               State=#state{table=Table}) ->
-    [{_Key, V}] = ets:lookup(Table, Id),
+               State=#state{variables=Variables}) ->
+    [{_Key, V}] = ets:lookup(Variables, Id),
     if
         V#dv.bounded == true ->
             {reply, ok, State};
@@ -230,14 +231,14 @@ handle_command({wait_needed, Id}, From,
                 [_H|_T] ->
                     {reply, ok, State};
                 _ ->
-                    true = ets:insert(Table, {Id, V#dv{lazy=true, creator=From}}),
+                    true = ets:insert(Variables, {Id, V#dv{lazy=true, creator=From}}),
                     {noreply, State}
                 end
     end;
 
 handle_command({read, X}, From,
-               State=#state{table=Table}) ->
-    [{_Key, V}] = ets:lookup(Table, X),
+               State=#state{variables=Variables}) ->
+    [{_Key, V}] = ets:lookup(Variables, X),
     Value = V#dv.value,
     Bounded = V#dv.bounded,
     Creator = V#dv.creator,
@@ -250,33 +251,33 @@ handle_command({read, X}, From,
                 Lazy == true ->
                     WT = lists:append(V#dv.waiting_threads, [From]),
                     V1 = V#dv{waiting_threads=WT},
-                    true = ets:insert(Table, {X, V1}),
+                    true = ets:insert(Variables, {X, V1}),
                     reply_to_all([Creator], ok),
                     {noreply, State};
                 true ->
                     WT = lists:append(V#dv.waiting_threads, [From]),
                     V1 = V#dv{waiting_threads=WT},
-                    true = ets:insert(Table, {X, V1}),
+                    true = ets:insert(Variables, {X, V1}),
                     {noreply, State}
             end
     end;
 
 handle_command({next, X}, _From,
-               State = #state{table = Table}) ->
-    [{_Key,V}] = ets:lookup(Table, X),
+               State=#state{variables=Variables}) ->
+    [{_Key,V}] = ets:lookup(Variables, X),
     NextKey0 = V#dv.next,
     if
         NextKey0 == undefined ->
             {ok, NextKey} = declare_next(V#dv.type),
             V1 = V#dv{next=NextKey},
-            true = ets:insert(Table, {X, V1}),
+            true = ets:insert(Variables, {X, V1}),
             {reply, {ok, NextKey}, State};
         true ->
             {reply, {ok, NextKey0}, State}
   end;
 
-handle_command({is_det, Id}, _From, State = #state{table = Table}) ->
-    [{_Key,V}] = ets:lookup(Table, Id),
+handle_command({is_det, Id}, _From, State=#state{variables=Variables}) ->
+    [{_Key,V}] = ets:lookup(Variables, Id),
     Bounded = V#dv.bounded,
     {reply, Bounded, State};
 
@@ -285,9 +286,9 @@ handle_command(Message, _Sender, State) ->
     {noreply, State}.
 
 handle_handoff_command(?FOLD_REQ{foldfun=FoldFun, acc0=Acc0}, _Sender,
-                       #state{table=Table}=State) ->
+                       #state{variables=Variable}=State) ->
     F = fun({Key, Operation}, Acc) -> FoldFun(Key, Operation, Acc) end,
-    Acc = ets:foldl(F, Acc0, Table),
+    Acc = ets:foldl(F, Acc0, Variable),
     {reply, Acc, State}.
 
 handoff_starting(_TargetNode, State) ->
@@ -299,9 +300,9 @@ handoff_cancelled(State) ->
 handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
-handle_handoff_data(Data, #state{table=Table}=State) ->
+handle_handoff_data(Data, State=#state{variables=Variables}) ->
     {Key, Operation} = binary_to_term(Data),
-    true = ets:insert_new(Table, {Key, Operation}),
+    true = ets:insert_new(Variables, {Key, Operation}),
     {reply, ok, State}.
 
 encode_handoff_item(Key, Operation) ->
@@ -324,12 +325,12 @@ terminate(_Reason, _State) ->
 
 %% Internal functions
 
-write(Type, Value, Next, Key, Table) ->
-    [{_Key,V}] = ets:lookup(Table, Key),
+write(Type, Value, Next, Key, Variables) ->
+    [{_Key,V}] = ets:lookup(Variables, Key),
     Threads = V#dv.waiting_threads,
     BindingList = V#dv.binding_list,
     V1 = #dv{type=Type, value=Value, next=Next, lazy=false, bounded=true},
-    true = ets:insert(Table, {Key, V1}),
+    true = ets:insert(Variables, {Key, V1}),
     notify_all(BindingList, Value),
     reply_to_all(Threads, {ok, Value, Next}).
 

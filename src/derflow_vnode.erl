@@ -13,7 +13,7 @@
          wait_needed/1,
          declare/2,
          get_new_id/0,
-         put/5]).
+         write/5]).
 
 -export([start_vnode/1,
          init/1,
@@ -149,14 +149,14 @@ handle_command({bind, Id, Value}, From,
                         _ ->
                             case is_inflation(V#dv.type, V#dv.value, Value) of
                                 true ->
-                                    put(V#dv.type, Value, NextKey, Id, Table),
+                                    write(V#dv.type, Value, NextKey, Id, Table),
                                     {reply, {ok, NextKey}, State};
                                 false ->
                                     {reply, error, State}
                             end
                     end;
                 false ->
-                    put(V#dv.type, Value, NextKey, Id, Table),
+                    write(V#dv.type, Value, NextKey, Id, Table),
                     {reply, {ok, NextKey}, State}
             end
         end;
@@ -190,7 +190,7 @@ handle_command({reply_fetch, FromId, FromP, FetchDV}, _From,
             Value = FetchDV#dv.value,
             Next = FetchDV#dv.next,
             Type = FetchDV#dv.type,
-            put(Type, Value, Next, FromId, Table),
+            write(Type, Value, Next, FromId, Table),
             reply_to_all([FromP], {ok, Next});
         true ->
             [{_,DV}] = ets:lookup(Table, FromId),
@@ -205,7 +205,7 @@ handle_command({notify_value, Id, Value}, _From,
     [{_, DV}] = ets:lookup(Table, Id),
     Next = DV#dv.next,
     Type = DV#dv.type,
-    put(Type, Value, Next, Id, Table),
+    write(Type, Value, Next, Id, Table),
     {noreply, State};
 
 handle_command({wait_needed, Id}, From,
@@ -313,7 +313,7 @@ terminate(_Reason, _State) ->
 
 %% Internal functions
 
-put(Type, Value, Next, Key, Table) ->
+write(Type, Value, Next, Key, Table) ->
     [{_Key,V}] = ets:lookup(Table, Key),
     Threads = V#dv.waiting_threads,
     BindingList = V#dv.binding_list,

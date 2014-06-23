@@ -15,6 +15,7 @@
          wait_needed/1,
          spawn_mon/4,
          thread/3,
+         generate_preflist/3,
          get_stream/1]).
 
 %% Public API
@@ -88,3 +89,8 @@ internal_get_stream(Head, Output) ->
             lager:info("Received: ~p", [Value]),
             internal_get_stream(Next, lists:append(Output, [Value]))
     end.
+
+%% @doc Generate a preference list for a given N value and data item.
+generate_preflist(NVal, Param, VNode) ->
+    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Param)}),
+    riak_core_apl:get_primary_apl(DocIdx, NVal, VNode).

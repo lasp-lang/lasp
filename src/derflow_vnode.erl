@@ -51,7 +51,7 @@
 bind(Id, Value) ->
     lager:info("Bind called by process ~p, value ~p, id: ~p",
                [self(), Value, Id]),
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {bind, Id, Value},
                                               ?VNODE_MASTER).
@@ -63,69 +63,64 @@ read(Id) ->
     read(Id, Function).
 
 read(Id, Function) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {read, Id, Function},
                                               ?VNODE_MASTER).
 
 thread(Module, Function, Args) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, {Module, Function, Args}),
+    [{IndexNode, _Type}] = derflow:generate_preflist(?N, {Module, Function, Args}, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {thread, Module, Function, Args},
                                               ?VNODE_MASTER).
 
 next(Id) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {next, Id},
                                               ?VNODE_MASTER).
 
 is_det(Id) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {is_det, Id},
                                               ?VNODE_MASTER).
 
 declare(Id, Type) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {declare, Id, Type},
                                               ?VNODE_MASTER).
 
 fetch(Id, FromId, FromP) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
     riak_core_vnode_master:command(IndexNode,
                                    {fetch, Id, FromId, FromP},
                                    ?VNODE_MASTER).
 
 reply_fetch(Id, FromP, DV) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
     riak_core_vnode_master:command(IndexNode,
                                    {reply_fetch, Id, FromP, DV},
                                    ?VNODE_MASTER).
 
 notify_value(Id, Value) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
     riak_core_vnode_master:command(IndexNode,
                                    {notify_value, Id, Value},
                                    ?VNODE_MASTER).
 
 get_new_id() ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, now()),
+    [{IndexNode, _Type}] = derflow:generate_preflist(?N, now(), derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               get_new_id,
                                               ?VNODE_MASTER).
 
 wait_needed(Id) ->
-    [{IndexNode, _Type}] = generate_preference_list(?N, Id),
+    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {wait_needed, Id},
                                               ?VNODE_MASTER).
-
-%% @doc Generate a preference list for a given N value and data item.
-generate_preference_list(NVal, Param) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Param)}),
-    riak_core_apl:get_primary_apl(DocIdx, NVal, derflow).
 
 %% API
 start_vnode(I) ->
@@ -420,6 +415,7 @@ notify_all(L, Value) ->
             ok
     end.
 
+%% @doc Declare the next object for streams.
 declare_next(Type)->
     Id = druuid:v4(),
     {ok, Id} = declare(Id, Type),

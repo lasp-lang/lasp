@@ -34,7 +34,7 @@ confirm() ->
 test() ->
     %% Generate a stream of objects.
     {ok, ObjectStream} = derflow:declare(),
-    spawn(?MODULE, producer, [0, 10, ObjectStream]),
+    derflow:thread(?MODULE, producer, [0, 10, ObjectStream]),
 
     %% Accumulate the objects into a set.
     {ok, ObjectSetStream} = derflow:declare(),
@@ -47,8 +47,8 @@ test() ->
             lager:info("~p set bound to new set: ~p", [self(), Set]),
             Set
     end,
-    spawn(?MODULE, consumer,
-          [ObjectStream, ObjectSetFun, ObjectSetStream]),
+    derflow:thread(?MODULE, consumer,
+                   [ObjectStream, ObjectSetFun, ObjectSetStream]),
 
     %% Accumulate set into a counter.
     {ok, ObjectCounterStream} = derflow:declare(),
@@ -65,8 +65,8 @@ test() ->
                        [self(), riak_dt_gcounter:value(Counter)]),
             X
     end,
-    spawn(?MODULE, consumer,
-          [ObjectSetStream, ObjectCounterFun, ObjectCounterStream]),
+    derflow:thread(?MODULE, consumer,
+                   [ObjectSetStream, ObjectCounterFun, ObjectCounterStream]),
 
     %% Block until all operations are complete, to ensure we don't shut
     %% the test harness down until everything is computed.

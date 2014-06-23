@@ -39,6 +39,7 @@
              next = undefined,
              waiting_threads = [],
              binding_list = [],
+             functions = [],
              creator,
              type,
              lazy = false,
@@ -245,15 +246,32 @@ handle_command({wait_needed, Id}, From,
                 end
     end;
 
-handle_command({read, X, _Function}, From,
+handle_command({read, X, Function}, From,
                State=#state{variables=Variables}) ->
     [{_Key, V}] = ets:lookup(Variables, X),
     Value = V#dv.value,
     Bounded = V#dv.bounded,
     Creator = V#dv.creator,
     Lazy = V#dv.lazy,
+    Type = V#dv.type,
+    NextKey = V#dv.next,
+    Functions0 = V#dv.functions,
     if
         Bounded == true ->
+            case is_lattice(Type) of
+                true ->
+                    case Function of
+                        undefined ->
+                            ok;
+                        _ ->
+                            Functions = [Function|Functions0],
+                            lager:info("Read depends on function: ~p",
+                                       [Functions]),
+                            write(Type, Value, NextKey, Functions, X, Variables)
+                    end;
+                false ->
+                    ok
+            end,
             {reply, {ok, Value, V#dv.next}, State};
         true ->
             if
@@ -335,10 +353,13 @@ terminate(_Reason, _State) ->
 %% Internal functions
 
 write(Type, Value, Next, Key, Variables) ->
+    write(Type, Value, Next, [], Key, Variables).
+
+write(Type, Value, Next, Functions, Key, Variables) ->
     [{_Key,V}] = ets:lookup(Variables, Key),
     Threads = V#dv.waiting_threads,
     BindingList = V#dv.binding_list,
-    V1 = #dv{type=Type, value=Value, next=Next, lazy=false, bounded=true},
+    V1 = #dv{type=Type, value=Value, functions=Functions, next=Next, lazy=false, bounded=true},
     true = ets:insert(Variables, {Key, V1}),
     notify_all(BindingList, Value),
     reply_to_all(Threads, {ok, Value, Next}).
@@ -386,3 +407,7 @@ is_inflation(Type, Value, NewValue) ->
         _ ->
             false
     end.
+
+%% @doc Return if something is a lattice or not.
+is_lattice(Type) ->
+    lists:member(Type, [riak_dt_gcounter, riak_dt_lwwreg, riak_dt_gset]).

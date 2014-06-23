@@ -53,9 +53,12 @@ bind(Id, Value) ->
                                               ?VNODE_MASTER).
 
 read(Id) ->
+    Function = get(initial_call),
+    lager:info("Read called by process ~p, function ~p",
+               [self(), Function]),
     [{IndexNode, _Type}] = generate_preference_list(?N, Id),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {read, Id},
+                                              {read, Id, Function},
                                               ?VNODE_MASTER).
 
 thread(Module, Function, Args) ->
@@ -242,7 +245,7 @@ handle_command({wait_needed, Id}, From,
                 end
     end;
 
-handle_command({read, X}, From,
+handle_command({read, X, _Function}, From,
                State=#state{variables=Variables}) ->
     [{_Key, V}] = ets:lookup(Variables, X),
     Value = V#dv.value,

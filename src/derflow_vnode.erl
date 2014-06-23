@@ -382,7 +382,7 @@ reply_to_all([], _Result) ->
     ok;
 
 reply_to_all([H|T], Result) ->
-    {server, undefined,{Address, Ref}} = H,
+    {server, undefined, {Address, Ref}} = H,
     gen_server:reply({Address, Ref}, Result),
     reply_to_all(T, Result).
 

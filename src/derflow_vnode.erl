@@ -134,10 +134,11 @@ init([Partition]) ->
     VariableAtom = list_to_atom(Variables),
     VariableAtom = ets:new(VariableAtom, [set, named_table, public,
                                           {write_concurrency, true}]),
-    {ok, #state {partition=Partition, variables=VariableAtom}}.
+    {ok, #state{partition=Partition, variables=VariableAtom}}.
 
 handle_command({declare, Id, Type}, _From,
                State=#state{variables=Variables}) ->
+    lager:info("Declare received: ~p ~p", [Id, Type]),
     Record = case Type of
         undefined ->
             #dv{value=undefined, type=undefined, bounded=false};
@@ -154,6 +155,7 @@ handle_command({bind, Id, {id, DVId}}, From,
     {noreply, State};
 handle_command({bind, Id, Value}, _From,
                State=#state{variables=Variables}) ->
+    lager:info("Bind received: ~p", [Id]),
     [{_Key, V}] = ets:lookup(Variables, Id),
     NextKey = next_key(V#dv.next, V#dv.type),
     case V#dv.bounded of
@@ -267,6 +269,7 @@ handle_command({read, X, Function}, From,
     Functions0 = V#dv.functions,
     if
         Bounded == true ->
+            lager:info("Read received: ~p, bound: ~p", [X, V]),
             case is_lattice(Type) of
                 true ->
                     case Function of
@@ -283,6 +286,8 @@ handle_command({read, X, Function}, From,
             end,
             {reply, {ok, Value, V#dv.next}, State};
         true ->
+            lager:info("Read received: ~p, unbound, function: ~p",
+                       [X, Function]),
             if
                 Lazy == true ->
                     WT = lists:append(V#dv.waiting_threads, [From]),

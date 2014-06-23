@@ -79,9 +79,12 @@ get_stream(Stream)->
 %% Internal functions
 
 internal_get_stream(Head, Output) ->
+    lager:info("About to consume: ~p", [Head]),
     case consume(Head) of
         {ok, nil, _} ->
+            lager:info("Received: ~p", [nil]),
             Output;
         {ok, Value, Next} ->
+            lager:info("Received: ~p", [Value]),
             internal_get_stream(Next, lists:append(Output, [Value]))
     end.

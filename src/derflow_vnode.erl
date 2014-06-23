@@ -49,6 +49,8 @@
 %% Extrenal API
 
 bind(Id, Value) ->
+    lager:info("Bind called by process ~p, value ~p, id: ~p",
+               [self(), Value, Id]),
     [{IndexNode, _Type}] = generate_preference_list(?N, Id),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {bind, Id, Value},
@@ -172,11 +174,15 @@ handle_command({bind, Id, Value}, _From,
                 _ ->
                     case is_lattice(V#dv.type) of
                         true ->
+                            write(V#dv.type, Value, NextKey, [], Id, Variables),
                             case is_inflation(V#dv.type, V#dv.value, Value) of
                                 true ->
-                                    write(V#dv.type, Value, NextKey, Id, Variables),
+                                    lager:info("Change is inflation: ~p ~p",
+                                               [V#dv.value, Value]),
+                                    execute(Functions),
                                     {reply, {ok, NextKey}, State};
                                 false ->
+                                    lager:info("Change is not inflation!"),
                                     {reply, {ok, NextKey}, State}
                             end;
                         false ->
@@ -375,11 +381,15 @@ terminate(_Reason, _State) ->
 write(Type, Value, Next, Key, Variables) ->
     write(Type, Value, Next, [], Key, Variables).
 
-write(Type, Value, Next, Functions, Key, Variables) ->
-    [{_Key,V}] = ets:lookup(Variables, Key),
+write(Type, Value, Next, Functions0, Key, Variables) ->
+    lager:info("Writing key: ~p next: ~p", [Key, Next]),
+    [{_Key, V}] = ets:lookup(Variables, Key),
     Threads = V#dv.waiting_threads,
     BindingList = V#dv.binding_list,
-    V1 = #dv{type=Type, value=Value, functions=Functions, next=Next, lazy=false, bounded=true},
+    Lazy = V#dv.lazy,
+    Functions = lists:usort(Functions0),
+    V1 = #dv{type=Type, value=Value, functions=Functions, next=Next,
+             lazy=Lazy, bounded=true},
     true = ets:insert(Variables, {Key, V1}),
     notify_all(BindingList, Value),
     reply_to_all(Threads, {ok, Value, Next}).
@@ -431,3 +441,10 @@ is_inflation(Type, Value, NewValue) ->
 %% @doc Return if something is a lattice or not.
 is_lattice(Type) ->
     lists:member(Type, [riak_dt_gcounter, riak_dt_lwwreg, riak_dt_gset]).
+
+%% @doc Execute a series of functions.
+execute({Module, Function, Args}) ->
+    lager:info("Re-executing: ~p ~p ~p", [Module, Function, Args]),
+    derflow:thread(Module, Function, Args);
+execute(Functions) ->
+    [execute(Function) || Function <- Functions].

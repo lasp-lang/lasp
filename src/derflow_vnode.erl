@@ -217,7 +217,13 @@ handle_command({notify_value, Id, Value}, _From,
     {noreply, State};
 
 handle_command({thread, Module, Function, Args}, _From, State) ->
-    Pid = spawn(Module, Function, Args),
+    Fun = fun() ->
+            put(initial_call, {Module, Function, Args}),
+            erlang:apply(Module, Function, Args)
+    end,
+    Pid = spawn(Fun),
+    lager:info("Spawned process ~p executing ~p",
+               [Pid, {Module, Function, Args}]),
     {reply, {ok, Pid}, State};
 
 handle_command({wait_needed, Id}, From,

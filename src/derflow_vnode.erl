@@ -143,35 +143,40 @@ handle_command({declare, Id, Type}, _From,
     true = ets:insert(Variables, {Id, Record}),
     {reply, {ok, Id}, State};
 
-handle_command({bind, Id, Value}, From,
+handle_command({bind, Id, {id, DVId}}, From,
                State=#state{variables=Variables}) ->
-    case Value of
-        {id, DVId} ->
-            true = ets:insert(Variables, {Id, #dv{value={id, DVId}}}),
-            fetch(DVId, Id, From),
-            {noreply, State};
-        _ ->
-            [{_Key, V}] = ets:lookup(Variables, Id),
-            NextKey = next_key(V#dv.next, V#dv.type),
-            case V#dv.bounded of
-                true ->
-                    case V#dv.value of
-                        Value ->
-                            {reply, {ok, NextKey}, State};
-                        _ ->
+    true = ets:insert(Variables, {Id, #dv{value={id, DVId}}}),
+    fetch(DVId, Id, From),
+    {noreply, State};
+handle_command({bind, Id, Value}, _From,
+               State=#state{variables=Variables}) ->
+    [{_Key, V}] = ets:lookup(Variables, Id),
+    NextKey = next_key(V#dv.next, V#dv.type),
+    case V#dv.bounded of
+        true ->
+            case V#dv.value of
+                Value ->
+                    {reply, {ok, NextKey}, State};
+                _ ->
+                    case is_lattice(V#dv.type) of
+                        true ->
                             case is_inflation(V#dv.type, V#dv.value, Value) of
                                 true ->
                                     write(V#dv.type, Value, NextKey, Id, Variables),
                                     {reply, {ok, NextKey}, State};
                                 false ->
-                                    {reply, error, State}
-                            end
-                    end;
-                false ->
-                    write(V#dv.type, Value, NextKey, Id, Variables),
-                    {reply, {ok, NextKey}, State}
-            end
-        end;
+                                    {reply, {ok, NextKey}, State}
+                            end;
+                        false ->
+                            lager:warning("Attempt to bind failed: ~p ~p ~p",
+                                          [V#dv.type, V#dv.value, Value]),
+                            {reply, error, State}
+                    end
+            end;
+        false ->
+            write(V#dv.type, Value, NextKey, Id, Variables),
+            {reply, {ok, NextKey}, State}
+    end;
 
 handle_command({fetch, TargetId, FromId, FromP}, _From,
                State=#state{variables=Variables}) ->

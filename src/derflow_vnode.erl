@@ -8,6 +8,7 @@
 
 -export([bind/2,
          read/1,
+         read/2,
          next/1,
          is_det/1,
          wait_needed/1,
@@ -55,8 +56,11 @@ bind(Id, Value) ->
 
 read(Id) ->
     Function = get(initial_call),
-    lager:info("Read called by process ~p, function ~p",
-               [self(), Function]),
+    lager:info("Read called by process ~p, function ~p, id: ~p",
+               [self(), Function, Id]),
+    read(Id, Function).
+
+read(Id, Function) ->
     [{IndexNode, _Type}] = generate_preference_list(?N, Id),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {read, Id, Function},

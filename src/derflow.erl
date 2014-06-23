@@ -51,7 +51,7 @@ produce(Id, Module, Function, Args) ->
     derflow_vnode:bind(Id, Value).
 
 consume(Id) ->
-    derflow_vnode:read(Id).
+    derflow_vnode:read(Id, undefined).
 
 extend(Id) ->
     derflow_vnode:next(Id).

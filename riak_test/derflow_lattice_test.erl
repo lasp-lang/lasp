@@ -40,11 +40,11 @@ test() ->
     {ok, ObjectSetStream} = derflow:declare(),
     {ok, ObjectSet} = derflow:declare(riak_dt_gset),
     ObjectSetFun = fun(X) ->
-            io:format("~p set received: ~p", [self(), X]),
+            lager:info("~p set received: ~p", [self(), X]),
             {ok, Set0} = derflow:read(ObjectSet),
             {ok, Set} = riak_dt_gset:update({add, X}, undefined, Set0),
             ok = derflow:bind(ObjectSet, Set),
-            io:format("~p set bound to new set: ~p", [self(), Set]),
+            lager:info("~p set bound to new set: ~p", [self(), Set]),
             Set
     end,
     spawn(?MODULE, consumer,
@@ -54,15 +54,15 @@ test() ->
     {ok, ObjectCounterStream} = derflow:declare(),
     {ok, ObjectCounter} = derflow:declare(riak_dt_gcounter),
     ObjectCounterFun = fun(X) ->
-            io:format("~p counter received: ~p", [self(), X]),
+            lager:info("~p counter received: ~p", [self(), X]),
             {ok, Counter0} = derflow:read(ObjectCounter),
             Delta = length(X) - riak_dt_gcounter:value(Counter0),
             {ok, Counter} = riak_dt_gcounter:update({increment, Delta},
                                                     ObjectCounterStream,
                                                     Counter0),
             ok = derflow:bind(ObjectCounter, Counter),
-            io:format("~p counter bound to new counter: ~p",
-                      [self(), riak_dt_gcounter:value(Counter)]),
+            lager:info("~p counter bound to new counter: ~p",
+                       [self(), riak_dt_gcounter:value(Counter)]),
             X
     end,
     spawn(?MODULE, consumer,
@@ -89,10 +89,10 @@ producer(Init, N, Output) ->
 consumer(S1, F, S2) ->
     case derflow:consume(S1) of
         {ok, nil, _} ->
-            io:format("~p consumed: ~p", [self(), nil]),
+            lager:info("~p consumed: ~p", [self(), nil]),
             derflow:bind(S2, nil);
         {ok, Value, Next} ->
-            io:format("~p consumed: ~p", [self(), Value]),
+            lager:info("~p consumed: ~p", [self(), Value]),
             {ok, NextOutput} = derflow:produce(S2, F(Value)),
             consumer(Next, F, NextOutput)
     end.

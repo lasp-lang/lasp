@@ -413,11 +413,11 @@ declare_next(Type)->
 is_inflation(Type, Value, NewValue) ->
     case Type of
         riak_dt_gcounter ->
-            Value =< NewValue;
+            Value < NewValue;
         riak_dt_gset ->
             OldSet = riak_dt_gset:value(Value),
             NewSet = riak_dt_gset:value(NewValue),
-            length(OldSet) =< length(NewSet);
+            length(OldSet) < length(NewSet);
         _ ->
             false
     end.

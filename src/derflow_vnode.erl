@@ -187,11 +187,11 @@ handle_command({bind, Id, Value}, _From,
 handle_command({fetch, TargetId, FromId, FromP}, _From,
                State=#state{variables=Variables}) ->
     [{_, DV}] = ets:lookup(Variables, TargetId),
-    if
-        DV#dv.bounded == true ->
+    case DV#dv.bounded of
+        true ->
             reply_fetch(FromId, FromP, DV),
             {noreply, State};
-        true ->
+        false ->
             case DV#dv.value of
                 {id, BindId} ->
                     fetch(BindId, FromId, FromP),
@@ -208,15 +208,15 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
 
 handle_command({reply_fetch, FromId, FromP, FetchDV}, _From,
                State=#state{variables=Variables}) ->
-      if
-        FetchDV#dv.bounded == true ->
+    case FetchDV#dv.bounded of
+        true ->
             Value = FetchDV#dv.value,
             Next = FetchDV#dv.next,
             Type = FetchDV#dv.type,
             write(Type, Value, Next, FromId, Variables),
             reply_to_all([FromP], {ok, Next});
-        true ->
-            [{_,DV}] = ets:lookup(Variables, FromId),
+        false ->
+            [{_, DV}] = ets:lookup(Variables, FromId),
             DV1 = DV#dv{next= FetchDV#dv.next},
             ets:insert(Variables, {FromId, DV1}),
             reply_to_all([FromP], {ok, FetchDV#dv.next})
@@ -225,9 +225,7 @@ handle_command({reply_fetch, FromId, FromP, FetchDV}, _From,
 
 handle_command({notify_value, Id, Value}, _From,
                State=#state{variables=Variables}) ->
-    [{_, DV}] = ets:lookup(Variables, Id),
-    Next = DV#dv.next,
-    Type = DV#dv.type,
+    [{_, #dv{next=Next, type=Type}}] = ets:lookup(Variables, Id),
     write(Type, Value, Next, Id, Variables),
     {noreply, State};
 
@@ -238,31 +236,31 @@ handle_command({thread, Module, Function, Args}, _From, State) ->
 handle_command({wait_needed, Id}, From,
                State=#state{variables=Variables}) ->
     [{_Key, V}] = ets:lookup(Variables, Id),
-    if
-        V#dv.bounded == true ->
-            {reply, ok, State};
+    case V#dv.bounded of
         true ->
+            {reply, ok, State};
+        false ->
             case V#dv.waiting_threads of
                 [_H|_T] ->
                     {reply, ok, State};
                 _ ->
-                    true = ets:insert(Variables, {Id, V#dv{lazy=true, creator=From}}),
+                    true = ets:insert(Variables,
+                                      {Id, V#dv{lazy=true, creator=From}}),
                     {noreply, State}
                 end
     end;
 
 handle_command({read, X, Function}, From,
                State=#state{variables=Variables}) ->
-    [{_Key, V}] = ets:lookup(Variables, X),
-    Value = V#dv.value,
-    Bounded = V#dv.bounded,
-    Creator = V#dv.creator,
-    Lazy = V#dv.lazy,
-    Type = V#dv.type,
-    NextKey = V#dv.next,
-    Functions0 = V#dv.functions,
-    if
-        Bounded == true ->
+    [{_Key, V=#dv{value=Value,
+                  bounded=Bounded,
+                  creator=Creator,
+                  lazy=Lazy,
+                  type=Type,
+                  next=NextKey,
+                  functions=Functions0}}] = ets:lookup(Variables, X),
+    case Bounded of
+        true ->
             lager:info("Read received: ~p, bound: ~p", [X, V]),
             case is_lattice(Type) of
                 true ->
@@ -279,17 +277,17 @@ handle_command({read, X, Function}, From,
                     ok
             end,
             {reply, {ok, Value, V#dv.next}, State};
-        true ->
+        false ->
             lager:info("Read received: ~p, unbound, function: ~p",
                        [X, Function]),
-            if
-                Lazy == true ->
+            case Lazy of
+                true ->
                     WT = lists:append(V#dv.waiting_threads, [From]),
                     V1 = V#dv{waiting_threads=WT},
                     true = ets:insert(Variables, {X, V1}),
                     reply_to_all([Creator], ok),
                     {noreply, State};
-                true ->
+                false ->
                     WT = lists:append(V#dv.waiting_threads, [From]),
                     V1 = V#dv{waiting_threads=WT},
                     true = ets:insert(Variables, {X, V1}),
@@ -301,19 +299,18 @@ handle_command({next, X}, _From,
                State=#state{variables=Variables}) ->
     [{_Key,V}] = ets:lookup(Variables, X),
     NextKey0 = V#dv.next,
-    if
-        NextKey0 == undefined ->
+    case NextKey0 of
+        undefined ->
             {ok, NextKey} = declare_next(V#dv.type, State),
             V1 = V#dv{next=NextKey},
             true = ets:insert(Variables, {X, V1}),
             {reply, {ok, NextKey}, State};
-        true ->
+        _ ->
             {reply, {ok, NextKey0}, State}
   end;
 
 handle_command({is_det, Id}, _From, State=#state{variables=Variables}) ->
-    [{_Key,V}] = ets:lookup(Variables, Id),
-    Bounded = V#dv.bounded,
+    [{_Key, #dv{bounded=Bounded}}] = ets:lookup(Variables, Id),
     {reply, Bounded, State};
 
 handle_command(_Message, _Sender, State) ->
@@ -430,7 +427,9 @@ is_inflation(Type, Value, NewValue) ->
 
 %% @doc Return if something is a lattice or not.
 is_lattice(Type) ->
-    lists:member(Type, [riak_dt_gcounter, riak_dt_lwwreg, riak_dt_gset]).
+    lists:member(Type, [riak_dt_gcounter,
+                        riak_dt_lwwreg,
+                        riak_dt_gset]).
 
 %% @doc Execute a series of functions.
 execute({Module, Function, Args},

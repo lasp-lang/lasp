@@ -198,7 +198,8 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
                 end
     end;
 
-handle_command({reply_fetch, FromId, FromP, FetchDV=#dv{value=Value, next=Next, type=Type}}, _From,
+handle_command({reply_fetch, FromId, FromP,
+                FetchDV=#dv{value=Value, next=Next, type=Type}}, _From, 
                State=#state{variables=Variables}) ->
     case FetchDV#dv.bound of
         true ->
@@ -269,17 +270,13 @@ handle_command({read, X, Function}, From,
         false ->
             lager:info("Read received: ~p, unbound, function: ~p",
                        [X, Function]),
+            WT = lists:append(V#dv.waiting_threads, [From]),
+            true = ets:insert(Variables, {X, V#dv{waiting_threads=WT}}),
             case Lazy of
                 true ->
-                    WT = lists:append(V#dv.waiting_threads, [From]),
-                    V1 = V#dv{waiting_threads=WT},
-                    true = ets:insert(Variables, {X, V1}),
                     reply_to_all([Creator], ok),
                     {noreply, State};
                 false ->
-                    WT = lists:append(V#dv.waiting_threads, [From]),
-                    V1 = V#dv{waiting_threads=WT},
-                    true = ets:insert(Variables, {X, V1}),
                     {noreply, State}
             end
     end;

@@ -4,7 +4,6 @@
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -define(VNODE_MASTER, derflow_vnode_master).
--define(N, 1).
 
 -export([bind/2,
          read/1,

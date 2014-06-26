@@ -12,7 +12,6 @@
          is_det/1,
          wait_needed/1,
          declare/2,
-         get_new_id/0,
          write/5,
          thread/3]).
 
@@ -110,12 +109,6 @@ notify_value(Id, Value) ->
     riak_core_vnode_master:command(IndexNode,
                                    {notify_value, Id, Value},
                                    ?VNODE_MASTER).
-
-get_new_id() ->
-    [{IndexNode, _Type}] = derflow:preflist(?N, now(), derflow),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              get_new_id,
-                                              ?VNODE_MASTER).
 
 wait_needed(Id) ->
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),

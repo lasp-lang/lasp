@@ -43,7 +43,7 @@
              creator,
              type,
              lazy = false,
-             bounded = false}).
+             bound = false}).
 
 %% Extrenal API
 
@@ -153,7 +153,7 @@ handle_command({bind, Id, Value}, _From,
         _ ->
             next_key(V#dv.next, V#dv.type, State)
     end,
-    case V#dv.bounded of
+    case V#dv.bound of
         true ->
             case V#dv.value of
                 Value ->
@@ -186,7 +186,7 @@ handle_command({bind, Id, Value}, _From,
 handle_command({fetch, TargetId, FromId, FromP}, _From,
                State=#state{variables=Variables}) ->
     [{_, DV}] = ets:lookup(Variables, TargetId),
-    case DV#dv.bounded of
+    case DV#dv.bound of
         true ->
             reply_fetch(FromId, FromP, DV),
             {noreply, State};
@@ -207,7 +207,7 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
 
 handle_command({reply_fetch, FromId, FromP, FetchDV=#dv{value=Value, next=Next, type=Type}}, _From,
                State=#state{variables=Variables}) ->
-    case FetchDV#dv.bounded of
+    case FetchDV#dv.bound of
         true ->
             write(Type, Value, Next, FromId, Variables),
             reply_to_all([FromP], {ok, Next});
@@ -232,7 +232,7 @@ handle_command({thread, Module, Function, Args}, _From, State) ->
 handle_command({wait_needed, Id}, From,
                State=#state{variables=Variables}) ->
     [{_Key, V}] = ets:lookup(Variables, Id),
-    case V#dv.bounded of
+    case V#dv.bound of
         true ->
             {reply, ok, State};
         false ->
@@ -249,13 +249,13 @@ handle_command({wait_needed, Id}, From,
 handle_command({read, X, Function}, From,
                State=#state{variables=Variables}) ->
     [{_Key, V=#dv{value=Value,
-                  bounded=Bounded,
+                  bound=Bound,
                   creator=Creator,
                   lazy=Lazy,
                   type=Type,
                   next=NextKey,
                   functions=Functions0}}] = ets:lookup(Variables, X),
-    case Bounded of
+    case Bound of
         true ->
             lager:info("Read received: ~p, bound: ~p", [X, V]),
             case is_lattice(Type) of
@@ -304,8 +304,8 @@ handle_command({next, Id}, _From,
   end;
 
 handle_command({is_det, Id}, _From, State=#state{variables=Variables}) ->
-    [{_Key, #dv{bounded=Bounded}}] = ets:lookup(Variables, Id),
-    {reply, Bounded, State};
+    [{_Key, #dv{bound=Bound}}] = ets:lookup(Variables, Id),
+    {reply, Bound, State};
 
 handle_command(_Message, _Sender, State) ->
     {noreply, State}.
@@ -361,7 +361,7 @@ write(Type, Value, Next, Functions0, Key, Variables) ->
     Lazy = V#dv.lazy,
     Functions = lists:usort(Functions0),
     V1 = #dv{type=Type, value=Value, functions=Functions, next=Next,
-             lazy=Lazy, bounded=true},
+             lazy=Lazy, bound=true},
     true = ets:insert(Variables, {Key, V1}),
     notify_all(BindingList, Value),
     reply_to_all(Threads, {ok, Value, Next}).
@@ -448,9 +448,9 @@ internal_declare(Id, Type, #state{variables=Variables}) ->
     lager:info("Declare received: ~p ~p", [Id, Type]),
     Record = case Type of
         undefined ->
-            #dv{value=undefined, type=undefined, bounded=false};
+            #dv{value=undefined, type=undefined, bound=false};
         Type ->
-            #dv{value=Type:new(), type=Type, bounded=true}
+            #dv{value=Type:new(), type=Type, bound=true}
     end,
     true = ets:insert(Variables, {Id, Record}),
     {ok, Id}.

@@ -146,14 +146,13 @@ handle_command({bind, Id, {id, DVId}}, From,
 handle_command({bind, Id, Value}, _From,
                State=#state{variables=Variables}) ->
     lager:info("Bind received: ~p", [Id]),
-    [{_Key, V}] = ets:lookup(Variables, Id),
+    [{_Key, V=#dv{functions=Functions}}] = ets:lookup(Variables, Id),
     NextKey = case Value of
         nil ->
             undefined;
         _ ->
             next_key(V#dv.next, V#dv.type, State)
     end,
-    Functions = V#dv.functions,
     case V#dv.bounded of
         true ->
             case V#dv.value of
@@ -206,13 +205,10 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
                 end
     end;
 
-handle_command({reply_fetch, FromId, FromP, FetchDV}, _From,
+handle_command({reply_fetch, FromId, FromP, FetchDV=#dv{value=Value, next=Next, type=Type}}, _From,
                State=#state{variables=Variables}) ->
     case FetchDV#dv.bounded of
         true ->
-            Value = FetchDV#dv.value,
-            Next = FetchDV#dv.next,
-            Type = FetchDV#dv.type,
             write(Type, Value, Next, FromId, Variables),
             reply_to_all([FromP], {ok, Next});
         false ->
@@ -295,15 +291,13 @@ handle_command({read, X, Function}, From,
             end
     end;
 
-handle_command({next, X}, _From,
+handle_command({next, Id}, _From,
                State=#state{variables=Variables}) ->
-    [{_Key,V}] = ets:lookup(Variables, X),
-    NextKey0 = V#dv.next,
+    [{_Key, V=#dv{next=NextKey0}}] = ets:lookup(Variables, Id),
     case NextKey0 of
         undefined ->
             {ok, NextKey} = declare_next(V#dv.type, State),
-            V1 = V#dv{next=NextKey},
-            true = ets:insert(Variables, {X, V1}),
+            true = ets:insert(Variables, {Id, V#dv{next=NextKey}}),
             {reply, {ok, NextKey}, State};
         _ ->
             {reply, {ok, NextKey0}, State}
@@ -317,9 +311,9 @@ handle_command(_Message, _Sender, State) ->
     {noreply, State}.
 
 handle_handoff_command(?FOLD_REQ{foldfun=FoldFun, acc0=Acc0}, _Sender,
-                       #state{variables=Variable}=State) ->
+                       #state{variables=Variables}=State) ->
     F = fun({Key, Operation}, Acc) -> FoldFun(Key, Operation, Acc) end,
-    Acc = ets:foldl(F, Acc0, Variable),
+    Acc = ets:foldl(F, Acc0, Variables),
     {reply, Acc, State}.
 
 handoff_starting(_TargetNode, State) ->

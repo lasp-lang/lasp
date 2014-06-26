@@ -24,9 +24,7 @@ declare() ->
     declare(undefined).
 
 declare(Type) ->
-    Id = druuid:v4(),
-    {ok, Id} = derflow_vnode:declare(Id, Type),
-    {ok, Id}.
+    derflow_vnode:declare(druuid:v4(), Type).
 
 bind(Id, Value) ->
     case derflow_vnode:bind(Id, Value) of
@@ -37,8 +35,7 @@ bind(Id, Value) ->
     end.
 
 bind(Id, Module, Function, Args) ->
-    Value = Module:Function(Args),
-    bind(Id, Value).
+    bind(Id, Module:Function(Args)).
 
 read(Id) ->
     {ok, Value, _Next} = derflow_vnode:read(Id),
@@ -48,8 +45,7 @@ produce(Id, Value) ->
     derflow_vnode:bind(Id, Value).
 
 produce(Id, Module, Function, Args) ->
-    Value = Module:Function(Args),
-    derflow_vnode:bind(Id, Value).
+    derflow_vnode:bind(Id, Module:Function(Args)).
 
 consume(Id) ->
     derflow_vnode:read(Id, undefined).
@@ -61,8 +57,7 @@ is_det(Id) ->
     derflow_vnode:is_det(Id).
 
 thread(Module, Function, Args) ->
-    {ok, Pid} = derflow_vnode:thread(Module, Function, Args),
-    {ok, Pid}.
+    derflow_vnode:thread(Module, Function, Args).
 
 wait_needed(Id) ->
     derflow_vnode:wait_needed(Id).

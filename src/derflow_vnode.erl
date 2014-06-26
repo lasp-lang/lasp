@@ -165,7 +165,7 @@ handle_command({bind, Id, Value}, _From,
                                 true ->
                                     lager:info("Change is inflation: ~p ~p",
                                                [V#dv.value, Value]),
-                                    execute(Functions),
+                                    execute(Functions, State),
                                     {reply, {ok, NextKey}, State};
                                 false ->
                                     lager:info("Change is not inflation!"),
@@ -230,13 +230,7 @@ handle_command({notify_value, Id, Value}, _From,
     {noreply, State};
 
 handle_command({thread, Module, Function, Args}, _From, State) ->
-    Fun = fun() ->
-            put(initial_call, {Module, Function, Args}),
-            erlang:apply(Module, Function, Args)
-    end,
-    Pid = spawn(Fun),
-    lager:info("Spawned process ~p executing ~p",
-               [Pid, {Module, Function, Args}]),
+    {ok, Pid} = internal_thread(Module, Function, Args),
     {reply, {ok, Pid}, State};
 
 handle_command({wait_needed, Id}, From,
@@ -437,11 +431,22 @@ is_lattice(Type) ->
     lists:member(Type, [riak_dt_gcounter, riak_dt_lwwreg, riak_dt_gset]).
 
 %% @doc Execute a series of functions.
-execute({Module, Function, Args}) ->
+execute({Module, Function, Args},
+        #state{partition=Partition, node=Node}) ->
     lager:info("Re-executing: ~p ~p ~p", [Module, Function, Args]),
-    derflow:thread(Module, Function, Args);
-execute(Functions) ->
-    [execute(Function) || Function <- Functions].
+    [{IndexNode, _Type}] = derflow:generate_preflist(?N,
+                                                     {Module, Function, Args},
+                                                     derflow),
+    case IndexNode of
+        {Partition, Node} ->
+            lager:info("Internal thread triggered: ~p", [IndexNode]),
+            internal_thread(Module, Function, Args);
+        _ ->
+            lager:info("Thread triggered: ~p", [IndexNode]),
+            thread(Module, Function, Args)
+    end;
+execute(Functions, State) ->
+    [execute(Function, State) || Function <- Functions].
 
 %% @doc Declare a new variable.
 internal_declare(Id, Type, #state{variables=Variables}) ->
@@ -454,3 +459,14 @@ internal_declare(Id, Type, #state{variables=Variables}) ->
     end,
     true = ets:insert(Variables, {Id, Record}),
     {ok, Id}.
+
+%% @doc Perform a thread operation locally.
+internal_thread(Module, Function, Args) ->
+    Fun = fun() ->
+            put(initial_call, {Module, Function, Args}),
+            erlang:apply(Module, Function, Args)
+    end,
+    Pid = spawn(Fun),
+    lager:info("Spawned process ~p executing ~p",
+               [Pid, {Module, Function, Args}]),
+    {ok, Pid}.

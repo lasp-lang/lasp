@@ -33,10 +33,10 @@
 
 -ignore_xref([start_vnode/1]).
 
--record(state, {partition, variables}).
+-record(state, {node, partition, variables}).
 
 -record(dv, {value,
-             next = undefined,
+             next,
              waiting_threads = [],
              binding_list = [],
              functions = [],
@@ -130,18 +130,10 @@ init([Partition]) ->
     VariableAtom = list_to_atom(Variables),
     VariableAtom = ets:new(VariableAtom, [set, named_table, public,
                                           {write_concurrency, true}]),
-    {ok, #state{partition=Partition, variables=VariableAtom}}.
+    {ok, #state{partition=Partition, node=node(), variables=VariableAtom}}.
 
-handle_command({declare, Id, Type}, _From,
-               State=#state{variables=Variables}) ->
-    lager:info("Declare received: ~p ~p", [Id, Type]),
-    Record = case Type of
-        undefined ->
-            #dv{value=undefined, type=undefined, bounded=false};
-        Type ->
-            #dv{value=Type:new(), type=Type, bounded=true}
-    end,
-    true = ets:insert(Variables, {Id, Record}),
+handle_command({declare, Id, Type}, _From, State) ->
+    {ok, Id} = internal_declare(Id, Type, State),
     {reply, {ok, Id}, State};
 
 handle_command({bind, Id, {id, DVId}}, From,
@@ -157,7 +149,7 @@ handle_command({bind, Id, Value}, _From,
         nil ->
             undefined;
         _ ->
-            next_key(V#dv.next, V#dv.type)
+            next_key(V#dv.next, V#dv.type, State)
     end,
     Functions = V#dv.functions,
     case V#dv.bounded of
@@ -203,7 +195,7 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
                     fetch(BindId, FromId, FromP),
                     {noreply, State};
                 _ ->
-                    NextKey = next_key(DV#dv.next, DV#dv.type),
+                    NextKey = next_key(DV#dv.next, DV#dv.type, State),
                     BindingList = lists:append(DV#dv.binding_list, [FromId]),
                     DV1 = DV#dv{binding_list=BindingList, next=NextKey},
                     true = ets:insert(Variables, {TargetId, DV1}),
@@ -315,7 +307,7 @@ handle_command({next, X}, _From,
     NextKey0 = V#dv.next,
     if
         NextKey0 == undefined ->
-            {ok, NextKey} = declare_next(V#dv.type),
+            {ok, NextKey} = declare_next(V#dv.type, State),
             V1 = V#dv{next=NextKey},
             true = ets:insert(Variables, {X, V1}),
             {reply, {ok, NextKey}, State};
@@ -328,8 +320,7 @@ handle_command({is_det, Id}, _From, State=#state{variables=Variables}) ->
     Bounded = V#dv.bounded,
     {reply, Bounded, State};
 
-handle_command(Message, _Sender, State) ->
-    ?PRINT({unhandled_command, Message}),
+handle_command(_Message, _Sender, State) ->
     {noreply, State}.
 
 handle_handoff_command(?FOLD_REQ{foldfun=FoldFun, acc0=Acc0}, _Sender,
@@ -396,10 +387,10 @@ reply_to_all([H|T], Result) ->
     gen_server:reply({Address, Ref}, Result),
     reply_to_all(T, Result).
 
-next_key(NextKey0, Type) ->
+next_key(NextKey0, Type, State) ->
     case NextKey0 of
         undefined ->
-            {ok, NextKey} = declare_next(Type),
+            {ok, NextKey} = declare_next(Type, State),
             NextKey;
         _ ->
             NextKey0
@@ -415,10 +406,18 @@ notify_all(L, Value) ->
     end.
 
 %% @doc Declare the next object for streams.
-declare_next(Type)->
+declare_next(Type, State=#state{partition=Partition, node=Node}) ->
+    lager:info("Current partition and node: ", [Partition, Node]),
     Id = druuid:v4(),
-    {ok, Id} = declare(Id, Type),
-    {ok, Id}.
+    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
+    case IndexNode of
+        {Partition, Node} ->
+            lager:info("Internal declare triggered: ~p", [IndexNode]),
+            internal_declare(Id, Type, State);
+        _ ->
+            lager:info("Declare triggered: ~p", [IndexNode]),
+            declare(Id, Type)
+    end.
 
 %% @doc Determine if `NewValue` is an inflation of `Value`.
 is_inflation(Type, Value, NewValue) ->
@@ -443,3 +442,15 @@ execute({Module, Function, Args}) ->
     derflow:thread(Module, Function, Args);
 execute(Functions) ->
     [execute(Function) || Function <- Functions].
+
+%% @doc Declare a new variable.
+internal_declare(Id, Type, #state{variables=Variables}) ->
+    lager:info("Declare received: ~p ~p", [Id, Type]),
+    Record = case Type of
+        undefined ->
+            #dv{value=undefined, type=undefined, bounded=false};
+        Type ->
+            #dv{value=Type:new(), type=Type, bounded=true}
+    end,
+    true = ets:insert(Variables, {Id, Record}),
+    {ok, Id}.

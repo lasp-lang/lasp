@@ -50,7 +50,7 @@
 bind(Id, Value) ->
     lager:info("Bind called by process ~p, value ~p, id: ~p",
                [self(), Value, Id]),
-    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {bind, Id, Value},
                                               ?VNODE_MASTER).
@@ -62,61 +62,63 @@ read(Id) ->
     read(Id, Function).
 
 read(Id, Function) ->
-    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {read, Id, Function},
                                               ?VNODE_MASTER).
 
 thread(Module, Function, Args) ->
-    [{IndexNode, _Type}] = derflow:generate_preflist(?N, {Module, Function, Args}, derflow),
+    [{IndexNode, _Type}] = derflow:preflist(?N,
+                                            {Module, Function, Args},
+                                            derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {thread, Module, Function, Args},
                                               ?VNODE_MASTER).
 
 next(Id) ->
-    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {next, Id},
                                               ?VNODE_MASTER).
 
 is_det(Id) ->
-    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {is_det, Id},
                                               ?VNODE_MASTER).
 
 declare(Id, Type) ->
-    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {declare, Id, Type},
                                               ?VNODE_MASTER).
 
 fetch(Id, FromId, FromP) ->
-    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:command(IndexNode,
                                    {fetch, Id, FromId, FromP},
                                    ?VNODE_MASTER).
 
 reply_fetch(Id, FromP, DV) ->
-    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:command(IndexNode,
                                    {reply_fetch, Id, FromP, DV},
                                    ?VNODE_MASTER).
 
 notify_value(Id, Value) ->
-    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:command(IndexNode,
                                    {notify_value, Id, Value},
                                    ?VNODE_MASTER).
 
 get_new_id() ->
-    [{IndexNode, _Type}] = derflow:generate_preflist(?N, now(), derflow),
+    [{IndexNode, _Type}] = derflow:preflist(?N, now(), derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               get_new_id,
                                               ?VNODE_MASTER).
 
 wait_needed(Id) ->
-    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {wait_needed, Id},
                                               ?VNODE_MASTER).
@@ -403,7 +405,7 @@ notify_all(L, Value) ->
 declare_next(Type, State=#state{partition=Partition, node=Node}) ->
     lager:info("Current partition and node: ", [Partition, Node]),
     Id = druuid:v4(),
-    [{IndexNode, _Type}] = derflow:generate_preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     case IndexNode of
         {Partition, Node} ->
             lager:info("Internal declare triggered: ~p", [IndexNode]),
@@ -434,9 +436,9 @@ is_lattice(Type) ->
 execute({Module, Function, Args},
         #state{partition=Partition, node=Node}) ->
     lager:info("Re-executing: ~p ~p ~p", [Module, Function, Args]),
-    [{IndexNode, _Type}] = derflow:generate_preflist(?N,
-                                                     {Module, Function, Args},
-                                                     derflow),
+    [{IndexNode, _Type}] = derflow:preflist(?N,
+                                            {Module, Function, Args},
+                                            derflow),
     case IndexNode of
         {Partition, Node} ->
             lager:info("Internal thread triggered: ~p", [IndexNode]),

@@ -204,12 +204,14 @@ handle_command({reply_fetch, FromId, FromP,
     case FetchDV#dv.bound of
         true ->
             write(Type, Value, Next, FromId, Variables),
-            reply_to_all([FromP], {ok, Next});
+            {ok, _} = reply_to_all([FromP], {ok, Next}),
+            ok;
         false ->
             [{_, DV}] = ets:lookup(Variables, FromId),
-            DV1 = DV#dv{next= FetchDV#dv.next},
-            ets:insert(Variables, {FromId, DV1}),
-            reply_to_all([FromP], {ok, FetchDV#dv.next})
+            DV1 = DV#dv{next=FetchDV#dv.next},
+            true = ets:insert(Variables, {FromId, DV1}),
+            {ok, _} = reply_to_all([FromP], {ok, FetchDV#dv.next}),
+            ok
       end,
       {noreply, State};
 
@@ -296,7 +298,7 @@ handle_command({read, Id, Threshold, Function}, From,
             true = ets:insert(Variables, {Id, V#dv{waiting_threads=WT}}),
             case Lazy of
                 true ->
-                    reply_to_all([Creator], ok),
+                    {ok, _} = reply_to_all([Creator], ok),
                     {noreply, State};
                 false ->
                     {noreply, State}

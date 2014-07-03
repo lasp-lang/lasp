@@ -240,7 +240,7 @@ handle_command({wait_needed, Id}, From,
                 end
     end;
 
-handle_command({read, X, Function}, From,
+handle_command({read, Id, Function}, From,
                State=#state{variables=Variables}) ->
     [{_Key, V=#dv{value=Value,
                   bound=Bound,
@@ -248,10 +248,10 @@ handle_command({read, X, Function}, From,
                   lazy=Lazy,
                   type=Type,
                   next=NextKey,
-                  functions=Functions0}}] = ets:lookup(Variables, X),
+                  functions=Functions0}}] = ets:lookup(Variables, Id),
     case Bound of
         true ->
-            lager:info("Read received: ~p, bound: ~p", [X, V]),
+            lager:info("Read received: ~p, bound: ~p", [Id, V]),
             case is_lattice(Type) of
                 true ->
                     case Function of
@@ -261,7 +261,7 @@ handle_command({read, X, Function}, From,
                             Functions = [Function|Functions0],
                             lager:info("Read depends on function: ~p",
                                        [Functions]),
-                            write(Type, Value, NextKey, Functions, X, Variables)
+                            write(Type, Value, NextKey, Functions, Id, Variables)
                     end;
                 false ->
                     ok
@@ -269,9 +269,9 @@ handle_command({read, X, Function}, From,
             {reply, {ok, Value, V#dv.next}, State};
         false ->
             lager:info("Read received: ~p, unbound, function: ~p",
-                       [X, Function]),
+                       [Id, Function]),
             WT = lists:append(V#dv.waiting_threads, [From]),
-            true = ets:insert(Variables, {X, V#dv{waiting_threads=WT}}),
+            true = ets:insert(Variables, {Id, V#dv{waiting_threads=WT}}),
             case Lazy of
                 true ->
                     reply_to_all([Creator], ok),
@@ -345,10 +345,9 @@ write(Type, Value, Next, Key, Variables) ->
 
 write(Type, Value, Next, Functions0, Key, Variables) ->
     lager:info("Writing key: ~p next: ~p", [Key, Next]),
-    [{_Key, V}] = ets:lookup(Variables, Key),
-    Threads = V#dv.waiting_threads,
-    BindingList = V#dv.binding_list,
-    Lazy = V#dv.lazy,
+    [{_Key, #dv{waiting_threads=Threads,
+                binding_list=BindingList,
+                lazy=Lazy}}] = ets:lookup(Variables, Key),
     Functions = lists:usort(Functions0),
     V1 = #dv{type=Type, value=Value, functions=Functions, next=Next,
              lazy=Lazy, bound=true},
@@ -356,31 +355,24 @@ write(Type, Value, Next, Functions0, Key, Variables) ->
     notify_all(BindingList, Value),
     reply_to_all(Threads, {ok, Value, Next}).
 
-reply_to_all([], _Result) ->
-    ok;
-
 reply_to_all([H|T], Result) ->
     {server, undefined, {Address, Ref}} = H,
     gen_server:reply({Address, Ref}, Result),
-    reply_to_all(T, Result).
+    reply_to_all(T, Result);
+reply_to_all([], _Result) ->
+    ok.
 
-next_key(NextKey0, Type, State) ->
-    case NextKey0 of
-        undefined ->
-            {ok, NextKey} = declare_next(Type, State),
-            NextKey;
-        _ ->
-            NextKey0
-    end.
+next_key(undefined, Type, State) ->
+    {ok, NextKey} = declare_next(Type, State),
+    NextKey;
+next_key(NextKey0, _, _) ->
+    NextKey0.
 
-notify_all(L, Value) ->
-    case L of
-        [H|T] ->
-            notify_value(H, Value),
-            notify_all(T, Value);
-        [] ->
-            ok
-    end.
+notify_all([H|T], Value) ->
+    notify_value(H, Value),
+    notify_all(T, Value);
+notify_all([], _) ->
+    ok.
 
 %% @doc Declare the next object for streams.
 declare_next(Type, State=#state{partition=Partition, node=Node}) ->

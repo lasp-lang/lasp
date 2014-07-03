@@ -29,8 +29,13 @@ stage : rel
 	$(foreach dep,$(wildcard deps/*), rm -rf rel/derflow/lib/$(shell basename $(dep))-* && ln -sf $(abspath $(dep)) rel/derflow/lib;)
 	$(foreach app,$(wildcard apps/*), rm -rf rel/derflow/lib/$(shell basename $(app))-* && ln -sf $(abspath $(app)) rel/derflow/lib;)
 
-riak-test: stagedevrel
+currentdevrel: stagedevrel
 	riak_test/bin/derflow-current.sh
+
+riak-test: currentdevrel
+	$(foreach dep,$(wildcard riak_test/*.erl), ../riak_test/riak_test -v -c derflow -t $(dep);)
+
+riak-test-lattice: currentdevrel
 	../riak_test/riak_test -v -c derflow -t derflow_lattice_test
 
 ##

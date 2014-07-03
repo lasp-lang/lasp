@@ -7,6 +7,7 @@
          bind/2,
          bind/4,
          read/1,
+         read/2,
          produce/2,
          produce/4,
          consume/1,
@@ -41,6 +42,11 @@ read(Id) ->
     {ok, Value, _Next} = derflow_vnode:read(Id),
     {ok, Value}.
 
+%% @doc Blocking threshold read.
+read(Id, Threshold) ->
+    {ok, Value, _Next} = derflow_vnode:read(Id, Threshold),
+    {ok, Value}.
+
 produce(Id, Value) ->
     derflow_vnode:bind(Id, Value).
 
@@ -48,7 +54,7 @@ produce(Id, Module, Function, Args) ->
     derflow_vnode:bind(Id, Module:Function(Args)).
 
 consume(Id) ->
-    derflow_vnode:read(Id, undefined).
+    derflow_vnode:read(Id).
 
 extend(Id) ->
     derflow_vnode:next(Id).

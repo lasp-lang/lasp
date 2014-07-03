@@ -55,15 +55,15 @@ bind(Id, Value) ->
                                               ?VNODE_MASTER).
 
 read(Id) ->
-    Function = get(initial_call),
-    lager:info("Read called by process ~p, function ~p, id: ~p",
-               [self(), Function, Id]),
-    read(Id, Function).
+    read(Id, undefined).
 
-read(Id, Function) ->
+read(Id, Threshold) ->
+    Function = get(initial_call),
+    lager:info("Read by process ~p, function ~p, id: ~p thresh: ~p",
+               [self(), Function, Id, Threshold]),
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {read, Id, Function},
+                                              {read, Id, Threshold, Function},
                                               ?VNODE_MASTER).
 
 thread(Module, Function, Args) ->
@@ -240,7 +240,7 @@ handle_command({wait_needed, Id}, From,
                 end
     end;
 
-handle_command({read, Id, Function}, From,
+handle_command({read, Id, Threshold, Function}, From,
                State=#state{variables=Variables}) ->
     [{_Key, V=#dv{value=Value,
                   bound=Bound,
@@ -251,9 +251,11 @@ handle_command({read, Id, Function}, From,
                   functions=Functions0}}] = ets:lookup(Variables, Id),
     case Bound of
         true ->
-            lager:info("Read received: ~p, bound: ~p", [Id, V]),
+            lager:info("Read received: ~p, bound: ~p, threshold: ~p",
+                       [Id, V, Threshold]),
             case is_lattice(Type) of
                 true ->
+                    %% Handle recalling the dependent functions.
                     case Function of
                         undefined ->
                             ok;
@@ -262,11 +264,31 @@ handle_command({read, Id, Function}, From,
                             lager:info("Read depends on function: ~p",
                                        [Functions]),
                             write(Type, Value, NextKey, Functions, Id, Variables)
+                    end,
+
+                    %% Handle threshold reaads.
+                    case Threshold of
+                        undefined ->
+                            lager:info("No threshold specified: ~p",
+                                       [Threshold]),
+                            {reply, {ok, Value, V#dv.next}, State};
+                        _ ->
+                            lager:info("Threshold specified: ~p",
+                                       [Threshold]),
+                            case threshold_met(Type, Value, Threshold) of
+                                true ->
+                                    {reply, {ok, Value, V#dv.next}, State};
+                                false ->
+                                    WT = lists:append(V#dv.waiting_threads,
+                                                      [{From, Type, Threshold}]),
+                                    true = ets:insert(Variables,
+                                                      {Id, V#dv{waiting_threads=WT}}),
+                                    {noreply, State}
+                            end
                     end;
                 false ->
-                    ok
-            end,
-            {reply, {ok, Value, V#dv.next}, State};
+                    {reply, {ok, Value, V#dv.next}, State}
+            end;
         false ->
             lager:info("Read received: ~p, unbound, function: ~p",
                        [Id, Function]),
@@ -349,18 +371,36 @@ write(Type, Value, Next, Functions0, Key, Variables) ->
                 binding_list=BindingList,
                 lazy=Lazy}}] = ets:lookup(Variables, Key),
     Functions = lists:usort(Functions0),
+    {ok, StillWaiting} = reply_to_all(Threads, [], {ok, Value, Next}),
     V1 = #dv{type=Type, value=Value, functions=Functions, next=Next,
-             lazy=Lazy, bound=true},
+             lazy=Lazy, bound=true, waiting_threads=StillWaiting},
     true = ets:insert(Variables, {Key, V1}),
-    notify_all(BindingList, Value),
-    reply_to_all(Threads, {ok, Value, Next}).
+    notify_all(BindingList, Value).
 
-reply_to_all([H|T], Result) ->
+reply_to_all(List, Result) ->
+    reply_to_all(List, [], Result).
+
+reply_to_all([{From, Type, Threshold}=H|T],
+             StillWaiting0,
+             {ok, Value, _Next}=Result) ->
+    lager:info("Result: ~p, Threshold: ~p", [Result, Threshold]),
+    StillWaiting = case threshold_met(Type, Value, Threshold) of
+        true ->
+            lager:info("Threshold ~p met: ~p", [Threshold, Value]),
+            {server, undefined, {Address, Ref}} = From,
+            gen_server:reply({Address, Ref}, Result),
+            StillWaiting0;
+        false ->
+            lager:info("Threshold ~p NOT met: ~p", [Threshold, Value]),
+            StillWaiting0 ++ [H]
+    end,
+    reply_to_all(T, StillWaiting, Result);
+reply_to_all([H|T], StillWaiting, Result) ->
     {server, undefined, {Address, Ref}} = H,
     gen_server:reply({Address, Ref}, Result),
-    reply_to_all(T, Result);
-reply_to_all([], _Result) ->
-    ok.
+    reply_to_all(T, StillWaiting, Result);
+reply_to_all([], StillWaiting, _Result) ->
+    {ok, StillWaiting}.
 
 next_key(undefined, Type, State) ->
     {ok, NextKey} = declare_next(Type, State),
@@ -388,18 +428,21 @@ declare_next(Type, State=#state{partition=Partition, node=Node}) ->
             declare(Id, Type)
     end.
 
+%% @doc Determine if a threshold is met.
+threshold_met(_, Value, {greater, Threshold}) ->
+    Threshold < Value;
+threshold_met(_, Value, Threshold) ->
+    Threshold =< Value.
+
 %% @doc Determine if `NewValue` is an inflation of `Value`.
-is_inflation(Type, Value, NewValue) ->
-    case Type of
-        riak_dt_gcounter ->
-            Value < NewValue;
-        riak_dt_gset ->
-            OldSet = riak_dt_gset:value(Value),
-            NewSet = riak_dt_gset:value(NewValue),
-            length(OldSet) < length(NewSet);
-        _ ->
-            false
-    end.
+is_inflation(riak_dt_gcounter, Value, NewValue) ->
+    Value < NewValue;
+is_inflation(riak_dt_gset, Value, NewValue) ->
+    OldSet = riak_dt_gset:value(Value),
+    NewSet = riak_dt_gset:value(NewValue),
+    length(OldSet) < length(NewSet);
+is_inflation(_, _Value, _NewValue) ->
+    false.
 
 %% @doc Return if something is a lattice or not.
 is_lattice(Type) ->

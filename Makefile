@@ -38,6 +38,9 @@ riak-test: currentdevrel
 riak-test-lattice: currentdevrel
 	../riak_test/riak_test -v -c derflow -t derflow_lattice_test
 
+riak-test-threshold: currentdevrel
+	../riak_test/riak_test -v -c derflow -t derflow_threshold_read_test
+
 ##
 ## Developer targets
 ##

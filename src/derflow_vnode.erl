@@ -141,7 +141,7 @@ handle_command({bind, Id, Value}, _From,
     lager:info("Bind received: ~p", [Id]),
     [{_Key, V=#dv{functions=Functions}}] = ets:lookup(Variables, Id),
     NextKey = case Value of
-        nil ->
+        undefined ->
             undefined;
         _ ->
             next_key(V#dv.next, V#dv.type, State)

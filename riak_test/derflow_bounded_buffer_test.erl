@@ -48,18 +48,23 @@ producer(Value, N, Output) ->
             {ok, Next} = derflow:produce(Output, Value),
             producer(Value + 1, N - 1,  Next);
         true ->
-            derflow:bind(Output, nil)
+            derflow:bind(Output, undefined)
     end.
 
 loop(S1, S2, End) ->
     ok = derflow:wait_needed(S2),
     {ok, S1Value, S1Next} = derflow:consume(S1),
     {ok, S2Next} = derflow:produce(S2, S1Value),
-    case derflow:extend(End) of
-        {ok, {nil, _}} ->
+    case derflow:produce(S2, S1Value) of
+        {ok, undefined} ->
             ok;
-        {ok, EndNext} ->
-            loop(S1Next, S2Next, EndNext)
+        {ok, S2Next} ->
+            case derflow:extend(End) of
+                {ok, {undefined, _}} ->
+                    ok;
+                {ok, EndNext} ->
+                    loop(S1Next, S2Next, EndNext)
+            end
     end.
 
 buffer(S1, Size, S2) ->
@@ -81,8 +86,8 @@ consumer(S2, Size, F, Output) ->
             ok;
         _ ->
             case derflow:consume(S2) of
-                {ok, nil, _} ->
-                    derflow:bind(Output, nil);
+                {ok, undefined, _} ->
+                    derflow:bind(Output, undefined);
                 {ok, Value, Next} ->
                     {ok, NextOutput} = derflow:produce(Output, F(Value)),
                     consumer(Next, Size - 1, F, NextOutput)

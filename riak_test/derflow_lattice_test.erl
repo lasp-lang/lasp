@@ -96,16 +96,16 @@ producer(Init, N, Output) ->
             {ok, Next} = derflow:produce(Output, Init),
             producer(Init + 1, N-1,  Next);
         false ->
-            derflow:bind(Output, nil)
+            derflow:bind(Output, undefined)
     end.
 
 %% @doc Stream consumer, which accepts inputs on one stream, applies a
 %%      function, and then produces inputs on another stream.
 consumer(S1, F, S2) ->
     case derflow:consume(S1) of
-        {ok, nil, _} ->
-            lager:info("~p consumed: ~p", [self(), nil]),
-            derflow:bind(S2, nil);
+        {ok, undefined, _} ->
+            lager:info("~p consumed: ~p", [self(), undefined]),
+            derflow:bind(S2, undefined);
         {ok, Value, Next} ->
             lager:info("~p consumed: ~p", [self(), Value]),
             Me = self(),

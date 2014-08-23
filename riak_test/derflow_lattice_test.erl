@@ -26,7 +26,9 @@ confirm() ->
     lager:info("Remote code loading complete."),
 
     lager:info("Remotely executing the test."),
-    rpc:call(Node, ?MODULE, test, []),
+    ?assertEqual([0,2,4,6,8], rpc:call(Node, ?MODULE, test, [])),
+
+    lager:info("Done!"),
 
     pass.
 
@@ -84,9 +86,7 @@ test() ->
     {ok, FilteredObjectSet} = derflow:read(FilteredObjectSetId),
     lager:info("FilteredObjectSet: ~p", [FilteredObjectSet]),
 
-    lager:info("Done!"),
-
-    pass.
+    FilteredObjectSet.
 
 %% @doc Stream producer, which generates a series of inputs on a stream.
 producer(Init, N, Output) ->

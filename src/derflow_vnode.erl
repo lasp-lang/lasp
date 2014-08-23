@@ -146,6 +146,7 @@ handle_command({bind, Id, Value}, _From,
         _ ->
             next_key(V#dv.next, V#dv.type, State)
     end,
+    lager:info("Value is: ~p NextKey is: ~p", [Value, NextKey]),
     case V#dv.bound of
         true ->
             case V#dv.value of
@@ -155,7 +156,7 @@ handle_command({bind, Id, Value}, _From,
                     case is_lattice(V#dv.type) of
                         true ->
                             write(V#dv.type, Value, NextKey, [], Id, Variables),
-                            case is_inflation(V#dv.type, V#dv.value, Value) of
+                            case is_strict_inflation(V#dv.type, V#dv.value, Value) of
                                 true ->
                                     lager:info("Change is inflation: ~p ~p",
                                                [V#dv.value, Value]),
@@ -227,6 +228,7 @@ handle_command({thread, Module, Function, Args}, _From, State) ->
 
 handle_command({wait_needed, Id}, From,
                State=#state{variables=Variables}) ->
+    lager:info("Wait needed issued for identifier: ~p", [Id]),
     [{_Key, V}] = ets:lookup(Variables, Id),
     case V#dv.bound of
         true ->
@@ -282,7 +284,7 @@ handle_command({read, Id, Threshold, Function}, From,
                                     {reply, {ok, Value, V#dv.next}, State};
                                 false ->
                                     WT = lists:append(V#dv.waiting_threads,
-                                                      [{From, Type, Threshold}]),
+                                                      [{threshold, From, Type, Threshold}]),
                                     true = ets:insert(Variables,
                                                       {Id, V#dv{waiting_threads=WT}}),
                                     {noreply, State}
@@ -372,6 +374,7 @@ write(Type, Value, Next, Functions0, Key, Variables) ->
     [{_Key, #dv{waiting_threads=Threads,
                 binding_list=BindingList,
                 lazy=Lazy}}] = ets:lookup(Variables, Key),
+    lager:info("Waiting threads are: ~p", [Threads]),
     Functions = lists:usort(Functions0),
     {ok, StillWaiting} = reply_to_all(Threads, [], {ok, Value, Next}),
     V1 = #dv{type=Type, value=Value, functions=Functions, next=Next,
@@ -382,7 +385,7 @@ write(Type, Value, Next, Functions0, Key, Variables) ->
 reply_to_all(List, Result) ->
     reply_to_all(List, [], Result).
 
-reply_to_all([{From, Type, Threshold}=H|T],
+reply_to_all([{threshold, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, Value, _Next}=Result) ->
     lager:info("Result: ~p, Threshold: ~p", [Result, Threshold]),
@@ -418,7 +421,7 @@ notify_all([], _) ->
 
 %% @doc Declare the next object for streams.
 declare_next(Type, State=#state{partition=Partition, node=Node}) ->
-    lager:info("Current partition and node: ", [Partition, Node]),
+    lager:info("Current partition and node: ~p ~p", [Partition, Node]),
     Id = druuid:v4(),
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     case IndexNode of
@@ -437,13 +440,13 @@ threshold_met(_, Value, Threshold) ->
     Threshold =< Value.
 
 %% @doc Determine if `NewValue` is an inflation of `Value`.
-is_inflation(riak_dt_gcounter, Value, NewValue) ->
+is_strict_inflation(riak_dt_gcounter, Value, NewValue) ->
     Value < NewValue;
-is_inflation(riak_dt_gset, Value, NewValue) ->
+is_strict_inflation(riak_dt_gset, Value, NewValue) ->
     OldSet = riak_dt_gset:value(Value),
     NewSet = riak_dt_gset:value(NewValue),
     length(OldSet) < length(NewSet);
-is_inflation(_, _Value, _NewValue) ->
+is_strict_inflation(_, _Value, _NewValue) ->
     false.
 
 %% @doc Return if something is a lattice or not.

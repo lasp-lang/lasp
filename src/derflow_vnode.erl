@@ -1,5 +1,11 @@
+%% @doc Derflow operational vnode, which powers the data flow variable
+%%      assignment and read operations.
+%%
+
 -module(derflow_vnode).
+
 -behaviour(riak_core_vnode).
+
 -include("derflow.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
@@ -38,7 +44,6 @@
              next,
              waiting_threads = [],
              binding_list = [],
-             functions = [],
              creator,
              type,
              lazy = false,
@@ -58,12 +63,11 @@ read(Id) ->
     read(Id, undefined).
 
 read(Id, Threshold) ->
-    Function = get(initial_call),
-    lager:info("Read by process ~p, function ~p, id: ~p thresh: ~p",
-               [self(), Function, Id, Threshold]),
+    lager:info("Read by process ~p, id: ~p thresh: ~p",
+               [self(), Id, Threshold]),
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {read, Id, Threshold, Function},
+                                              {read, Id, Threshold},
                                               ?VNODE_MASTER).
 
 thread(Module, Function, Args) ->
@@ -139,7 +143,7 @@ handle_command({bind, Id, {id, DVId}}, From,
 handle_command({bind, Id, Value}, _From,
                State=#state{variables=Variables}) ->
     lager:info("Bind received: ~p", [Id]),
-    [{_Key, V=#dv{functions=Functions}}] = ets:lookup(Variables, Id),
+    [{_Key, V}] = ets:lookup(Variables, Id),
     NextKey = case Value of
         undefined ->
             undefined;
@@ -155,17 +159,8 @@ handle_command({bind, Id, Value}, _From,
                 _ ->
                     case is_lattice(V#dv.type) of
                         true ->
-                            write(V#dv.type, Value, NextKey, [], Id, Variables),
-                            case is_strict_inflation(V#dv.type, V#dv.value, Value) of
-                                true ->
-                                    lager:info("Change is inflation: ~p ~p",
-                                               [V#dv.value, Value]),
-                                    execute(Functions, State),
-                                    {reply, {ok, NextKey}, State};
-                                false ->
-                                    lager:info("Change is not inflation!"),
-                                    {reply, {ok, NextKey}, State}
-                            end;
+                            write(V#dv.type, Value, NextKey, Id, Variables),
+                            {reply, {ok, NextKey}, State};
                         false ->
                             lager:warning("Attempt to bind failed: ~p ~p ~p",
                                           [V#dv.type, V#dv.value, Value]),
@@ -244,32 +239,19 @@ handle_command({wait_needed, Id}, From,
                 end
     end;
 
-handle_command({read, Id, Threshold, Function}, From,
+handle_command({read, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
     [{_Key, V=#dv{value=Value,
                   bound=Bound,
                   creator=Creator,
                   lazy=Lazy,
-                  type=Type,
-                  next=NextKey,
-                  functions=Functions0}}] = ets:lookup(Variables, Id),
+                  type=Type}}] = ets:lookup(Variables, Id),
     case Bound of
         true ->
             lager:info("Read received: ~p, bound: ~p, threshold: ~p",
                        [Id, V, Threshold]),
             case is_lattice(Type) of
                 true ->
-                    %% Handle recalling the dependent functions.
-                    case Function of
-                        undefined ->
-                            ok;
-                        _ ->
-                            Functions = [Function|Functions0],
-                            lager:info("Read depends on function: ~p",
-                                       [Functions]),
-                            write(Type, Value, NextKey, Functions, Id, Variables)
-                    end,
-
                     %% Handle threshold reaads.
                     case Threshold of
                         undefined ->
@@ -294,8 +276,7 @@ handle_command({read, Id, Threshold, Function}, From,
                     {reply, {ok, Value, V#dv.next}, State}
             end;
         false ->
-            lager:info("Read received: ~p, unbound, function: ~p",
-                       [Id, Function]),
+            lager:info("Read received: ~p, unbound", [Id]),
             WT = lists:append(V#dv.waiting_threads, [From]),
             true = ets:insert(Variables, {Id, V#dv{waiting_threads=WT}}),
             case Lazy of
@@ -367,17 +348,13 @@ terminate(_Reason, _State) ->
 %% Internal functions
 
 write(Type, Value, Next, Key, Variables) ->
-    write(Type, Value, Next, [], Key, Variables).
-
-write(Type, Value, Next, Functions0, Key, Variables) ->
     lager:info("Writing key: ~p next: ~p", [Key, Next]),
     [{_Key, #dv{waiting_threads=Threads,
                 binding_list=BindingList,
                 lazy=Lazy}}] = ets:lookup(Variables, Key),
     lager:info("Waiting threads are: ~p", [Threads]),
-    Functions = lists:usort(Functions0),
     {ok, StillWaiting} = reply_to_all(Threads, [], {ok, Value, Next}),
-    V1 = #dv{type=Type, value=Value, functions=Functions, next=Next,
+    V1 = #dv{type=Type, value=Value, next=Next,
              lazy=Lazy, bound=true, waiting_threads=StillWaiting},
     true = ets:insert(Variables, {Key, V1}),
     notify_all(BindingList, Value).
@@ -439,39 +416,11 @@ threshold_met(_, Value, {greater, Threshold}) ->
 threshold_met(_, Value, Threshold) ->
     Threshold =< Value.
 
-%% @doc Determine if `NewValue` is an inflation of `Value`.
-is_strict_inflation(riak_dt_gcounter, Value, NewValue) ->
-    Value < NewValue;
-is_strict_inflation(riak_dt_gset, Value, NewValue) ->
-    OldSet = riak_dt_gset:value(Value),
-    NewSet = riak_dt_gset:value(NewValue),
-    length(OldSet) < length(NewSet);
-is_strict_inflation(_, _Value, _NewValue) ->
-    false.
-
 %% @doc Return if something is a lattice or not.
 is_lattice(Type) ->
     lists:member(Type, [riak_dt_gcounter,
                         riak_dt_lwwreg,
                         riak_dt_gset]).
-
-%% @doc Execute a series of functions.
-execute({Module, Function, Args},
-        #state{partition=Partition, node=Node}) ->
-    lager:info("Re-executing: ~p ~p ~p", [Module, Function, Args]),
-    [{IndexNode, _Type}] = derflow:preflist(?N,
-                                            {Module, Function, Args},
-                                            derflow),
-    case IndexNode of
-        {Partition, Node} ->
-            lager:info("Internal thread triggered: ~p", [IndexNode]),
-            internal_thread(Module, Function, Args);
-        _ ->
-            lager:info("Thread triggered: ~p", [IndexNode]),
-            thread(Module, Function, Args)
-    end;
-execute(Functions, State) ->
-    [execute(Function, State) || Function <- Functions].
 
 %% @doc Declare a new variable.
 internal_declare(Id, Type, #state{variables=Variables}) ->
@@ -488,7 +437,6 @@ internal_declare(Id, Type, #state{variables=Variables}) ->
 %% @doc Perform a thread operation locally.
 internal_thread(Module, Function, Args) ->
     Fun = fun() ->
-            put(initial_call, {Module, Function, Args}),
             erlang:apply(Module, Function, Args)
     end,
     Pid = spawn(Fun),

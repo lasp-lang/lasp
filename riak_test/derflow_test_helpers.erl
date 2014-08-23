@@ -3,11 +3,7 @@
 -module(derflow_test_helpers).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--export([load/1,
-         declare/1,
-         thread/4,
-         read/2,
-         bind/3]).
+-export([load/1]).
 
 %% @doc Remotely load test code on a series of nodes.
 load(Nodes) when is_list(Nodes) ->
@@ -34,19 +30,3 @@ remote_compile_and_load(Node, F) ->
     ModName = list_to_atom(filename:basename(F, ".erl")),
     {module, _} = rpc:call(Node, code, load_binary, [ModName, F, Bin]),
     ok.
-
-%% @doc Remotely declare a dataflow variable at a given node.
-declare(Node) ->
-    rpc:call(Node, derflow, declare, []).
-
-%% @doc Remotely bind a dataflow variable at a given node.
-bind(Node, Id, Value) ->
-    rpc:call(Node, derflow, bind, [Id, Value]).
-
-%% @doc Remotely read a dataflow variable at a given node.
-read(Node, Id) ->
-    rpc:call(Node, derflow, read, [Id]).
-
-%% @doc Remotely thread a dataflow function to a variable.
-thread(Node, Module, Function, Args) ->
-    rpc:call(Node, Module, Function, Args).

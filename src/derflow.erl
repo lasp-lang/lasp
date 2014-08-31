@@ -76,11 +76,9 @@ spawn_mon(Supervisor, Module, Function, Args) ->
     Supervisor ! {'SUPERVISE', Pid, Module, Function, Args}.
 
 get_stream(Stream)->
-    internal_get_stream(Stream, []).
+    get_stream(Stream, []).
 
-%% Internal functions
-
-internal_get_stream(Head, Output) ->
+get_stream(Head, Output) ->
     lager:info("About to consume: ~p", [Head]),
     case consume(Head) of
         {ok, undefined, _} ->
@@ -88,7 +86,7 @@ internal_get_stream(Head, Output) ->
             Output;
         {ok, Value, Next} ->
             lager:info("Received: ~p", [Value]),
-            internal_get_stream(Next, lists:append(Output, [Value]))
+            get_stream(Next, lists:append(Output, [Value]))
     end.
 
 %% @doc Generate a preference list for a given N value and data item.

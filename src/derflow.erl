@@ -68,9 +68,6 @@ thread(Module, Function, Args) ->
 wait_needed(Id) ->
     derflow_vnode:wait_needed(Id).
 
-%% The rest of primitives are not in the paper. They are just utilities.
-%% maybe we should just remove them
-
 spawn_mon(Supervisor, Module, Function, Args) ->
     {ok, Pid} = thread(Module, Function, Args),
     Supervisor ! {'SUPERVISE', Pid, Module, Function, Args}.

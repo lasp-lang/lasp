@@ -17,9 +17,17 @@
          spawn_mon/4,
          thread/3,
          preflist/3,
-         get_stream/1]).
+         get_stream/1,
+         register/2,
+         execute/1]).
 
 %% Public API
+
+register(Module, File) ->
+    derflow_vnode:register(Module, File).
+
+execute(Module) ->
+    derflow_vnode:execute(Module).
 
 declare() ->
     declare(undefined).

@@ -11,6 +11,7 @@ load(Nodes) when is_list(Nodes) ->
     ok;
 load(Node) ->
     TestGlob = rt_config:get(tests_to_remote_load, undefined),
+    lager:info("Test glob is: ~p", [TestGlob]),
     case TestGlob of
         undefined ->
             ok;

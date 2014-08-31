@@ -7,6 +7,7 @@
 -behaviour(riak_core_vnode).
 
 -include("derflow.hrl").
+
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -define(VNODE_MASTER, derflow_vnode_master).
@@ -19,7 +20,9 @@
          wait_needed/1,
          declare/2,
          write/5,
-         thread/3]).
+         thread/3,
+         register/2,
+         execute/1]).
 
 -export([start_vnode/1,
          init/1,
@@ -38,7 +41,10 @@
 
 -ignore_xref([start_vnode/1]).
 
--record(state, {node, partition, variables}).
+-record(state, {node,
+                partition,
+                variables,
+                programs = []}).
 
 -record(dv, {value,
              next,
@@ -50,6 +56,21 @@
              bound = false}).
 
 %% Extrenal API
+
+register(Name, File) ->
+    lager:info("Register called for name: ~p and file: ~p",
+               [Name, File]),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Name, derflow),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {register, Name, File},
+                                              ?VNODE_MASTER).
+
+execute(Name) ->
+    lager:info("Execute called for name: ~p", [Name]),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Name, derflow),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {execute, Name},
+                                              ?VNODE_MASTER).
 
 bind(Id, Value) ->
     lager:info("Bind called by process ~p, value ~p, id: ~p",
@@ -131,8 +152,43 @@ init([Partition]) ->
                                           {write_concurrency, true}]),
     {ok, #state{partition=Partition, node=node(), variables=VariableAtom}}.
 
+handle_command({execute, Module}, _From,
+               #state{programs=Programs}=State) ->
+    lager:info("Execute triggered for module: ~p", [Module]),
+    case lists:member(Module, Programs) of
+        true ->
+            lager:info("Executing module: ~p", [Module]),
+            Module:execute(),
+            {reply, ok, State};
+        false ->
+            lager:info("Failed to execute module: ~p", [Module]),
+            {reply, error, State}
+    end;
+
+handle_command({register, Module, File}, _From,
+               #state{programs=Programs}=State) ->
+    lager:info("Register triggered for module: ~p and file: ~p",
+               [Module, File]),
+    case compile:file(File, [binary, {parse_transform, lager_transform}]) of
+        {ok, _, Bin} ->
+            lager:info("Compiled file: ~p", [Bin]),
+            case code:load_binary(Module, File, Bin) of
+                {module, Module} ->
+                    lager:info("Successfully loaded module: ~p",
+                               [Module]),
+                    {reply, ok, State#state{programs=Programs ++ [Module]}};
+                {error, Reason} ->
+                    lager:info("Failed to load file: ~p, reason: ~p",
+                               [File, Reason]),
+                    {reply, error, State}
+            end;
+        _ ->
+            lager:info("Remote loading of file: ~p failed.", [File]),
+            {reply, error, State}
+    end;
+
 handle_command({declare, Id, Type}, _From, State) ->
-    {ok, Id} = internal_declare(Id, Type, State),
+    {ok, Id} = local_declare(Id, Type, State),
     {reply, {ok, Id}, State};
 
 handle_command({bind, Id, {id, DVId}}, From,
@@ -218,7 +274,7 @@ handle_command({notify_value, Id, Value}, _From,
     {noreply, State};
 
 handle_command({thread, Module, Function, Args}, _From, State) ->
-    {ok, Pid} = internal_thread(Module, Function, Args),
+    {ok, Pid} = local_thread(Module, Function, Args),
     {reply, {ok, Pid}, State};
 
 handle_command({wait_needed, Id}, From,
@@ -403,8 +459,8 @@ declare_next(Type, State=#state{partition=Partition, node=Node}) ->
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     case IndexNode of
         {Partition, Node} ->
-            lager:info("Internal declare triggered: ~p", [IndexNode]),
-            internal_declare(Id, Type, State);
+            lager:info("Local declare triggered: ~p", [IndexNode]),
+            local_declare(Id, Type, State);
         _ ->
             lager:info("Declare triggered: ~p", [IndexNode]),
             declare(Id, Type)
@@ -423,7 +479,7 @@ is_lattice(Type) ->
                         riak_dt_gset]).
 
 %% @doc Declare a new variable.
-internal_declare(Id, Type, #state{variables=Variables}) ->
+local_declare(Id, Type, #state{variables=Variables}) ->
     lager:info("Declare received: ~p ~p", [Id, Type]),
     Record = case Type of
         undefined ->
@@ -435,10 +491,8 @@ internal_declare(Id, Type, #state{variables=Variables}) ->
     {ok, Id}.
 
 %% @doc Perform a thread operation locally.
-internal_thread(Module, Function, Args) ->
-    Fun = fun() ->
-            erlang:apply(Module, Function, Args)
-    end,
+local_thread(Module, Function, Args) ->
+    Fun = fun() -> erlang:apply(Module, Function, Args) end,
     Pid = spawn(Fun),
     lager:info("Spawned process ~p executing ~p",
                [Pid, {Module, Function, Args}]),

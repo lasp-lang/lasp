@@ -32,14 +32,17 @@ stage : rel
 currentdevrel: stagedevrel
 	riak_test/bin/derflow-current.sh
 
-riak-test: currentdevrel
-	$(foreach dep,$(wildcard riak_test/*.erl), ../riak_test/riak_test -v -c derflow -t $(dep);)
+riak-test:
+	$(foreach dep,$(wildcard riak_test/*_test.erl), ../riak_test/riak_test -v -c derflow -t $(dep);)
 
 riak-test-lattice: currentdevrel
 	../riak_test/riak_test -v -c derflow -t derflow_lattice_test
 
 riak-test-threshold: currentdevrel
 	../riak_test/riak_test -v -c derflow -t derflow_threshold_read_test
+
+riak-test-programs: compile compile-riak-test
+	../riak_test/riak_test -v -c derflow -t derflow_programs_test
 
 ##
 ## Developer targets

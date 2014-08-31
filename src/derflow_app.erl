@@ -16,8 +16,11 @@ start(_StartType, _StartArgs) ->
                                     [{vnode_module, derflow_vnode}]),
             ok = riak_core_node_watcher:service_up(derflow, self()),
 
-            ok = riak_core_ring_events:add_guarded_handler(derflow_ring_event_handler, []),
-            ok = riak_core_node_watcher_events:add_guarded_handler(derflow_node_event_handler, []),
+            ok = riak_core_ring_events:add_guarded_handler(
+                    derflow_ring_event_handler, []),
+
+            ok = riak_core_node_watcher_events:add_guarded_handler(
+                    derflow_node_event_handler, []),
 
             {ok, Pid};
         {error, Reason} ->

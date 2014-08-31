@@ -158,8 +158,8 @@ handle_command({execute, Module}, _From,
     case lists:member(Module, Programs) of
         true ->
             lager:info("Executing module: ~p", [Module]),
-            Module:execute(),
-            {reply, ok, State};
+            Result = Module:execute(),
+            {reply, Result, State};
         false ->
             lager:info("Failed to execute module: ~p", [Module]),
             {reply, error, State}

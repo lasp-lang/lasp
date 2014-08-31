@@ -23,7 +23,7 @@ confirm() ->
     lager:info("Remote code loading complete."),
 
     lager:info("Remotely executing the test."),
-    ?assertEqual(ok, rpc:call(Node, ?MODULE, test, [])),
+    ?assertEqual({ok, 1, 1}, rpc:call(Node, ?MODULE, test, [])),
 
     pass.
 
@@ -37,6 +37,6 @@ test() ->
 
     lager:info("Executing program from the test."),
 
-    ok = derflow:execute(derflow_program),
+    Result = derflow:execute(derflow_program),
 
-    ok.
+    Result.

@@ -23,7 +23,7 @@ confirm() ->
     lager:info("Remote code loading complete."),
 
     lager:info("Remotely executing the test."),
-    ?assertEqual({ok, 1, 1, 1}, rpc:call(Node, ?MODULE, test, [])),
+    ?assertEqual({ok, 1, 1}, rpc:call(Node, ?MODULE, test, [])),
 
     pass.
 

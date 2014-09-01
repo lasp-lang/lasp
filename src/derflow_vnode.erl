@@ -253,13 +253,13 @@ handle_command({reply_fetch, FromId, FromP,
     case FetchDV#dv.bound of
         true ->
             write(Type, Value, Next, FromId, Variables),
-            {ok, _} = reply_to_all([FromP], {ok, Next}),
+            {ok, _} = derflow_ets:reply_to_all([FromP], {ok, Next}),
             ok;
         false ->
             [{_, DV}] = ets:lookup(Variables, FromId),
             DV1 = DV#dv{next=FetchDV#dv.next},
             true = ets:insert(Variables, {FromId, DV1}),
-            {ok, _} = reply_to_all([FromP], {ok, FetchDV#dv.next}),
+            {ok, _} = derflow_ets:reply_to_all([FromP], {ok, FetchDV#dv.next}),
             ok
       end,
       {noreply, State};
@@ -335,7 +335,7 @@ handle_command({read, Id, Threshold}, From,
             true = ets:insert(Variables, {Id, V#dv{waiting_threads=WT}}),
             case Lazy of
                 true ->
-                    {ok, _} = reply_to_all([Creator], ok),
+                    {ok, _} = derflow_ets:reply_to_all([Creator], ok),
                     {noreply, State};
                 false ->
                     {noreply, State}
@@ -410,36 +410,11 @@ write(Type, Value, Next, Key, Variables) ->
                 binding_list=BindingList,
                 lazy=Lazy}}] = ets:lookup(Variables, Key),
     lager:info("Waiting threads are: ~p", [Threads]),
-    {ok, StillWaiting} = reply_to_all(Threads, [], {ok, Value, Next}),
+    {ok, StillWaiting} = derflow_ets:reply_to_all(Threads, [], {ok, Value, Next}),
     V1 = #dv{type=Type, value=Value, next=Next,
              lazy=Lazy, bound=true, waiting_threads=StillWaiting},
     true = ets:insert(Variables, {Key, V1}),
     notify_all(BindingList, Value).
-
-reply_to_all(List, Result) ->
-    reply_to_all(List, [], Result).
-
-reply_to_all([{threshold, From, Type, Threshold}=H|T],
-             StillWaiting0,
-             {ok, Value, _Next}=Result) ->
-    lager:info("Result: ~p, Threshold: ~p", [Result, Threshold]),
-    StillWaiting = case derflow_ets:threshold_met(Type, Value, Threshold) of
-        true ->
-            lager:info("Threshold ~p met: ~p", [Threshold, Value]),
-            {server, undefined, {Address, Ref}} = From,
-            gen_server:reply({Address, Ref}, Result),
-            StillWaiting0;
-        false ->
-            lager:info("Threshold ~p NOT met: ~p", [Threshold, Value]),
-            StillWaiting0 ++ [H]
-    end,
-    reply_to_all(T, StillWaiting, Result);
-reply_to_all([H|T], StillWaiting, Result) ->
-    {server, undefined, {Address, Ref}} = H,
-    gen_server:reply({Address, Ref}, Result),
-    reply_to_all(T, StillWaiting, Result);
-reply_to_all([], StillWaiting, _Result) ->
-    {ok, StillWaiting}.
 
 next_key(undefined, Type, State) ->
     {ok, NextKey} = declare_next(Type, State),

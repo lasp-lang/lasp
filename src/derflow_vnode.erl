@@ -24,7 +24,7 @@
 
 %% Program execution functions.
 -export([register/4,
-         execute/1]).
+         execute/3]).
 
 -export([start_vnode/1,
          init/1,
@@ -58,12 +58,12 @@ register(Preflist, Identity, Module, File) ->
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
-execute(Name) ->
-    lager:info("Execute called for name: ~p", [Name]),
-    [{IndexNode, _Type}] = derflow:preflist(?N, Name, derflow),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {execute, Name},
-                                              ?VNODE_MASTER).
+execute(Preflist, Identity, Module) ->
+    lager:info("Execute called for module: ~p", [Module]),
+    riak_core_vnode_master:command(Preflist,
+                                   {execute, Identity, Module},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
 bind(Id, Value) ->
     lager:info("Bind called by process ~p, value ~p, id: ~p",
@@ -145,17 +145,17 @@ init([Partition]) ->
                                           {write_concurrency, true}]),
     {ok, #state{partition=Partition, node=node(), variables=VariableAtom}}.
 
-handle_command({execute, Module}, _From,
+handle_command({execute, {ReqId, _}, Module}, _From,
                #state{programs=Programs}=State) ->
     lager:info("Execute triggered for module: ~p", [Module]),
     case lists:member(Module, Programs) of
         true ->
             lager:info("Executing module: ~p", [Module]),
             Result = Module:execute(),
-            {reply, Result, State};
+            {reply, {ok, ReqId, Result}, State};
         false ->
             lager:info("Failed to execute module: ~p", [Module]),
-            {reply, error, State}
+            {reply, {error, ReqId}, State}
     end;
 
 handle_command({register, {ReqId, _}, Module, File}, _From,

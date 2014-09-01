@@ -1,7 +1,8 @@
 -module(derflow_program).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--export([execute/0]).
+-export([execute/0,
+         merge/1]).
 
 execute() ->
     {ok, Id1} = derflow:declare(),
@@ -19,3 +20,6 @@ execute() ->
     lager:info("Value2: ~p", [Value2]),
 
     {ok, Value1, Value2}.
+
+merge([Reply|_]) ->
+    Reply.

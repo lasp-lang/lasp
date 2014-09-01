@@ -37,6 +37,6 @@ test() ->
 
     lager:info("Executing program from the test."),
 
-    Result = derflow:execute(derflow_program),
+    {ok, Result} = derflow:execute(derflow_program),
 
     Result.

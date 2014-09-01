@@ -31,7 +31,8 @@ register(Module, File) ->
     wait_for_reqid(ReqId, ?TIMEOUT).
 
 execute(Module) ->
-    derflow_vnode:execute(Module).
+    {ok, ReqId} = derflow_execute_fsm:execute(Module),
+    wait_for_reqid(ReqId, ?TIMEOUT).
 
 declare() ->
     declare(undefined).

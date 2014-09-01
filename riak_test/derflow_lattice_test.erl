@@ -52,9 +52,9 @@ test() ->
     {ok, ObjectSetId} = derflow:declare(riak_dt_gset),
     ObjectSetFun = fun(X) ->
             lager:info("~p set received: ~p", [self(), X]),
-            {ok, Set0} = derflow:read(ObjectSetId),
+            {ok, Set0, _} = derflow:read(ObjectSetId),
             {ok, Set} = riak_dt_gset:update({add, X}, undefined, Set0),
-            ok = derflow:bind(ObjectSetId, Set),
+            {ok, _} = derflow:bind(ObjectSetId, Set),
             lager:info("~p set bound to new set: ~p", [self(), Set]),
             Set
     end,

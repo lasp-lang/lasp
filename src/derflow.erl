@@ -37,8 +37,8 @@ declare(Type) ->
 
 bind(Id, Value) ->
     case derflow_vnode:bind(Id, Value) of
-        {ok, _} ->
-            ok;
+        {ok, Next} ->
+            {ok, Next};
         error ->
             error
     end.
@@ -47,13 +47,11 @@ bind(Id, Module, Function, Args) ->
     bind(Id, Module:Function(Args)).
 
 read(Id) ->
-    {ok, Value, _Next} = derflow_vnode:read(Id),
-    {ok, Value}.
+    derflow_vnode:read(Id).
 
 %% @doc Blocking threshold read.
 read(Id, Threshold) ->
-    {ok, Value, _Next} = derflow_vnode:read(Id, Threshold),
-    {ok, Value}.
+    derflow_vnode:read(Id, Threshold).
 
 produce(Id, Value) ->
     derflow_vnode:bind(Id, Value).

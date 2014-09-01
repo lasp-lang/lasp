@@ -22,8 +22,8 @@ confirm() ->
 
     lager:info("Remotely executing the test."),
     {GSet, GSet2} = rpc:call(Node, ?MODULE, test, []),
-    ?assertEqual({ok, [1,2,3]}, GSet),
-    ?assertEqual({ok, [1,2,3,4,5]}, GSet2),
+    ?assertMatch({ok, [1,2,3], _}, GSet),
+    ?assertMatch({ok, [1,2,3,4,5], _}, GSet2),
 
     pass.
 

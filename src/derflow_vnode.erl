@@ -169,7 +169,9 @@ handle_command({register, Module, File}, _From,
                #state{programs=Programs}=State) ->
     lager:info("Register triggered for module: ~p and file: ~p",
                [Module, File]),
-    case compile:file(File, [binary, {parse_transform, lager_transform}]) of
+    case compile:file(File, [binary,
+                             {parse_transform, lager_transform},
+                             {parse_transform, derflow_transform}]) of
         {ok, _, Bin} ->
             lager:info("Compiled file: ~p", [Bin]),
             case code:load_binary(Module, File, Bin) of

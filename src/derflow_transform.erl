@@ -7,7 +7,9 @@
 -export([parse_transform/2]).
 
 %% @private
-parse_transform(AST, _Options) ->
+parse_transform(AST, Options) ->
+    {store, Store} = lists:keyfind(store, 1, Options),
+    put(store, Store),
     walk_ast([], AST).
 
 %% @private
@@ -42,10 +44,12 @@ walk_body(Acc, [H|T]) ->
 %% @private
 transform_statement({call, Line1,
                      {remote, Line2,
-                      {atom, Line3, derflow}, {atom, Line4, Func}}, Arguments}) ->
+                      {atom, Line3, derflow}, {atom, Line4, Func}},
+                     Arguments}) ->
     {call, Line1,
      {remote, Line2,
-      {atom, Line3, derflow}, {atom, Line4, Func}}, Arguments};
+      {atom, Line3, derflow_ets}, {atom, Line4, Func}},
+     Arguments ++ [{atom, Line4, get(store)}]};
 transform_statement(Stmt) when is_tuple(Stmt) ->
     list_to_tuple(transform_statement(tuple_to_list(Stmt)));
 transform_statement(Stmt) when is_list(Stmt) ->

@@ -12,6 +12,7 @@
 
 -define(VNODE_MASTER, derflow_vnode_master).
 
+%% Language execution primitives.
 -export([bind/2,
          read/1,
          read/2,
@@ -19,9 +20,10 @@
          is_det/1,
          wait_needed/1,
          declare/2,
-         write/5,
-         thread/3,
-         register/2,
+         thread/3]).
+
+%% Program execution functions.
+-export([register/2,
          execute/1]).
 
 -export([start_vnode/1,
@@ -45,15 +47,6 @@
                 partition,
                 variables,
                 programs = []}).
-
--record(dv, {value,
-             next,
-             waiting_threads = [],
-             binding_list = [],
-             creator,
-             type,
-             lazy = false,
-             bound = false}).
 
 %% Extrenal API
 
@@ -166,12 +159,13 @@ handle_command({execute, Module}, _From,
     end;
 
 handle_command({register, Module, File}, _From,
-               #state{programs=Programs}=State) ->
+               #state{variables=Variables, programs=Programs}=State) ->
     lager:info("Register triggered for module: ~p and file: ~p",
                [Module, File]),
     case compile:file(File, [binary,
                              {parse_transform, lager_transform},
-                             {parse_transform, derflow_transform}]) of
+                             {parse_transform, derflow_transform},
+                             {store, Variables}]) of
         {ok, _, Bin} ->
             lager:info("Compiled file: ~p", [Bin]),
             case code:load_binary(Module, File, Bin) of
@@ -189,8 +183,9 @@ handle_command({register, Module, File}, _From,
             {reply, error, State}
     end;
 
-handle_command({declare, Id, Type}, _From, State) ->
-    {ok, Id} = local_declare(Id, Type, State),
+handle_command({declare, Id, Type}, _From,
+               #state{variables=Variables}=State) ->
+    {ok, Id} = derflow_ets:declare(Id, Type, Variables),
     {reply, {ok, Id}, State};
 
 handle_command({bind, Id, {id, DVId}}, From,
@@ -215,7 +210,7 @@ handle_command({bind, Id, Value}, _From,
                 Value ->
                     {reply, {ok, NextKey}, State};
                 _ ->
-                    case is_lattice(V#dv.type) of
+                    case derflow_ets:is_lattice(V#dv.type) of
                         true ->
                             write(V#dv.type, Value, NextKey, Id, Variables),
                             {reply, {ok, NextKey}, State};
@@ -275,19 +270,20 @@ handle_command({notify_value, Id, Value}, _From,
     write(Type, Value, Next, Id, Variables),
     {noreply, State};
 
-handle_command({thread, Module, Function, Args}, _From, State) ->
-    {ok, Pid} = local_thread(Module, Function, Args),
+handle_command({thread, Module, Function, Args}, _From,
+               #state{variables=Variables}=State) ->
+    {ok, Pid} = derflow_ets:thread(Module, Function, Args, Variables),
     {reply, {ok, Pid}, State};
 
 handle_command({wait_needed, Id}, From,
                State=#state{variables=Variables}) ->
     lager:info("Wait needed issued for identifier: ~p", [Id]),
-    [{_Key, V}] = ets:lookup(Variables, Id),
-    case V#dv.bound of
+    [{_Key, V=#dv{waiting_threads=WT, bound=Bound}}] = ets:lookup(Variables, Id),
+    case Bound of
         true ->
             {reply, ok, State};
         false ->
-            case V#dv.waiting_threads of
+            case WT of
                 [_H|_T] ->
                     {reply, ok, State};
                 _ ->
@@ -308,7 +304,7 @@ handle_command({read, Id, Threshold}, From,
         true ->
             lager:info("Read received: ~p, bound: ~p, threshold: ~p",
                        [Id, V, Threshold]),
-            case is_lattice(Type) of
+            case derflow_ets:is_lattice(Type) of
                 true ->
                     %% Handle threshold reaads.
                     case Threshold of
@@ -319,7 +315,7 @@ handle_command({read, Id, Threshold}, From,
                         _ ->
                             lager:info("Threshold specified: ~p",
                                        [Threshold]),
-                            case threshold_met(Type, Value, Threshold) of
+                            case derflow_ets:threshold_met(Type, Value, Threshold) of
                                 true ->
                                     {reply, {ok, Value, V#dv.next}, State};
                                 false ->
@@ -359,12 +355,13 @@ handle_command({next, Id}, _From,
   end;
 
 handle_command({is_det, Id}, _From, State=#state{variables=Variables}) ->
-    [{_Key, #dv{bound=Bound}}] = ets:lookup(Variables, Id),
+    {ok, Bound} = derflow_ets:is_det(Id, Variables),
     {reply, Bound, State};
 
 handle_command(_Message, _Sender, State) ->
     {noreply, State}.
 
+%% @todo Most likely broken...
 handle_handoff_command(?FOLD_REQ{foldfun=FoldFun, acc0=Acc0}, _Sender,
                        #state{variables=Variables}=State) ->
     F = fun({Key, Operation}, Acc) -> FoldFun(Key, Operation, Acc) end,
@@ -380,11 +377,13 @@ handoff_cancelled(State) ->
 handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
+%% @todo Most likely broken...
 handle_handoff_data(Data, State=#state{variables=Variables}) ->
     {Key, Operation} = binary_to_term(Data),
     true = ets:insert_new(Variables, {Key, Operation}),
     {reply, ok, State}.
 
+%% @todo Most likely broken...
 encode_handoff_item(Key, Operation) ->
     term_to_binary({Key, Operation}).
 
@@ -424,7 +423,7 @@ reply_to_all([{threshold, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, Value, _Next}=Result) ->
     lager:info("Result: ~p, Threshold: ~p", [Result, Threshold]),
-    StillWaiting = case threshold_met(Type, Value, Threshold) of
+    StillWaiting = case derflow_ets:threshold_met(Type, Value, Threshold) of
         true ->
             lager:info("Threshold ~p met: ~p", [Threshold, Value]),
             {server, undefined, {Address, Ref}} = From,
@@ -455,47 +454,15 @@ notify_all([], _) ->
     ok.
 
 %% @doc Declare the next object for streams.
-declare_next(Type, State=#state{partition=Partition, node=Node}) ->
+declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) ->
     lager:info("Current partition and node: ~p ~p", [Partition, Node]),
     Id = druuid:v4(),
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     case IndexNode of
         {Partition, Node} ->
             lager:info("Local declare triggered: ~p", [IndexNode]),
-            local_declare(Id, Type, State);
+            derflow_ets:declare(Id, Type, Variables);
         _ ->
             lager:info("Declare triggered: ~p", [IndexNode]),
             declare(Id, Type)
     end.
-
-%% @doc Determine if a threshold is met.
-threshold_met(_, Value, {greater, Threshold}) ->
-    Threshold < Value;
-threshold_met(_, Value, Threshold) ->
-    Threshold =< Value.
-
-%% @doc Return if something is a lattice or not.
-is_lattice(Type) ->
-    lists:member(Type, [riak_dt_gcounter,
-                        riak_dt_lwwreg,
-                        riak_dt_gset]).
-
-%% @doc Declare a new variable.
-local_declare(Id, Type, #state{variables=Variables}) ->
-    lager:info("Declare received: ~p ~p", [Id, Type]),
-    Record = case Type of
-        undefined ->
-            #dv{value=undefined, type=undefined, bound=false};
-        Type ->
-            #dv{value=Type:new(), type=Type, bound=true}
-    end,
-    true = ets:insert(Variables, {Id, Record}),
-    {ok, Id}.
-
-%% @doc Perform a thread operation locally.
-local_thread(Module, Function, Args) ->
-    Fun = fun() -> erlang:apply(Module, Function, Args) end,
-    Pid = spawn(Fun),
-    lager:info("Spawned process ~p executing ~p",
-               [Pid, {Module, Function, Args}]),
-    {ok, Pid}.

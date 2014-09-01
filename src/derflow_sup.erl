@@ -28,4 +28,8 @@ init(_Args) ->
                   {derflow_declare_fsm_sup, start_link, []},
                    permanent, infinity, supervisor, [derflow_declare_fsm_sup]},
 
-    {ok, {{one_for_one, 5, 10}, [VMaster, DeclareFSM]}}.
+    RegisterFSM = {derflow_register_fsm_sup,
+                   {derflow_register_fsm_sup, start_link, []},
+                    permanent, infinity, supervisor, [derflow_register_fsm_sup]},
+
+    {ok, {{one_for_one, 5, 10}, [VMaster, DeclareFSM, RegisterFSM]}}.

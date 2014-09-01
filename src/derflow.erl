@@ -19,12 +19,16 @@
          preflist/3,
          get_stream/1,
          register/2,
-         execute/1]).
+         execute/1,
+         mk_reqid/0]).
+
+-define(TIMEOUT, 100000).
 
 %% Public API
 
 register(Module, File) ->
-    derflow_vnode:register(Module, File).
+    {ok, ReqId} = derflow_register_fsm:register(Module, File),
+    wait_for_reqid(ReqId, ?TIMEOUT).
 
 execute(Module) ->
     derflow_vnode:execute(Module).
@@ -96,3 +100,22 @@ get_stream(Head, Output) ->
 preflist(NVal, Param, VNode) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Param)}),
     riak_core_apl:get_primary_apl(DocIdx, NVal, VNode).
+
+%%%===================================================================
+%%% Internal Functions
+%%%===================================================================
+
+%% @doc Generate a request id.
+mk_reqid() ->
+    erlang:phash2(erlang:now()).
+
+%% @doc Wait for a response.
+wait_for_reqid(ReqID, Timeout) ->
+    receive
+        {ReqID, ok} ->
+            ok;
+        {ReqID, ok, Val} ->
+            {ok, Val}
+    after Timeout ->
+        {error, timeout}
+    end.

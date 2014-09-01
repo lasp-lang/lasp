@@ -23,7 +23,7 @@
          thread/3]).
 
 %% Program execution functions.
--export([register/2,
+-export([register/4,
          execute/1]).
 
 -export([start_vnode/1,
@@ -50,13 +50,13 @@
 
 %% Extrenal API
 
-register(Name, File) ->
-    lager:info("Register called for name: ~p and file: ~p",
-               [Name, File]),
-    [{IndexNode, _Type}] = derflow:preflist(?N, Name, derflow),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {register, Name, File},
-                                              ?VNODE_MASTER).
+register(Preflist, Identity, Module, File) ->
+    lager:info("Register called for module: ~p and file: ~p",
+               [Module, File]),
+    riak_core_vnode_master:command(Preflist,
+                                   {register, Identity, Module, File},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
 execute(Name) ->
     lager:info("Execute called for name: ~p", [Name]),
@@ -158,7 +158,7 @@ handle_command({execute, Module}, _From,
             {reply, error, State}
     end;
 
-handle_command({register, Module, File}, _From,
+handle_command({register, {ReqId, _}, Module, File}, _From,
                #state{variables=Variables, programs=Programs}=State) ->
     lager:info("Register triggered for module: ~p and file: ~p",
                [Module, File]),
@@ -172,15 +172,15 @@ handle_command({register, Module, File}, _From,
                 {module, Module} ->
                     lager:info("Successfully loaded module: ~p",
                                [Module]),
-                    {reply, ok, State#state{programs=Programs ++ [Module]}};
+                    {reply, {ok, ReqId}, State#state{programs=Programs ++ [Module]}};
                 {error, Reason} ->
                     lager:info("Failed to load file: ~p, reason: ~p",
                                [File, Reason]),
-                    {reply, error, State}
+                    {reply, {error, ReqId}, State}
             end;
         _ ->
             lager:info("Remote loading of file: ~p failed.", [File]),
-            {reply, error, State}
+            {reply, {error, ReqId}, State}
     end;
 
 handle_command({declare, Id, Type}, _From,

@@ -32,11 +32,21 @@ init(_Args) ->
                    {derflow_register_fsm_sup, start_link, []},
                     permanent, infinity, supervisor, [derflow_register_fsm_sup]},
 
+    RegisterGlobalFSM = {derflow_register_global_fsm_sup,
+                         {derflow_register_global_fsm_sup, start_link, []},
+                          permanent, infinity, supervisor, [derflow_register_global_fsm_sup]},
+
     ExecuteFSM = {derflow_execute_fsm_sup,
                   {derflow_execute_fsm_sup, start_link, []},
                    permanent, infinity, supervisor, [derflow_execute_fsm_sup]},
 
+    ExecuteCoverageFSM = {derflow_execute_coverage_fsm_sup,
+                          {derflow_execute_coverage_fsm_sup, start_link, []},
+                           permanent, infinity, supervisor, [derflow_execute_coverage_fsm_sup]},
+
     {ok, {{one_for_one, 5, 10}, [VMaster,
                                  DeclareFSM,
                                  RegisterFSM,
-                                 ExecuteFSM]}}.
+                                 RegisterGlobalFSM,
+                                 ExecuteFSM,
+                                 ExecuteCoverageFSM]}}.

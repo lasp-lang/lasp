@@ -1,6 +1,6 @@
-%% @doc Programs test.
+%% @doc Global programs test.
 
--module(derflow_programs_test).
+-module(derflow_global_programs_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([test/0]).
@@ -34,10 +34,10 @@ test() ->
 
     ok = derflow:register(derflow_program,
                           "/Users/cmeiklejohn/SyncFree/derflow/riak_test/derflow_program.erl",
-                         preflist),
+                         global),
 
     lager:info("Executing program from the test."),
 
-    {ok, Result} = derflow:execute(derflow_program, preflist),
+    {ok, Result} = derflow:execute(derflow_program, global),
 
     Result.

@@ -147,14 +147,10 @@ init([Partition]) ->
 
 handle_command({execute, {ReqId, _}, Module}, _From,
                #state{programs=Programs}=State) ->
-    lager:info("Execute triggered for module: ~p", [Module]),
-    case lists:member(Module, Programs) of
-        true ->
-            lager:info("Executing module: ~p", [Module]),
-            Result = Module:execute(),
+    case execute(Module, Programs) of
+        {ok, Result} ->
             {reply, {ok, ReqId, Result}, State};
-        false ->
-            lager:info("Failed to execute module: ~p", [Module]),
+        {error, undefined} ->
             {reply, {error, ReqId}, State}
     end;
 
@@ -167,7 +163,7 @@ handle_command({register, {ReqId, _}, Module, File}, _From,
                              {parse_transform, derflow_transform},
                              {store, Variables}]) of
         {ok, _, Bin} ->
-            lager:info("Compiled file: ~p", [Bin]),
+            lager:info("Compiled file!"),
             case code:load_binary(Module, File, Bin) of
                 {module, Module} ->
                     lager:info("Successfully loaded module: ~p",
@@ -393,6 +389,16 @@ is_empty(State) ->
 delete(State) ->
     {ok, State}.
 
+handle_coverage(?EXECUTE_REQUEST{module=Module}, _KeySpaces, _Sender,
+                #state{programs=Programs}=State) ->
+    lager:info("Coverage execute request received for module: ~p",
+               [Module]),
+    case execute(Module, Programs) of
+        {ok, Result} ->
+            {reply, {done, Result}, State};
+        {error, undefined} ->
+            {reply, {error, undefined}, State}
+    end;
 handle_coverage(_Req, _KeySpaces, _Sender, State) ->
     {stop, not_implemented, State}.
 
@@ -440,4 +446,17 @@ declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) 
         _ ->
             lager:info("Declare triggered: ~p", [IndexNode]),
             declare(Id, Type)
+    end.
+
+%% @doc Execute a given program.
+execute(Module, Programs) ->
+    lager:info("Execute triggered for module: ~p", [Module]),
+    case lists:member(Module, Programs) of
+        true ->
+            lager:info("Executing module: ~p", [Module]),
+            Result = Module:execute(),
+            {ok, Result};
+        false ->
+            lager:info("Failed to execute module: ~p", [Module]),
+            {error, undefined}
     end.

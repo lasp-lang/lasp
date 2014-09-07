@@ -18,20 +18,24 @@
          thread/3,
          preflist/3,
          get_stream/1,
-         register/2,
-         execute/1,
+         register/3,
+         execute/2,
          mk_reqid/0]).
-
--define(TIMEOUT, 100000).
 
 %% Public API
 
-register(Module, File) ->
+register(Module, File, preflist) ->
     {ok, ReqId} = derflow_register_fsm:register(Module, File),
+    wait_for_reqid(ReqId, ?TIMEOUT);
+register(Module, File, global) ->
+    {ok, ReqId} = derflow_register_global_fsm:register(Module, File),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
-execute(Module) ->
+execute(Module, preflist) ->
     {ok, ReqId} = derflow_execute_fsm:execute(Module),
+    wait_for_reqid(ReqId, ?TIMEOUT);
+execute(Module, global) ->
+    {ok, ReqId} = derflow_execute_coverage_fsm:execute(Module),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
 declare() ->
@@ -41,12 +45,7 @@ declare(Type) ->
     derflow_vnode:declare(druuid:v4(), Type).
 
 bind(Id, Value) ->
-    case derflow_vnode:bind(Id, Value) of
-        {ok, Next} ->
-            {ok, Next};
-        error ->
-            error
-    end.
+    derflow_vnode:bind(Id, Value).
 
 bind(Id, Module, Function, Args) ->
     bind(Id, Module:Function(Args)).

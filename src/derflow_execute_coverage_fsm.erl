@@ -5,7 +5,8 @@
 
 -include_lib("derflow.hrl").
 
--export([execute/1]).
+-export([execute/1,
+         execute/2]).
 
 -export([init/2,
          process_results/2,
@@ -18,8 +19,11 @@
 %% ===================================================================
 
 execute(Module) ->
+    execute(Module, 1).
+
+execute(Module, NVal) ->
     ReqId = derflow:mk_reqid(),
-    _ = derflow_execute_coverage_fsm_sup:start_child([{raw, ReqId, self()}, [?TIMEOUT, 1, Module]]),
+    _ = derflow_execute_coverage_fsm_sup:start_child([{raw, ReqId, self()}, [?TIMEOUT, NVal, Module]]),
     {ok, ReqId}.
 
 init(From={_, _, _}, [Timeout, NVal, Module]) ->

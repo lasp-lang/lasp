@@ -20,6 +20,7 @@
          get_stream/1,
          register/3,
          execute/2,
+         execute/3,
          mk_reqid/0]).
 
 %% Public API
@@ -36,6 +37,10 @@ execute(Module, preflist) ->
     wait_for_reqid(ReqId, ?TIMEOUT);
 execute(Module, global) ->
     {ok, ReqId} = derflow_execute_coverage_fsm:execute(Module),
+    wait_for_reqid(ReqId, ?TIMEOUT).
+
+execute(Module, NVal, preflist) ->
+    {ok, ReqId} = derflow_execute_coverage_fsm:execute(Module, NVal),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
 declare() ->

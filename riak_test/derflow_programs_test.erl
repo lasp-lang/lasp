@@ -40,4 +40,6 @@ test() ->
 
     {ok, Result} = derflow:execute(derflow_program, preflist),
 
+    {ok, Result} = derflow:execute(derflow_program, 3, preflist),
+
     Result.

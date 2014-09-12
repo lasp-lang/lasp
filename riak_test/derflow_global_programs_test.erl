@@ -18,12 +18,14 @@ confirm() ->
     lager:info("Nodes: ~p", [Nodes]),
     Node = hd(Nodes),
 
+    ok = rt:wait_until_ring_converged(Nodes),
+
     lager:info("Remotely loading code on node ~p", [Node]),
     ok = derflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
     lager:info("Remotely executing the test."),
-    ?assertEqual({ok, 1, 1}, rpc:call(Node, ?MODULE, test, [])),
+    ?assertEqual([], rpc:call(Node, ?MODULE, test, [])),
 
     pass.
 
@@ -32,12 +34,12 @@ confirm() ->
 test() ->
     lager:info("Registering program from the test."),
 
-    ok = derflow:register(derflow_program,
-                          "/Users/cmeiklejohn/SyncFree/derflow/riak_test/derflow_program.erl",
+    ok = derflow:register(derflow_example_program,
+                          "/Users/cmeiklejohn/SyncFree/derflow/riak_test/derflow_example_program.erl",
                          global),
 
     lager:info("Executing program from the test."),
 
-    {ok, Result} = derflow:execute(derflow_program, global),
+    {ok, Result} = derflow:execute(derflow_example_program, global),
 
     Result.

@@ -23,7 +23,7 @@ confirm() ->
     lager:info("Remote code loading complete."),
 
     lager:info("Remotely executing the test."),
-    ?assertEqual({ok, 1, 1}, rpc:call(Node, ?MODULE, test, [])),
+    ?assertEqual([], rpc:call(Node, ?MODULE, test, [])),
 
     pass.
 
@@ -32,14 +32,12 @@ confirm() ->
 test() ->
     lager:info("Registering program from the test."),
 
-    ok = derflow:register(derflow_program,
-                          "/Users/cmeiklejohn/SyncFree/derflow/riak_test/derflow_program.erl",
+    ok = derflow:register(derflow_example_program,
+                          "/Users/cmeiklejohn/SyncFree/derflow/riak_test/derflow_example_program.erl",
                          preflist),
 
     lager:info("Executing program from the test."),
 
-    {ok, Result} = derflow:execute(derflow_program, preflist),
-
-    {ok, Result} = derflow:execute(derflow_program, 3, preflist),
+    {ok, Result} = derflow:execute(derflow_example_program, preflist),
 
     Result.

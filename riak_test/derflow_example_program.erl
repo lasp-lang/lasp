@@ -1,10 +1,20 @@
--module(derflow_program).
+-module(derflow_example_program).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--export([execute/0,
+-behavior(derflow_program).
+
+-export([init/0,
+         execute/1,
+         execute/2,
          merge/1]).
 
-execute() ->
+init() ->
+    {ok, riak_dt_gset:new()}.
+
+execute(Acc) ->
+    {ok, Acc}.
+
+execute(Acc, _X) ->
     {ok, Id1} = derflow:declare(),
 
     {ok, _} = derflow:bind(Id1, 1),
@@ -19,7 +29,7 @@ execute() ->
     {ok, Value2, _} = derflow:read(Id1),
     lager:info("Value2: ~p", [Value2]),
 
-    {ok, Value1, Value2}.
+    {ok, Acc}.
 
 merge([Reply|_]) ->
     Reply.

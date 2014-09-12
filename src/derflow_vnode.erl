@@ -46,7 +46,7 @@
 -record(state, {node,
                 partition,
                 variables,
-                programs = []}).
+                programs}).
 
 %% Extrenal API
 
@@ -143,7 +143,10 @@ init([Partition]) ->
     VariableAtom = list_to_atom(Variables),
     VariableAtom = ets:new(VariableAtom, [set, named_table, public,
                                           {write_concurrency, true}]),
-    {ok, #state{partition=Partition, node=node(), variables=VariableAtom}}.
+    {ok, #state{partition=Partition,
+                programs=dict:new(),
+                node=node(),
+                variables=VariableAtom}}.
 
 handle_command({execute, {ReqId, _}, Module}, _From,
                #state{programs=Programs}=State) ->
@@ -155,27 +158,34 @@ handle_command({execute, {ReqId, _}, Module}, _From,
     end;
 
 handle_command({register, {ReqId, _}, Module, File}, _From,
-               #state{variables=Variables, programs=Programs}=State) ->
+               #state{variables=Variables, programs=Programs0}=State) ->
     lager:info("Register triggered for module: ~p and file: ~p",
                [Module, File]),
-    case compile:file(File, [binary,
-                             {parse_transform, lager_transform},
-                             {parse_transform, derflow_transform},
-                             {store, Variables}]) of
-        {ok, _, Bin} ->
-            lager:info("Compiled file!"),
-            case code:load_binary(Module, File, Bin) of
-                {module, Module} ->
-                    lager:info("Successfully loaded module: ~p",
-                               [Module]),
-                    {reply, {ok, ReqId}, State#state{programs=Programs ++ [Module]}};
-                {error, Reason} ->
-                    lager:info("Failed to load file: ~p, reason: ~p",
-                               [File, Reason]),
-                    {reply, {error, ReqId}, State}
-            end;
-        _ ->
-            lager:info("Remote loading of file: ~p failed.", [File]),
+    try
+        case compile:file(File, [binary,
+                                 {parse_transform, lager_transform},
+                                 {parse_transform, derflow_transform},
+                                 {store, Variables}]) of
+            {ok, _, Bin} ->
+                case code:load_binary(Module, File, Bin) of
+                    {module, Module} ->
+                        {ok, Init} = Module:init(),
+                        lager:info("Initialized module: ~p with value: ~p",
+                                   [Module, Init]),
+                        Programs = dict:store(Module, Init, Programs0),
+                        {reply, {ok, ReqId}, State#state{programs=Programs}};
+                    {error, Reason} ->
+                        lager:info("Failed to load file: ~p, reason: ~p",
+                                   [File, Reason]),
+                        {reply, {error, ReqId}, State}
+                end;
+            _ ->
+                lager:info("Remote loading of file: ~p failed.", [File]),
+                {reply, {error, ReqId}, State}
+        end
+    catch
+        _:Error ->
+            lager:info("Exception caught: ~p", [Error]),
             {reply, {error, ReqId}, State}
     end;
 
@@ -451,11 +461,11 @@ declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) 
 %% @doc Execute a given program.
 execute(Module, Programs) ->
     lager:info("Execute triggered for module: ~p", [Module]),
-    case lists:member(Module, Programs) of
+    case dict:is_key(Module, Programs) of
         true ->
+            Acc = dict:fetch(Module, Programs),
             lager:info("Executing module: ~p", [Module]),
-            Result = Module:execute(),
-            {ok, Result};
+            Module:execute(Acc);
         false ->
             lager:info("Failed to execute module: ~p", [Module]),
             {error, undefined}

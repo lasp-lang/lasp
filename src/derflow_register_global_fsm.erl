@@ -102,7 +102,6 @@ execute(timeout, #state{preflist=Preflist,
 %%      group.
 waiting({ok, ReqId},
         #state{responses=Responses0, preflist=Preflist2, from=From}=State0) ->
-    lager:info("Response received!"),
     Responses = Responses0 + 1,
     State = State0#state{responses=Responses},
     case Responses =:= length(Preflist2) of
@@ -111,7 +110,10 @@ waiting({ok, ReqId},
             {stop, normal, State};
         false ->
             {next_state, waiting, State}
-    end.
+    end;
+waiting(Message, State) ->
+    lager:warning("Received unhandled message: ~p", [Message]),
+    {next_state, waiting, State}.
 
 %%%===================================================================
 %%% Internal Functions

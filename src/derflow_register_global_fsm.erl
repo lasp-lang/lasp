@@ -70,7 +70,6 @@ terminate(_Reason, _SN, _SD) ->
 
 %% @doc Initialize the request.
 init([ReqId, From, Module, File]) ->
-    lager:info("Register FSM initialized!"),
     State = #state{preflist=undefined,
                    req_id=ReqId,
                    coordinator=node(),
@@ -84,9 +83,6 @@ init([ReqId, From, Module, File]) ->
 prepare(timeout, State) ->
     {ok, Ring} = riak_core_ring_manager:get_my_ring(),
     Preflist2 = lists:flatten(riak_core_ring:all_preflists(Ring, 1)),
-    % Preflist = derflow:preflist(?PROGRAM_N, Module, derflow),
-    % Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
-    lager:info("Register FSM preflist2: ~p", [Preflist2]),
     {next_state, execute, State#state{preflist=Preflist2}, 0}.
 
 %% @doc Execute the request.

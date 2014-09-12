@@ -139,17 +139,24 @@ start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
 init([Partition]) ->
-    Variables = string:concat(integer_to_list(Partition), "dvstore"),
-    VariableAtom = list_to_atom(Variables),
-    VariableAtom = ets:new(VariableAtom, [set, named_table, public,
-                                          {write_concurrency, true}]),
+    Node = node(),
+    Variables = generate_unique_partition_identifier(Partition, Node),
+    Variables = ets:new(Variables, [set, named_table, public,
+                                    {write_concurrency, true}]),
+    lager:info("Partition: ~p, node: ~p, table: ~p initialized.",
+               [Partition, Node, Variables]),
     {ok, #state{partition=Partition,
                 programs=dict:new(),
-                node=node(),
-                variables=VariableAtom}}.
+                node=Node,
+                variables=Variables}}.
 
-handle_command({execute, {ReqId, _}, Module}, _From,
-               #state{programs=Programs}=State) ->
+handle_command({execute, {ReqId, _}, Module0}, _From,
+               #state{programs=Programs,
+                      node=Node,
+                      partition=Partition}=State) ->
+    Module = generate_unique_module_identifier(Partition,
+                                               Node,
+                                               Module0),
     case execute(Module, Programs) of
         {ok, Result} ->
             {reply, {ok, ReqId, Result}, State};
@@ -157,36 +164,53 @@ handle_command({execute, {ReqId, _}, Module}, _From,
             {reply, {error, ReqId}, State}
     end;
 
-handle_command({register, {ReqId, _}, Module, File}, _From,
-               #state{variables=Variables, programs=Programs0}=State) ->
-    lager:info("Register triggered for module: ~p and file: ~p",
-               [Module, File]),
+handle_command({register, {ReqId, _}, Module0, File}, _From,
+               #state{partition=Partition,
+                      node=Node,
+                      variables=Variables,
+                      programs=Programs0}=State) ->
     try
+        lager:info("Partition registration for module: ~p, partition: ~p",
+                   [Module0, Partition]),
+        Module = generate_unique_module_identifier(Partition,
+                                                   Node,
+                                                   Module0),
         case compile:file(File, [binary,
                                  {parse_transform, lager_transform},
                                  {parse_transform, derflow_transform},
-                                 {store, Variables}]) of
+                                 {store, Variables},
+                                 {partition, Partition},
+                                 {module, Module},
+                                 {node, Node}]) of
             {ok, _, Bin} ->
+                lager:info("Compilation succeeded; partition: ~p",
+                           [Partition]),
                 case code:load_binary(Module, File, Bin) of
                     {module, Module} ->
-                        {ok, Init} = Module:init(),
-                        lager:info("Initialized module: ~p with value: ~p",
-                                   [Module, Init]),
-                        Programs = dict:store(Module, Init, Programs0),
+                        lager:info("Binary loaded, module: ~p, partition: ~p",
+                                   [Module, Partition]),
+                        {ok, Value} = Module:init(),
+                        lager:info("Module initialized: value: ~p",
+                                   [Value]),
+                        Programs = dict:store(Module, Value, Programs0),
+                        lager:info("Initialized module at partition: ~p",
+                                   [Partition]),
                         {reply, {ok, ReqId}, State#state{programs=Programs}};
-                    {error, Reason} ->
-                        lager:info("Failed to load file: ~p, reason: ~p",
-                                   [File, Reason]),
-                        {reply, {error, ReqId}, State}
+                    Reason ->
+                        lager:info("Binary not loaded, reason: ~p, partition: ~p",
+                                   [Reason, Partition]),
+                        {reply, {error, Reason}, State}
                 end;
-            _ ->
-                lager:info("Remote loading of file: ~p failed.", [File]),
-                {reply, {error, ReqId}, State}
+            Error ->
+                lager:info("Compilation failed; error: ~p, partition: ~p",
+                           [Error, Partition]),
+                {reply, {error, Error}, State}
         end
     catch
-        _:Error ->
-            lager:info("Exception caught: ~p", [Error]),
-            {reply, {error, ReqId}, State}
+        _:Exception ->
+            lager:info("Exception: ~p, partition: ~p, module: ~p",
+                       [Exception, Partition, Module0]),
+            {reply, {error, Exception}, State}
     end;
 
 handle_command({declare, Id, Type}, _From,
@@ -399,10 +423,15 @@ is_empty(State) ->
 delete(State) ->
     {ok, State}.
 
-handle_coverage(?EXECUTE_REQUEST{module=Module}, _KeySpaces, _Sender,
-                #state{programs=Programs}=State) ->
+handle_coverage(?EXECUTE_REQUEST{module=Module0}, _KeySpaces, _Sender,
+                #state{programs=Programs,
+                       node=Node,
+                       partition=Partition}=State) ->
     lager:info("Coverage execute request received for module: ~p",
-               [Module]),
+               [Module0]),
+    Module = generate_unique_module_identifier(Partition,
+                                               Node,
+                                               Module0),
     case execute(Module, Programs) of
         {ok, Result} ->
             {reply, {done, Result}, State};
@@ -470,3 +499,14 @@ execute(Module, Programs) ->
             lager:info("Failed to execute module: ~p", [Module]),
             {error, undefined}
     end.
+
+%% @doc Generate a unique partition identifier.
+generate_unique_partition_identifier(Partition, Node) ->
+    list_to_atom(
+        integer_to_list(Partition) ++ "-" ++ atom_to_list(Node)).
+
+%% @doc Generate a unique module identifier.
+generate_unique_module_identifier(Partition, Node, Module) ->
+    list_to_atom(
+        integer_to_list(Partition) ++ "-" ++
+            atom_to_list(Node) ++ "-" ++ atom_to_list(Module)).

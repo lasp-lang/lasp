@@ -108,7 +108,10 @@ waiting({ok, ReqId}, #state{responses=Responses0, from=From}=State0) ->
             {stop, normal, State};
         false ->
             {next_state, waiting, State}
-    end.
+    end;
+waiting(Message, State) ->
+    lager:info("Unhandled message received: ~p", [Message]),
+    {next_state, waiting, State}.
 
 %%%===================================================================
 %%% Internal Functions

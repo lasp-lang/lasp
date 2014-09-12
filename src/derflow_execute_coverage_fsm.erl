@@ -36,7 +36,6 @@ process_results({error, Reason}, _State) ->
     lager:info("Error received: ~p", [Reason]),
     {error, Reason};
 process_results({done, Result}, #state{results=Results}=State) ->
-    lager:info("Result received: ~p", [Result]),
     {done, State#state{results=[Result|Results]}};
 process_results(Message, State) ->
     lager:info("Unhandled result: ~p", [Message]),

@@ -10,6 +10,16 @@
 parse_transform(AST, Options) ->
     {store, Store} = lists:keyfind(store, 1, Options),
     put(store, Store),
+
+    {node, Node} = lists:keyfind(node, 1, Options),
+    put(node, Node),
+
+    {partition, Partition} = lists:keyfind(partition, 1, Options),
+    put(partition, Partition),
+
+    {module, Module} = lists:keyfind(module, 1, Options),
+    put(module, Module),
+
     walk_ast([], AST).
 
 %% @private
@@ -17,8 +27,9 @@ walk_ast(Acc, []) ->
     lists:reverse(Acc);
 walk_ast(Acc, [{attribute, _, module, {_Module, _PmodArgs}}=H|T]) ->
     walk_ast([H|Acc], T);
-walk_ast(Acc, [{attribute, _, module, _Module}=H|T]) ->
-    walk_ast([H|Acc], T);
+walk_ast(Acc, [{attribute, Line, module, _Module}=_H|T]) ->
+    H1 = {attribute, Line, module, get(module)},
+    walk_ast([H1|Acc], T);
 walk_ast(Acc, [{function, Line, Name, Arity, Clauses}|T]) ->
     walk_ast([{function, Line, Name, Arity,
                 walk_clauses([], Clauses)}|Acc], T);

@@ -17,9 +17,26 @@
          spawn_mon/4,
          thread/3,
          preflist/3,
-         get_stream/1]).
+         get_stream/1,
+         register/3,
+         execute/2,
+         mk_reqid/0]).
 
 %% Public API
+
+register(Module, File, preflist) ->
+    {ok, ReqId} = derflow_register_fsm:register(Module, File),
+    wait_for_reqid(ReqId, ?TIMEOUT);
+register(Module, File, global) ->
+    {ok, ReqId} = derflow_register_global_fsm:register(Module, File),
+    wait_for_reqid(ReqId, ?TIMEOUT).
+
+execute(Module, preflist) ->
+    {ok, ReqId} = derflow_execute_fsm:execute(Module),
+    wait_for_reqid(ReqId, ?TIMEOUT);
+execute(Module, global) ->
+    {ok, ReqId} = derflow_execute_coverage_fsm:execute(Module),
+    wait_for_reqid(ReqId, ?TIMEOUT).
 
 declare() ->
     declare(undefined).
@@ -28,24 +45,17 @@ declare(Type) ->
     derflow_vnode:declare(druuid:v4(), Type).
 
 bind(Id, Value) ->
-    case derflow_vnode:bind(Id, Value) of
-        {ok, _} ->
-            ok;
-        error ->
-            error
-    end.
+    derflow_vnode:bind(Id, Value).
 
 bind(Id, Module, Function, Args) ->
     bind(Id, Module:Function(Args)).
 
 read(Id) ->
-    {ok, Value, _Next} = derflow_vnode:read(Id),
-    {ok, Value}.
+    derflow_vnode:read(Id).
 
 %% @doc Blocking threshold read.
 read(Id, Threshold) ->
-    {ok, Value, _Next} = derflow_vnode:read(Id, Threshold),
-    {ok, Value}.
+    derflow_vnode:read(Id, Threshold).
 
 produce(Id, Value) ->
     derflow_vnode:bind(Id, Value).
@@ -68,30 +78,44 @@ thread(Module, Function, Args) ->
 wait_needed(Id) ->
     derflow_vnode:wait_needed(Id).
 
-%% The rest of primitives are not in the paper. They are just utilities.
-%% maybe we should just remove them
-
 spawn_mon(Supervisor, Module, Function, Args) ->
     {ok, Pid} = thread(Module, Function, Args),
     Supervisor ! {'SUPERVISE', Pid, Module, Function, Args}.
 
 get_stream(Stream)->
-    internal_get_stream(Stream, []).
+    get_stream(Stream, []).
 
-%% Internal functions
-
-internal_get_stream(Head, Output) ->
+get_stream(Head, Output) ->
     lager:info("About to consume: ~p", [Head]),
     case consume(Head) of
-        {ok, nil, _} ->
-            lager:info("Received: ~p", [nil]),
+        {ok, undefined, _} ->
+            lager:info("Received: ~p", [undefined]),
             Output;
         {ok, Value, Next} ->
             lager:info("Received: ~p", [Value]),
-            internal_get_stream(Next, lists:append(Output, [Value]))
+            get_stream(Next, lists:append(Output, [Value]))
     end.
 
 %% @doc Generate a preference list for a given N value and data item.
 preflist(NVal, Param, VNode) ->
     DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Param)}),
     riak_core_apl:get_primary_apl(DocIdx, NVal, VNode).
+
+%%%===================================================================
+%%% Internal Functions
+%%%===================================================================
+
+%% @doc Generate a request id.
+mk_reqid() ->
+    erlang:phash2(erlang:now()).
+
+%% @doc Wait for a response.
+wait_for_reqid(ReqID, Timeout) ->
+    receive
+        {ReqID, ok} ->
+            ok;
+        {ReqID, ok, Val} ->
+            {ok, Val}
+    after Timeout ->
+        {error, timeout}
+    end.

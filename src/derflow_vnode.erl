@@ -1,10 +1,18 @@
+%% @doc Derflow operational vnode, which powers the data flow variable
+%%      assignment and read operations.
+%%
+
 -module(derflow_vnode).
+
 -behaviour(riak_core_vnode).
+
 -include("derflow.hrl").
+
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -define(VNODE_MASTER, derflow_vnode_master).
 
+%% Language execution primitives.
 -export([bind/2,
          read/1,
          read/2,
@@ -12,8 +20,11 @@
          is_det/1,
          wait_needed/1,
          declare/2,
-         write/5,
          thread/3]).
+
+%% Program execution functions.
+-export([register/4,
+         execute/3]).
 
 -export([start_vnode/1,
          init/1,
@@ -32,19 +43,27 @@
 
 -ignore_xref([start_vnode/1]).
 
--record(state, {node, partition, variables}).
-
--record(dv, {value,
-             next,
-             waiting_threads = [],
-             binding_list = [],
-             functions = [],
-             creator,
-             type,
-             lazy = false,
-             bound = false}).
+-record(state, {node,
+                partition,
+                variables,
+                programs}).
 
 %% Extrenal API
+
+register(Preflist, Identity, Module, File) ->
+    lager:info("Register called for module: ~p and file: ~p",
+               [Module, File]),
+    riak_core_vnode_master:command(Preflist,
+                                   {register, Identity, Module, File},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
+
+execute(Preflist, Identity, Module) ->
+    lager:info("Execute called for module: ~p", [Module]),
+    riak_core_vnode_master:command(Preflist,
+                                   {execute, Identity, Module},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
 bind(Id, Value) ->
     lager:info("Bind called by process ~p, value ~p, id: ~p",
@@ -58,12 +77,11 @@ read(Id) ->
     read(Id, undefined).
 
 read(Id, Threshold) ->
-    Function = get(initial_call),
-    lager:info("Read by process ~p, function ~p, id: ~p thresh: ~p",
-               [self(), Function, Id, Threshold]),
+    lager:info("Read by process ~p, id: ~p thresh: ~p",
+               [self(), Id, Threshold]),
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {read, Id, Threshold, Function},
+                                              {read, Id, Threshold},
                                               ?VNODE_MASTER).
 
 thread(Module, Function, Args) ->
@@ -121,14 +139,83 @@ start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
 init([Partition]) ->
-    Variables = string:concat(integer_to_list(Partition), "dvstore"),
-    VariableAtom = list_to_atom(Variables),
-    VariableAtom = ets:new(VariableAtom, [set, named_table, public,
-                                          {write_concurrency, true}]),
-    {ok, #state{partition=Partition, node=node(), variables=VariableAtom}}.
+    Node = node(),
+    Variables = generate_unique_partition_identifier(Partition, Node),
+    Variables = ets:new(Variables, [set, named_table, public,
+                                    {write_concurrency, true}]),
+    lager:info("Partition: ~p, node: ~p, table: ~p initialized.",
+               [Partition, Node, Variables]),
+    {ok, #state{partition=Partition,
+                programs=dict:new(),
+                node=Node,
+                variables=Variables}}.
 
-handle_command({declare, Id, Type}, _From, State) ->
-    {ok, Id} = internal_declare(Id, Type, State),
+handle_command({execute, {ReqId, _}, Module0}, _From,
+               #state{programs=Programs,
+                      node=Node,
+                      partition=Partition}=State) ->
+    Module = generate_unique_module_identifier(Partition,
+                                               Node,
+                                               Module0),
+    case execute(Module, Programs) of
+        {ok, Result} ->
+            {reply, {ok, ReqId, Result}, State};
+        {error, undefined} ->
+            {reply, {error, ReqId}, State}
+    end;
+
+handle_command({register, {ReqId, _}, Module0, File}, _From,
+               #state{partition=Partition,
+                      node=Node,
+                      variables=Variables,
+                      programs=Programs0}=State) ->
+    try
+        lager:info("Partition registration for module: ~p, partition: ~p",
+                   [Module0, Partition]),
+        Module = generate_unique_module_identifier(Partition,
+                                                   Node,
+                                                   Module0),
+        case compile:file(File, [binary,
+                                 {parse_transform, lager_transform},
+                                 {parse_transform, derflow_transform},
+                                 {store, Variables},
+                                 {partition, Partition},
+                                 {module, Module},
+                                 {node, Node}]) of
+            {ok, _, Bin} ->
+                lager:info("Compilation succeeded; partition: ~p",
+                           [Partition]),
+                case code:load_binary(Module, File, Bin) of
+                    {module, Module} ->
+                        lager:info("Binary loaded, module: ~p, partition: ~p",
+                                   [Module, Partition]),
+                        {ok, Value} = Module:init(),
+                        lager:info("Module initialized: value: ~p",
+                                   [Value]),
+                        Programs = dict:store(Module, Value, Programs0),
+                        lager:info("Initialized module at partition: ~p",
+                                   [Partition]),
+                        {reply, {ok, ReqId}, State#state{programs=Programs}};
+                    Reason ->
+                        lager:info("Binary not loaded, reason: ~p, partition: ~p",
+                                   [Reason, Partition]),
+                        {reply, {error, Reason}, State}
+                end;
+            Error ->
+                lager:info("Compilation failed; error: ~p, partition: ~p",
+                           [Error, Partition]),
+                {reply, {error, Error}, State}
+        end
+    catch
+        _:Exception ->
+            lager:info("Exception: ~p, partition: ~p, module: ~p",
+                       [Exception, Partition, Module0]),
+            {reply, {error, Exception}, State}
+    end;
+
+handle_command({declare, Id, Type}, _From,
+               #state{variables=Variables}=State) ->
+    {ok, Id} = derflow_ets:declare(Id, Type, Variables),
     {reply, {ok, Id}, State};
 
 handle_command({bind, Id, {id, DVId}}, From,
@@ -139,32 +226,24 @@ handle_command({bind, Id, {id, DVId}}, From,
 handle_command({bind, Id, Value}, _From,
                State=#state{variables=Variables}) ->
     lager:info("Bind received: ~p", [Id]),
-    [{_Key, V=#dv{functions=Functions}}] = ets:lookup(Variables, Id),
+    [{_Key, V}] = ets:lookup(Variables, Id),
     NextKey = case Value of
-        nil ->
+        undefined ->
             undefined;
         _ ->
             next_key(V#dv.next, V#dv.type, State)
     end,
+    lager:info("Value is: ~p NextKey is: ~p", [Value, NextKey]),
     case V#dv.bound of
         true ->
             case V#dv.value of
                 Value ->
                     {reply, {ok, NextKey}, State};
                 _ ->
-                    case is_lattice(V#dv.type) of
+                    case derflow_ets:is_lattice(V#dv.type) of
                         true ->
-                            write(V#dv.type, Value, NextKey, [], Id, Variables),
-                            case is_inflation(V#dv.type, V#dv.value, Value) of
-                                true ->
-                                    lager:info("Change is inflation: ~p ~p",
-                                               [V#dv.value, Value]),
-                                    execute(Functions, State),
-                                    {reply, {ok, NextKey}, State};
-                                false ->
-                                    lager:info("Change is not inflation!"),
-                                    {reply, {ok, NextKey}, State}
-                            end;
+                            write(V#dv.type, Value, NextKey, Id, Variables),
+                            {reply, {ok, NextKey}, State};
                         false ->
                             lager:warning("Attempt to bind failed: ~p ~p ~p",
                                           [V#dv.type, V#dv.value, Value]),
@@ -204,12 +283,14 @@ handle_command({reply_fetch, FromId, FromP,
     case FetchDV#dv.bound of
         true ->
             write(Type, Value, Next, FromId, Variables),
-            reply_to_all([FromP], {ok, Next});
+            {ok, _} = derflow_ets:reply_to_all([FromP], {ok, Next}),
+            ok;
         false ->
             [{_, DV}] = ets:lookup(Variables, FromId),
-            DV1 = DV#dv{next= FetchDV#dv.next},
-            ets:insert(Variables, {FromId, DV1}),
-            reply_to_all([FromP], {ok, FetchDV#dv.next})
+            DV1 = DV#dv{next=FetchDV#dv.next},
+            true = ets:insert(Variables, {FromId, DV1}),
+            {ok, _} = derflow_ets:reply_to_all([FromP], {ok, FetchDV#dv.next}),
+            ok
       end,
       {noreply, State};
 
@@ -219,18 +300,20 @@ handle_command({notify_value, Id, Value}, _From,
     write(Type, Value, Next, Id, Variables),
     {noreply, State};
 
-handle_command({thread, Module, Function, Args}, _From, State) ->
-    {ok, Pid} = internal_thread(Module, Function, Args),
+handle_command({thread, Module, Function, Args}, _From,
+               #state{variables=Variables}=State) ->
+    {ok, Pid} = derflow_ets:thread(Module, Function, Args, Variables),
     {reply, {ok, Pid}, State};
 
 handle_command({wait_needed, Id}, From,
                State=#state{variables=Variables}) ->
-    [{_Key, V}] = ets:lookup(Variables, Id),
-    case V#dv.bound of
+    lager:info("Wait needed issued for identifier: ~p", [Id]),
+    [{_Key, V=#dv{waiting_threads=WT, bound=Bound}}] = ets:lookup(Variables, Id),
+    case Bound of
         true ->
             {reply, ok, State};
         false ->
-            case V#dv.waiting_threads of
+            case WT of
                 [_H|_T] ->
                     {reply, ok, State};
                 _ ->
@@ -240,32 +323,19 @@ handle_command({wait_needed, Id}, From,
                 end
     end;
 
-handle_command({read, Id, Threshold, Function}, From,
+handle_command({read, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
     [{_Key, V=#dv{value=Value,
                   bound=Bound,
                   creator=Creator,
                   lazy=Lazy,
-                  type=Type,
-                  next=NextKey,
-                  functions=Functions0}}] = ets:lookup(Variables, Id),
+                  type=Type}}] = ets:lookup(Variables, Id),
     case Bound of
         true ->
             lager:info("Read received: ~p, bound: ~p, threshold: ~p",
                        [Id, V, Threshold]),
-            case is_lattice(Type) of
+            case derflow_ets:is_lattice(Type) of
                 true ->
-                    %% Handle recalling the dependent functions.
-                    case Function of
-                        undefined ->
-                            ok;
-                        _ ->
-                            Functions = [Function|Functions0],
-                            lager:info("Read depends on function: ~p",
-                                       [Functions]),
-                            write(Type, Value, NextKey, Functions, Id, Variables)
-                    end,
-
                     %% Handle threshold reaads.
                     case Threshold of
                         undefined ->
@@ -275,12 +345,12 @@ handle_command({read, Id, Threshold, Function}, From,
                         _ ->
                             lager:info("Threshold specified: ~p",
                                        [Threshold]),
-                            case threshold_met(Type, Value, Threshold) of
+                            case derflow_ets:threshold_met(Type, Value, Threshold) of
                                 true ->
                                     {reply, {ok, Value, V#dv.next}, State};
                                 false ->
                                     WT = lists:append(V#dv.waiting_threads,
-                                                      [{From, Type, Threshold}]),
+                                                      [{threshold, From, Type, Threshold}]),
                                     true = ets:insert(Variables,
                                                       {Id, V#dv{waiting_threads=WT}}),
                                     {noreply, State}
@@ -290,13 +360,12 @@ handle_command({read, Id, Threshold, Function}, From,
                     {reply, {ok, Value, V#dv.next}, State}
             end;
         false ->
-            lager:info("Read received: ~p, unbound, function: ~p",
-                       [Id, Function]),
+            lager:info("Read received: ~p, unbound", [Id]),
             WT = lists:append(V#dv.waiting_threads, [From]),
             true = ets:insert(Variables, {Id, V#dv{waiting_threads=WT}}),
             case Lazy of
                 true ->
-                    reply_to_all([Creator], ok),
+                    {ok, _} = derflow_ets:reply_to_all([Creator], ok),
                     {noreply, State};
                 false ->
                     {noreply, State}
@@ -316,12 +385,13 @@ handle_command({next, Id}, _From,
   end;
 
 handle_command({is_det, Id}, _From, State=#state{variables=Variables}) ->
-    [{_Key, #dv{bound=Bound}}] = ets:lookup(Variables, Id),
+    {ok, Bound} = derflow_ets:is_det(Id, Variables),
     {reply, Bound, State};
 
 handle_command(_Message, _Sender, State) ->
     {noreply, State}.
 
+%% @todo Most likely broken...
 handle_handoff_command(?FOLD_REQ{foldfun=FoldFun, acc0=Acc0}, _Sender,
                        #state{variables=Variables}=State) ->
     F = fun({Key, Operation}, Acc) -> FoldFun(Key, Operation, Acc) end,
@@ -337,11 +407,13 @@ handoff_cancelled(State) ->
 handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
+%% @todo Most likely broken...
 handle_handoff_data(Data, State=#state{variables=Variables}) ->
     {Key, Operation} = binary_to_term(Data),
     true = ets:insert_new(Variables, {Key, Operation}),
     {reply, ok, State}.
 
+%% @todo Most likely broken...
 encode_handoff_item(Key, Operation) ->
     term_to_binary({Key, Operation}).
 
@@ -351,6 +423,21 @@ is_empty(State) ->
 delete(State) ->
     {ok, State}.
 
+handle_coverage(?EXECUTE_REQUEST{module=Module0}, _KeySpaces, _Sender,
+                #state{programs=Programs,
+                       node=Node,
+                       partition=Partition}=State) ->
+    lager:info("Coverage execute request received for module: ~p",
+               [Module0]),
+    Module = generate_unique_module_identifier(Partition,
+                                               Node,
+                                               Module0),
+    case execute(Module, Programs) of
+        {ok, Result} ->
+            {reply, {done, Result}, State};
+        {error, undefined} ->
+            {reply, {error, undefined}, State}
+    end;
 handle_coverage(_Req, _KeySpaces, _Sender, State) ->
     {stop, not_implemented, State}.
 
@@ -363,44 +450,16 @@ terminate(_Reason, _State) ->
 %% Internal functions
 
 write(Type, Value, Next, Key, Variables) ->
-    write(Type, Value, Next, [], Key, Variables).
-
-write(Type, Value, Next, Functions0, Key, Variables) ->
     lager:info("Writing key: ~p next: ~p", [Key, Next]),
     [{_Key, #dv{waiting_threads=Threads,
                 binding_list=BindingList,
                 lazy=Lazy}}] = ets:lookup(Variables, Key),
-    Functions = lists:usort(Functions0),
-    {ok, StillWaiting} = reply_to_all(Threads, [], {ok, Value, Next}),
-    V1 = #dv{type=Type, value=Value, functions=Functions, next=Next,
+    lager:info("Waiting threads are: ~p", [Threads]),
+    {ok, StillWaiting} = derflow_ets:reply_to_all(Threads, [], {ok, Value, Next}),
+    V1 = #dv{type=Type, value=Value, next=Next,
              lazy=Lazy, bound=true, waiting_threads=StillWaiting},
     true = ets:insert(Variables, {Key, V1}),
     notify_all(BindingList, Value).
-
-reply_to_all(List, Result) ->
-    reply_to_all(List, [], Result).
-
-reply_to_all([{From, Type, Threshold}=H|T],
-             StillWaiting0,
-             {ok, Value, _Next}=Result) ->
-    lager:info("Result: ~p, Threshold: ~p", [Result, Threshold]),
-    StillWaiting = case threshold_met(Type, Value, Threshold) of
-        true ->
-            lager:info("Threshold ~p met: ~p", [Threshold, Value]),
-            {server, undefined, {Address, Ref}} = From,
-            gen_server:reply({Address, Ref}, Result),
-            StillWaiting0;
-        false ->
-            lager:info("Threshold ~p NOT met: ~p", [Threshold, Value]),
-            StillWaiting0 ++ [H]
-    end,
-    reply_to_all(T, StillWaiting, Result);
-reply_to_all([H|T], StillWaiting, Result) ->
-    {server, undefined, {Address, Ref}} = H,
-    gen_server:reply({Address, Ref}, Result),
-    reply_to_all(T, StillWaiting, Result);
-reply_to_all([], StillWaiting, _Result) ->
-    {ok, StillWaiting}.
 
 next_key(undefined, Type, State) ->
     {ok, NextKey} = declare_next(Type, State),
@@ -415,78 +474,39 @@ notify_all([], _) ->
     ok.
 
 %% @doc Declare the next object for streams.
-declare_next(Type, State=#state{partition=Partition, node=Node}) ->
-    lager:info("Current partition and node: ", [Partition, Node]),
+declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) ->
+    lager:info("Current partition and node: ~p ~p", [Partition, Node]),
     Id = druuid:v4(),
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     case IndexNode of
         {Partition, Node} ->
-            lager:info("Internal declare triggered: ~p", [IndexNode]),
-            internal_declare(Id, Type, State);
+            lager:info("Local declare triggered: ~p", [IndexNode]),
+            derflow_ets:declare(Id, Type, Variables);
         _ ->
             lager:info("Declare triggered: ~p", [IndexNode]),
             declare(Id, Type)
     end.
 
-%% @doc Determine if a threshold is met.
-threshold_met(_, Value, {greater, Threshold}) ->
-    Threshold < Value;
-threshold_met(_, Value, Threshold) ->
-    Threshold =< Value.
+%% @doc Execute a given program.
+execute(Module, Programs) ->
+    lager:info("Execute triggered for module: ~p", [Module]),
+    case dict:is_key(Module, Programs) of
+        true ->
+            Acc = dict:fetch(Module, Programs),
+            lager:info("Executing module: ~p", [Module]),
+            Module:execute(Acc);
+        false ->
+            lager:info("Failed to execute module: ~p", [Module]),
+            {error, undefined}
+    end.
 
-%% @doc Determine if `NewValue` is an inflation of `Value`.
-is_inflation(riak_dt_gcounter, Value, NewValue) ->
-    Value < NewValue;
-is_inflation(riak_dt_gset, Value, NewValue) ->
-    OldSet = riak_dt_gset:value(Value),
-    NewSet = riak_dt_gset:value(NewValue),
-    length(OldSet) < length(NewSet);
-is_inflation(_, _Value, _NewValue) ->
-    false.
+%% @doc Generate a unique partition identifier.
+generate_unique_partition_identifier(Partition, Node) ->
+    list_to_atom(
+        integer_to_list(Partition) ++ "-" ++ atom_to_list(Node)).
 
-%% @doc Return if something is a lattice or not.
-is_lattice(Type) ->
-    lists:member(Type, [riak_dt_gcounter,
-                        riak_dt_lwwreg,
-                        riak_dt_gset]).
-
-%% @doc Execute a series of functions.
-execute({Module, Function, Args},
-        #state{partition=Partition, node=Node}) ->
-    lager:info("Re-executing: ~p ~p ~p", [Module, Function, Args]),
-    [{IndexNode, _Type}] = derflow:preflist(?N,
-                                            {Module, Function, Args},
-                                            derflow),
-    case IndexNode of
-        {Partition, Node} ->
-            lager:info("Internal thread triggered: ~p", [IndexNode]),
-            internal_thread(Module, Function, Args);
-        _ ->
-            lager:info("Thread triggered: ~p", [IndexNode]),
-            thread(Module, Function, Args)
-    end;
-execute(Functions, State) ->
-    [execute(Function, State) || Function <- Functions].
-
-%% @doc Declare a new variable.
-internal_declare(Id, Type, #state{variables=Variables}) ->
-    lager:info("Declare received: ~p ~p", [Id, Type]),
-    Record = case Type of
-        undefined ->
-            #dv{value=undefined, type=undefined, bound=false};
-        Type ->
-            #dv{value=Type:new(), type=Type, bound=true}
-    end,
-    true = ets:insert(Variables, {Id, Record}),
-    {ok, Id}.
-
-%% @doc Perform a thread operation locally.
-internal_thread(Module, Function, Args) ->
-    Fun = fun() ->
-            put(initial_call, {Module, Function, Args}),
-            erlang:apply(Module, Function, Args)
-    end,
-    Pid = spawn(Fun),
-    lager:info("Spawned process ~p executing ~p",
-               [Pid, {Module, Function, Args}]),
-    {ok, Pid}.
+%% @doc Generate a unique module identifier.
+generate_unique_module_identifier(Partition, Node, Module) ->
+    list_to_atom(
+        integer_to_list(Partition) ++ "-" ++
+            atom_to_list(Node) ++ "-" ++ atom_to_list(Module)).

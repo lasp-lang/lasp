@@ -1,5 +1,3 @@
-%% @doc Test that a derflow cluster can be built and initialized.
-
 -module(derflow_threshold_read_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
@@ -24,8 +22,8 @@ confirm() ->
 
     lager:info("Remotely executing the test."),
     {GSet, GSet2} = rpc:call(Node, ?MODULE, test, []),
-    ?assertEqual({ok, [1,2,3]}, GSet),
-    ?assertEqual({ok, [1,2,3,4,5]}, GSet2),
+    ?assertMatch({ok, [1,2,3], _}, GSet),
+    ?assertMatch({ok, [1,2,3,4,5], _}, GSet2),
 
     pass.
 
@@ -42,14 +40,14 @@ test() ->
     spawn(fun() -> Me ! derflow:read(GSetId, [1,2,3]) end),
 
     %% Perform 4 binds, each an inflation.
-    ok = derflow:bind(GSetId, [1]),
-    ok = derflow:bind(GSetId, [1, 2]),
-    ok = derflow:bind(GSetId, [1, 2, 3]),
-    ok = derflow:bind(GSetId, [1, 2, 3, 4]),
+    {ok, _} = derflow:bind(GSetId, [1]),
+    {ok, _} = derflow:bind(GSetId, [1, 2]),
+    {ok, _} = derflow:bind(GSetId, [1, 2, 3]),
+    {ok, _} = derflow:bind(GSetId, [1, 2, 3, 4]),
 
     %% Ensure we receive [1, 2, 3].
     GSet = receive
-        {ok, [1, 2, 3]} = V ->
+        {ok, [1, 2, 3], _} = V ->
             V
     end,
 
@@ -57,11 +55,11 @@ test() ->
     spawn(fun() -> Me ! derflow:read(GSetId, {greater, [1,2,3,4]}) end),
 
     %% Perform another inflation.
-    ok = derflow:bind(GSetId, [1, 2, 3, 4, 5]),
+    {ok, _} = derflow:bind(GSetId, [1, 2, 3, 4, 5]),
 
     %% Ensure we receive [1, 2, 3, 4, 5].
     GSet2 = receive
-        {ok, [1, 2, 3, 4, 5]} = V1 ->
+        {ok, [1, 2, 3, 4, 5], _} = V1 ->
             V1
     end,
 

@@ -1,6 +1,6 @@
-%% @doc Test that a bind works on a distributed cluster of nodes.
+%% @doc Global programs test.
 
--module(derflow_bind_test).
+-module(derflow_global_programs_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([test/0]).
@@ -18,32 +18,28 @@ confirm() ->
     lager:info("Nodes: ~p", [Nodes]),
     Node = hd(Nodes),
 
+    ok = rt:wait_until_ring_converged(Nodes),
+
     lager:info("Remotely loading code on node ~p", [Node]),
     ok = derflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
     lager:info("Remotely executing the test."),
-    ?assertEqual({ok, 1, 1}, rpc:call(Node, ?MODULE, test, [])),
-
-    lager:info("Done!"),
+    ?assertEqual([], rpc:call(Node, ?MODULE, test, [])),
 
     pass.
 
 -endif.
 
 test() ->
-    {ok, Id} = derflow:declare(),
+    lager:info("Registering program from the test."),
 
-    {ok, _} = derflow:bind(Id, 1),
-    lager:info("Successful bind."),
+    ok = derflow:register(derflow_example_program,
+                          "/Users/cmeiklejohn/SyncFree/derflow/riak_test/derflow_example_program.erl",
+                         global),
 
-    {ok, Value1, _} = derflow:read(Id),
-    lager:info("Value1: ~p", [Value1]),
+    lager:info("Executing program from the test."),
 
-    error = derflow:bind(Id, 2),
-    lager:info("Unsuccessful bind."),
+    {ok, Result} = derflow:execute(derflow_example_program, global),
 
-    {ok, Value2, _} = derflow:read(Id),
-    lager:info("Value2: ~p", [Value2]),
-
-    {ok, Value1, Value2}.
+    Result.

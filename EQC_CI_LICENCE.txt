@@ -1,0 +1,34 @@
+This file is an agreement between Quviq AB ("Quviq"), Sven Hultins
+Gata 9, Gothenburg, Sweden, and the committers to the github
+repository in which the file appears ("the owner"). By placing this
+file in a github repository, the owner agrees to the terms below.
+
+The purpose of the agreement is to enable Quviq AB to provide a
+continuous integration service to the owner, whereby the code in the
+repository ("the source code") is tested using Quviq's test tools, and
+the test results are made available on the web. The test results
+include test output, generated test cases, and a copy of the source
+code in the repository annotated with coverage information ("the test
+results").
+
+The owner agrees that Quviq may run the tests in the source code and
+display the test results on the web, without obligation.
+
+The owner warrants that running the tests in the source code and
+displaying the test results on the web violates no laws, licences or other
+agreements. In the event of such a violation, the owner accepts full
+responsibility.
+
+The owner warrants that the source code is not malicious, and will not
+mount an attack on either Quviq's server or any other server--for
+example by taking part in a denial of service attack, or by attempting
+to send unsolicited emails.
+
+The owner warrants that the source code does not attempt to reverse
+engineer Quviq's code.
+
+Quviq reserves the right to exclude repositories that break this
+agreement from its continuous integration service.
+
+Any dispute arising from the use of Quviq's service will be resolved
+under Swedish law.

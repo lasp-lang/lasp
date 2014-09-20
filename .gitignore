@@ -8,3 +8,4 @@ src/*.swp
 apps/derflow/src/*
 .local_dialyzer_plt
 tags
+log/

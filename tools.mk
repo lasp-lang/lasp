@@ -24,10 +24,10 @@ ${PLT}: compile
 ${LOCAL_PLT}: compile
 	@if [ -d deps ]; then \
 		if [ -f $(LOCAL_PLT) ]; then \
-			dialyzer --check_plt --plt $(LOCAL_PLT) deps/*/ebin  && \
-			dialyzer --add_to_plt --plt $(LOCAL_PLT) --output_plt $(LOCAL_PLT) deps/*/ebin ; test $$? -ne 1; \
+			dialyzer --check_plt --plt $(LOCAL_PLT) deps/*/ebin riak_test/ebin && \
+			dialyzer --add_to_plt --plt $(LOCAL_PLT) --output_plt $(LOCAL_PLT) deps/*/ebin riak_test/ebin ; test $$? -ne 1; \
 		else \
-			dialyzer --build_plt --output_plt $(LOCAL_PLT) deps/*/ebin ; test $$? -ne 1; \
+			dialyzer --build_plt --output_plt $(LOCAL_PLT) deps/*/ebin riak_test/ebin ; test $$? -ne 1; \
 		fi \
 	fi
 

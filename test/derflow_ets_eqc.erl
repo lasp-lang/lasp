@@ -214,7 +214,9 @@ prop_parallel() ->
                 end)).
 
 setup() ->
-    ?ETS = ets:new(?ETS, [public, set, named_table]),
+    ?ETS = ets:new(?ETS, [public, set, named_table,
+                          {write_concurrency, true},
+                          {read_concurrency, true}]),
     ok.
 
 teardown() ->

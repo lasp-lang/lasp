@@ -55,12 +55,11 @@ initial_state() ->
     #state{ets=?ETS, types=?LATTICES, store=dict:new()}.
 
 %% Generate commands
-command(#state{ets=Ets, types=_Types, store=Store}) ->
+command(#state{ets=Ets, types=Types, store=Store}) ->
     Variables = dict:fetch_keys(Store),
     oneof(
-        [{call, ?MODULE, declare, [undefined, Ets]}] ++
-        % [{call, ?MODULE, declare,
-        %   [oneof([elements(Types), undefined]), Ets]}] ++
+        [{call, ?MODULE, declare,
+          [oneof([elements(Types), undefined]), Ets]}] ++
         [{call, ?MODULE, read,
           [elements(Variables), undefined, Ets]} || length(Variables) > 0] ++
         [?LET({Variable, GeneratedValue}, {elements(Variables), nat()},
@@ -78,7 +77,8 @@ command(#state{ets=Ets, types=_Types, store=Store}) ->
                                     X
                                   end)
                     end,
-                    {call, ?MODULE, bind, [Variable, Value, Ets]}
+                    oneof([{call, ?MODULE, bind, [Variable, Value, Ets]},
+                           {call, ?MODULE, read, [Variable, Value, Ets]}])
                 end) || length(Variables) > 0]).
 
 next_state(#state{store=Store0}=S, _V, {call, ?MODULE, bind, [Id, NewValue, _]}) ->
@@ -92,7 +92,7 @@ next_state(#state{store=Store0}=S, _V, {call, ?MODULE, bind, [Id, NewValue, _]})
         {ok, #variable{type=Type, value=Value}=Variable} ->
             case derflow_ets:is_inflation(Type, Value, NewValue) of
                 true ->
-                    dict:store(Id, Variable#variable{value=Value}, Store0);
+                    dict:store(Id, Variable#variable{value=NewValue}, Store0);
                 false ->
                     Store0
             end
@@ -101,15 +101,13 @@ next_state(#state{store=Store0}=S, _V, {call, ?MODULE, bind, [Id, NewValue, _]})
 next_state(#state{store=Store0}=S, V, {call, ?MODULE, declare, [Type, _]}) ->
     Store = dict:store(V, #variable{type=Type}, Store0),
     S#state{store=Store};
-next_state(S, _V, {call, ?MODULE, bind, _}) ->
-    S;
 
 %% Next state transformation
 next_state(S,_V,{call,_,_,_}) ->
     S.
 
 precondition(#state{store=Store},
-             {call, ?MODULE, read, [Id, _Threshold, _Store]}) ->
+             {call, ?MODULE, read, [Id, Threshold, _Store]}) ->
     case dict:find(Id, Store) of
         error ->
             %% Not declared.
@@ -117,8 +115,15 @@ precondition(#state{store=Store},
         {ok, #variable{value=undefined}} ->
             %% Not bound.
             false;
-        {ok, _} ->
-            true
+        {ok, #variable{type=undefined}} ->
+            true;
+        {ok, #variable{value=Value, type=Type}} ->
+            case derflow_ets:threshold_met(Type, Value, Threshold) of
+                true ->
+                    true;
+                false ->
+                    false
+            end
     end;
 
 %% Precondition, checked before command is added to the command sequence

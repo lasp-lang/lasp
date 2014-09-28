@@ -32,7 +32,7 @@ stage : rel
 currentdevrel: stagedevrel
 	riak_test/bin/derflow-current.sh
 
-riak-test:
+riak-test: compile compile-riak-test
 	$(foreach dep,$(wildcard riak_test/*_test.erl), ../riak_test/riak_test -v -c derflow -t $(dep);)
 
 riak-test-lattice: currentdevrel

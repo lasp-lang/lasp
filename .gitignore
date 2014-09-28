@@ -10,3 +10,4 @@ apps/derflow/src/*
 tags
 log/
 .qc/
+riak_test/ebin/*.beam

@@ -49,7 +49,7 @@ read(Id, Threshold, Store) ->
                                        [Threshold]),
                             case derflow_ets:threshold_met(Type, Value, Threshold) of
                                 true ->
-                                    {ok, Value, V#dv.next};
+                                    {ok, Threshold, V#dv.next};
                                 false ->
                                     WT = lists:append(V#dv.waiting_threads,
                                                       [{threshold, self(), Type, Threshold}]),
@@ -162,10 +162,11 @@ next_key(NextKey0, _, _) ->
     NextKey0.
 
 %% @doc Determine if a threshold is met.
-threshold_met(_, Value, {greater, Threshold}) ->
-    Threshold < Value;
-threshold_met(_, Value, Threshold) ->
-    Threshold =< Value.
+threshold_met(riak_dt_gset, _Value, {greater, _Threshold}) ->
+    {error, not_implemented};
+
+threshold_met(riak_dt_gset, Value, Threshold) ->
+    is_inflation(riak_dt_gset, Threshold, Value).
 
 %% @doc Determine if a change is an inflation or not.
 is_inflation(Type, Previous, Current) ->
@@ -214,14 +215,14 @@ reply_to_all(List, Result) ->
 %%      them of bound values or met thresholds.
 reply_to_all([{threshold, From, Type, Threshold}=H|T],
              StillWaiting0,
-             {ok, Value, _Next}=Result) ->
+             {ok, Value, Next}=Result) ->
     lager:info("Result: ~p, Threshold: ~p", [Result, Threshold]),
     StillWaiting = case derflow_ets:threshold_met(Type, Value, Threshold) of
         true ->
             lager:info("Threshold ~p met: ~p", [Threshold, Value]),
             case From of
                 {server, undefined, {Address, Ref}} ->
-                    gen_server:reply({Address, Ref}, Result);
+                    gen_server:reply({Address, Ref}, {ok, Threshold, Next});
                 _ ->
                     From ! Result
             end,

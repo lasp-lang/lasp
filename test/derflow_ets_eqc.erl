@@ -60,25 +60,42 @@ command(#state{ets=Ets, types=Types, store=Store}) ->
     oneof(
         [{call, ?MODULE, declare,
           [oneof([elements(Types), undefined]), Ets]}] ++
-        [{call, ?MODULE, read,
-          [elements(Variables), undefined, Ets]} || length(Variables) > 0] ++
         [?LET({Variable, GeneratedValue}, {elements(Variables), nat()},
              begin
+                    %% Generate values for binds, based on operating
+                    %% type.
                     Value = case dict:find(Variable, Store) of
                         {ok, #variable{type=undefined}} ->
                             GeneratedValue;
-                        {ok, #variable{type=Type}} ->
+                        {ok, #variable{type=T1}} ->
                             ?LET({Object, Update},
-                                 {Type:new(), Type:gen_op()},
+                                 {T1:new(), T1:gen_op()},
                                   begin
-                                    {ok, X} = Type:update(Update,
-                                                          undefined,
-                                                          Object),
+                                    {ok, X} = T1:update(Update,
+                                                        undefined,
+                                                        Object),
                                     X
                                   end)
                     end,
+
+                    %% Generate values for threshold, based on operating
+                    %% type.
+                    Threshold = case dict:find(Variable, Store) of
+                        {ok, #variable{type=undefined}} ->
+                            undefined;
+                        {ok, #variable{type=T2}} ->
+                            ?LET({Object, Update},
+                                 {T2:new(), T2:gen_op()},
+                                  begin
+                                    {ok, X} = T2:update(Update,
+                                                        undefined,
+                                                        Object),
+                                    X
+                                  end)
+                    end,
+
                     oneof([{call, ?MODULE, bind, [Variable, Value, Ets]},
-                           {call, ?MODULE, read, [Variable, Value, Ets]}])
+                           {call, ?MODULE, read, [Variable, Threshold, Ets]}])
                 end) || length(Variables) > 0]).
 
 next_state(#state{store=Store0}=S, _V, {call, ?MODULE, bind, [Id, NewValue, _]}) ->
@@ -130,12 +147,17 @@ precondition(#state{store=Store},
 precondition(_S,{call,_,_,_}) ->
     true.
 
+%% Ensure we always read values that we are expecting.
 postcondition(#state{store=Store},
-              {call, ?MODULE, read, [Id, _, _]}, {op, V}) ->
+              {call, ?MODULE, read, [Id, Threshold, _]}, {ok, V, _}) ->
     case dict:find(Id, Store) of
-        {ok, #variable{value=V}} ->
-            %% Ensure we always read values that we are expecting.
-            true;
+        {ok, #variable{value=Value}} ->
+            case Threshold of
+                undefined ->
+                    Value == V;
+                _ ->
+                    Threshold == V
+            end;
         _ ->
             false
     end;

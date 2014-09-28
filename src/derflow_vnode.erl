@@ -1,6 +1,10 @@
 %% @doc Derflow operational vnode, which powers the data flow variable
 %%      assignment and read operations.
 %%
+%% @todo This probably has a ton of bugs, because it needs to be
+%%       rewritten to use the derflow_ets backend, which is now
+%%       quickchecked.
+%%
 
 -module(derflow_vnode).
 

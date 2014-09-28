@@ -110,7 +110,7 @@ postcondition(#state{store=Store},
         {ok, #variable{type=Type, value=V}} ->
             case Type of
                 undefined ->
-                    true;
+                    V == undefined;
                 _ ->
                     derflow_ets:is_inflation(Type, V, Value)
             end;

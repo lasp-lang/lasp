@@ -24,13 +24,20 @@
 
 -define(NUM_TESTS, 200).
 
+-define(ETS, derflow_ets_eqc).
+
 -define(QC_OUT(P),
         eqc:on_output(fun(Str, Args) -> io:format(user, Str, Args) end, P)).
 
 derflow_ets_test_() ->
     {timeout, 60,
      ?_assert(eqc:quickcheck(
-                eqc:numtests(?NUM_TESTS, ?QC_OUT(?MODULE:prop_statem()))))}.
+                eqc:numtests(?NUM_TESTS,
+                             ?QC_OUT(?MODULE:prop_sequential())))),
+    ?_assert(eqc:quickcheck(
+               eqc:numtests(?NUM_TESTS,
+                            ?QC_OUT(?MODULE:prop_parallel()))))
+    }.
 
 %% Generators
 declare(Type, Ets) ->
@@ -40,13 +47,12 @@ declare(Type, Ets) ->
 bind(Id, Value, Ets) ->
     derflow_ets:bind(Id, Value, Ets).
 
-read(Id, Ets) ->
-    derflow_ets:read(Id, Ets).
+read(Id, Threshold, Ets) ->
+    derflow_ets:read(Id, Threshold, Ets).
 
 %% Initialize state
 initial_state() ->
-    Ets = ets:new(derflow_ets_eqc, [set]),
-    #state{ets=Ets, types=?LATTICES, store=dict:new()}.
+    #state{ets=?ETS, types=?LATTICES, store=dict:new()}.
 
 %% Generate commands
 command(#state{ets=Ets, types=Types, store=Store}) ->
@@ -55,7 +61,7 @@ command(#state{ets=Ets, types=Types, store=Store}) ->
         [{call, ?MODULE, declare,
           [oneof([elements(Types), undefined]), Ets]}] ++
         [{call, ?MODULE, read,
-          [elements(Types), Ets]} || length(Variables) > 0] ++
+          [elements(Variables), undefined, Ets]} || length(Variables) > 0] ++
         [?LET({Variable, GeneratedValue}, {elements(Variables), nat()},
              begin
                     Value = case dict:find(Variable, Store) of
@@ -87,7 +93,8 @@ next_state(S, _V, {call, ?MODULE, bind, _}) ->
 next_state(S,_V,{call,_,_,_}) ->
     S.
 
-precondition(#state{store=Store}, {call, ?MODULE, read, [Id, _Store]}) ->
+precondition(#state{store=Store},
+             {call, ?MODULE, read, [Id, _Threshold, _Store]}) ->
     case dict:find(Id, Store) of
         error ->
             %% Not declared.
@@ -142,15 +149,39 @@ postcondition(#state{store=Store},
 postcondition(_S,{call,_,_,_},_Res) ->
     true.
 
-%% Property for the state machine.
-prop_statem() ->
-    ?FORALL(Cmds, commands(?MODULE),
-            begin
-                {H, S, Res} = run_commands(?MODULE, Cmds),
-                ?WHENFAIL(
-                    io:format("History: ~p~nState: ~p~nRes: ~p~n", [H, S, Res]),
-                    Res == ok)
-            end).
+%% Sequential property for the state machine.
+prop_sequential() ->
+    ?SETUP(fun() ->
+                setup(),
+                fun teardown/0
+           end,
+        ?FORALL(Cmds, commands(?MODULE),
+                begin
+                    {H, S, Res} = run_commands(?MODULE, Cmds),
+                    ?WHENFAIL(
+                        io:format("History: ~p~nState: ~p~nRes: ~p~n", [H, S, Res]),
+                        Res == ok)
+                end)).
+
+prop_parallel() ->
+    ?SETUP(fun() ->
+                setup(),
+                fun teardown/0
+           end,
+        ?FORALL(Cmds, parallel_commands(?MODULE),
+                begin
+                    {H, S, Res} = run_parallel_commands(?MODULE, Cmds),
+                    ?WHENFAIL(
+                        io:format("History: ~p~nState: ~p~nRes: ~p~n", [H, S, Res]),
+                        Res == ok)
+                end)).
+
+setup() ->
+    ?ETS = ets:new(?ETS, [public, set, named_table]),
+    ok.
+
+teardown() ->
+    ok.
 
 -endif.
 -endif.

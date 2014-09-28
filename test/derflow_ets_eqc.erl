@@ -1,5 +1,8 @@
 -module(derflow_ets_eqc).
 
+-include("derflow.hrl").
+
+-ifdef(TEST).
 -ifdef(EQC).
 
 -include_lib("eqc/include/eqc.hrl").
@@ -16,7 +19,8 @@
          precondition/2,
          postcondition/3]).
 
--record(state, {ets, store}).
+-record(state, {ets, types, store}).
+-record(variable, {type, value}).
 
 -define(NUM_TESTS, 200).
 
@@ -29,38 +33,57 @@ derflow_ets_test_() ->
                 eqc:numtests(?NUM_TESTS, ?QC_OUT(?MODULE:prop_statem()))))}.
 
 %% Generators
-declare(Store) ->
-    {ok, Id} = derflow_ets:declare(Store),
+declare(Type, Ets) ->
+    {ok, Id} = derflow_ets:declare(Type, Ets),
     Id.
 
-bind(Id, Value, Store) ->
-    derflow_ets:bind(Id, Value, Store).
+bind(Id, Value, Ets) ->
+    derflow_ets:bind(Id, Value, Ets).
 
-read(Id, Store) ->
-    derflow_ets:read(Id, Store).
-
-value() ->
-    int().
+read(Id, Ets) ->
+    derflow_ets:read(Id, Ets).
 
 %% Initialize state
 initial_state() ->
     Ets = ets:new(derflow_ets_eqc, [set]),
-    #state{ets=Ets, store=dict:new()}.
+    #state{ets=Ets, types=?LATTICES, store=dict:new()}.
 
 %% Generate commands
-command(#state{ets=Ets, store=Store}) ->
+command(#state{ets=Ets, types=Types, store=Store}) ->
     Variables = dict:fetch_keys(Store),
-    oneof([{call, ?MODULE, declare, [Ets]}] ++
-          [{call, ?MODULE, bind, [elements(Variables), value(), Ets]}
-           || length(Variables) > 0] ++
-          [{call, ?MODULE, read, [elements(Variables), Ets]}
-           || length(Variables) > 0]).
+    oneof(
+        [{call, ?MODULE, declare,
+          [oneof([elements(Types), undefined]), Ets]}] ++
+        [{call, ?MODULE, read,
+          [elements(Types), Ets]} || length(Variables) > 0] ++
+        [?LET({Variable, GeneratedValue}, {elements(Variables), nat()},
+             begin
+                    Value = case dict:find(Variable, Store) of
+                        {ok, #variable{type=undefined}} ->
+                            GeneratedValue;
+                        {ok, #variable{type=Type}} ->
+                            ?LET({Object, Update},
+                                 {Type:new(), Type:gen_op()},
+                                  begin
+                                    {ok, X} = Type:update(Update,
+                                                          undefined,
+                                                          Object),
+                                    X
+                                  end)
+                    end,
+                    {call, ?MODULE, bind, [Variable, Value, Ets]}
+                end) || length(Variables) > 0]).
+
+next_state(#state{store=Store0}=S, V, {call, ?MODULE, declare, [Type, _]}) ->
+    Store = dict:store(V, #variable{type=Type}, Store0),
+    S#state{store=Store};
+next_state(#state{store=Store0}=S, V, {call, ?MODULE, declare, [_]}) ->
+    Store = dict:store(V, #variable{}, Store0),
+    S#state{store=Store};
+next_state(S, _V, {call, ?MODULE, bind, _}) ->
+    S;
 
 %% Next state transformation
-next_state(#state{store=Store0}=S, V, {call, ?MODULE, declare, _}) ->
-    Store = dict:store(V, undefined, Store0),
-    S#state{store=Store};
-
 next_state(S,_V,{call,_,_,_}) ->
     S.
 
@@ -69,7 +92,7 @@ precondition(#state{store=Store}, {call, ?MODULE, read, [Id, _Store]}) ->
         error ->
             %% Not declared.
             false;
-        {ok, undefined} ->
+        {ok, #variable{value=undefined}} ->
             %% Not bound.
             false;
         {ok, _} ->
@@ -80,6 +103,21 @@ precondition(#state{store=Store}, {call, ?MODULE, read, [Id, _Store]}) ->
 precondition(_S,{call,_,_,_}) ->
     true.
 
+%% If the bind succeeded, the value must be an inflation.
+postcondition(#state{store=Store},
+              {call, ?MODULE, bind, [Id, Value, _]}, {ok, _}) ->
+    case dict:find(Id, Store) of
+        {ok, #variable{type=Type, value=V}} ->
+            case Type of
+                undefined ->
+                    true;
+                _ ->
+                    derflow_ets:is_inflation(Type, V, Value)
+            end;
+        _ ->
+            false
+    end;
+
 %% If a bind failed, that's only allowed if the variable is already
 %% bound or undefined.
 %%
@@ -89,7 +127,7 @@ postcondition(#state{store=Store},
         error ->
             %% Not declared.
             true;
-        {ok, Value} ->
+        {ok, #variable{value=Value}} ->
             %% Already bound to same value.
             false;
         {ok, _} ->
@@ -114,4 +152,5 @@ prop_statem() ->
                     Res == ok)
             end).
 
+-endif.
 -endif.

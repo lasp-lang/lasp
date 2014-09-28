@@ -17,7 +17,8 @@
          reply_to_all/3]).
 
 -export([threshold_met/3,
-         is_lattice/1]).
+         is_lattice/1,
+         is_inflation/3]).
 
 %% @doc Perform a read of a particular identifier.
 read(Id, Store) ->
@@ -119,20 +120,19 @@ bind(Id, Value, Store) ->
         _ ->
             next_key(Next, Type, Store)
     end,
-    lager:info("Value is: ~p NextKey is: ~p", [Value, NextKey]),
     case Bound of
         true ->
             case V#dv.value of
                 Value ->
                     {ok, NextKey};
                 _ ->
-                    case is_lattice(Type) of
+                    case is_inflation(Type, V#dv.value, Value) of
                         true ->
                             write(Type, Value, NextKey, Id, Store),
                             {ok, NextKey};
                         false ->
-                            lager:warning("Attempt to bind failed: ~p ~p ~p",
-                                          [Type, Value0, Value]),
+                            lager:error("Attempt to bind failed: ~p ~p ~p~n",
+                                        [Type, Value0, Value]),
                             error
                     end
             end;
@@ -166,6 +166,18 @@ threshold_met(_, Value, {greater, Threshold}) ->
     Threshold < Value;
 threshold_met(_, Value, Threshold) ->
     Threshold =< Value.
+
+%% @doc Determine if a change is an inflation or not.
+is_inflation(Type, Previous, Current) ->
+    is_lattice(Type) andalso is_lattice_inflation(Type, Previous, Current).
+
+%% @doc Determine if a change is an inflation or not.
+is_lattice_inflation(riak_dt_gset, undefined, _) ->
+    true;
+is_lattice_inflation(riak_dt_gset, Previous, Current) ->
+    sets:is_subset(
+        sets:from_list(riak_dt_gset:value(Previous)),
+        sets:from_list(riak_dt_gset:value(Current))).
 
 %% @doc Return if something is a lattice or not.
 is_lattice(Type) ->

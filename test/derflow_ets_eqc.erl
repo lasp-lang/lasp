@@ -29,15 +29,17 @@
 -define(QC_OUT(P),
         eqc:on_output(fun(Str, Args) -> io:format(user, Str, Args) end, P)).
 
-derflow_ets_test_() ->
+derflow_ets_sequential_test_() ->
     {timeout, 60,
      ?_assert(eqc:quickcheck(
                 eqc:numtests(?NUM_TESTS,
-                             ?QC_OUT(?MODULE:prop_sequential())))),
-    ?_assert(eqc:quickcheck(
-               eqc:numtests(?NUM_TESTS,
-                            ?QC_OUT(?MODULE:prop_parallel()))))
-    }.
+                             ?QC_OUT(?MODULE:prop_sequential()))))}.
+
+derflow_ets_parallel_test_() ->
+    {timeout, 60,
+     ?_assert(eqc:quickcheck(
+                eqc:numtests(?NUM_TESTS,
+                             ?QC_OUT(?MODULE:prop_parallel()))))}.
 
 %% Generators
 declare(Type, Ets) ->

@@ -145,7 +145,7 @@ stat(actor_count, PNCounter) ->
     length(PNCounter);
 stat(_, _) -> undefined.
 
--include("riak_dt_tags.hrl").
+-include_lib("riak_dt/include/riak_dt_tags.hrl").
 -define(DT_SUM_TAG, 86).
 -define(TAG, ?DT_SUM_TAG).
 -define(V1_VERS, 1).

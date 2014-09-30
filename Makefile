@@ -14,7 +14,7 @@ deps:
 
 clean:
 	$(REBAR) clean
-	rm -rf riak_test/ebin
+	rm -rf riak_test/ebin/*.beam
 
 distclean: clean devclean relclean
 	$(REBAR) delete-deps

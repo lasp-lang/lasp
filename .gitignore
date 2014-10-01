@@ -11,3 +11,5 @@ tags
 log/
 .qc/
 riak_test/ebin/*.beam
+.eqc-info
+current_counterexample.eqc

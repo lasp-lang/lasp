@@ -23,7 +23,7 @@ confirm() ->
     lager:info("Remotely executing the test."),
     {GSet, GSet2} = rpc:call(Node, ?MODULE, test, []),
     ?assertMatch({ok, [1,2,3], _}, GSet),
-    ?assertMatch({ok, [1,2,3,4,5], _}, GSet2),
+    ?assertMatch({ok, [1,2,3,4], _}, GSet2),
 
     pass.
 
@@ -43,7 +43,6 @@ test() ->
     {ok, _} = derflow:bind(GSetId, [1]),
     {ok, _} = derflow:bind(GSetId, [1, 2]),
     {ok, _} = derflow:bind(GSetId, [1, 2, 3]),
-    {ok, _} = derflow:bind(GSetId, [1, 2, 3, 4]),
 
     %% Ensure we receive [1, 2, 3].
     GSet = receive
@@ -52,14 +51,15 @@ test() ->
     end,
 
     %% Spawn fun which should block until lattice reaches [1,2,3,4,5].
-    spawn(fun() -> Me ! derflow:read(GSetId, {greater, [1,2,3,4]}) end),
+    spawn(fun() -> Me ! derflow:read(GSetId, [1,2,3,4]) end),
 
     %% Perform another inflation.
+    {ok, _} = derflow:bind(GSetId, [1, 2, 3, 4]),
     {ok, _} = derflow:bind(GSetId, [1, 2, 3, 4, 5]),
 
-    %% Ensure we receive [1, 2, 3, 4, 5].
+    %% Ensure we receive [1, 2, 3, 4].
     GSet2 = receive
-        {ok, [1, 2, 3, 4, 5], _} = V1 ->
+        {ok, [1, 2, 3, 4], _} = V1 ->
             V1
     end,
 

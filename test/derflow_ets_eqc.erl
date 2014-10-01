@@ -52,6 +52,34 @@ bind(Id, Value, Ets) ->
 read(Id, Threshold, Ets) ->
     derflow_ets:read(Id, Threshold, Ets).
 
+%% @doc Generate values for threshold, based on operating type.
+threshold(Variable, Store) ->
+    case dict:find(Variable, Store) of
+        {ok, #variable{type=undefined}} ->
+            undefined;
+        {ok, #variable{type=Type}} ->
+            ?LET({Object, Update},
+                 {Type:new(), Type:gen_op()},
+                  begin
+                    {ok, X} = Type:update(Update, undefined, Object),
+                    X
+                  end)
+    end.
+
+%% @doc Generate values for binds, based on operating type.
+value(Variable, Store, DefaultValue) ->
+    case dict:find(Variable, Store) of
+        {ok, #variable{type=undefined}} ->
+            DefaultValue;
+        {ok, #variable{type=Type}} ->
+            ?LET({Object, Update},
+                 {Type:new(), Type:gen_op()},
+                  begin
+                    {ok, X} = Type:update(Update, undefined, Object),
+                    X
+                  end)
+    end.
+
 %% Initialize state
 initial_state() ->
     #state{ets=?ETS, types=?LATTICES, store=dict:new()}.
@@ -64,38 +92,8 @@ command(#state{ets=Ets, types=Types, store=Store}) ->
           [oneof([elements(Types), undefined]), Ets]}] ++
         [?LET({Variable, GeneratedValue}, {elements(Variables), nat()},
              begin
-                    %% Generate values for binds, based on operating
-                    %% type.
-                    Value = case dict:find(Variable, Store) of
-                        {ok, #variable{type=undefined}} ->
-                            GeneratedValue;
-                        {ok, #variable{type=T1}} ->
-                            ?LET({Object, Update},
-                                 {T1:new(), T1:gen_op()},
-                                  begin
-                                    {ok, X} = T1:update(Update,
-                                                        undefined,
-                                                        Object),
-                                    X
-                                  end)
-                    end,
-
-                    %% Generate values for threshold, based on operating
-                    %% type.
-                    Threshold = case dict:find(Variable, Store) of
-                        {ok, #variable{type=undefined}} ->
-                            undefined;
-                        {ok, #variable{type=T2}} ->
-                            ?LET({Object, Update},
-                                 {T2:new(), T2:gen_op()},
-                                  begin
-                                    {ok, X} = T2:update(Update,
-                                                        undefined,
-                                                        Object),
-                                    X
-                                  end)
-                    end,
-
+                    Value = value(Variable, Store, GeneratedValue),
+                    Threshold = threshold(Variable, Store),
                     oneof([{call, ?MODULE, bind, [Variable, Value, Ets]},
                            {call, ?MODULE, read, [Variable, Threshold, Ets]}])
                 end) || length(Variables) > 0]).

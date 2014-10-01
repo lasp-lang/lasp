@@ -168,12 +168,9 @@ postcondition(#state{store=Store},
 postcondition(#state{store=Store},
               {call, ?MODULE, bind, [Id, Value, _]}, error) ->
     case dict:find(Id, Store) of
-        error ->
-            %% Not declared.
-            true;
         {ok, #variable{value=Value}} ->
             %% Already bound to same value.
-            true;
+            false;
         {ok, _} ->
             %% Bound, to different value.
             true;

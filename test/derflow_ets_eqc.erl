@@ -9,19 +9,12 @@
 -include_lib("eqc/include/eqc_statem.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--behavior(eqc_statem).
-
 -compile(export_all).
 
--export([command/1,
-         initial_state/0,
-         next_state/3,
-         precondition/2,
-         postcondition/3]).
-
--record(state, {ets, types, store}).
+-record(state, {store}).
 -record(variable, {type, value}).
 
+-define(SECS, 60).
 -define(NUM_TESTS, 200).
 
 -define(ETS, derflow_ets_eqc).
@@ -41,32 +34,8 @@ derflow_ets_parallel_test_() ->
                 eqc:numtests(?NUM_TESTS,
                              ?QC_OUT(?MODULE:prop_parallel()))))}.
 
-%% Generators
-declare(Type, Ets) ->
-    {ok, Id} = derflow_ets:declare(Type, Ets),
-    Id.
+%% Generators.
 
-bind(Id, Value, Ets) ->
-    derflow_ets:bind(Id, Value, Ets).
-
-read(Id, Threshold, Ets) ->
-    derflow_ets:read(Id, Threshold, Ets).
-
-%% @doc Generate values for threshold, based on operating type.
-threshold(Variable, Store) ->
-    case dict:find(Variable, Store) of
-        {ok, #variable{type=undefined}} ->
-            undefined;
-        {ok, #variable{type=Type}} ->
-            ?LET({Object, Update},
-                 {Type:new(), Type:gen_op()},
-                  begin
-                    {ok, X} = Type:update(Update, undefined, Object),
-                    X
-                  end)
-    end.
-
-%% @doc Generate values for binds, based on operating type.
 value(Variable, Store, DefaultValue) ->
     case dict:find(Variable, Store) of
         {ok, #variable{type=undefined}} ->
@@ -80,25 +49,57 @@ value(Variable, Store, DefaultValue) ->
                   end)
     end.
 
+threshold(Variable, Store) ->
+    case dict:find(Variable, Store) of
+        {ok, #variable{type=undefined}} ->
+            undefined;
+        {ok, #variable{type=Type}} ->
+            ?LET({Object, Update},
+                 {Type:new(), Type:gen_op()},
+                  begin
+                    {ok, X} = Type:update(Update, undefined, Object),
+                    X
+                  end)
+    end.
+
 %% Initialize state
+
 initial_state() ->
-    #state{ets=?ETS, types=?LATTICES, store=dict:new()}.
+    #state{store=dict:new()}.
 
-%% Generate commands
-command(#state{ets=Ets, types=Types, store=Store}) ->
+%% Declaring new variables.
+
+declare(Type) ->
+    {ok, Id} = derflow_ets:declare(Type, ?ETS),
+    Id.
+
+declare_args(_S) ->
+    [oneof([elements(?LATTICES), undefined])].
+
+declare_next(#state{store=Store0}=S, V, [Type]) ->
+    Store = dict:store(V, #variable{type=Type}, Store0),
+    S#state{store=Store}.
+
+%% Binding variables.
+%%
+%% If a bind failed, that's only allowed if the variable is already
+%% bound or undefined.
+
+bind(Id, Value) ->
+    derflow_ets:bind(Id, Value, ?ETS).
+
+bind_pre(S) ->
+    has_variables(S).
+
+bind_args(#state{store=Store}) ->
     Variables = dict:fetch_keys(Store),
-    oneof(
-        [{call, ?MODULE, declare,
-          [oneof([elements(Types), undefined]), Ets]}] ++
-        [?LET({Variable, GeneratedValue}, {elements(Variables), nat()},
-             begin
-                    Value = value(Variable, Store, GeneratedValue),
-                    Threshold = threshold(Variable, Store),
-                    oneof([{call, ?MODULE, bind, [Variable, Value, Ets]},
-                           {call, ?MODULE, read, [Variable, Threshold, Ets]}])
-                end) || length(Variables) > 0]).
+    ?LET({Variable, GeneratedValue}, {elements(Variables), nat()},
+                    begin
+                        Value = value(Variable, Store, GeneratedValue),
+                        [Variable, Value]
+                    end).
 
-next_state(#state{store=Store0}=S, _V, {call, ?MODULE, bind, [Id, NewValue, _]}) ->
+bind_next(#state{store=Store0}=S, _V, [Id, NewValue]) ->
     %% Only update the record, if it's in inflation or has never been
     %% updated before.
     Store = case dict:find(Id, Store0) of
@@ -114,17 +115,62 @@ next_state(#state{store=Store0}=S, _V, {call, ?MODULE, bind, [Id, NewValue, _]})
                     Store0
             end
     end,
-    S#state{store=Store};
-next_state(#state{store=Store0}=S, V, {call, ?MODULE, declare, [Type, _]}) ->
-    Store = dict:store(V, #variable{type=Type}, Store0),
-    S#state{store=Store};
+    S#state{store=Store}.
 
-%% Next state transformation
-next_state(S,_V,{call,_,_,_}) ->
-    S.
+bind_post(#state{store=Store}, [Id, V], error) ->
+    case dict:find(Id, Store) of
+        {ok, #variable{type=_Type, value=undefined}} ->
+            false;
+        {ok, #variable{type=Type, value=Value}} ->
+            case derflow_ets:is_inflation(Type, Value, V) of
+                true ->
+                    false;
+                false ->
+                    true
+            end
+    end;
+bind_post(_, _, _) ->
+    true.
 
-precondition(#state{store=Store},
-             {call, ?MODULE, read, [Id, Threshold, _Store]}) ->
+%% Read variables.
+
+read(Id, Threshold) ->
+    derflow_ets:read(Id, Threshold, ?ETS).
+
+read_pre(S) ->
+    has_variables(S).
+
+read_pre(S, [Id, Threshold]) ->
+    is_read_valid(S, Id, Threshold).
+
+read_args(#state{store=Store}) ->
+    Variables = dict:fetch_keys(Store),
+    ?LET(Variable, elements(Variables),
+                    begin
+                        Threshold = threshold(Variable, Store),
+                        [Variable, Threshold]
+                    end).
+
+read_post(#state{store=Store}, [Id, Threshold], {ok, V, _}) ->
+    case dict:find(Id, Store) of
+        {ok, #variable{value=Value}} ->
+            case Threshold of
+                undefined ->
+                    Value == V;
+                _ ->
+                    Threshold == V
+            end;
+        _ ->
+            false
+    end.
+
+%% Predicates.
+
+has_variables(#state{store=Store}) ->
+    Variables = dict:fetch_keys(Store),
+    length(Variables) > 0.
+
+is_read_valid(#state{store=Store}, Id, Threshold) ->
     case dict:find(Id, Store) of
         error ->
             %% Not declared.
@@ -141,75 +187,37 @@ precondition(#state{store=Store},
                 false ->
                     false
             end
-    end;
+    end.
 
-%% Precondition, checked before command is added to the command sequence
-precondition(_S,{call,_,_,_}) ->
-    true.
+%% Properties for the state machine.
 
-%% Ensure we always read values that we are expecting.
-postcondition(#state{store=Store},
-              {call, ?MODULE, read, [Id, Threshold, _]}, {ok, V, _}) ->
-    case dict:find(Id, Store) of
-        {ok, #variable{value=Value}} ->
-            case Threshold of
-                undefined ->
-                    Value == V;
-                _ ->
-                    Threshold == V
-            end;
-        _ ->
-            false
-    end;
-
-%% If a bind failed, that's only allowed if the variable is already
-%% bound or undefined.
-%%
-postcondition(#state{store=Store},
-              {call, ?MODULE, bind, [Id, V, _]}, error) ->
-    case dict:find(Id, Store) of
-        {ok, #variable{type=_Type, value=undefined}} ->
-            false;
-        {ok, #variable{type=Type, value=Value}} ->
-            case derflow_ets:is_inflation(Type, Value, V) of
-                true ->
-                    false;
-                false ->
-                    true
-            end
-    end;
-
-%% Postcondition, checked after command has been evaluated
-%% OBS: S is the state before next_state(S,_,<command>)
-postcondition(_S,{call,_,_,_},_Res) ->
-    true.
-
-%% Sequential property for the state machine.
 prop_sequential() ->
-    ?SETUP(fun() ->
-                setup(),
-                fun teardown/0
-           end,
-       ?FORALL(Cmds, noshrink(commands(?MODULE)),
-                begin
-                    {H, S, Res} = run_commands(?MODULE, Cmds),
-                    ?WHENFAIL(
-                        io:format("History: ~p~nState: ~p~nRes: ~p~n", [H, S, Res]),
-                        Res == ok)
-                end)).
+    eqc:testing_time(?SECS,
+                     ?SETUP(fun() ->
+                                 setup(),
+                                 fun teardown/0
+                            end,
+                         ?FORALL(Cmds, commands(?MODULE),
+                                 begin
+                                     {H, S, Res} = run_commands(?MODULE, Cmds),
+                                     ?WHENFAIL(
+                                         io:format("History: ~p~nState: ~p~nRes: ~p~n", [H, S, Res]),
+                                         Res == ok)
+                     end))).
 
 prop_parallel() ->
-    ?SETUP(fun() ->
-                setup(),
-                fun teardown/0
-           end,
-        ?FORALL(Cmds, parallel_commands(?MODULE),
-                begin
-                    {H, S, Res} = run_parallel_commands(?MODULE, Cmds),
-                    ?WHENFAIL(
-                        io:format("History: ~p~nState: ~p~nRes: ~p~n", [H, S, Res]),
-                        Res == ok)
-                end)).
+    eqc:testing_time(?SECS,
+                     ?SETUP(fun() ->
+                                 setup(),
+                                 fun teardown/0
+                            end,
+                         ?FORALL(Cmds, parallel_commands(?MODULE),
+                                 begin
+                                     {H, S, Res} = run_parallel_commands(?MODULE, Cmds),
+                                     ?WHENFAIL(
+                                         io:format("History: ~p~nState: ~p~nRes: ~p~n", [H, S, Res]),
+                                         Res == ok)
+                     end))).
 
 setup() ->
     ?ETS = ets:new(?ETS, [public, set, named_table,

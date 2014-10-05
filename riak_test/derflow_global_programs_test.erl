@@ -3,7 +3,7 @@
 -module(derflow_global_programs_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--export([test/0]).
+-export([test/1]).
 
 -ifdef(TEST).
 
@@ -24,19 +24,21 @@ confirm() ->
     ok = derflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
+    TestPaths = rt_config:get(test_paths, undefined),
+    Program = hd(TestPaths) ++ "/../derflow_example_program.erl",
+    lager:info("Program is: ~p", [Program]),
+
     lager:info("Remotely executing the test."),
-    ?assertEqual([], rpc:call(Node, ?MODULE, test, [])),
+    ?assertEqual([], rpc:call(Node, ?MODULE, test, [Program])),
 
     pass.
 
 -endif.
 
-test() ->
+test(Program) ->
     lager:info("Registering program from the test."),
 
-    ok = derflow:register(derflow_example_program,
-                          "/Users/cmeiklejohn/SyncFree/derflow/riak_test/derflow_example_program.erl",
-                         global),
+    ok = derflow:register(derflow_example_program, Program, global),
 
     lager:info("Executing program from the test."),
 

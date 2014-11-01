@@ -22,6 +22,9 @@ confirm() ->
     ok = derflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
+    lager:info("Waiting for transfers to complete."),
+    ok = rt:wait_until_transfers_complete(Nodes),
+
     lager:info("Remotely executing the test."),
     ?assertEqual({ok, 1, 1}, rpc:call(Node, ?MODULE, test, [])),
 

@@ -20,6 +20,8 @@ confirm() ->
     ok = derflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
+    ok = derflow_test_helpers:wait_for_cluster(Nodes),
+
     lager:info("Remotely executing the test."),
     {GSet, GSet2} = rpc:call(Node, ?MODULE, test, []),
     ?assertMatch({ok, [1,2,3], _}, GSet),

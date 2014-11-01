@@ -24,6 +24,8 @@ confirm() ->
     ok = derflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
+    ok = derflow_test_helpers:wait_for_cluster(Nodes),
+
     TestPaths = rt_config:get(test_paths, undefined),
     Program = hd(TestPaths) ++ "/../derflow_example_program.erl",
     lager:info("Program is: ~p", [Program]),

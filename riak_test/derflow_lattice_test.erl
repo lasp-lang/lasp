@@ -24,6 +24,8 @@ confirm() ->
     ok = derflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
+    ok = derflow_test_helpers:wait_for_cluster(Nodes),
+
     lager:info("Remotely executing the test."),
     ?assertEqual({ok, [[0],
                        [0,1],

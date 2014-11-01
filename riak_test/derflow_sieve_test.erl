@@ -25,6 +25,8 @@ confirm() ->
     ok = derflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
+    ok = derflow_test_helpers:wait_for_cluster(Nodes),
+
     lager:info("Remotely executing the test."),
     Result = rpc:call(Node, ?MODULE, test, [100]),
     ?assertEqual([2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,

@@ -3,7 +3,14 @@
 -module(derflow_test_helpers).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--export([load/1]).
+-export([load/1,
+         wait_for_cluster/1]).
+
+%% @doc Ensure cluster is properly configured.
+wait_for_cluster(Nodes) ->
+    lager:info("Waiting for transfers to complete."),
+    ok = rt:wait_until_transfers_complete(Nodes),
+    lager:info("Transfers complete.").
 
 %% @doc Remotely load test code on a series of nodes.
 load(Nodes) when is_list(Nodes) ->

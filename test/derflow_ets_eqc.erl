@@ -28,12 +28,6 @@ derflow_ets_sequential_test_() ->
                 eqc:numtests(?NUM_TESTS,
                              ?QC_OUT(?MODULE:prop_sequential()))))}.
 
-derflow_ets_parallel_test_() ->
-    {timeout, 60,
-     ?_assert(eqc:quickcheck(
-                eqc:numtests(?NUM_TESTS,
-                             ?QC_OUT(?MODULE:prop_parallel()))))}.
-
 %% Generators.
 
 value(Variable, Store, DefaultValue) ->
@@ -151,15 +145,10 @@ read_args(#state{store=Store}) ->
                         [Variable, Threshold]
                     end).
 
-read_post(#state{store=Store}, [Id, Threshold], {ok, V, _}) ->
+read_post(#state{store=Store}, [Id, _Threshold], {ok, V, _}) ->
     case dict:find(Id, Store) of
         {ok, #variable{value=Value}} ->
-            case Threshold of
-                undefined ->
-                    Value == V;
-                _ ->
-                    Threshold == V
-            end;
+            Value == V;
         _ ->
             false
     end.
@@ -200,20 +189,6 @@ prop_sequential() ->
                          ?FORALL(Cmds, commands(?MODULE),
                                  begin
                                      {H, S, Res} = run_commands(?MODULE, Cmds),
-                                     ?WHENFAIL(
-                                         io:format("History: ~p~nState: ~p~nRes: ~p~n", [H, S, Res]),
-                                         Res == ok)
-                     end))).
-
-prop_parallel() ->
-    eqc:testing_time(?SECS,
-                     ?SETUP(fun() ->
-                                 setup(),
-                                 fun teardown/0
-                            end,
-                         ?FORALL(Cmds, parallel_commands(?MODULE),
-                                 begin
-                                     {H, S, Res} = run_parallel_commands(?MODULE, Cmds),
                                      ?WHENFAIL(
                                          io:format("History: ~p~nState: ~p~nRes: ~p~n", [H, S, Res]),
                                          Res == ok)

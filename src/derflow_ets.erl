@@ -144,12 +144,20 @@ bind(Id, Value, Store) ->
                 Value ->
                     {ok, NextKey};
                 _ ->
-                    case is_inflation(Type, V#dv.value, Value) of
+                    case is_lattice(Type) of
                         true ->
-                            write(Type, Value, NextKey, Id, Store),
-                            {ok, NextKey};
+                            Merged = Type:merge(V#dv.value, Value),
+                            case is_inflation(Type, V#dv.value, Merged) of
+                                true ->
+                                    write(Type, Merged, NextKey, Id, Store),
+                                    {ok, NextKey};
+                                false ->
+                                    lager:error("Bind failed: ~p ~p ~p~n",
+                                                [Type, Value0, Value]),
+                                    error
+                            end;
                         false ->
-                            lager:error("Attempt to bind failed: ~p ~p ~p~n",
+                            lager:error("Bind failed: ~p ~p ~p~n",
                                         [Type, Value0, Value]),
                             error
                     end

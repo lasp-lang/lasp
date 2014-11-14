@@ -99,12 +99,18 @@ bind_next(#state{store=Store0}=S, _V, [Id, NewValue]) ->
     Store = case dict:find(Id, Store0) of
         {ok, #variable{type=undefined, value=undefined}=Variable} ->
             dict:store(Id, Variable#variable{value=NewValue}, Store0);
-        {ok, #variable{type=undefined, value=_Value}} ->
+        {ok, #variable{type=undefined}} ->
             Store0;
         {ok, #variable{type=Type, value=Value}=Variable} ->
-            case derflow_ets:is_inflation(Type, Value, NewValue) of
+            Merged = case Value of
+                undefined ->
+                    NewValue;
+                _ ->
+                    Type:merge(Value, NewValue)
+            end,
+            case derflow_ets:is_inflation(Type, Value, Merged) of
                 true ->
-                    dict:store(Id, Variable#variable{value=NewValue}, Store0);
+                    dict:store(Id, Variable#variable{value=Merged}, Store0);
                 false ->
                     Store0
             end
@@ -116,11 +122,17 @@ bind_post(#state{store=Store}, [Id, V], error) ->
         {ok, #variable{type=_Type, value=undefined}} ->
             false;
         {ok, #variable{type=Type, value=Value}} ->
-            case derflow_ets:is_inflation(Type, Value, V) of
+            case derflow_ets:is_lattice(Type) of
                 true ->
-                    false;
+                    Merged = Type:merge(V, Value),
+                    case derflow_ets:is_inflation(Type, Value, Merged) of
+                        true ->
+                            false;
+                        false ->
+                            true
+                    end;
                 false ->
-                    true
+                    V =/= Value
             end
     end;
 bind_post(_, _, _) ->

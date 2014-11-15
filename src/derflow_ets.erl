@@ -192,13 +192,29 @@ threshold_met(riak_dt_gset, _Value, {greater, _Threshold}) ->
     {error, not_implemented};
 
 threshold_met(riak_dt_gset, Value, Threshold) ->
-    is_inflation(riak_dt_gset, Threshold, Value).
+    is_inflation(riak_dt_gset, Threshold, Value);
+
+threshold_met(riak_dt_gcounter, Value, Threshold) ->
+    Threshold =< riak_dt_gcounter:value(Value).
 
 %% @doc Determine if a change is an inflation or not.
 is_inflation(Type, Previous, Current) ->
     is_lattice(Type) andalso is_lattice_inflation(Type, Previous, Current).
 
 %% @doc Determine if a change is an inflation or not.
+is_lattice_inflation(riak_dt_gcounter, undefined, _) ->
+    true;
+is_lattice_inflation(riak_dt_gcounter, Previous, Current) ->
+    PreviousList = lists:sort(orddict:to_list(Previous)),
+    CurrentList = lists:sort(orddict:to_list(Current)),
+    lists:fold(fun({Actor, Count}, Acc) ->
+            case lists:keyfind(Actor, 1, CurrentList) of
+                false ->
+                    Acc andalso false;
+                {_Actor1, Count1} ->
+                    Acc andalso (Count =< Count1)
+            end
+            end, true, PreviousList);
 is_lattice_inflation(riak_dt_gset, undefined, _) ->
     true;
 is_lattice_inflation(riak_dt_gset, Previous, Current) ->

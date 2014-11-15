@@ -26,4 +26,4 @@
              lazy = false,
              bound = false}).
 
--define(LATTICES, [riak_dt_gset]).
+-define(LATTICES, [riak_dt_gset, riak_dt_gcounter]).

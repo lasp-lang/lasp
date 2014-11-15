@@ -207,7 +207,7 @@ is_lattice_inflation(riak_dt_gcounter, undefined, _) ->
 is_lattice_inflation(riak_dt_gcounter, Previous, Current) ->
     PreviousList = lists:sort(orddict:to_list(Previous)),
     CurrentList = lists:sort(orddict:to_list(Current)),
-    lists:fold(fun({Actor, Count}, Acc) ->
+    lists:foldl(fun({Actor, Count}, Acc) ->
             case lists:keyfind(Actor, 1, CurrentList) of
                 false ->
                     Acc andalso false;

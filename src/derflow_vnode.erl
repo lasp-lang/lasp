@@ -250,27 +250,38 @@ handle_command({bind, Id, {id, DVId}}, From,
 handle_command({bind, Id, Value}, _From,
                State=#state{variables=Variables}) ->
     lager:info("Bind received: ~p", [Id]),
-    [{_Key, V}] = ets:lookup(Variables, Id),
+    [{_Key, V=#dv{next=Next,
+                  type=Type,
+                  bound=Bound,
+                  value=Value0}}] = ets:lookup(Variables, Id),
     NextKey = case Value of
         undefined ->
             undefined;
         _ ->
-            next_key(V#dv.next, V#dv.type, State)
+            next_key(Next, Type, State)
     end,
     lager:info("Value is: ~p NextKey is: ~p", [Value, NextKey]),
-    case V#dv.bound of
+    case Bound of
         true ->
             case V#dv.value of
                 Value ->
                     {reply, {ok, NextKey}, State};
                 _ ->
-                    case derflow_ets:is_lattice(V#dv.type) of
+                    case derflow_ets:is_lattice(Type) of
                         true ->
-                            write(V#dv.type, Value, NextKey, Id, Variables),
-                            {reply, {ok, NextKey}, State};
+                            Merged = Type:merge(V#dv.value, Value),
+                            case derflow_ets:is_inflation(Type, V#dv.value, Merged) of
+                                true ->
+                                    write(Type, Merged, NextKey, Id, Variables),
+                                    {reply, {ok, NextKey}, State};
+                                false ->
+                                    lager:error("Bind failed: ~p ~p ~p~n",
+                                                [Type, Value, Value]),
+                                    {reply, error, State}
+                            end;
                         false ->
-                            lager:warning("Attempt to bind failed: ~p ~p ~p",
-                                          [V#dv.type, V#dv.value, Value]),
+                            lager:error("Bind failed: ~p ~p ~p~n",
+                                        [Type, Value0, Value]),
                             {reply, error, State}
                     end
             end;

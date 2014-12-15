@@ -36,7 +36,8 @@
 
 -export([threshold_met/3,
          is_lattice/1,
-         is_inflation/3]).
+         is_inflation/3,
+         generate_operations/2]).
 
 %% @doc Perform a read of a particular identifier.
 read(Id, Store) ->
@@ -284,3 +285,10 @@ reply_to_all([From|T], StillWaiting, Result) ->
     reply_to_all(T, StillWaiting, Result);
 reply_to_all([], StillWaiting, _Result) ->
     {ok, StillWaiting}.
+
+%% @doc Given an object type from riak_dt; generate a series of
+%%      operations for that type which are representative of a partial
+%%      order of operations on this object yielding this state.
+generate_operations(riak_dt_gset, Set) ->
+    Values = riak_dt_gset:value(Set),
+    {ok, [{add, Value} || Value <- Values]}.

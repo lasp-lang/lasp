@@ -40,6 +40,7 @@
 -export([bind/2,
          read/1,
          read/2,
+         foldl/3,
          next/1,
          is_det/1,
          wait_needed/1,
@@ -106,6 +107,14 @@ read(Id, Threshold) ->
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {read, Id, Threshold},
+                                              ?VNODE_MASTER).
+
+foldl(Id, Function, AccId) ->
+    lager:info("Foldl by process ~p, id: ~p accid: ~p",
+               [self(), Id, AccId]),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {foldl, Id, Function, AccId},
                                               ?VNODE_MASTER).
 
 thread(Module, Function, Args) ->
@@ -407,6 +416,45 @@ handle_command({read, Id, Threshold}, From,
             end
     end;
 
+%% TODO: needs to be added to derflow_ets.
+%% TODO: use correct actor ids.
+%% TODO: capture same causality as the origin object.
+handle_command({foldl, Id, Function, AccId}, _From,
+               State=#state{variables=Variables,
+                            partition=Partition,
+                            node=Node}) ->
+    [{_Key, #dv{type=Type, value=Value}}] = ets:lookup(Variables, Id),
+
+    %% Generate operations for given data type.
+    {ok, Operations} = derflow_ets:generate_operations(Type, Value),
+
+    %% Build new data structure.
+    AccValue = lists:foldl(
+                 fun({add, Element} = Op, Acc) ->
+                         case Function(Element) of
+                             true ->
+                                 {ok, NewAcc} = Type:update(Op, undefined, Acc),
+                                 NewAcc;
+                             _ ->
+                                 Acc
+                         end
+                 end, Type:new(), Operations),
+
+    %% Beware of cycles in the gen_server calls!
+    [{IndexNode, _Type}] = derflow:preflist(?N, AccId, derflow),
+
+    {ok, NextKey} = case IndexNode of
+        {Partition, Node} ->
+            %% We're local, which means that we can interact directly
+            %% with the data store.
+            derflow_ets:bind(AccId, AccValue, Variables);
+        _ ->
+            %% We're remote, go through all of the routing logic.
+            bind(AccId, AccValue)
+    end,
+
+    {reply, {ok, NextKey}, State};
+
 handle_command({next, Id}, _From,
                State=#state{variables=Variables}) ->
     [{_Key, V=#dv{next=NextKey0}}] = ets:lookup(Variables, Id),
@@ -417,7 +465,7 @@ handle_command({next, Id}, _From,
             {reply, {ok, NextKey}, State};
         _ ->
             {reply, {ok, NextKey0}, State}
-  end;
+    end;
 
 handle_command({is_det, Id}, _From, State=#state{variables=Variables}) ->
     {ok, Bound} = derflow_ets:is_det(Id, Variables),
@@ -426,7 +474,6 @@ handle_command({is_det, Id}, _From, State=#state{variables=Variables}) ->
 handle_command(_Message, _Sender, State) ->
     {noreply, State}.
 
-%% @todo Most likely broken...
 handle_handoff_command(?FOLD_REQ{foldfun=FoldFun, acc0=Acc0}, _Sender,
                        #state{variables=Variables}=State) ->
     F = fun({Key, Operation}, Acc) -> FoldFun(Key, Operation, Acc) end,
@@ -442,13 +489,11 @@ handoff_cancelled(State) ->
 handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
-%% @todo Most likely broken...
 handle_handoff_data(Data, State=#state{variables=Variables}) ->
     {Key, Operation} = binary_to_term(Data),
     true = ets:insert_new(Variables, {Key, Operation}),
     {reply, ok, State}.
 
-%% @todo Most likely broken...
 encode_handoff_item(Key, Operation) ->
     term_to_binary({Key, Operation}).
 
@@ -512,12 +557,18 @@ notify_all([], _) ->
 declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) ->
     lager:info("Current partition and node: ~p ~p", [Partition, Node]),
     Id = druuid:v4(),
+
+    %% Beware of cycles in the gen_server calls!
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+
     case IndexNode of
         {Partition, Node} ->
+            %% We're local, which means that we can interact directly
+            %% with the data store.
             lager:info("Local declare triggered: ~p", [IndexNode]),
             derflow_ets:declare(Id, Type, Variables);
         _ ->
+            %% We're remote, go through all of the routing logic.
             lager:info("Declare triggered: ~p", [IndexNode]),
             declare(Id, Type)
     end.

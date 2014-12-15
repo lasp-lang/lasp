@@ -189,12 +189,8 @@ next_key(NextKey0, _, _) ->
     NextKey0.
 
 %% @doc Determine if a threshold is met.
-threshold_met(riak_dt_gset, _Value, {greater, _Threshold}) ->
-    {error, not_implemented};
-
 threshold_met(riak_dt_gset, Value, Threshold) ->
     is_inflation(riak_dt_gset, Threshold, Value);
-
 threshold_met(riak_dt_gcounter, Value, Threshold) ->
     Threshold =< riak_dt_gcounter:value(Value).
 

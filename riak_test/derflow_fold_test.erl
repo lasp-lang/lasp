@@ -44,7 +44,7 @@ confirm() ->
 
     ok = derflow_test_helpers:wait_for_cluster(Nodes),
 
-    ?assertEqual({ok, [1,2,3], [2]}, rpc:call(Node, ?MODULE, test, [])),
+    ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6]}, rpc:call(Node, ?MODULE, test, [])),
     lager:info("Done!"),
 
     pass.
@@ -69,9 +69,23 @@ test() ->
     {ok, S2} = derflow:declare(riak_dt_gset),
 
     %% Apply fold.
-    {ok, _} = derflow:foldl(S1, fun(X) -> X rem 2 == 0 end, S2),
+    {ok, _Pid} = derflow:foldl(S1, fun(X) -> X rem 2 == 0 end, S2),
+
+    %% Wait.
+    timer:sleep(4000),
+
+    %% Bind again.
+    {ok, S1V3, _} = derflow:read(S1),
+    {ok, S1V4} = riak_dt_gset:update({add_all, [4,5,6]}, undefined, S1V3),
+    {ok, _} = derflow:bind(S1, S1V4),
+
+    %% Wait.
+    timer:sleep(4000),
+
+    %% Read resulting value.
+    {ok, S1V4, _} = derflow:read(S1),
 
     %% Read resulting value.
     {ok, S2V1, _} = derflow:read(S2),
 
-    {ok, S1V2, S2V1}.
+    {ok, S1V4, S2V1}.

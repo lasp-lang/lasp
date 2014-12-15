@@ -66,6 +66,8 @@
          handle_coverage/4,
          handle_exit/3]).
 
+-export([foldl_harness/6]).
+
 -ignore_xref([start_vnode/1]).
 
 -record(state, {node,
@@ -423,37 +425,8 @@ handle_command({foldl, Id, Function, AccId}, _From,
                State=#state{variables=Variables,
                             partition=Partition,
                             node=Node}) ->
-    [{_Key, #dv{type=Type, value=Value}}] = ets:lookup(Variables, Id),
-
-    %% Generate operations for given data type.
-    {ok, Operations} = derflow_ets:generate_operations(Type, Value),
-
-    %% Build new data structure.
-    AccValue = lists:foldl(
-                 fun({add, Element} = Op, Acc) ->
-                         case Function(Element) of
-                             true ->
-                                 {ok, NewAcc} = Type:update(Op, undefined, Acc),
-                                 NewAcc;
-                             _ ->
-                                 Acc
-                         end
-                 end, Type:new(), Operations),
-
-    %% Beware of cycles in the gen_server calls!
-    [{IndexNode, _Type}] = derflow:preflist(?N, AccId, derflow),
-
-    {ok, NextKey} = case IndexNode of
-        {Partition, Node} ->
-            %% We're local, which means that we can interact directly
-            %% with the data store.
-            derflow_ets:bind(AccId, AccValue, Variables);
-        _ ->
-            %% We're remote, go through all of the routing logic.
-            bind(AccId, AccValue)
-    end,
-
-    {reply, {ok, NextKey}, State};
+    Pid = spawn_link(?MODULE, foldl_harness, [Node, Partition, Variables, Id, Function, AccId]),
+    {reply, {ok, Pid}, State};
 
 handle_command({next, Id}, _From,
                State=#state{variables=Variables}) ->
@@ -596,3 +569,38 @@ generate_unique_module_identifier(Partition, Node, Module) ->
     list_to_atom(
         integer_to_list(Partition) ++ "-" ++
             atom_to_list(Node) ++ "-" ++ atom_to_list(Module)).
+
+%% @doc Harness for managing the fold operation.
+%% TODO: needs to perform a blocking threshold read for new values.
+foldl_harness(Node, Partition, Variables, Id, Function, AccId) ->
+    lager:info("Fold executing!"),
+    [{_Key, #dv{type=Type, value=Value}}] = ets:lookup(Variables, Id),
+
+    %% Generate operations for given data type.
+    {ok, Operations} = derflow_ets:generate_operations(Type, Value),
+
+    %% Build new data structure.
+    AccValue = lists:foldl(
+                 fun({add, Element} = Op, Acc) ->
+                         case Function(Element) of
+                             true ->
+                                 {ok, NewAcc} = Type:update(Op, undefined, Acc),
+                                 NewAcc;
+                             _ ->
+                                 Acc
+                         end
+                 end, Type:new(), Operations),
+
+    %% Beware of cycles in the gen_server calls!
+    [{IndexNode, _Type}] = derflow:preflist(?N, AccId, derflow),
+
+    case IndexNode of
+        {Partition, Node} ->
+            %% We're local, which means that we can interact directly
+            %% with the data store.
+            derflow_ets:bind(AccId, AccValue, Variables);
+        _ ->
+            %% We're remote, go through all of the routing logic.
+            bind(AccId, AccValue)
+    end,
+    foldl_harness(Node, Partition, Variables, Id, Function, AccId).

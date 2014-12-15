@@ -387,13 +387,13 @@ handle_command({read, Id, Threshold}, From,
                         undefined ->
                             lager:info("No threshold specified: ~p",
                                        [Threshold]),
-                            {reply, {ok, Value, V#dv.next}, State};
+                            {reply, {ok, Type, Value, V#dv.next}, State};
                         _ ->
                             lager:info("Threshold specified: ~p",
                                        [Threshold]),
                             case derflow_ets:threshold_met(Type, Value, Threshold) of
                                 true ->
-                                    {reply, {ok, Value, V#dv.next}, State};
+                                    {reply, {ok, Type, Value, V#dv.next}, State};
                                 false ->
                                     WT = lists:append(V#dv.waiting_threads,
                                                       [{threshold, From, Type, Threshold}]),
@@ -403,7 +403,7 @@ handle_command({read, Id, Threshold}, From,
                             end
                     end;
                 false ->
-                    {reply, {ok, Value, V#dv.next}, State}
+                    {reply, {ok, Type, Value, V#dv.next}, State}
             end;
         false ->
             lager:info("Read received: ~p, unbound", [Id]),
@@ -508,7 +508,7 @@ write(Type, Value, Next, Key, Variables) ->
                 binding_list=BindingList,
                 lazy=Lazy}}] = ets:lookup(Variables, Key),
     lager:info("Waiting threads are: ~p", [Threads]),
-    {ok, StillWaiting} = derflow_ets:reply_to_all(Threads, [], {ok, Value, Next}),
+    {ok, StillWaiting} = derflow_ets:reply_to_all(Threads, [], {ok, Type, Value, Next}),
     V1 = #dv{type=Type, value=Value, next=Next,
              lazy=Lazy, bound=true, waiting_threads=StillWaiting},
     true = ets:insert(Variables, {Key, V1}),

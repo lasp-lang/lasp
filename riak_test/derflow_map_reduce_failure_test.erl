@@ -145,9 +145,9 @@ word_count_reduce(Input, Tempout, Output) ->
 
 loop(Elem, Output) ->
     case derflow:consume(Elem) of
-        {ok, undefined, _} ->
+        {ok, _, undefined, _} ->
             Output;
-        {ok, Value, Next} ->
+        {ok, _, Value, Next} ->
             case lists:keysearch(Value, 1, Output) of
                 {value, {_, Count}} ->
                     NewOutput = lists:keyreplace(Value, 1, Output,

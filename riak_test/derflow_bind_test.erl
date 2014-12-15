@@ -59,13 +59,13 @@ test() ->
     {ok, _} = derflow:bind(Id, 1),
     lager:info("Successful bind."),
 
-    {ok, Value1, _} = derflow:read(Id),
+    {ok, _, Value1, _} = derflow:read(Id),
     lager:info("Value1: ~p", [Value1]),
 
     error = derflow:bind(Id, 2),
     lager:info("Unsuccessful bind."),
 
-    {ok, Value2, _} = derflow:read(Id),
+    {ok, _, Value2, _} = derflow:read(Id),
     lager:info("Value2: ~p", [Value2]),
 
     {ok, Value1, Value2}.

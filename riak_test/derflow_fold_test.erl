@@ -56,14 +56,14 @@ test() ->
     {ok, S1} = derflow:declare(riak_dt_gset),
 
     %% Add elements to initial set.
-    {ok, S1V1, _} = derflow:read(S1),
+    {ok, _, S1V1, _} = derflow:read(S1),
     {ok, S1V2} = riak_dt_gset:update({add_all, [1,2,3]}, undefined, S1V1),
 
     %% Bind update.
     {ok, _} = derflow:bind(S1, S1V2),
 
     %% Read resulting value.
-    {ok, S1V2, _} = derflow:read(S1),
+    {ok, _, S1V2, _} = derflow:read(S1),
 
     %% Create second set.
     {ok, S2} = derflow:declare(riak_dt_gset),
@@ -75,7 +75,7 @@ test() ->
     timer:sleep(4000),
 
     %% Bind again.
-    {ok, S1V3, _} = derflow:read(S1),
+    {ok, _, S1V3, _} = derflow:read(S1),
     {ok, S1V4} = riak_dt_gset:update({add_all, [4,5,6]}, undefined, S1V3),
     {ok, _} = derflow:bind(S1, S1V4),
 
@@ -83,9 +83,9 @@ test() ->
     timer:sleep(4000),
 
     %% Read resulting value.
-    {ok, S1V4, _} = derflow:read(S1),
+    {ok, _, S1V4, _} = derflow:read(S1),
 
     %% Read resulting value.
-    {ok, S2V1, _} = derflow:read(S2),
+    {ok, _, S2V1, _} = derflow:read(S2),
 
     {ok, S1V4, S2V1}.

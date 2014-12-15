@@ -60,7 +60,7 @@ test(List) ->
     ?TABLE = ets:new(?TABLE, [set, named_table, public, {write_concurrency, true}]),
     true = ets:insert(?TABLE, {count, 0}),
     spawn(derflow_get_minimum_test, insort, [List, S1]),
-    {ok, V, _} = derflow:consume(S1),
+    {ok, _, V, _} = derflow:consume(S1),
     V.
 
 insort(List, S) ->
@@ -78,10 +78,10 @@ insert(X, In, Out) ->
     true = ets:insert(?TABLE, {Id, C+1}),
     ok = derflow:wait_needed(Out),
     case derflow:consume(In) of
-        {ok, undefined, _} ->
+        {ok, _, undefined, _} ->
             {ok, Next} = derflow:produce(Out, X),
             derflow:bind(Next, undefined);
-        {ok, V, SNext} ->
+        {ok, _, V, SNext} ->
             if
                 X < V ->
                     {ok, Next} = derflow:produce(Out, X),

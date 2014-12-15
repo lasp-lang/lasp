@@ -114,10 +114,10 @@ get_stream(Stream)->
 get_stream(Head, Output) ->
     lager:info("About to consume: ~p", [Head]),
     case consume(Head) of
-        {ok, undefined, _} ->
+        {ok, _, undefined, _} ->
             lager:info("Received: ~p", [undefined]),
             Output;
-        {ok, Value, Next} ->
+        {ok, _, Value, Next} ->
             lager:info("Received: ~p", [Value]),
             get_stream(Next, lists:append(Output, [Value]))
     end.

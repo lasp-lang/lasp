@@ -79,11 +79,11 @@ sensor(Port, Identifier) ->
 
 dcs_monitor(Input, Output, State) ->
     case derflow:consume(Input) of
-        {ok, {computer_down, Identifier}, NextInput} ->
+        {ok, _, {computer_down, Identifier}, NextInput} ->
             NewState = register_comfailure(Identifier, State),
             {ok, NextOutput} = derflow:produce(Output, NewState),
             dcs_monitor(NextInput, NextOutput, NewState);
-        {ok, _, NextInput} ->
+        {ok, _, _, NextInput} ->
             dcs_monitor(NextInput, Output, State)
     end.
 

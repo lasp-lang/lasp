@@ -62,13 +62,13 @@ read(Id, Threshold, Store) ->
                         undefined ->
                             lager:info("No threshold specified: ~p",
                                        [Threshold]),
-                            {ok, Value, V#dv.next};
+                            {ok, Type, Value, V#dv.next};
                         _ ->
                             lager:info("Threshold specified: ~p",
                                        [Threshold]),
                             case derflow_ets:threshold_met(Type, Value, Threshold) of
                                 true ->
-                                    {ok, Value, V#dv.next};
+                                    {ok, Type, Value, V#dv.next};
                                 false ->
                                     WT = lists:append(V#dv.waiting_threads,
                                                       [{threshold, self(), Type, Threshold}]),
@@ -81,7 +81,7 @@ read(Id, Threshold, Store) ->
                             end
                     end;
                 false ->
-                    {ok, Value, V#dv.next}
+                    {ok, Type, Value, V#dv.next}
             end;
         false ->
             lager:info("Read received: ~p, unbound", [Id]),
@@ -238,7 +238,7 @@ write(Type, Value, Next, Key, Store) ->
                 binding_list=_BindingList,
                 lazy=Lazy}}] = ets:lookup(Store, Key),
     lager:info("Waiting threads are: ~p", [Threads]),
-    {ok, StillWaiting} = reply_to_all(Threads, [], {ok, Value, Next}),
+    {ok, StillWaiting} = reply_to_all(Threads, [], {ok, Type, Value, Next}),
     V1 = #dv{type=Type, value=Value, next=Next,
              lazy=Lazy, bound=true, waiting_threads=StillWaiting},
     true = ets:insert(Store, {Key, V1}),
@@ -254,14 +254,14 @@ reply_to_all(List, Result) ->
 %%      them of bound values or met thresholds.
 reply_to_all([{threshold, From, Type, Threshold}=H|T],
              StillWaiting0,
-             {ok, Value, Next}=Result) ->
+             {ok, Type, Value, Next}=Result) ->
     lager:info("Result: ~p, Threshold: ~p", [Result, Threshold]),
     StillWaiting = case derflow_ets:threshold_met(Type, Value, Threshold) of
         true ->
             lager:info("Threshold ~p met: ~p", [Threshold, Value]),
             case From of
                 {server, undefined, {Address, Ref}} ->
-                    gen_server:reply({Address, Ref}, {ok, Value, Next});
+                    gen_server:reply({Address, Ref}, {ok, Type, Value, Next});
                 _ ->
                     From ! Result
             end,

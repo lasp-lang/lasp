@@ -74,9 +74,9 @@ read(Id, Threshold, Store) ->
                                                       [{threshold, self(), Type, Threshold}]),
                                     true = ets:insert(Store, {Id, V#dv{waiting_threads=WT}}),
                                     receive
-                                        Value ->
+                                        X ->
                                             lager:info("Value: ~p", [Value]),
-                                            Value
+                                            X
                                     end
                             end
                     end;
@@ -189,14 +189,21 @@ next_key(NextKey0, _, _) ->
     NextKey0.
 
 %% @doc Determine if a threshold is met.
+threshold_met(riak_dt_gset, Value, {strict, Threshold}) ->
+    is_strict_inflation(riak_dt_gset, Threshold, Value);
 threshold_met(riak_dt_gset, Value, Threshold) ->
     is_inflation(riak_dt_gset, Threshold, Value);
+threshold_met(riak_dt_gcounter, Value, {strict, Threshold}) ->
+    Threshold < riak_dt_gcounter:value(Value);
 threshold_met(riak_dt_gcounter, Value, Threshold) ->
     Threshold =< riak_dt_gcounter:value(Value).
 
 %% @doc Determine if a change is an inflation or not.
 is_inflation(Type, Previous, Current) ->
     is_lattice(Type) andalso is_lattice_inflation(Type, Previous, Current).
+
+is_strict_inflation(Type, Previous, Current) ->
+    is_lattice(Type) andalso is_lattice_strict_inflation(Type, Previous, Current).
 
 %% @doc Determine if a change is an inflation or not.
 is_lattice_inflation(riak_dt_gcounter, undefined, _) ->
@@ -218,6 +225,15 @@ is_lattice_inflation(riak_dt_gset, Previous, Current) ->
     sets:is_subset(
         sets:from_list(riak_dt_gset:value(Previous)),
         sets:from_list(riak_dt_gset:value(Current))).
+
+is_lattice_strict_inflation(riak_dt_gset, undefined, _) ->
+    true;
+is_lattice_strict_inflation(riak_dt_gset, Previous, Current) ->
+    sets:is_subset(
+        sets:from_list(riak_dt_gset:value(Previous)),
+        sets:from_list(riak_dt_gset:value(Current))) andalso
+    lists:usort(riak_dt_gset:value(Previous)) =/=
+    lists:usort(riak_dt_gset:value(Current)).
 
 %% @doc Return if something is a lattice or not.
 is_lattice(Type) ->

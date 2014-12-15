@@ -66,7 +66,7 @@
          handle_coverage/4,
          handle_exit/3]).
 
--export([foldl_harness/6]).
+-export([foldl_harness/7]).
 
 -ignore_xref([start_vnode/1]).
 
@@ -425,7 +425,13 @@ handle_command({foldl, Id, Function, AccId}, _From,
                State=#state{variables=Variables,
                             partition=Partition,
                             node=Node}) ->
-    Pid = spawn_link(?MODULE, foldl_harness, [Node, Partition, Variables, Id, Function, AccId]),
+    Pid = spawn_link(?MODULE, foldl_harness, [Node,
+                                              Partition,
+                                              Variables,
+                                              Id,
+                                              Function,
+                                              AccId,
+                                              undefined]),
     {reply, {ok, Pid}, State};
 
 handle_command({next, Id}, _From,
@@ -572,12 +578,15 @@ generate_unique_module_identifier(Partition, Node, Module) ->
 
 %% @doc Harness for managing the fold operation.
 %% TODO: needs to perform a blocking threshold read for new values.
-foldl_harness(Node, Partition, Variables, Id, Function, AccId) ->
+foldl_harness(Node, Partition, Variables, Id, Function, AccId, Previous) ->
     lager:info("Fold executing!"),
+    {ok, Type, Value, _} = derflow_ets:read(Id, {strict, Previous}, Variables),
+    lager:info("Threshold was met!"),
     [{_Key, #dv{type=Type, value=Value}}] = ets:lookup(Variables, Id),
 
     %% Generate operations for given data type.
     {ok, Operations} = derflow_ets:generate_operations(Type, Value),
+    lager:info("Operations generated: ~p", [Operations]),
 
     %% Build new data structure.
     AccValue = lists:foldl(
@@ -603,4 +612,4 @@ foldl_harness(Node, Partition, Variables, Id, Function, AccId) ->
             %% We're remote, go through all of the routing logic.
             bind(AccId, AccValue)
     end,
-    foldl_harness(Node, Partition, Variables, Id, Function, AccId).
+    foldl_harness(Node, Partition, Variables, Id, Function, AccId, Value).

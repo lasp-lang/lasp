@@ -120,5 +120,5 @@ client(Id, Ads) ->
         {remove_ad, Ad} ->
             %% Remove ad.
             lager:info("Removing ad: ~p from client: ~p~n", [Ad, Id]),
-            client(Id, Ads -- [Ad])
+            client(Id, tl(Ads) -- [Ad])
     end.

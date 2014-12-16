@@ -1,7 +1,8 @@
   Checking whether the PLT /Users/cmeiklejohn/.combo_dialyzer_plt is up-to-date... yes
   Checking whether the PLT .local_dialyzer_plt is up-to-date... yes
-  Compiling some key modules to native code... done in 0m35.43s
+  Compiling some key modules to native code... done in 0m35.78s
   Proceeding with analysis...
 derflow_execute_coverage_fsm.erl:24: Callback info about the riak_core_coverage_fsm behaviour is not available
- done in 0m7.23s
+riak_dt_gcounter.erl:121: The specification for riak_dt_gcounter:stat/2 states that the function might also return float() but the inferred return is 'undefined' | non_neg_integer()
+ done in 0m7.26s
 done (warnings were emitted)

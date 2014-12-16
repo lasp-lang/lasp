@@ -18,12 +18,12 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc Fold test.
+%% @doc Select test.
 
--module(derflow_fold_test).
+-module(derflow_select_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--export([test/0]).
+-export([test/1]).
 
 -ifdef(TEST).
 
@@ -44,20 +44,22 @@ confirm() ->
 
     ok = derflow_test_helpers:wait_for_cluster(Nodes),
 
-    ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6]}, rpc:call(Node, ?MODULE, test, [])),
+    ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6]},
+                 rpc:call(Node, ?MODULE, test, [riak_dt_gset])),
+
     lager:info("Done!"),
 
     pass.
 
 -endif.
 
-test() ->
+test(Type) ->
     %% Create initial set.
-    {ok, S1} = derflow:declare(riak_dt_gset),
+    {ok, S1} = derflow:declare(Type),
 
     %% Add elements to initial set.
     {ok, _, S1V1, _} = derflow:read(S1),
-    {ok, S1V2} = riak_dt_gset:update({add_all, [1,2,3]}, undefined, S1V1),
+    {ok, S1V2} = Type:update({add_all, [1,2,3]}, undefined, S1V1),
 
     %% Bind update.
     {ok, _} = derflow:bind(S1, S1V2),
@@ -66,17 +68,17 @@ test() ->
     {ok, _, S1V2, _} = derflow:read(S1),
 
     %% Create second set.
-    {ok, S2} = derflow:declare(riak_dt_gset),
+    {ok, S2} = derflow:declare(Type),
 
-    %% Apply fold.
-    {ok, _Pid} = derflow:foldl(S1, fun(X) -> X rem 2 == 0 end, S2),
+    %% Apply select.
+    {ok, _Pid} = derflow:select(S1, fun(X) -> X rem 2 == 0 end, S2),
 
     %% Wait.
     timer:sleep(4000),
 
     %% Bind again.
     {ok, _, S1V3, _} = derflow:read(S1),
-    {ok, S1V4} = riak_dt_gset:update({add_all, [4,5,6]}, undefined, S1V3),
+    {ok, S1V4} = Type:update({add_all, [4,5,6]}, undefined, S1V3),
     {ok, _} = derflow:bind(S1, S1V4),
 
     %% Wait.

@@ -29,7 +29,7 @@
          bind/4,
          read/1,
          read/2,
-         foldl/3,
+         select/3,
          produce/2,
          produce/4,
          consume/1,
@@ -79,9 +79,9 @@ read(Id) ->
 read(Id, Threshold) ->
     derflow_vnode:read(Id, Threshold).
 
-%% @doc Add foldl.
-foldl(Id, Function, AccId) ->
-    derflow_vnode:foldl(Id, Function, AccId).
+%% @doc Add select.
+select(Id, Function, AccId) ->
+    derflow_vnode:select(Id, Function, AccId).
 
 produce(Id, Value) ->
     derflow_vnode:bind(Id, Value).

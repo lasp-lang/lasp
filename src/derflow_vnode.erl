@@ -21,7 +21,7 @@
 %% @doc Derflow operational vnode, which powers the data flow variable
 %%      assignment and read operations.
 %%
-%% @todo This probably has a ton of bugs, because it needs to be
+%% @TODO This probably has a ton of bugs, because it needs to be
 %%       rewritten to use the derflow_ets backend, which is now
 %%       quickchecked.
 %%
@@ -40,7 +40,7 @@
 -export([bind/2,
          read/1,
          read/2,
-         foldl/3,
+         select/3,
          next/1,
          is_det/1,
          wait_needed/1,
@@ -66,7 +66,7 @@
          handle_coverage/4,
          handle_exit/3]).
 
--export([foldl_harness/7]).
+-export([select_harness/7]).
 
 -ignore_xref([start_vnode/1]).
 
@@ -111,12 +111,12 @@ read(Id, Threshold) ->
                                               {read, Id, Threshold},
                                               ?VNODE_MASTER).
 
-foldl(Id, Function, AccId) ->
-    lager:info("Foldl by process ~p, id: ~p accid: ~p",
+select(Id, Function, AccId) ->
+    lager:info("Select by process ~p, id: ~p accid: ~p",
                [self(), Id, AccId]),
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {foldl, Id, Function, AccId},
+                                              {select, Id, Function, AccId},
                                               ?VNODE_MASTER).
 
 thread(Module, Function, Args) ->
@@ -418,20 +418,18 @@ handle_command({read, Id, Threshold}, From,
             end
     end;
 
-%% TODO: needs to be added to derflow_ets.
-%% TODO: use correct actor ids.
-%% TODO: capture same causality as the origin object.
-handle_command({foldl, Id, Function, AccId}, _From,
+%% @TODO: needs to be added to derflow_ets.
+handle_command({select, Id, Function, AccId}, _From,
                State=#state{variables=Variables,
                             partition=Partition,
                             node=Node}) ->
-    Pid = spawn_link(?MODULE, foldl_harness, [Node,
-                                              Partition,
-                                              Variables,
-                                              Id,
-                                              Function,
-                                              AccId,
-                                              undefined]),
+    Pid = spawn_link(?MODULE, select_harness, [Node,
+                                               Partition,
+                                               Variables,
+                                               Id,
+                                               Function,
+                                               AccId,
+                                               undefined]),
     {reply, {ok, Pid}, State};
 
 handle_command({next, Id}, _From,
@@ -576,10 +574,9 @@ generate_unique_module_identifier(Partition, Node, Module) ->
         integer_to_list(Partition) ++ "-" ++
             atom_to_list(Node) ++ "-" ++ atom_to_list(Module)).
 
-%% @doc Harness for managing the fold operation.
-%% TODO: needs to perform a blocking threshold read for new values.
-foldl_harness(Node, Partition, Variables, Id, Function, AccId, Previous) ->
-    lager:info("Fold executing!"),
+%% @doc Harness for managing the select operation.
+select_harness(Node, Partition, Variables, Id, Function, AccId, Previous) ->
+    lager:info("Select executing!"),
     {ok, Type, Value, _} = derflow_ets:read(Id, {strict, Previous}, Variables),
     lager:info("Threshold was met!"),
     [{_Key, #dv{type=Type, value=Value}}] = ets:lookup(Variables, Id),
@@ -612,4 +609,4 @@ foldl_harness(Node, Partition, Variables, Id, Function, AccId, Previous) ->
             %% We're remote, go through all of the routing logic.
             bind(AccId, AccValue)
     end,
-    foldl_harness(Node, Partition, Variables, Id, Function, AccId, Value).
+    select_harness(Node, Partition, Variables, Id, Function, AccId, Value).

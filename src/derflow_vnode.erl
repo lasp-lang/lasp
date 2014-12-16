@@ -257,7 +257,8 @@ handle_command({declare, Id, Type}, _From,
     {ok, Id} = derflow_ets:declare(Id, Type, Variables),
     {reply, {ok, Id}, State};
 
-%% @TODO: use derflow_ets
+%% @TODO: this should be implemented in derflow_ets to cut down in code
+%%        duplication.
 handle_command({bind, Id, {id, DVId}}, From,
                State=#state{variables=Variables}) ->
     true = ets:insert(Variables, {Id, #dv{value={id, DVId}}}),
@@ -277,7 +278,8 @@ handle_command({bind, Id, Value}, _From,
     Result = derflow_ets:bind(Id, Value, Variables, NextKeyFun),
     {reply, Result, State};
 
-%% @TODO: use derflow_ets
+%% @TODO: this should be implemented in derflow_ets to cut down in code
+%%        duplication.
 handle_command({fetch, TargetId, FromId, FromP}, _From,
                State=#state{variables=Variables}) ->
     [{_, DV}] = ets:lookup(Variables, TargetId),
@@ -300,7 +302,8 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
                 end
     end;
 
-%% @TODO: use derflow_ets
+%% @TODO: this should be implemented in derflow_ets to cut down in code
+%%        duplication.
 handle_command({reply_fetch, FromId, FromP,
                 FetchDV=#dv{value=Value, next=Next, type=Type}}, _From, 
                State=#state{variables=Variables}) ->
@@ -318,7 +321,8 @@ handle_command({reply_fetch, FromId, FromP,
       end,
       {noreply, State};
 
-%% @TODO: use derflow_ets
+%% @TODO: this should be implemented in derflow_ets to cut down in code
+%%        duplication.
 handle_command({notify_value, Id, Value}, _From,
                State=#state{variables=Variables}) ->
     [{_, #dv{next=Next, type=Type}}] = ets:lookup(Variables, Id),
@@ -330,7 +334,7 @@ handle_command({thread, Module, Function, Args}, _From,
     {ok, Pid} = derflow_ets:thread(Module, Function, Args, Variables),
     {reply, {ok, Pid}, State};
 
-%% @TODO: use derflow_ets
+%% @TODO: derflow_ets needs support for the wait_needed operation.
 handle_command({wait_needed, Id}, From,
                State=#state{variables=Variables}) ->
     lager:info("Wait needed issued for identifier: ~p", [Id]),
@@ -365,7 +369,7 @@ handle_command({read, Id, Threshold}, From,
                      ReplyFun,
                      BlockingFun);
 
-%% @TODO: needs to be added to derflow_ets.
+%% @TODO: derflow_ets needs support for the select function.
 handle_command({select, Id, Function, AccId}, _From,
                State=#state{variables=Variables,
                             partition=Partition,
@@ -447,7 +451,7 @@ handle_exit(_Pid, _Reason, State) ->
 terminate(_Reason, _State) ->
     ok.
 
-%% Internal functions
+%% Internal language functions.
 
 write(Type, Value, Next, Key, Variables) ->
     lager:info("Writing key: ~p next: ~p", [Key, Next]),
@@ -492,6 +496,8 @@ declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) 
             lager:info("Declare triggered: ~p", [IndexNode]),
             declare(Id, Type)
     end.
+
+%% Internal program execution functions.
 
 %% @doc Execute a given program.
 execute(Module, Programs) ->

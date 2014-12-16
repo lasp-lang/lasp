@@ -185,6 +185,8 @@ init([Partition]) ->
                 node=Node,
                 variables=Variables}}.
 
+%% Program execution handling.
+
 handle_command({execute, {ReqId, _}, Module0}, _From,
                #state{programs=Programs,
                       node=Node,
@@ -247,6 +249,8 @@ handle_command({register, {ReqId, _}, Module0, File}, _From,
                        [Exception, Partition, Module0]),
             {reply, {error, Exception}, State}
     end;
+
+%% Language handling.
 
 handle_command({declare, Id, Type}, _From,
                #state{variables=Variables}=State) ->
@@ -371,52 +375,19 @@ handle_command({wait_needed, Id}, From,
 
 handle_command({read, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
-    [{_Key, V=#dv{value=Value,
-                  bound=Bound,
-                  creator=Creator,
-                  lazy=Lazy,
-                  type=Type}}] = ets:lookup(Variables, Id),
-    case Bound of
-        true ->
-            lager:info("Read received: ~p, bound: ~p, threshold: ~p",
-                       [Id, V, Threshold]),
-            case derflow_ets:is_lattice(Type) of
-                true ->
-                    %% Handle threshold reaads.
-                    case Threshold of
-                        undefined ->
-                            lager:info("No threshold specified: ~p",
-                                       [Threshold]),
-                            {reply, {ok, Type, Value, V#dv.next}, State};
-                        _ ->
-                            lager:info("Threshold specified: ~p",
-                                       [Threshold]),
-                            case derflow_ets:threshold_met(Type, Value, Threshold) of
-                                true ->
-                                    {reply, {ok, Type, Value, V#dv.next}, State};
-                                false ->
-                                    WT = lists:append(V#dv.waiting_threads,
-                                                      [{threshold, From, Type, Threshold}]),
-                                    true = ets:insert(Variables,
-                                                      {Id, V#dv{waiting_threads=WT}}),
-                                    {noreply, State}
-                            end
-                    end;
-                false ->
-                    {reply, {ok, Type, Value, V#dv.next}, State}
-            end;
-        false ->
-            lager:info("Read received: ~p, unbound", [Id]),
-            WT = lists:append(V#dv.waiting_threads, [From]),
-            true = ets:insert(Variables, {Id, V#dv{waiting_threads=WT}}),
-            case Lazy of
-                true ->
-                    {ok, _} = derflow_ets:reply_to_all([Creator], ok),
-                    {noreply, State};
-                false ->
-                    {noreply, State}
-            end
-    end;
+    Self = From,
+    ReplyFun = fun(Type, Value, Next) ->
+                       {reply, {ok, Type, Value, Next}, State}
+               end,
+    BlockingFun = fun() ->
+                        {noreply, State}
+                  end,
+    derflow_ets:read(Id,
+                     Threshold,
+                     Variables,
+                     Self,
+                     ReplyFun,
+                     BlockingFun);
 
 %% @TODO: needs to be added to derflow_ets.
 handle_command({select, Id, Function, AccId}, _From,

@@ -27,6 +27,7 @@
          bind/3,
          read/2,
          read/3,
+         read/6,
          declare/1,
          declare/2,
          declare/3,
@@ -39,14 +40,44 @@
          is_inflation/3,
          generate_operations/2]).
 
-%% @doc Perform a read of a particular identifier.
+%% @doc Perform a read for a particular identifier.
+%%
 read(Id, Store) ->
     read(Id, undefined, Store).
 
-%% @doc  Perform a threshold read of a particular identifier.
-%% @todo Rewrite the derflow_vnode to use this read operation, and avoid
-%%       the code duplication.
+%% @doc Perform a threshold read for a particular identifier.
+%%
+%%      This operation blocks until `Threshold' has been reached,
+%%      reading from the provided {@link ets:new/2} store, `Store'.
+%%
 read(Id, Threshold, Store) ->
+    Self = self(),
+    ReplyFun = fun(Type, Value, Next) ->
+                    {ok, Type, Value, Next}
+               end,
+    BlockingFun = fun() ->
+                        receive
+                            X ->
+                                lager:info("Value: ~p", [X]),
+                                X
+                        end
+                 end,
+    read(Id, Threshold, Store, Self, ReplyFun, BlockingFun).
+
+%% @doc  Perform a read (or threshold read) for a particular identifier.
+%%
+%%       Perform a read -- reads will either block until the `Threshold'
+%%       is met, or the variable is bound.  Reads will be performed
+%%       against the `Store' provided, which should be the identifier of
+%%       an {@link ets:new/2} table.  When the process should register
+%%       itself for notification of the variable being bound, it should
+%%       supply the process identifier for notifications as `Self'.
+%%       Finally, the `ReplyFun' and `BlockingFun' functions will be
+%%       executed in the event that the reply is available immediately,
+%%       or it will have to wait for the notification, in the event the
+%%       variable is unbound or has not met the threshold yet.
+%%
+read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
     [{_Key, V=#dv{value=Value,
                   bound=Bound,
                   creator=Creator,
@@ -62,57 +93,50 @@ read(Id, Threshold, Store) ->
                         undefined ->
                             lager:info("No threshold specified: ~p",
                                        [Threshold]),
-                            {ok, Type, Value, V#dv.next};
+                            ReplyFun(Type, Value, V#dv.next);
                         _ ->
                             lager:info("Threshold specified: ~p",
                                        [Threshold]),
                             case derflow_ets:threshold_met(Type, Value, Threshold) of
                                 true ->
-                                    {ok, Type, Value, V#dv.next};
+                                    ReplyFun(Type, Value, V#dv.next);
                                 false ->
                                     WT = lists:append(V#dv.waiting_threads,
-                                                      [{threshold, self(), Type, Threshold}]),
+                                                      [{threshold, Self, Type, Threshold}]),
                                     true = ets:insert(Store, {Id, V#dv{waiting_threads=WT}}),
-                                    receive
-                                        X ->
-                                            lager:info("Value: ~p", [Value]),
-                                            X
-                                    end
+                                    BlockingFun()
                             end
                     end;
                 false ->
-                    {ok, Type, Value, V#dv.next}
+                    ReplyFun(Type, Value, V#dv.next)
             end;
         false ->
             lager:info("Read received: ~p, unbound", [Id]),
-            WT = lists:append(V#dv.waiting_threads, [self()]),
+            WT = lists:append(V#dv.waiting_threads, [Self]),
             true = ets:insert(Store, {Id, V#dv{waiting_threads=WT}}),
             case Lazy of
                 true ->
                     {ok, _} = reply_to_all([Creator], ok),
-                    receive
-                        Value ->
-                            lager:info("Value: ~p", [Value]),
-                            Value
-                    end;
+                    BlockingFun();
                 false ->
-                    receive
-                        Value ->
-                            lager:info("Value: ~p", [Value]),
-                            Value
-                    end
+                    BlockingFun()
             end
     end.
 
-%% @doc Declare a dataflow variable.
+%% @doc Declare a dataflow variable in a provided by identifer {@link
+%%      ets:new/2} `Store'.
+%%
 declare(Store) ->
     declare(undefined, Store).
 
-%% @doc Declare a dataflow variable of a given type.
+%% @doc Declare a dataflow variable, as a given type, in a provided by
+%%      identifer {@link ets:new/2} `Store'.
+%%
 declare(Type, Store) ->
     declare(druuid:v4(), Type, Store).
 
 %% @doc Declare a dataflow variable of a given type with a given id.
+%%
 declare(Id, Type, Store) ->
     Record = case Type of
         undefined ->

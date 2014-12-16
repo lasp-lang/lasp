@@ -248,11 +248,13 @@ bind(Id, Value, Store, NextKeyFun) ->
     end.
 
 %% @doc Return the binding status of a given dataflow variable.
+%%
 is_det(Id, Store) ->
     [{_Key, #dv{bound=Bound}}] = ets:lookup(Store, Id),
     {ok, Bound}.
 
 %% @doc Spawn a function.
+%%
 thread(Module, Function, Args, _Store) ->
     Fun = fun() -> erlang:apply(Module, Function, Args) end,
     Pid = spawn(Fun),
@@ -262,6 +264,7 @@ thread(Module, Function, Args, _Store) ->
 
 %% @doc Declare next key, if undefined.  This function assumes that the
 %%      next key will be declared in the local store.
+%%
 next_key(undefined, Type, Store) ->
     {ok, NextKey} = declare(druuid:v4(), Type, Store),
     NextKey;
@@ -269,6 +272,7 @@ next_key(NextKey0, _, _) ->
     NextKey0.
 
 %% @doc Determine if a threshold is met.
+%%
 threshold_met(riak_dt_gset, Value, {strict, Threshold}) ->
     is_strict_inflation(riak_dt_gset, Threshold, Value);
 threshold_met(riak_dt_gset, Value, Threshold) ->
@@ -279,16 +283,19 @@ threshold_met(riak_dt_gcounter, Value, Threshold) ->
     Threshold =< riak_dt_gcounter:value(Value).
 
 %% @doc Determine if a change is an inflation or not.
+%%
 is_inflation(Type, Previous, Current) ->
     is_lattice(Type) andalso
         is_lattice_inflation(Type, Previous, Current).
 
 %% @doc Determine if a change is a strict inflation or not.
+%%
 is_strict_inflation(Type, Previous, Current) ->
     is_lattice(Type) andalso
         is_lattice_strict_inflation(Type, Previous, Current).
 
 %% @doc Determine if a change for a given type is an inflation or not.
+%%
 is_lattice_inflation(riak_dt_gcounter, undefined, _) ->
     true;
 is_lattice_inflation(riak_dt_gcounter, Previous, Current) ->
@@ -311,6 +318,7 @@ is_lattice_inflation(riak_dt_gset, Previous, Current) ->
 
 %% @doc Determine if a change for a given type is a strict inflation or
 %%      not.
+%%
 is_lattice_strict_inflation(riak_dt_gset, undefined, Current) ->
     is_lattice_inflation(riak_dt_gset, undefined, Current);
 is_lattice_strict_inflation(riak_dt_gset, Previous, Current) ->
@@ -319,6 +327,7 @@ is_lattice_strict_inflation(riak_dt_gset, Previous, Current) ->
         lists:usort(riak_dt_gset:value(Current)).
 
 %% @doc Return if something is a lattice or not.
+%%
 is_lattice(Type) ->
     lists:member(Type, ?LATTICES).
 
@@ -334,23 +343,44 @@ is_lattice(Type) ->
 write(Type, Value, Next, Key, Store) ->
     lager:info("Writing key: ~p next: ~p", [Key, Next]),
     [{_Key, #dv{waiting_threads=Threads,
-                binding_list=_BindingList,
+                binding_list=BindingList,
                 lazy=Lazy}}] = ets:lookup(Store, Key),
     lager:info("Waiting threads are: ~p", [Threads]),
     {ok, StillWaiting} = reply_to_all(Threads, [], {ok, Type, Value, Next}),
-    V1 = #dv{type=Type, value=Value, next=Next,
-             lazy=Lazy, bound=true, waiting_threads=StillWaiting},
+    V1 = #dv{type=Type,
+             value=Value,
+             next=Next,
+             lazy=Lazy,
+             bound=true,
+             waiting_threads=StillWaiting},
     true = ets:insert(Store, {Key, V1}),
-    %% notify_all(BindingList, Value),
+    notify_all(BindingList, Value, Store),
+    ok.
+
+%% @doc Update a partially bound variable, when what it's been bound to
+%%      is bound.
+%%
+notify_value(Id, Value, Store) ->
+    [{_, #dv{next=Next, type=Type}}] = ets:lookup(Store, Id),
+    write(Type, Value, Next, Id, Store).
+
+%% @doc Notify a series of variables of bind.
+%%
+notify_all([H|T], Value, Store) ->
+    notify_value(H, Value, Store),
+    notify_all(T, Value, Store);
+notify_all([], _, _) ->
     ok.
 
 %% @doc Given a group of processes which are blocking on reads, notify
 %%      them of bound values or met thresholds.
+%%
 reply_to_all(List, Result) ->
     reply_to_all(List, [], Result).
 
 %% @doc Given a group of processes which are blocking on reads, notify
 %%      them of bound values or met thresholds.
+%%
 reply_to_all([{threshold, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, Type, Value, Next}=Result) ->
@@ -384,6 +414,7 @@ reply_to_all([], StillWaiting, _Result) ->
 %% @doc Given an object type from riak_dt; generate a series of
 %%      operations for that type which are representative of a partial
 %%      order of operations on this object yielding this state.
+%%
 generate_operations(riak_dt_gset, Set) ->
     Values = riak_dt_gset:value(Set),
     {ok, [{add, Value} || Value <- Values]}.

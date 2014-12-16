@@ -200,12 +200,15 @@ threshold_met(riak_dt_gcounter, Value, Threshold) ->
 
 %% @doc Determine if a change is an inflation or not.
 is_inflation(Type, Previous, Current) ->
-    is_lattice(Type) andalso is_lattice_inflation(Type, Previous, Current).
+    is_lattice(Type) andalso
+        is_lattice_inflation(Type, Previous, Current).
 
+%% @doc Determine if a change is a strict inflation or not.
 is_strict_inflation(Type, Previous, Current) ->
-    is_lattice(Type) andalso is_lattice_strict_inflation(Type, Previous, Current).
+    is_lattice(Type) andalso
+        is_lattice_strict_inflation(Type, Previous, Current).
 
-%% @doc Determine if a change is an inflation or not.
+%% @doc Determine if a change for a given type is an inflation or not.
 is_lattice_inflation(riak_dt_gcounter, undefined, _) ->
     true;
 is_lattice_inflation(riak_dt_gcounter, Previous, Current) ->
@@ -226,14 +229,14 @@ is_lattice_inflation(riak_dt_gset, Previous, Current) ->
         sets:from_list(riak_dt_gset:value(Previous)),
         sets:from_list(riak_dt_gset:value(Current))).
 
-is_lattice_strict_inflation(riak_dt_gset, undefined, _) ->
-    true;
+%% @doc Determine if a change for a given type is a strict inflation or
+%%      not.
+is_lattice_strict_inflation(riak_dt_gset, undefined, Current) ->
+    is_lattice_inflation(riak_dt_gset, undefined, Current);
 is_lattice_strict_inflation(riak_dt_gset, Previous, Current) ->
-    sets:is_subset(
-        sets:from_list(riak_dt_gset:value(Previous)),
-        sets:from_list(riak_dt_gset:value(Current))) andalso
-    lists:usort(riak_dt_gset:value(Previous)) =/=
-    lists:usort(riak_dt_gset:value(Current)).
+    is_lattice_inflation(riak_dt_gset, Previous, Current) andalso
+        lists:usort(riak_dt_gset:value(Previous)) =/=
+        lists:usort(riak_dt_gset:value(Current)).
 
 %% @doc Return if something is a lattice or not.
 is_lattice(Type) ->

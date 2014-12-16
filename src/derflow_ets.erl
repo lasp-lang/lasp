@@ -40,7 +40,8 @@
 %% dynamic.
 -export([next/3,
          bind/4,
-         read/6]).
+         read/6,
+         write/6]).
 
 %% Exported utility functions.
 -export([threshold_met/3,
@@ -341,6 +342,14 @@ is_lattice(Type) ->
 %%      3. Mark variable as bound.
 %%
 write(Type, Value, Next, Key, Store) ->
+    NotifyFun = fun(Id, NewValue) ->
+                        [{_, #dv{next=Next,
+                                 type=Type}}] = ets:lookup(Store, Id),
+                        write(Type, NewValue, Next, Id, Store)
+                end,
+    write(Type, Value, Next, Key, Store, NotifyFun).
+
+write(Type, Value, Next, Key, Store, NotifyFun) ->
     lager:info("Writing key: ~p next: ~p", [Key, Next]),
     [{_Key, #dv{waiting_threads=Threads,
                 binding_list=BindingList,
@@ -354,22 +363,15 @@ write(Type, Value, Next, Key, Store) ->
              bound=true,
              waiting_threads=StillWaiting},
     true = ets:insert(Store, {Key, V1}),
-    notify_all(BindingList, Value, Store),
+    notify_all(NotifyFun, BindingList, Value),
     ok.
-
-%% @doc Update a partially bound variable, when what it's been bound to
-%%      is bound.
-%%
-notify_value(Id, Value, Store) ->
-    [{_, #dv{next=Next, type=Type}}] = ets:lookup(Store, Id),
-    write(Type, Value, Next, Id, Store).
 
 %% @doc Notify a series of variables of bind.
 %%
-notify_all([H|T], Value, Store) ->
-    notify_value(H, Value, Store),
-    notify_all(T, Value, Store);
-notify_all([], _, _) ->
+notify_all(NotifyFun, [H|T], Value) ->
+    NotifyFun(H, Value),
+    notify_all(NotifyFun, T, Value);
+notify_all(_, [], _) ->
     ok.
 
 %% @doc Given a group of processes which are blocking on reads, notify

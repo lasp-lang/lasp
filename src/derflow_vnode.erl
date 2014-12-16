@@ -265,45 +265,55 @@ handle_command({bind, Id, {id, DVId}}, From,
 handle_command({bind, Id, Value}, _From,
                State=#state{variables=Variables}) ->
     lager:info("Bind received: ~p", [Id]),
-    [{_Key, V=#dv{next=Next,
-                  type=Type,
-                  bound=Bound,
-                  value=Value0}}] = ets:lookup(Variables, Id),
-    NextKey = case Value of
-        undefined ->
-            undefined;
-        _ ->
-            next_key(Next, Type, State)
-    end,
-    lager:info("Value is: ~p NextKey is: ~p", [Value, NextKey]),
-    case Bound of
-        true ->
-            case V#dv.value of
-                Value ->
-                    {reply, {ok, NextKey}, State};
-                _ ->
-                    case derflow_ets:is_lattice(Type) of
-                        true ->
-                            Merged = Type:merge(V#dv.value, Value),
-                            case derflow_ets:is_inflation(Type, V#dv.value, Merged) of
-                                true ->
-                                    write(Type, Merged, NextKey, Id, Variables),
-                                    {reply, {ok, NextKey}, State};
-                                false ->
-                                    lager:error("Bind failed: ~p ~p ~p~n",
-                                                [Type, Value, Value]),
-                                    {reply, error, State}
-                            end;
-                        false ->
-                            lager:error("Bind failed: ~p ~p ~p~n",
-                                        [Type, Value0, Value]),
-                            {reply, error, State}
-                    end
-            end;
-        false ->
-            write(V#dv.type, Value, NextKey, Id, Variables),
-            {reply, {ok, NextKey}, State}
-    end;
+    NextKeyFun = fun(Type, Next) ->
+                        case Value of
+                            undefined ->
+                                undefined;
+                            _ ->
+                                next_key(Next, Type, State)
+                        end
+                 end,
+    Result = derflow_ets:bind(Id, Value, Variables, NextKeyFun),
+    {reply, Result, State};
+    % [{_Key, V=#dv{next=Next,
+    %               type=Type,
+    %               bound=Bound,
+    %               value=Value0}}] = ets:lookup(Variables, Id),
+    % NextKey = case Value of
+    %     undefined ->
+    %         undefined;
+    %     _ ->
+    %         next_key(Next, Type, State)
+    % end,
+    % lager:info("Value is: ~p NextKey is: ~p", [Value, NextKey]),
+    % case Bound of
+    %     true ->
+    %         case V#dv.value of
+    %             Value ->
+    %                 {reply, {ok, NextKey}, State};
+    %             _ ->
+    %                 case derflow_ets:is_lattice(Type) of
+    %                     true ->
+    %                         Merged = Type:merge(V#dv.value, Value),
+    %                         case derflow_ets:is_inflation(Type, V#dv.value, Merged) of
+    %                             true ->
+    %                                 write(Type, Merged, NextKey, Id, Variables),
+    %                                 {reply, {ok, NextKey}, State};
+    %                             false ->
+    %                                 lager:error("Bind failed: ~p ~p ~p~n",
+    %                                             [Type, Value, Value]),
+    %                                 {reply, error, State}
+    %                         end;
+    %                     false ->
+    %                         lager:error("Bind failed: ~p ~p ~p~n",
+    %                                     [Type, Value0, Value]),
+    %                         {reply, error, State}
+    %                 end
+    %         end;
+    %     false ->
+    %         write(V#dv.type, Value, NextKey, Id, Variables),
+    %         {reply, {ok, NextKey}, State}
+    % end;
 
 handle_command({fetch, TargetId, FromId, FromP}, _From,
                State=#state{variables=Variables}) ->

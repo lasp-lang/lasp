@@ -23,11 +23,11 @@
 
 -include("derflow.hrl").
 
+%% Core API.
 -export([is_det/2,
          bind/3,
          read/2,
          read/3,
-         read/6,
          declare/1,
          declare/2,
          declare/3,
@@ -35,6 +35,12 @@
          reply_to_all/2,
          reply_to_all/3]).
 
+%% Exported functions for vnode integration, where callback behavior is
+%% dynamic.
+-export([bind/4,
+         read/6]).
+
+%% Exported utility functions.
 -export([threshold_met/3,
          is_lattice/1,
          is_inflation/3,
@@ -97,13 +103,20 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                         _ ->
                             lager:info("Threshold specified: ~p",
                                        [Threshold]),
-                            case derflow_ets:threshold_met(Type, Value, Threshold) of
+                            case derflow_ets:threshold_met(Type,
+                                                           Value,
+                                                           Threshold) of
                                 true ->
                                     ReplyFun(Type, Value, V#dv.next);
                                 false ->
                                     WT = lists:append(V#dv.waiting_threads,
-                                                      [{threshold, Self, Type, Threshold}]),
-                                    true = ets:insert(Store, {Id, V#dv{waiting_threads=WT}}),
+                                                      [{threshold,
+                                                        Self,
+                                                        Type,
+                                                        Threshold}]),
+                                    true = ets:insert(Store,
+                                                      {Id,
+                                                       V#dv{waiting_threads=WT}}),
                                     BlockingFun()
                             end
                     end;
@@ -147,22 +160,40 @@ declare(Id, Type, Store) ->
     true = ets:insert(Store, {Id, Record}),
     {ok, Id}.
 
-%% @doc  Define a dataflow variable to be bound to another or a value.
+%% @doc Define a dataflow variable to be bound to another dataflow
+%%      variable.
 %% @todo Implement.
+%%
 bind(_Id, {id, _DVId}, _Store) ->
     {error, not_implemented};
 
+%% @doc Define a dataflow variable to be bound a value.
+%%
 bind(Id, Value, Store) ->
+    NextKeyFun = fun(Type, Next) ->
+                        case Value of
+                            undefined ->
+                                undefined;
+                            _ ->
+                                next_key(Next, Type, Store)
+                        end
+                 end,
+    bind(Id, Value, Store, NextKeyFun).
+
+%% @doc Define a dataflow variable to be bound a value.
+%%
+%%      `NextKeyFun' is used to determine how to generate the next
+%%      identifier -- this is abstracted because in some settings this
+%%      next key may be located in the local store, when running code at
+%%      the replica, or located in a remote store, when running the code
+%%      at the client.
+%%
+bind(Id, Value, Store, NextKeyFun) ->
     [{_Key, V=#dv{next=Next,
                   type=Type,
                   bound=Bound,
                   value=Value0}}] = ets:lookup(Store, Id),
-    NextKey = case Value of
-        undefined ->
-            undefined;
-        _ ->
-            next_key(Next, Type, Store)
-    end,
+    NextKey = NextKeyFun(Type, Next),
     case Bound of
         true ->
             case V#dv.value of
@@ -205,7 +236,8 @@ thread(Module, Function, Args, _Store) ->
 
 %% Internal functions
 
-%% @doc Declare next key, if undefined.
+%% @doc Declare next key, if undefined.  This function assumes that the
+%%      next key will be declared in the local store.
 next_key(undefined, Type, Store) ->
     {ok, NextKey} = declare(druuid:v4(), Type, Store),
     NextKey;

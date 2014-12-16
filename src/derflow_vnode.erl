@@ -21,10 +21,6 @@
 %% @doc Derflow operational vnode, which powers the data flow variable
 %%      assignment and read operations.
 %%
-%% @TODO This probably has a ton of bugs, because it needs to be
-%%       rewritten to use the derflow_ets backend, which is now
-%%       quickchecked.
-%%
 
 -module(derflow_vnode).
 
@@ -50,6 +46,9 @@
 %% Program execution functions.
 -export([register/4,
          execute/3]).
+
+%% Callbacks from the backend module.
+-export([notify_value/2]).
 
 -export([start_vnode/1,
          init/1,
@@ -309,7 +308,10 @@ handle_command({reply_fetch, FromId, FromP,
                State=#state{variables=Variables}) ->
     case FetchDV#dv.bound of
         true ->
-            write(Type, Value, Next, FromId, Variables),
+            NotifyFun = fun(Id, NewValue) ->
+                                derflow_vnode:notify_value(Id, NewValue)
+                        end,
+            derflow_ets:write(Type, Value, Next, FromId, Variables, NotifyFun),
             {ok, _} = derflow_ets:reply_to_all([FromP], {ok, Next}),
             ok;
         false ->
@@ -321,12 +323,12 @@ handle_command({reply_fetch, FromId, FromP,
       end,
       {noreply, State};
 
-%% @TODO: this should be implemented in derflow_ets to cut down in code
-%%        duplication.
 handle_command({notify_value, Id, Value}, _From,
                State=#state{variables=Variables}) ->
-    [{_, #dv{next=Next, type=Type}}] = ets:lookup(Variables, Id),
-    write(Type, Value, Next, Id, Variables),
+    NotifyFun = fun(_Id, NewValue) ->
+                        derflow_vnode:notify_value(_Id, NewValue)
+                end,
+    derflow_ets:notify_value(Id, Value, Variables, NotifyFun),
     {noreply, State};
 
 handle_command({thread, Module, Function, Args}, _From,
@@ -334,24 +336,16 @@ handle_command({thread, Module, Function, Args}, _From,
     {ok, Pid} = derflow_ets:thread(Module, Function, Args, Variables),
     {reply, {ok, Pid}, State};
 
-%% @TODO: derflow_ets needs support for the wait_needed operation.
 handle_command({wait_needed, Id}, From,
                State=#state{variables=Variables}) ->
-    lager:info("Wait needed issued for identifier: ~p", [Id]),
-    [{_Key, V=#dv{waiting_threads=WT, bound=Bound}}] = ets:lookup(Variables, Id),
-    case Bound of
-        true ->
-            {reply, ok, State};
-        false ->
-            case WT of
-                [_H|_T] ->
-                    {reply, ok, State};
-                _ ->
-                    true = ets:insert(Variables,
-                                      {Id, V#dv{lazy=true, creator=From}}),
-                    {noreply, State}
-                end
-    end;
+    Self = From,
+    ReplyFun = fun() ->
+                       {reply, ok, State}
+               end,
+    BlockingFun = fun() ->
+                        {noreply, State}
+                  end,
+    derflow_ets:wait_needed(Id, Variables, Self, ReplyFun, BlockingFun);
 
 handle_command({read, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
@@ -453,29 +447,11 @@ terminate(_Reason, _State) ->
 
 %% Internal language functions.
 
-write(Type, Value, Next, Key, Variables) ->
-    lager:info("Writing key: ~p next: ~p", [Key, Next]),
-    [{_Key, #dv{waiting_threads=Threads,
-                binding_list=BindingList,
-                lazy=Lazy}}] = ets:lookup(Variables, Key),
-    lager:info("Waiting threads are: ~p", [Threads]),
-    {ok, StillWaiting} = derflow_ets:reply_to_all(Threads, [], {ok, Type, Value, Next}),
-    V1 = #dv{type=Type, value=Value, next=Next,
-             lazy=Lazy, bound=true, waiting_threads=StillWaiting},
-    true = ets:insert(Variables, {Key, V1}),
-    notify_all(BindingList, Value).
-
 next_key(undefined, Type, State) ->
     {ok, NextKey} = declare_next(Type, State),
     NextKey;
 next_key(NextKey0, _, _) ->
     NextKey0.
-
-notify_all([H|T], Value) ->
-    notify_value(H, Value),
-    notify_all(T, Value);
-notify_all([], _) ->
-    ok.
 
 %% @doc Declare the next object for streams.
 declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) ->

@@ -33,6 +33,7 @@
          declare/2,
          declare/3,
          thread/4,
+         wait_needed/2,
          reply_to_all/2,
          reply_to_all/3]).
 
@@ -40,6 +41,8 @@
 %% dynamic.
 -export([next/3,
          bind/4,
+         notify_value/4,
+         wait_needed/5,
          read/6,
          write/6]).
 
@@ -187,8 +190,7 @@ declare(Id, Type, Store) ->
 
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.
-%% @todo Implement.
-%%
+%% @TODO Implement.
 bind(_Id, {id, _DVId}, _Store) ->
     {error, not_implemented};
 
@@ -365,6 +367,36 @@ write(Type, Value, Next, Key, Store, NotifyFun) ->
     true = ets:insert(Store, {Key, V1}),
     notify_all(NotifyFun, BindingList, Value),
     ok.
+
+%% @TODO implement.
+wait_needed(_Id, _Store) ->
+    {error, not_implemeneted}.
+
+%% @doc Callback wait_needed function for derflow_vnode, where we
+%%      change the reply and blocking replies.
+%%
+wait_needed(Id, Store, Self, ReplyFun, BlockingFun) ->
+    lager:info("Wait needed issued for identifier: ~p", [Id]),
+    [{_Key, V=#dv{waiting_threads=WT,
+                  bound=Bound}}] = ets:lookup(Store, Id),
+    case Bound of
+        true ->
+            ReplyFun();
+        false ->
+            case WT of
+                [_H|_T] ->
+                    ReplyFun();
+                _ ->
+                    true = ets:insert(Store,
+                                      {Id, V#dv{lazy=true, creator=Self}}),
+                    BlockingFun()
+                end
+    end.
+
+%% @doc Notify a value and write.
+notify_value(Id, Value, Store, NotifyFun) ->
+    [{_, #dv{next=Next, type=Type}}] = ets:lookup(Store, Id),
+    write(Type, Value, Next, Id, Store, NotifyFun).
 
 %% @doc Notify a series of variables of bind.
 %%

@@ -387,10 +387,9 @@ handle_command({next, Id}, _From,
     Result = derflow_ets:next(Id, Variables, DeclareNextFun),
     {reply, Result, State};
 
-%% @TODO: fix me to not do this ridiculous match.
 handle_command({is_det, Id}, _From, State=#state{variables=Variables}) ->
-    {ok, Bound} = derflow_ets:is_det(Id, Variables),
-    {reply, Bound, State};
+    Result = derflow_ets:is_det(Id, Variables),
+    {reply, Result, State};
 
 handle_command(_Message, _Sender, State) ->
     {noreply, State}.

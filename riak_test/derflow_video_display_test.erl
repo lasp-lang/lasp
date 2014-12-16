@@ -75,9 +75,9 @@ skip1(Input, Output) ->
             derflow:bind(Output, undefined);
         {ok, _, _Value, Next} ->
             case derflow:is_det(Next) of
-                true ->
+                {ok, true} ->
                     skip1(Next, Output);
-                false ->
+                {ok, false} ->
                     derflow:bind(Output, {id, Input})
             end
     end.

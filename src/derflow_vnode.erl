@@ -116,7 +116,8 @@ select(Id, Function, AccId) ->
                [self(), Id, AccId]),
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {select, Id, Function, AccId},
+                                              {select,
+                                               Id, Function, AccId},
                                               ?VNODE_MASTER).
 
 thread(Module, Function, Args) ->
@@ -124,7 +125,8 @@ thread(Module, Function, Args) ->
                                             {Module, Function, Args},
                                             derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {thread, Module, Function, Args},
+                                              {thread,
+                                               Module, Function, Args},
                                               ?VNODE_MASTER).
 
 next(Id) ->
@@ -178,8 +180,6 @@ init([Partition]) ->
     Variables = generate_unique_partition_identifier(Partition, Node),
     Variables = ets:new(Variables, [set, named_table, public,
                                     {write_concurrency, true}]),
-    lager:info("Partition: ~p, node: ~p, table: ~p initialized.",
-               [Partition, Node, Variables]),
     {ok, #state{partition=Partition,
                 programs=dict:new(),
                 node=Node,
@@ -257,14 +257,15 @@ handle_command({declare, Id, Type}, _From,
     {ok, Id} = derflow_ets:declare(Id, Type, Variables),
     {reply, {ok, Id}, State};
 
+%% @TODO: use derflow_ets
 handle_command({bind, Id, {id, DVId}}, From,
                State=#state{variables=Variables}) ->
     true = ets:insert(Variables, {Id, #dv{value={id, DVId}}}),
     fetch(DVId, Id, From),
     {noreply, State};
+
 handle_command({bind, Id, Value}, _From,
                State=#state{variables=Variables}) ->
-    lager:info("Bind received: ~p", [Id]),
     NextKeyFun = fun(Type, Next) ->
                         case Value of
                             undefined ->
@@ -275,46 +276,8 @@ handle_command({bind, Id, Value}, _From,
                  end,
     Result = derflow_ets:bind(Id, Value, Variables, NextKeyFun),
     {reply, Result, State};
-    % [{_Key, V=#dv{next=Next,
-    %               type=Type,
-    %               bound=Bound,
-    %               value=Value0}}] = ets:lookup(Variables, Id),
-    % NextKey = case Value of
-    %     undefined ->
-    %         undefined;
-    %     _ ->
-    %         next_key(Next, Type, State)
-    % end,
-    % lager:info("Value is: ~p NextKey is: ~p", [Value, NextKey]),
-    % case Bound of
-    %     true ->
-    %         case V#dv.value of
-    %             Value ->
-    %                 {reply, {ok, NextKey}, State};
-    %             _ ->
-    %                 case derflow_ets:is_lattice(Type) of
-    %                     true ->
-    %                         Merged = Type:merge(V#dv.value, Value),
-    %                         case derflow_ets:is_inflation(Type, V#dv.value, Merged) of
-    %                             true ->
-    %                                 write(Type, Merged, NextKey, Id, Variables),
-    %                                 {reply, {ok, NextKey}, State};
-    %                             false ->
-    %                                 lager:error("Bind failed: ~p ~p ~p~n",
-    %                                             [Type, Value, Value]),
-    %                                 {reply, error, State}
-    %                         end;
-    %                     false ->
-    %                         lager:error("Bind failed: ~p ~p ~p~n",
-    %                                     [Type, Value0, Value]),
-    %                         {reply, error, State}
-    %                 end
-    %         end;
-    %     false ->
-    %         write(V#dv.type, Value, NextKey, Id, Variables),
-    %         {reply, {ok, NextKey}, State}
-    % end;
 
+%% @TODO: use derflow_ets
 handle_command({fetch, TargetId, FromId, FromP}, _From,
                State=#state{variables=Variables}) ->
     [{_, DV}] = ets:lookup(Variables, TargetId),
@@ -337,6 +300,7 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
                 end
     end;
 
+%% @TODO: use derflow_ets
 handle_command({reply_fetch, FromId, FromP,
                 FetchDV=#dv{value=Value, next=Next, type=Type}}, _From, 
                State=#state{variables=Variables}) ->
@@ -354,6 +318,7 @@ handle_command({reply_fetch, FromId, FromP,
       end,
       {noreply, State};
 
+%% @TODO: use derflow_ets
 handle_command({notify_value, Id, Value}, _From,
                State=#state{variables=Variables}) ->
     [{_, #dv{next=Next, type=Type}}] = ets:lookup(Variables, Id),
@@ -365,6 +330,7 @@ handle_command({thread, Module, Function, Args}, _From,
     {ok, Pid} = derflow_ets:thread(Module, Function, Args, Variables),
     {reply, {ok, Pid}, State};
 
+%% @TODO: use derflow_ets
 handle_command({wait_needed, Id}, From,
                State=#state{variables=Variables}) ->
     lager:info("Wait needed issued for identifier: ~p", [Id]),
@@ -415,16 +381,13 @@ handle_command({select, Id, Function, AccId}, _From,
 
 handle_command({next, Id}, _From,
                State=#state{variables=Variables}) ->
-    [{_Key, V=#dv{next=NextKey0}}] = ets:lookup(Variables, Id),
-    case NextKey0 of
-        undefined ->
-            {ok, NextKey} = declare_next(V#dv.type, State),
-            true = ets:insert(Variables, {Id, V#dv{next=NextKey}}),
-            {reply, {ok, NextKey}, State};
-        _ ->
-            {reply, {ok, NextKey0}, State}
-    end;
+    DeclareNextFun = fun(Type) ->
+                            declare_next(Type, State)
+                     end,
+    Result = derflow_ets:next(Id, Variables, DeclareNextFun),
+    {reply, Result, State};
 
+%% @TODO: fix me to not do this ridiculous match.
 handle_command({is_det, Id}, _From, State=#state{variables=Variables}) ->
     {ok, Bound} = derflow_ets:is_det(Id, Variables),
     {reply, Bound, State};

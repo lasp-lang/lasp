@@ -28,6 +28,7 @@
          bind/3,
          read/2,
          read/3,
+         next/2,
          declare/1,
          declare/2,
          declare/3,
@@ -37,7 +38,8 @@
 
 %% Exported functions for vnode integration, where callback behavior is
 %% dynamic.
--export([bind/4,
+-export([next/3,
+         bind/4,
          read/6]).
 
 %% Exported utility functions.
@@ -45,6 +47,28 @@
          is_lattice/1,
          is_inflation/3,
          generate_operations/2]).
+
+%% @doc Given an identifier, return the next identifier.
+next(Id, Store) ->
+    DeclareNextFun = fun(Type) ->
+            declare(Type, Store)
+    end,
+    next(Id, Store, DeclareNextFun).
+
+%% @doc Given an identifier, return the next identifier.
+%%      Allow for an override function for performing the generation of
+%%      the next identifier, using `DeclareNextFun'.
+%%
+next(Id, Store, DeclareNextFun) ->
+    [{_Key, V=#dv{next=NextKey0}}] = ets:lookup(Store, Id),
+    case NextKey0 of
+        undefined ->
+            {ok, NextKey} = DeclareNextFun(V#dv.type),
+            true = ets:insert(Store, {Id, V#dv{next=NextKey}}),
+            {ok, NextKey};
+        _ ->
+            {ok, NextKey0}
+    end.
 
 %% @doc Perform a read for a particular identifier.
 %%

@@ -154,8 +154,6 @@ waiting_n({ok, _ReqId, Reply},
             {next_state, waiting_n, State}
     end.
 
-%% @doc  Perform read repair.
-%% @todo Implement.
 finalize(timeout, State) ->
     {stop, normal, State}.
 

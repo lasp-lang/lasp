@@ -49,6 +49,7 @@
 
 %% Callbacks from the backend module.
 -export([notify_value/2,
+         fetch/3,
          reply_fetch/3]).
 
 -export([start_vnode/1,
@@ -252,15 +253,15 @@ handle_command({register, {ReqId, _}, Module0, File}, _From,
 
 handle_command({declare, Id, Type}, _From,
                #state{variables=Variables}=State) ->
-    {ok, Id} = derflow_ets:declare(Id, Type, Variables),
+    {ok, Id} = ?BACKEND:declare(Id, Type, Variables),
     {reply, {ok, Id}, State};
 
-%% @TODO: this should be implemented in derflow_ets to cut down in code
-%%        duplication.
-handle_command({bind, Id, {id, DVId}}, From,
+handle_command({bind, Id, {id, DVId}}, FromPid,
                State=#state{variables=Variables}) ->
-    true = ets:insert(Variables, {Id, #dv{value={id, DVId}}}),
-    fetch(DVId, Id, From),
+    FetchFun = fun(_TargetId, _FromId, _FromPid) ->
+            ?MODULE:fetch(_TargetId, _FromId, _FromPid)
+    end,
+    ?BACKEND:bind(Id, {id, DVId}, Variables, FetchFun, FromPid),
     {noreply, State};
 
 handle_command({bind, Id, Value}, _From,
@@ -273,55 +274,53 @@ handle_command({bind, Id, Value}, _From,
                                 next_key(Next, Type, State)
                         end
                  end,
-    Result = derflow_ets:bind(Id, Value, Variables, NextKeyFun),
+    Result = ?BACKEND:bind(Id, Value, Variables, NextKeyFun),
     {reply, Result, State};
 
-%% @TODO: this should be implemented in derflow_ets to cut down in code
-%%        duplication.
 handle_command({fetch, TargetId, FromId, FromPid}, _From,
                State=#state{variables=Variables}) ->
     ResponseFun = fun() ->
             {noreply, State}
     end,
     FetchFun = fun(_TargetId, _FromId, _FromPid) ->
-            derflow_vnode:fetch(_TargetId, _FromId, _FromPid)
+            ?MODULE:fetch(_TargetId, _FromId, _FromPid)
     end,
     ReplyFetchFun = fun(_FromId, _FromPid, DV) ->
-            derflow_vnode:reply_fetch(_FromId, _FromPid, DV)
+            ?MODULE:reply_fetch(_FromId, _FromPid, DV)
     end,
     NextKeyFun = fun(Next, Type) ->
-            next_key(Next, Type, State)
+            ?MODULE:next_key(Next, Type, State)
     end,
-    derflow_ets:fetch(TargetId,
-                      FromId,
-                      FromPid,
-                      Variables,
-                      ResponseFun,
-                      FetchFun,
-                      ReplyFetchFun,
-                      NextKeyFun);
+    ?BACKEND:fetch(TargetId,
+                   FromId,
+                   FromPid,
+                   Variables,
+                   ResponseFun,
+                   FetchFun,
+                   ReplyFetchFun,
+                   NextKeyFun);
 
 handle_command({reply_fetch, FromId, FromPid,
                 #dv{value=Value, next=Next, type=Type}}, _From,
                State=#state{variables=Variables}) ->
     NotifyFun = fun(Id, NewValue) ->
-                        derflow_vnode:notify_value(Id, NewValue)
+                        ?MODULE:notify_value(Id, NewValue)
                 end,
-    derflow_ets:write(Type, Value, Next, FromId, Variables, NotifyFun),
-    {ok, _} = derflow_ets:reply_to_all([FromPid], {ok, Next}),
+    ?BACKEND:write(Type, Value, Next, FromId, Variables, NotifyFun),
+    {ok, _} = ?BACKEND:reply_to_all([FromPid], {ok, Next}),
     {noreply, State};
 
 handle_command({notify_value, Id, Value}, _From,
                State=#state{variables=Variables}) ->
     NotifyFun = fun(_Id, NewValue) ->
-                        derflow_vnode:notify_value(_Id, NewValue)
+                        ?MODULE:notify_value(_Id, NewValue)
                 end,
-    derflow_ets:notify_value(Id, Value, Variables, NotifyFun),
+    ?BACKEND:notify_value(Id, Value, Variables, NotifyFun),
     {noreply, State};
 
 handle_command({thread, Module, Function, Args}, _From,
                #state{variables=Variables}=State) ->
-    {ok, Pid} = derflow_ets:thread(Module, Function, Args, Variables),
+    {ok, Pid} = ?BACKEND:thread(Module, Function, Args, Variables),
     {reply, {ok, Pid}, State};
 
 handle_command({wait_needed, Id}, From,
@@ -333,7 +332,7 @@ handle_command({wait_needed, Id}, From,
     BlockingFun = fun() ->
                         {noreply, State}
                   end,
-    derflow_ets:wait_needed(Id, Variables, Self, ReplyFun, BlockingFun);
+    ?BACKEND:wait_needed(Id, Variables, Self, ReplyFun, BlockingFun);
 
 handle_command({read, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
@@ -344,12 +343,12 @@ handle_command({read, Id, Threshold}, From,
     BlockingFun = fun() ->
                         {noreply, State}
                   end,
-    derflow_ets:read(Id,
-                     Threshold,
-                     Variables,
-                     Self,
-                     ReplyFun,
-                     BlockingFun);
+    ?BACKEND:read(Id,
+                  Threshold,
+                  Variables,
+                  Self,
+                  ReplyFun,
+                  BlockingFun);
 
 handle_command({select, Id, Function, AccId}, _From,
                State=#state{variables=Variables,
@@ -363,13 +362,13 @@ handle_command({select, Id, Function, AccId}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    derflow_ets:bind(_AccId, AccValue, _Variables);
+                    ?BACKEND:bind(_AccId, AccValue, _Variables);
                 _ ->
                     %% We're remote, go through all of the routing logic.
-                    derflow_vnode:bind(_AccId, AccValue)
+                    ?MODULE:bind(_AccId, AccValue)
             end
     end,
-    Result = derflow_ets:select(Id, Function, AccId, Variables, BindFun),
+    Result = ?BACKEND:select(Id, Function, AccId, Variables, BindFun),
     {reply, Result, State};
 
 handle_command({next, Id}, _From,
@@ -377,11 +376,11 @@ handle_command({next, Id}, _From,
     DeclareNextFun = fun(Type) ->
                             declare_next(Type, State)
                      end,
-    Result = derflow_ets:next(Id, Variables, DeclareNextFun),
+    Result = ?BACKEND:next(Id, Variables, DeclareNextFun),
     {reply, Result, State};
 
 handle_command({is_det, Id}, _From, State=#state{variables=Variables}) ->
-    Result = derflow_ets:is_det(Id, Variables),
+    Result = ?BACKEND:is_det(Id, Variables),
     {reply, Result, State};
 
 handle_command(_Message, _Sender, State) ->
@@ -461,11 +460,11 @@ declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) 
             %% We're local, which means that we can interact directly
             %% with the data store.
             lager:info("Local declare triggered: ~p", [IndexNode]),
-            derflow_ets:declare(Id, Type, Variables);
+            ?BACKEND:declare(Id, Type, Variables);
         _ ->
             %% We're remote, go through all of the routing logic.
             lager:info("Declare triggered: ~p", [IndexNode]),
-            declare(Id, Type)
+            ?MODULE:declare(Id, Type)
     end.
 
 %% Internal program execution functions.

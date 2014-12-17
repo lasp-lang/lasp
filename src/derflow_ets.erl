@@ -42,6 +42,7 @@
 %% dynamic.
 -export([next/3,
          bind/4,
+         bind/5,
          notify_value/4,
          wait_needed/5,
          read/6,
@@ -85,12 +86,12 @@ select(_Id, _Function, _AccId, _Store) ->
     {error, not_implemented}.
 
 select(Id, Function, AccId, Store, BindFun) ->
-    Pid = spawn_link(derflow_ets, select_harness, [Store,
-                                                   Id,
-                                                   Function,
-                                                   AccId,
-                                                   BindFun,
-                                                   undefined]),
+    Pid = spawn_link(?MODULE, select_harness, [Store,
+                                               Id,
+                                               Function,
+                                               AccId,
+                                               BindFun,
+                                               undefined]),
     {ok, Pid}.
 
 %% @doc Perform a read for a particular identifier.
@@ -140,7 +141,7 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
         true ->
             lager:info("Read received: ~p, bound: ~p, threshold: ~p",
                        [Id, V, Threshold]),
-            case derflow_ets:is_lattice(Type) of
+            case ?MODULE:is_lattice(Type) of
                 true ->
                     case Threshold of
                         undefined ->
@@ -150,7 +151,7 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                         _ ->
                             lager:info("Threshold specified: ~p",
                                        [Threshold]),
-                            case derflow_ets:threshold_met(Type,
+                            case ?MODULE:threshold_met(Type,
                                                            Value,
                                                            Threshold) of
                                 true ->
@@ -261,6 +262,12 @@ declare(Id, Type, Store) ->
     end,
     true = ets:insert(Store, {Id, Record}),
     {ok, Id}.
+
+%% @doc Define a dataflow variable to be bound to another dataflow
+%%      variable.
+bind(Id, {id, DVId}, Store, FetchFun, FromPid) ->
+    true = ets:insert(Store, {Id, #dv{value={id, DVId}}}),
+    FetchFun(DVId, Id, FromPid).
 
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.
@@ -493,7 +500,7 @@ reply_to_all([{threshold, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, Type, Value, Next}=Result) ->
     lager:info("Result: ~p, Threshold: ~p", [Result, Threshold]),
-    StillWaiting = case derflow_ets:threshold_met(Type, Value, Threshold) of
+    StillWaiting = case ?MODULE:threshold_met(Type, Value, Threshold) of
         true ->
             lager:info("Threshold ~p met: ~p", [Threshold, Value]),
             case From of
@@ -530,12 +537,12 @@ generate_operations(riak_dt_gset, Set) ->
 %% @doc Harness for managing the select operation.
 select_harness(Variables, Id, Function, AccId, BindFun, Previous) ->
     lager:info("Select executing!"),
-    {ok, Type, Value, _} = derflow_ets:read(Id, {strict, Previous}, Variables),
+    {ok, Type, Value, _} = ?MODULE:read(Id, {strict, Previous}, Variables),
     lager:info("Threshold was met!"),
     [{_Key, #dv{type=Type, value=Value}}] = ets:lookup(Variables, Id),
 
     %% Generate operations for given data type.
-    {ok, Operations} = derflow_ets:generate_operations(Type, Value),
+    {ok, Operations} = ?MODULE:generate_operations(Type, Value),
     lager:info("Operations generated: ~p", [Operations]),
 
     %% Build new data structure.

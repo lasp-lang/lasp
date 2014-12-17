@@ -28,3 +28,15 @@
              bound = false}).
 
 -define(LATTICES, [riak_dt_gset, riak_dt_gcounter]).
+
+-type module() :: atom().
+-type file() :: iolist().
+-type registration() :: preflist | global.
+-type id() :: atom().
+-type result() :: term().
+-type type() :: undefined | riak_dt_gset | riak_dt_gcounter.
+-type value() :: term().
+-type args() :: list().
+-type bound() :: true | false.
+-type supervisor() :: pid().
+-type stream() :: list(#dv{}).

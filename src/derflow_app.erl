@@ -29,6 +29,7 @@
 %% Application callbacks
 %% ===================================================================
 
+%% @doc Start the derflow application.
 start(_StartType, _StartArgs) ->
     case derflow_sup:start_link() of
         {ok, Pid} ->
@@ -47,5 +48,6 @@ start(_StartType, _StartArgs) ->
             {error, Reason}
     end.
 
+%% @doc Stop the derflow application.
 stop(_State) ->
     ok.

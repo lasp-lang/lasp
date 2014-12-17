@@ -115,7 +115,6 @@ execute(timeout, #state{preflist=Preflist,
     derflow_vnode:execute(Preflist, {ReqId, Coordinator}, Module),
     {next_state, waiting, State}.
 
-%% @todo Use the first reply right now, until we know how to merge.
 waiting({ok, _ReqId, Reply},
         #state{from=From,
                req_id=ReqId,

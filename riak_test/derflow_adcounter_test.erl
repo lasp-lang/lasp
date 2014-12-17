@@ -90,7 +90,7 @@ test() ->
 %       disable the advertisement.
 server(Ad, Clients) ->
     lager:info("Server launched for ad: ~p", [Ad]),
-    {ok, _, _} = derflow:read(Ad, 5),
+    {ok, _, _, _} = derflow:read(Ad, 5),
     lager:info("Threshold reached; disable ad ~p for all clients!",
                [Ad]),
     lists:map(fun(Client) ->
@@ -112,7 +112,7 @@ client(Id, Ads) ->
             lager:info("Displaying ad: ~p from client: ~p~n", [Ad, Id]),
 
             %% Update ad by incrementing value.
-            {ok, Value, _} = derflow:read(Ad),
+            {ok, _, Value, _} = derflow:read(Ad),
             {ok, Updated} = riak_dt_gcounter:update(increment, Id, Value),
             {ok, _} = derflow:bind(Ad, Updated),
 
@@ -120,5 +120,5 @@ client(Id, Ads) ->
         {remove_ad, Ad} ->
             %% Remove ad.
             lager:info("Removing ad: ~p from client: ~p~n", [Ad, Id]),
-            client(Id, Ads -- [Ad])
+            client(Id, tl(Ads) -- [Ad])
     end.

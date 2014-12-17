@@ -40,13 +40,13 @@ execute(Acc, _X) ->
     {ok, _} = derflow:bind(Id1, 1),
     lager:info("Successful bind."),
 
-    {ok, Value1, _} = derflow:read(Id1),
+    {ok, _, Value1, _} = derflow:read(Id1),
     lager:info("Value1: ~p", [Value1]),
 
     error = derflow:bind(Id1, 2),
     lager:info("Unsuccessful bind."),
 
-    {ok, Value2, _} = derflow:read(Id1),
+    {ok, _, Value2, _} = derflow:read(Id1),
     lager:info("Value2: ~p", [Value2]),
 
     {ok, Acc}.

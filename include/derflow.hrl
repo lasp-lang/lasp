@@ -1,6 +1,7 @@
 -define(TIMEOUT, 100000).
 
 -define(BUCKET, <<"derflow">>).
+-define(BACKEND, derflow_ets).
 
 -define(N, 1).
 -define(W, 1).

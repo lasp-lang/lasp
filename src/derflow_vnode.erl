@@ -21,10 +21,6 @@
 %% @doc Derflow operational vnode, which powers the data flow variable
 %%      assignment and read operations.
 %%
-%% @todo This probably has a ton of bugs, because it needs to be
-%%       rewritten to use the derflow_ets backend, which is now
-%%       quickchecked.
-%%
 
 -module(derflow_vnode).
 
@@ -40,6 +36,7 @@
 -export([bind/2,
          read/1,
          read/2,
+         select/3,
          next/1,
          is_det/1,
          wait_needed/1,
@@ -49,6 +46,11 @@
 %% Program execution functions.
 -export([register/4,
          execute/3]).
+
+%% Callbacks from the backend module.
+-export([notify_value/2,
+         fetch/3,
+         reply_fetch/3]).
 
 -export([start_vnode/1,
          init/1,
@@ -108,12 +110,22 @@ read(Id, Threshold) ->
                                               {read, Id, Threshold},
                                               ?VNODE_MASTER).
 
+select(Id, Function, AccId) ->
+    lager:info("Select by process ~p, id: ~p accid: ~p",
+               [self(), Id, AccId]),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {select,
+                                               Id, Function, AccId},
+                                              ?VNODE_MASTER).
+
 thread(Module, Function, Args) ->
     [{IndexNode, _Type}] = derflow:preflist(?N,
                                             {Module, Function, Args},
                                             derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {thread, Module, Function, Args},
+                                              {thread,
+                                               Module, Function, Args},
                                               ?VNODE_MASTER).
 
 next(Id) ->
@@ -134,16 +146,16 @@ declare(Id, Type) ->
                                               {declare, Id, Type},
                                               ?VNODE_MASTER).
 
-fetch(Id, FromId, FromP) ->
+fetch(Id, FromId, FromPid) ->
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:command(IndexNode,
-                                   {fetch, Id, FromId, FromP},
+                                   {fetch, Id, FromId, FromPid},
                                    ?VNODE_MASTER).
 
-reply_fetch(Id, FromP, DV) ->
+reply_fetch(Id, FromPid, DV) ->
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:command(IndexNode,
-                                   {reply_fetch, Id, FromP, DV},
+                                   {reply_fetch, Id, FromPid, DV},
                                    ?VNODE_MASTER).
 
 notify_value(Id, Value) ->
@@ -167,12 +179,12 @@ init([Partition]) ->
     Variables = generate_unique_partition_identifier(Partition, Node),
     Variables = ets:new(Variables, [set, named_table, public,
                                     {write_concurrency, true}]),
-    lager:info("Partition: ~p, node: ~p, table: ~p initialized.",
-               [Partition, Node, Variables]),
     {ok, #state{partition=Partition,
                 programs=dict:new(),
                 node=Node,
                 variables=Variables}}.
+
+%% Program execution handling.
 
 handle_command({execute, {ReqId, _}, Module0}, _From,
                #state{programs=Programs,
@@ -237,196 +249,143 @@ handle_command({register, {ReqId, _}, Module0, File}, _From,
             {reply, {error, Exception}, State}
     end;
 
+%% Language handling.
+
 handle_command({declare, Id, Type}, _From,
                #state{variables=Variables}=State) ->
-    {ok, Id} = derflow_ets:declare(Id, Type, Variables),
+    {ok, Id} = ?BACKEND:declare(Id, Type, Variables),
     {reply, {ok, Id}, State};
 
-handle_command({bind, Id, {id, DVId}}, From,
+handle_command({bind, Id, {id, DVId}}, FromPid,
                State=#state{variables=Variables}) ->
-    true = ets:insert(Variables, {Id, #dv{value={id, DVId}}}),
-    fetch(DVId, Id, From),
+    FetchFun = fun(_TargetId, _FromId, _FromPid) ->
+            ?MODULE:fetch(_TargetId, _FromId, _FromPid)
+    end,
+    ?BACKEND:bind(Id, {id, DVId}, Variables, FetchFun, FromPid),
     {noreply, State};
+
 handle_command({bind, Id, Value}, _From,
                State=#state{variables=Variables}) ->
-    lager:info("Bind received: ~p", [Id]),
-    [{_Key, V=#dv{next=Next,
-                  type=Type,
-                  bound=Bound,
-                  value=Value0}}] = ets:lookup(Variables, Id),
-    NextKey = case Value of
-        undefined ->
-            undefined;
-        _ ->
-            next_key(Next, Type, State)
+    NextKeyFun = fun(Type, Next) ->
+                        case Value of
+                            undefined ->
+                                undefined;
+                            _ ->
+                                next_key(Next, Type, State)
+                        end
+                 end,
+    Result = ?BACKEND:bind(Id, Value, Variables, NextKeyFun),
+    {reply, Result, State};
+
+handle_command({fetch, TargetId, FromId, FromPid}, _From,
+               State=#state{variables=Variables}) ->
+    ResponseFun = fun() ->
+            {noreply, State}
     end,
-    lager:info("Value is: ~p NextKey is: ~p", [Value, NextKey]),
-    case Bound of
-        true ->
-            case V#dv.value of
-                Value ->
-                    {reply, {ok, NextKey}, State};
-                _ ->
-                    case derflow_ets:is_lattice(Type) of
-                        true ->
-                            Merged = Type:merge(V#dv.value, Value),
-                            case derflow_ets:is_inflation(Type, V#dv.value, Merged) of
-                                true ->
-                                    write(Type, Merged, NextKey, Id, Variables),
-                                    {reply, {ok, NextKey}, State};
-                                false ->
-                                    lager:error("Bind failed: ~p ~p ~p~n",
-                                                [Type, Value, Value]),
-                                    {reply, error, State}
-                            end;
-                        false ->
-                            lager:error("Bind failed: ~p ~p ~p~n",
-                                        [Type, Value0, Value]),
-                            {reply, error, State}
-                    end
-            end;
-        false ->
-            write(V#dv.type, Value, NextKey, Id, Variables),
-            {reply, {ok, NextKey}, State}
-    end;
+    FetchFun = fun(_TargetId, _FromId, _FromPid) ->
+            ?MODULE:fetch(_TargetId, _FromId, _FromPid)
+    end,
+    ReplyFetchFun = fun(_FromId, _FromPid, DV) ->
+            ?MODULE:reply_fetch(_FromId, _FromPid, DV)
+    end,
+    NextKeyFun = fun(Next, Type) ->
+            ?MODULE:next_key(Next, Type, State)
+    end,
+    ?BACKEND:fetch(TargetId,
+                   FromId,
+                   FromPid,
+                   Variables,
+                   ResponseFun,
+                   FetchFun,
+                   ReplyFetchFun,
+                   NextKeyFun);
 
-handle_command({fetch, TargetId, FromId, FromP}, _From,
+handle_command({reply_fetch, FromId, FromPid,
+                #dv{value=Value, next=Next, type=Type}}, _From,
                State=#state{variables=Variables}) ->
-    [{_, DV}] = ets:lookup(Variables, TargetId),
-    case DV#dv.bound of
-        true ->
-            reply_fetch(FromId, FromP, DV),
-            {noreply, State};
-        false ->
-            case DV#dv.value of
-                {id, BindId} ->
-                    fetch(BindId, FromId, FromP),
-                    {noreply, State};
-                _ ->
-                    NextKey = next_key(DV#dv.next, DV#dv.type, State),
-                    BindingList = lists:append(DV#dv.binding_list, [FromId]),
-                    DV1 = DV#dv{binding_list=BindingList, next=NextKey},
-                    true = ets:insert(Variables, {TargetId, DV1}),
-                    reply_fetch(FromId, FromP, DV1),
-                    {noreply, State}
-                end
-    end;
-
-handle_command({reply_fetch, FromId, FromP,
-                FetchDV=#dv{value=Value, next=Next, type=Type}}, _From, 
-               State=#state{variables=Variables}) ->
-    case FetchDV#dv.bound of
-        true ->
-            write(Type, Value, Next, FromId, Variables),
-            {ok, _} = derflow_ets:reply_to_all([FromP], {ok, Next}),
-            ok;
-        false ->
-            [{_, DV}] = ets:lookup(Variables, FromId),
-            DV1 = DV#dv{next=FetchDV#dv.next},
-            true = ets:insert(Variables, {FromId, DV1}),
-            {ok, _} = derflow_ets:reply_to_all([FromP], {ok, FetchDV#dv.next}),
-            ok
-      end,
-      {noreply, State};
+    NotifyFun = fun(Id, NewValue) ->
+                        ?MODULE:notify_value(Id, NewValue)
+                end,
+    ?BACKEND:write(Type, Value, Next, FromId, Variables, NotifyFun),
+    {ok, _} = ?BACKEND:reply_to_all([FromPid], {ok, Next}),
+    {noreply, State};
 
 handle_command({notify_value, Id, Value}, _From,
                State=#state{variables=Variables}) ->
-    [{_, #dv{next=Next, type=Type}}] = ets:lookup(Variables, Id),
-    write(Type, Value, Next, Id, Variables),
+    NotifyFun = fun(_Id, NewValue) ->
+                        ?MODULE:notify_value(_Id, NewValue)
+                end,
+    ?BACKEND:notify_value(Id, Value, Variables, NotifyFun),
     {noreply, State};
 
 handle_command({thread, Module, Function, Args}, _From,
                #state{variables=Variables}=State) ->
-    {ok, Pid} = derflow_ets:thread(Module, Function, Args, Variables),
+    {ok, Pid} = ?BACKEND:thread(Module, Function, Args, Variables),
     {reply, {ok, Pid}, State};
 
 handle_command({wait_needed, Id}, From,
                State=#state{variables=Variables}) ->
-    lager:info("Wait needed issued for identifier: ~p", [Id]),
-    [{_Key, V=#dv{waiting_threads=WT, bound=Bound}}] = ets:lookup(Variables, Id),
-    case Bound of
-        true ->
-            {reply, ok, State};
-        false ->
-            case WT of
-                [_H|_T] ->
-                    {reply, ok, State};
-                _ ->
-                    true = ets:insert(Variables,
-                                      {Id, V#dv{lazy=true, creator=From}}),
-                    {noreply, State}
-                end
-    end;
+    Self = From,
+    ReplyFun = fun() ->
+                       {reply, ok, State}
+               end,
+    BlockingFun = fun() ->
+                        {noreply, State}
+                  end,
+    ?BACKEND:wait_needed(Id, Variables, Self, ReplyFun, BlockingFun);
 
 handle_command({read, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
-    [{_Key, V=#dv{value=Value,
-                  bound=Bound,
-                  creator=Creator,
-                  lazy=Lazy,
-                  type=Type}}] = ets:lookup(Variables, Id),
-    case Bound of
-        true ->
-            lager:info("Read received: ~p, bound: ~p, threshold: ~p",
-                       [Id, V, Threshold]),
-            case derflow_ets:is_lattice(Type) of
-                true ->
-                    %% Handle threshold reaads.
-                    case Threshold of
-                        undefined ->
-                            lager:info("No threshold specified: ~p",
-                                       [Threshold]),
-                            {reply, {ok, Value, V#dv.next}, State};
-                        _ ->
-                            lager:info("Threshold specified: ~p",
-                                       [Threshold]),
-                            case derflow_ets:threshold_met(Type, Value, Threshold) of
-                                true ->
-                                    {reply, {ok, Value, V#dv.next}, State};
-                                false ->
-                                    WT = lists:append(V#dv.waiting_threads,
-                                                      [{threshold, From, Type, Threshold}]),
-                                    true = ets:insert(Variables,
-                                                      {Id, V#dv{waiting_threads=WT}}),
-                                    {noreply, State}
-                            end
-                    end;
-                false ->
-                    {reply, {ok, Value, V#dv.next}, State}
-            end;
-        false ->
-            lager:info("Read received: ~p, unbound", [Id]),
-            WT = lists:append(V#dv.waiting_threads, [From]),
-            true = ets:insert(Variables, {Id, V#dv{waiting_threads=WT}}),
-            case Lazy of
-                true ->
-                    {ok, _} = derflow_ets:reply_to_all([Creator], ok),
-                    {noreply, State};
-                false ->
-                    {noreply, State}
+    Self = From,
+    ReplyFun = fun(Type, Value, Next) ->
+                       {reply, {ok, Type, Value, Next}, State}
+               end,
+    BlockingFun = fun() ->
+                        {noreply, State}
+                  end,
+    ?BACKEND:read(Id,
+                  Threshold,
+                  Variables,
+                  Self,
+                  ReplyFun,
+                  BlockingFun);
+
+handle_command({select, Id, Function, AccId}, _From,
+               State=#state{variables=Variables,
+                            partition=Partition,
+                            node=Node}) ->
+    BindFun = fun(_AccId, AccValue, _Variables) ->
+            %% Beware of cycles in the gen_server calls!
+            [{IndexNode, _Type}] = derflow:preflist(?N, _AccId, derflow),
+
+            case IndexNode of
+                {Partition, Node} ->
+                    %% We're local, which means that we can interact
+                    %% directly with the data store.
+                    ?BACKEND:bind(_AccId, AccValue, _Variables);
+                _ ->
+                    %% We're remote, go through all of the routing logic.
+                    ?MODULE:bind(_AccId, AccValue)
             end
-    end;
+    end,
+    Result = ?BACKEND:select(Id, Function, AccId, Variables, BindFun),
+    {reply, Result, State};
 
 handle_command({next, Id}, _From,
                State=#state{variables=Variables}) ->
-    [{_Key, V=#dv{next=NextKey0}}] = ets:lookup(Variables, Id),
-    case NextKey0 of
-        undefined ->
-            {ok, NextKey} = declare_next(V#dv.type, State),
-            true = ets:insert(Variables, {Id, V#dv{next=NextKey}}),
-            {reply, {ok, NextKey}, State};
-        _ ->
-            {reply, {ok, NextKey0}, State}
-  end;
+    DeclareNextFun = fun(Type) ->
+                            declare_next(Type, State)
+                     end,
+    Result = ?BACKEND:next(Id, Variables, DeclareNextFun),
+    {reply, Result, State};
 
 handle_command({is_det, Id}, _From, State=#state{variables=Variables}) ->
-    {ok, Bound} = derflow_ets:is_det(Id, Variables),
-    {reply, Bound, State};
+    Result = ?BACKEND:is_det(Id, Variables),
+    {reply, Result, State};
 
 handle_command(_Message, _Sender, State) ->
     {noreply, State}.
 
-%% @todo Most likely broken...
 handle_handoff_command(?FOLD_REQ{foldfun=FoldFun, acc0=Acc0}, _Sender,
                        #state{variables=Variables}=State) ->
     F = fun({Key, Operation}, Acc) -> FoldFun(Key, Operation, Acc) end,
@@ -442,13 +401,11 @@ handoff_cancelled(State) ->
 handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
-%% @todo Most likely broken...
 handle_handoff_data(Data, State=#state{variables=Variables}) ->
     {Key, Operation} = binary_to_term(Data),
     true = ets:insert_new(Variables, {Key, Operation}),
     {reply, ok, State}.
 
-%% @todo Most likely broken...
 encode_handoff_item(Key, Operation) ->
     term_to_binary({Key, Operation}).
 
@@ -482,19 +439,7 @@ handle_exit(_Pid, _Reason, State) ->
 terminate(_Reason, _State) ->
     ok.
 
-%% Internal functions
-
-write(Type, Value, Next, Key, Variables) ->
-    lager:info("Writing key: ~p next: ~p", [Key, Next]),
-    [{_Key, #dv{waiting_threads=Threads,
-                binding_list=BindingList,
-                lazy=Lazy}}] = ets:lookup(Variables, Key),
-    lager:info("Waiting threads are: ~p", [Threads]),
-    {ok, StillWaiting} = derflow_ets:reply_to_all(Threads, [], {ok, Value, Next}),
-    V1 = #dv{type=Type, value=Value, next=Next,
-             lazy=Lazy, bound=true, waiting_threads=StillWaiting},
-    true = ets:insert(Variables, {Key, V1}),
-    notify_all(BindingList, Value).
+%% Internal language functions.
 
 next_key(undefined, Type, State) ->
     {ok, NextKey} = declare_next(Type, State),
@@ -502,25 +447,27 @@ next_key(undefined, Type, State) ->
 next_key(NextKey0, _, _) ->
     NextKey0.
 
-notify_all([H|T], Value) ->
-    notify_value(H, Value),
-    notify_all(T, Value);
-notify_all([], _) ->
-    ok.
-
 %% @doc Declare the next object for streams.
 declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) ->
     lager:info("Current partition and node: ~p ~p", [Partition, Node]),
     Id = druuid:v4(),
+
+    %% Beware of cycles in the gen_server calls!
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+
     case IndexNode of
         {Partition, Node} ->
+            %% We're local, which means that we can interact directly
+            %% with the data store.
             lager:info("Local declare triggered: ~p", [IndexNode]),
-            derflow_ets:declare(Id, Type, Variables);
+            ?BACKEND:declare(Id, Type, Variables);
         _ ->
+            %% We're remote, go through all of the routing logic.
             lager:info("Declare triggered: ~p", [IndexNode]),
-            declare(Id, Type)
+            ?MODULE:declare(Id, Type)
     end.
+
+%% Internal program execution functions.
 
 %% @doc Execute a given program.
 execute(Module, Programs) ->

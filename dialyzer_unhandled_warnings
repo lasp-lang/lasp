@@ -1,0 +1,1 @@
+riak_dt_gcounter.erl:121: The specification for riak_dt_gcounter:stat/2 states that the function might also return float() but the inferred return is 'undefined' | non_neg_integer()

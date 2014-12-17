@@ -18,14 +18,12 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc Producer/consumer test application.
+%% @doc Select test.
 
--module(derflow_producer_consumer_test).
+-module(derflow_select_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--export([test/0,
-         producer/3,
-         consumer/3]).
+-export([test/1]).
 
 -ifdef(TEST).
 
@@ -46,37 +44,50 @@ confirm() ->
 
     ok = derflow_test_helpers:wait_for_cluster(Nodes),
 
-    lager:info("Remotely executing the test."),
-    Result = rpc:call(Node, ?MODULE, test, []),
-    ?assertEqual([5,6,7,8,9,10,11,12,13,14], Result),
+    ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6]},
+                 rpc:call(Node, ?MODULE, test, [riak_dt_gset])),
+
+    lager:info("Done!"),
+
     pass.
 
 -endif.
 
-test() ->
-    {ok, S1} = derflow:declare(),
-    spawn(derflow_producer_consumer_test, producer,
-                   [0, 10, S1]),
-    {ok, S2} = derflow:declare(),
-    spawn(derflow_producer_consumer_test, consumer,
-                   [S1, fun(X) -> X + 5 end, S2]),
-    derflow:get_stream(S2).
+test(Type) ->
+    %% Create initial set.
+    {ok, S1} = derflow:declare(Type),
 
-producer(Init, N, Output) ->
-    if
-        (N > 0) ->
-            timer:sleep(1000),
-            {ok, Next} = derflow:produce(Output, Init),
-            producer(Init + 1, N-1,  Next);
-        true ->
-            derflow:bind(Output, undefined)
-    end.
+    %% Add elements to initial set.
+    {ok, _, S1V1, _} = derflow:read(S1),
+    {ok, S1V2} = Type:update({add_all, [1,2,3]}, undefined, S1V1),
 
-consumer(S1, F, S2) ->
-    case derflow:consume(S1) of
-        {ok, _, undefined, _} ->
-            derflow:bind(S2, undefined);
-        {ok, _, Value, Next} ->
-            {ok, NextOutput} = derflow:produce(S2, F(Value)),
-            consumer(Next, F, NextOutput)
-    end.
+    %% Bind update.
+    {ok, _} = derflow:bind(S1, S1V2),
+
+    %% Read resulting value.
+    {ok, _, S1V2, _} = derflow:read(S1),
+
+    %% Create second set.
+    {ok, S2} = derflow:declare(Type),
+
+    %% Apply select.
+    {ok, _Pid} = derflow:select(S1, fun(X) -> X rem 2 == 0 end, S2),
+
+    %% Wait.
+    timer:sleep(4000),
+
+    %% Bind again.
+    {ok, _, S1V3, _} = derflow:read(S1),
+    {ok, S1V4} = Type:update({add_all, [4,5,6]}, undefined, S1V3),
+    {ok, _} = derflow:bind(S1, S1V4),
+
+    %% Wait.
+    timer:sleep(4000),
+
+    %% Read resulting value.
+    {ok, _, S1V4, _} = derflow:read(S1),
+
+    %% Read resulting value.
+    {ok, _, S2V1, _} = derflow:read(S2),
+
+    {ok, S1V4, S2V1}.

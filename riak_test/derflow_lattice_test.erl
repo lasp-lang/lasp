@@ -74,7 +74,7 @@ test() ->
     {ok, ObjectSetId} = derflow:declare(riak_dt_gset),
     ObjectSetFun = fun(X) ->
             lager:info("~p set received: ~p", [self(), X]),
-            {ok, Set0, _} = derflow:read(ObjectSetId),
+            {ok, _, Set0, _} = derflow:read(ObjectSetId),
             {ok, Set} = riak_dt_gset:update({add, X}, undefined, Set0),
             {ok, _} = derflow:bind(ObjectSetId, Set),
             lager:info("~p set bound to new set: ~p", [self(), Set]),
@@ -106,10 +106,10 @@ producer(Init, N, Output) ->
 %%      function, and then produces inputs on another stream.
 consumer(S1, F, S2) ->
     case derflow:consume(S1) of
-        {ok, undefined, _} ->
+        {ok, _, undefined, _} ->
             lager:info("~p consumed: ~p", [self(), undefined]),
             derflow:bind(S2, undefined);
-        {ok, Value, Next} ->
+        {ok, _, Value, Next} ->
             lager:info("~p consumed: ~p", [self(), Value]),
             Me = self(),
             spawn(fun() -> Me ! F(Value) end),

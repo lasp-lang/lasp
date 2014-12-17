@@ -29,6 +29,7 @@
          bind/4,
          read/1,
          read/2,
+         select/3,
          produce/2,
          produce/4,
          consume/1,
@@ -78,6 +79,10 @@ read(Id) ->
 read(Id, Threshold) ->
     derflow_vnode:read(Id, Threshold).
 
+%% @doc Add select.
+select(Id, Function, AccId) ->
+    derflow_vnode:select(Id, Function, AccId).
+
 produce(Id, Value) ->
     derflow_vnode:bind(Id, Value).
 
@@ -109,10 +114,10 @@ get_stream(Stream)->
 get_stream(Head, Output) ->
     lager:info("About to consume: ~p", [Head]),
     case consume(Head) of
-        {ok, undefined, _} ->
+        {ok, _, undefined, _} ->
             lager:info("Received: ~p", [undefined]),
             Output;
-        {ok, Value, Next} ->
+        {ok, _, Value, Next} ->
             lager:info("Received: ~p", [Value]),
             get_stream(Next, lists:append(Output, [Value]))
     end.

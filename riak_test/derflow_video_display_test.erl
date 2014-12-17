@@ -71,13 +71,13 @@ sender(Init, N, Output) ->
 
 skip1(Input, Output) ->
     case derflow:consume(Input) of
-        {ok, undefined, _} ->
+        {ok, _, undefined, _} ->
             derflow:bind(Output, undefined);
-        {ok, _Value, Next} ->
+        {ok, _, _Value, Next} ->
             case derflow:is_det(Next) of
-                true ->
+                {ok, true} ->
                     skip1(Next, Output);
-                false ->
+                {ok, false} ->
                     derflow:bind(Output, {id, Input})
             end
     end.
@@ -87,9 +87,9 @@ display(Input) ->
     {ok, Output} = derflow:declare(),
     skip1(Input, Output),
     case derflow:consume(Output) of
-        {ok, undefined, _} ->
+        {ok, _, undefined, _} ->
             ok;
-        {ok, Value, Next} ->
+        {ok, _, Value, Next} ->
             display_frame(Value),
             display(Next)
     end.

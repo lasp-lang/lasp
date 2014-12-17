@@ -64,9 +64,9 @@ test(Max) ->
 
 sieve(S1, S2) ->
     case derflow:consume(S1) of
-        {ok, undefined, _} ->
+        {ok, _, undefined, _} ->
             derflow:bind(S2, undefined);
-        {ok, Value, Next} ->
+        {ok, _, Value, Next} ->
             {ok, SN} = derflow:declare(),
             spawn(derflow_sieve_test, filter,
                            [Next, fun(Y) -> Y rem Value =/= 0 end, SN]),
@@ -76,9 +76,9 @@ sieve(S1, S2) ->
 
 filter(S1, F, S2) ->
     case derflow:consume(S1) of
-        {ok, undefined, _} ->
+        {ok, _, undefined, _} ->
             derflow:bind(S2, undefined);
-        {ok, Value, Next} ->
+        {ok, _, Value, Next} ->
             case F(Value) of
                 false ->
                     filter(Next, F, S2);

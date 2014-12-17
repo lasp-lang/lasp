@@ -33,6 +33,7 @@
          declare/2,
          declare/3,
          thread/4,
+         select/4,
          wait_needed/2,
          reply_to_all/2,
          reply_to_all/3]).
@@ -45,7 +46,11 @@
          wait_needed/5,
          read/6,
          write/6,
+         select/5,
          fetch/8]).
+
+%% Exported helper functions.
+-export([select_harness/6]).
 
 %% Exported utility functions.
 -export([threshold_met/3,
@@ -74,6 +79,19 @@ next(Id, Store, DeclareNextFun) ->
         _ ->
             {ok, NextKey0}
     end.
+
+%% @TODO implement.
+select(_Id, _Function, _AccId, _Store) ->
+    {error, not_implemented}.
+
+select(Id, Function, AccId, Store, BindFun) ->
+    Pid = spawn_link(derflow_ets, select_harness, [Store,
+                                                   Id,
+                                                   Function,
+                                                   AccId,
+                                                   BindFun,
+                                                   undefined]),
+    {ok, Pid}.
 
 %% @doc Perform a read for a particular identifier.
 %%
@@ -508,3 +526,28 @@ reply_to_all([], StillWaiting, _Result) ->
 generate_operations(riak_dt_gset, Set) ->
     Values = riak_dt_gset:value(Set),
     {ok, [{add, Value} || Value <- Values]}.
+
+%% @doc Harness for managing the select operation.
+select_harness(Variables, Id, Function, AccId, BindFun, Previous) ->
+    lager:info("Select executing!"),
+    {ok, Type, Value, _} = derflow_ets:read(Id, {strict, Previous}, Variables),
+    lager:info("Threshold was met!"),
+    [{_Key, #dv{type=Type, value=Value}}] = ets:lookup(Variables, Id),
+
+    %% Generate operations for given data type.
+    {ok, Operations} = derflow_ets:generate_operations(Type, Value),
+    lager:info("Operations generated: ~p", [Operations]),
+
+    %% Build new data structure.
+    AccValue = lists:foldl(
+                 fun({add, Element} = Op, Acc) ->
+                         case Function(Element) of
+                             true ->
+                                 {ok, NewAcc} = Type:update(Op, undefined, Acc),
+                                 NewAcc;
+                             _ ->
+                                 Acc
+                         end
+                 end, Type:new(), Operations),
+    BindFun(AccId, AccValue, Variables),
+    select_harness(Variables, Id, Function, AccId, BindFun, Value).

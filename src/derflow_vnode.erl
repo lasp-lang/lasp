@@ -66,8 +66,6 @@
          handle_coverage/4,
          handle_exit/3]).
 
--export([select_harness/7]).
-
 -ignore_xref([start_vnode/1]).
 
 -record(state, {node,
@@ -353,19 +351,26 @@ handle_command({read, Id, Threshold}, From,
                      ReplyFun,
                      BlockingFun);
 
-%% @TODO: derflow_ets needs support for the select function.
 handle_command({select, Id, Function, AccId}, _From,
                State=#state{variables=Variables,
                             partition=Partition,
                             node=Node}) ->
-    Pid = spawn_link(?MODULE, select_harness, [Node,
-                                               Partition,
-                                               Variables,
-                                               Id,
-                                               Function,
-                                               AccId,
-                                               undefined]),
-    {reply, {ok, Pid}, State};
+    BindFun = fun(_AccId, AccValue, _Variables) ->
+            %% Beware of cycles in the gen_server calls!
+            [{IndexNode, _Type}] = derflow:preflist(?N, _AccId, derflow),
+
+            case IndexNode of
+                {Partition, Node} ->
+                    %% We're local, which means that we can interact
+                    %% directly with the data store.
+                    derflow_ets:bind(_AccId, AccValue, _Variables);
+                _ ->
+                    %% We're remote, go through all of the routing logic.
+                    derflow_vnode:bind(_AccId, AccValue)
+            end
+    end,
+    Result = derflow_ets:select(Id, Function, AccId, Variables, BindFun),
+    {reply, Result, State};
 
 handle_command({next, Id}, _From,
                State=#state{variables=Variables}) ->
@@ -488,40 +493,3 @@ generate_unique_module_identifier(Partition, Node, Module) ->
     list_to_atom(
         integer_to_list(Partition) ++ "-" ++
             atom_to_list(Node) ++ "-" ++ atom_to_list(Module)).
-
-%% @doc Harness for managing the select operation.
-select_harness(Node, Partition, Variables, Id, Function, AccId, Previous) ->
-    lager:info("Select executing!"),
-    {ok, Type, Value, _} = derflow_ets:read(Id, {strict, Previous}, Variables),
-    lager:info("Threshold was met!"),
-    [{_Key, #dv{type=Type, value=Value}}] = ets:lookup(Variables, Id),
-
-    %% Generate operations for given data type.
-    {ok, Operations} = derflow_ets:generate_operations(Type, Value),
-    lager:info("Operations generated: ~p", [Operations]),
-
-    %% Build new data structure.
-    AccValue = lists:foldl(
-                 fun({add, Element} = Op, Acc) ->
-                         case Function(Element) of
-                             true ->
-                                 {ok, NewAcc} = Type:update(Op, undefined, Acc),
-                                 NewAcc;
-                             _ ->
-                                 Acc
-                         end
-                 end, Type:new(), Operations),
-
-    %% Beware of cycles in the gen_server calls!
-    [{IndexNode, _Type}] = derflow:preflist(?N, AccId, derflow),
-
-    case IndexNode of
-        {Partition, Node} ->
-            %% We're local, which means that we can interact directly
-            %% with the data store.
-            derflow_ets:bind(AccId, AccValue, Variables);
-        _ ->
-            %% We're remote, go through all of the routing logic.
-            bind(AccId, AccValue)
-    end,
-    select_harness(Node, Partition, Variables, Id, Function, AccId, Value).

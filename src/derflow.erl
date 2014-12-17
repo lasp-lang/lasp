@@ -129,7 +129,7 @@ bind(Id, Value) ->
 %%      Execute `Module:Function(Args)' and bind the result using {@link
 %%      bind/2}.
 %%
--spec bind(id(), module(), function(), args()) -> {ok, id()} | error.
+-spec bind(id(), module(), func(), args()) -> {ok, id()} | error.
 bind(Id, Module, Function, Args) ->
     bind(Id, Module:Function(Args)).
 
@@ -172,7 +172,7 @@ produce(Id, Value) ->
 %%      stream, bind the result of `Module:Function(Args)' to it.
 %%      Similar to {@link produce/2}.
 %%
--spec produce(id(), module(), function(), args()) -> {ok, id()}.
+-spec produce(id(), module(), func(), args()) -> {ok, id()}.
 produce(Id, Module, Function, Args) ->
     derflow_vnode:bind(Id, Module:Function(Args)).
 
@@ -209,7 +209,7 @@ is_det(Id) ->
 %%
 %%      Spawn a process executing `Module:Function(Args)'.
 %%
--spec thread(module(), function(), args()) -> {ok, pid()}.
+-spec thread(module(), func(), args()) -> {ok, pid()}.
 thread(Module, Function, Args) ->
     derflow_vnode:thread(Module, Function, Args).
 
@@ -228,10 +228,11 @@ wait_needed(Id) ->
 %%      Spawn a process and register the process with a given derflow
 %%      supervisor process.
 %%
--spec spawn_mon(supervisor(), module(), function(), args()) -> supervisor().
+-spec spawn_mon(supervisor(), module(), func(), args()) -> ok.
 spawn_mon(Supervisor, Module, Function, Args) ->
     {ok, Pid} = thread(Module, Function, Args),
-    Supervisor ! {'SUPERVISE', Pid, Module, Function, Args}.
+    Supervisor ! {'SUPERVISE', Pid, Module, Function, Args},
+    ok.
 
 %% @doc Materialize all values in a stream and print to the log.
 %%

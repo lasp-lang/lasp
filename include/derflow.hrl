@@ -36,6 +36,7 @@
 -type result() :: term().
 -type type() :: undefined | riak_dt_gset | riak_dt_gcounter.
 -type value() :: term().
+-type func() :: atom().
 -type args() :: list().
 -type bound() :: true | false.
 -type supervisor() :: pid().

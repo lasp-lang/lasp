@@ -1,5 +1,11 @@
-Distributed deterministic dataflow programming
+Distributed deterministic dataflow programming (with CRDTs!)
 =======================================================
+
+Curious about what we're building?  Try out these posts:
+
+* [Programming Models, Part 1: Try Derflow!](http://christophermeiklejohn.com/derflow/erlang/2014/09/28/try-derflow.html)
+* [Programming Models, Part 2: QuickChecking Derflow](http://christophermeiklejohn.com/derflow/erlang/2014/10/01/quickchecking-derflow.html)
+* [Programming Models, Part 3: Ad Counter, Part 1](http://christophermeiklejohn.com/derflow/erlang/2014/11/16/ad-counter-derflow.html)
 
 To build:
 

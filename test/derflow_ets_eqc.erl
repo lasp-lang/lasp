@@ -108,7 +108,7 @@ bind_next(#state{store=Store0}=S, _V, [Id, NewValue]) ->
                 _ ->
                     Type:merge(Value, NewValue)
             end,
-            case derflow_ets:is_inflation(Type, Value, Merged) of
+            case derflow_lattice:is_inflation(Type, Value, Merged) of
                 true ->
                     dict:store(Id, Variable#variable{value=Merged}, Store0);
                 false ->
@@ -122,10 +122,10 @@ bind_post(#state{store=Store}, [Id, V], error) ->
         {ok, #variable{type=_Type, value=undefined}} ->
             false;
         {ok, #variable{type=Type, value=Value}} ->
-            case derflow_ets:is_lattice(Type) of
+            case derflow_lattice:is_lattice(Type) of
                 true ->
                     Merged = Type:merge(V, Value),
-                    case derflow_ets:is_inflation(Type, Value, Merged) of
+                    case derflow_lattice:is_inflation(Type, Value, Merged) of
                         true ->
                             false;
                         false ->
@@ -182,7 +182,7 @@ is_read_valid(#state{store=Store}, Id, Threshold) ->
         {ok, #variable{type=undefined}} ->
             true;
         {ok, #variable{value=Value, type=Type}} ->
-            case derflow_ets:threshold_met(Type, Value, Threshold) of
+            case derflow_lattice:threshold_met(Type, Value, Threshold) of
                 true ->
                     true;
                 false ->

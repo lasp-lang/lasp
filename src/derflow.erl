@@ -148,7 +148,7 @@ read(Id) ->
 %%      is monotonically greater (as defined by the lattice) then the
 %%      provided `Threshold' value.
 %%
--spec read(id(), value()) -> {ok, type(), value(), id()}.
+-spec read(id(), threshold()) -> {ok, type(), value(), id()}.
 read(Id, Threshold) ->
     derflow_vnode:read(Id, Threshold).
 

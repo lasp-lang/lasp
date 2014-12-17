@@ -35,9 +35,15 @@
 -type id() :: atom().
 -type result() :: term().
 -type type() :: undefined | riak_dt_gset | riak_dt_gcounter.
+-type lattice() :: riak_dt_gset | riak_dt_gcounter.
 -type value() :: term().
 -type func() :: atom().
 -type args() :: list().
 -type bound() :: true | false.
 -type supervisor() :: pid().
 -type stream() :: list(#dv{}).
+-type store() :: ets:tid().
+-type threshold() :: value() | {strict, value()}.
+-type pending_threshold() :: {threshold, pid(), lattice(), threshold()}.
+-type operation() :: {atom(), value()}.
+-type operations() :: list(operation()).

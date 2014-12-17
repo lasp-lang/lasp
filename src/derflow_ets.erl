@@ -23,6 +23,8 @@
 
 -include("derflow.hrl").
 
+-behaviour(derflow_backend).
+
 %% Core API.
 -export([is_det/2,
          bind/3,
@@ -54,12 +56,16 @@
 -export([select_harness/6]).
 
 %% Exported utility functions.
--export([threshold_met/3,
-         is_lattice/1,
-         is_inflation/3,
-         generate_operations/2]).
+-export([next_key/3,
+         notify_all/3,
+         write/5]).
 
 %% @doc Given an identifier, return the next identifier.
+%%
+%%      Given `Id', return the next identifier to create a stream of
+%%      variables.
+%%
+-spec next(id(), store()) -> {ok, id()}.
 next(Id, Store) ->
     DeclareNextFun = fun(Type) ->
             declare(Type, Store)
@@ -67,9 +73,14 @@ next(Id, Store) ->
     next(Id, Store, DeclareNextFun).
 
 %% @doc Given an identifier, return the next identifier.
+%%
+%%      Given `Id', return the next identifier to create a stream of
+%%      variables.
+%%
 %%      Allow for an override function for performing the generation of
 %%      the next identifier, using `DeclareNextFun'.
 %%
+-spec next(id(), store(), function()) -> {ok, id()}.
 next(Id, Store, DeclareNextFun) ->
     [{_Key, V=#dv{next=NextKey0}}] = ets:lookup(Store, Id),
     case NextKey0 of
@@ -81,10 +92,14 @@ next(Id, Store, DeclareNextFun) ->
             {ok, NextKey0}
     end.
 
+%% @TODO doc.
+%% @TODO spec.
 %% @TODO implement.
 select(_Id, _Function, _AccId, _Store) ->
     {error, not_implemented}.
 
+%% @TODO doc.
+%% @TODO spec.
 select(Id, Function, AccId, Store, BindFun) ->
     Pid = spawn_link(?MODULE, select_harness, [Store,
                                                Id,
@@ -96,14 +111,22 @@ select(Id, Function, AccId, Store, BindFun) ->
 
 %% @doc Perform a read for a particular identifier.
 %%
+%%      Given an `Id', perform a blocking read until the variable is
+%%      bound.
+%%
+-spec read(id(), store()) -> {ok, type(), value(), id()}.
 read(Id, Store) ->
     read(Id, undefined, Store).
 
 %% @doc Perform a threshold read for a particular identifier.
 %%
+%%      Given an `Id', perform a blocking read until the variable is
+%%      bound.
+%%
 %%      This operation blocks until `Threshold' has been reached,
 %%      reading from the provided {@link ets:new/2} store, `Store'.
 %%
+-spec read(id(), value(), store()) -> {ok, type(), value(), id()}.
 read(Id, Threshold, Store) ->
     Self = self(),
     ReplyFun = fun(Type, Value, Next) ->
@@ -118,19 +141,24 @@ read(Id, Threshold, Store) ->
                  end,
     read(Id, Threshold, Store, Self, ReplyFun, BlockingFun).
 
-%% @doc  Perform a read (or threshold read) for a particular identifier.
+%% @doc Perform a read (or threshold read) for a particular identifier.
 %%
-%%       Perform a read -- reads will either block until the `Threshold'
-%%       is met, or the variable is bound.  Reads will be performed
-%%       against the `Store' provided, which should be the identifier of
-%%       an {@link ets:new/2} table.  When the process should register
-%%       itself for notification of the variable being bound, it should
-%%       supply the process identifier for notifications as `Self'.
-%%       Finally, the `ReplyFun' and `BlockingFun' functions will be
-%%       executed in the event that the reply is available immediately,
-%%       or it will have to wait for the notification, in the event the
-%%       variable is unbound or has not met the threshold yet.
+%%      Given an `Id', perform a blocking read until the variable is
+%%      bound.
 %%
+%%      Perform a read -- reads will either block until the `Threshold'
+%%      is met, or the variable is bound.  Reads will be performed
+%%      against the `Store' provided, which should be the identifier of
+%%      an {@link ets:new/2} table.  When the process should register
+%%      itself for notification of the variable being bound, it should
+%%      supply the process identifier for notifications as `Self'.
+%%      Finally, the `ReplyFun' and `BlockingFun' functions will be
+%%      executed in the event that the reply is available immediately,
+%%      or it will have to wait for the notification, in the event the
+%%      variable is unbound or has not met the threshold yet.
+%%
+-spec read(id(), value(), store(), pid(), function(), function()) ->
+    {ok, type(), value(), id()}.
 read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
     [{_Key, V=#dv{value=Value,
                   bound=Bound,
@@ -141,7 +169,7 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
         true ->
             lager:info("Read received: ~p, bound: ~p, threshold: ~p",
                        [Id, V, Threshold]),
-            case ?MODULE:is_lattice(Type) of
+            case derflow_lattice:is_lattice(Type) of
                 true ->
                     case Threshold of
                         undefined ->
@@ -151,9 +179,9 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                         _ ->
                             lager:info("Threshold specified: ~p",
                                        [Threshold]),
-                            case ?MODULE:threshold_met(Type,
-                                                           Value,
-                                                           Threshold) of
+                            case derflow_lattice:threshold_met(Type,
+                                                               Value,
+                                                               Threshold) of
                                 true ->
                                     ReplyFun(Type, Value, V#dv.next);
                                 false ->
@@ -216,6 +244,8 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
 %%      `NextKeyFun' is responsible for generating the next identifier
 %%      for use in building a stream from this partially-bound variable.
 %%
+-spec fetch(id(), id(), pid(), store(), function(), function(),
+            function(), function()) -> term().
 fetch(TargetId, FromId, FromPid, Store,
       ResponseFun, FetchFun, ReplyFetchFun, NextKeyFun) ->
     [{_, DV=#dv{bound=Bound,
@@ -242,17 +272,21 @@ fetch(TargetId, FromId, FromPid, Store,
 %% @doc Declare a dataflow variable in a provided by identifer {@link
 %%      ets:new/2} `Store'.
 %%
+-spec declare(store()) -> {ok, id()}.
 declare(Store) ->
     declare(undefined, Store).
 
 %% @doc Declare a dataflow variable, as a given type, in a provided by
 %%      identifer {@link ets:new/2} `Store'.
 %%
+-spec declare(type(), store()) -> {ok, id()}.
 declare(Type, Store) ->
     declare(druuid:v4(), Type, Store).
 
-%% @doc Declare a dataflow variable of a given type with a given id.
+%% @doc Declare a dataflow variable in a provided by identifer {@link
+%%      ets:new/2} `Store' with a given `Type'.
 %%
+-spec declare(id(), type(), store()) -> {ok, id()}.
 declare(Id, Type, Store) ->
     Record = case Type of
         undefined ->
@@ -265,18 +299,34 @@ declare(Id, Type, Store) ->
 
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.
+%%
+%%      This version, performs a partial bind to another dataflow
+%%      variable.
+%%
+%%      `FetchFun' is used to specify how to find the target identifier,
+%%      given it is located in another data store.
+%%
+%%      `FromPid' is sent a message with the target identifiers value,
+%%      if the target identifier is already bound.
+%%
+-spec bind(id(), {id, id()}, store(), function(), pid()) -> any().
 bind(Id, {id, DVId}, Store, FetchFun, FromPid) ->
     true = ets:insert(Store, {Id, #dv{value={id, DVId}}}),
     FetchFun(DVId, Id, FromPid).
 
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.
+%%
+%%      When `Id' is `{id, id()}', a partial bind is performed, where
+%%      one dataflow variable is bound to another and when assigned a
+%%      value, are updated together.
+%%
 %% @TODO Implement.
+%% @TODO doc.
+-spec bind(id(), {id, id()} | value(), store()) -> {ok, id()}.
 bind(_Id, {id, _DVId}, _Store) ->
     {error, not_implemented};
 
-%% @doc Define a dataflow variable to be bound a value.
-%%
 bind(Id, Value, Store) ->
     NextKeyFun = fun(Type, Next) ->
                         case Value of
@@ -290,12 +340,15 @@ bind(Id, Value, Store) ->
 
 %% @doc Define a dataflow variable to be bound a value.
 %%
+%%      Similar to {@link bind/3}.
+%%
 %%      `NextKeyFun' is used to determine how to generate the next
 %%      identifier -- this is abstracted because in some settings this
 %%      next key may be located in the local store, when running code at
 %%      the replica, or located in a remote store, when running the code
 %%      at the client.
 %%
+-spec bind(id(), {id, id()} | value(), store(), function()) -> {ok, id()}.
 bind(Id, Value, Store, NextKeyFun) ->
     [{_Key, V=#dv{next=Next,
                   type=Type,
@@ -308,10 +361,10 @@ bind(Id, Value, Store, NextKeyFun) ->
                 Value ->
                     {ok, NextKey};
                 _ ->
-                    case is_lattice(Type) of
+                    case derflow_lattice:is_lattice(Type) of
                         true ->
                             Merged = Type:merge(V#dv.value, Value),
-                            case is_inflation(Type, V#dv.value, Merged) of
+                            case derflow_lattice:is_inflation(Type, V#dv.value, Merged) of
                                 true ->
                                     write(Type, Merged, NextKey, Id, Store),
                                     {ok, NextKey};
@@ -331,14 +384,23 @@ bind(Id, Value, Store, NextKeyFun) ->
             {ok, NextKey}
     end.
 
-%% @doc Return the binding status of a given dataflow variable.
+%% @doc Inspect the bind status of a variable.
 %%
+%%      Return the bound status of `Id'.
+%%
+%%      Operator introduces non-determinism if a choice is made using
+%%      the result.
+%%
+-spec is_det(id(), store()) -> {ok, bound()}.
 is_det(Id, Store) ->
     [{_Key, #dv{bound=Bound}}] = ets:lookup(Store, Id),
     {ok, Bound}.
 
 %% @doc Spawn a function.
 %%
+%%      Spawn a process executing `Module:Function(Args)'.
+%%
+-spec thread(module(), func(), args(), store()) -> {ok, pid()}.
 thread(Module, Function, Args, _Store) ->
     Fun = fun() -> erlang:apply(Module, Function, Args) end,
     Pid = spawn(Fun),
@@ -349,71 +411,12 @@ thread(Module, Function, Args, _Store) ->
 %% @doc Declare next key, if undefined.  This function assumes that the
 %%      next key will be declared in the local store.
 %%
+-spec next_key(undefined | id(), type(), store()) -> id().
 next_key(undefined, Type, Store) ->
     {ok, NextKey} = declare(druuid:v4(), Type, Store),
     NextKey;
 next_key(NextKey0, _, _) ->
     NextKey0.
-
-%% @doc Determine if a threshold is met.
-%%
-threshold_met(riak_dt_gset, Value, {strict, Threshold}) ->
-    is_strict_inflation(riak_dt_gset, Threshold, Value);
-threshold_met(riak_dt_gset, Value, Threshold) ->
-    is_inflation(riak_dt_gset, Threshold, Value);
-threshold_met(riak_dt_gcounter, Value, {strict, Threshold}) ->
-    Threshold < riak_dt_gcounter:value(Value);
-threshold_met(riak_dt_gcounter, Value, Threshold) ->
-    Threshold =< riak_dt_gcounter:value(Value).
-
-%% @doc Determine if a change is an inflation or not.
-%%
-is_inflation(Type, Previous, Current) ->
-    is_lattice(Type) andalso
-        is_lattice_inflation(Type, Previous, Current).
-
-%% @doc Determine if a change is a strict inflation or not.
-%%
-is_strict_inflation(Type, Previous, Current) ->
-    is_lattice(Type) andalso
-        is_lattice_strict_inflation(Type, Previous, Current).
-
-%% @doc Determine if a change for a given type is an inflation or not.
-%%
-is_lattice_inflation(riak_dt_gcounter, undefined, _) ->
-    true;
-is_lattice_inflation(riak_dt_gcounter, Previous, Current) ->
-    PreviousList = lists:sort(orddict:to_list(Previous)),
-    CurrentList = lists:sort(orddict:to_list(Current)),
-    lists:foldl(fun({Actor, Count}, Acc) ->
-            case lists:keyfind(Actor, 1, CurrentList) of
-                false ->
-                    Acc andalso false;
-                {_Actor1, Count1} ->
-                    Acc andalso (Count =< Count1)
-            end
-            end, true, PreviousList);
-is_lattice_inflation(riak_dt_gset, undefined, _) ->
-    true;
-is_lattice_inflation(riak_dt_gset, Previous, Current) ->
-    sets:is_subset(
-        sets:from_list(riak_dt_gset:value(Previous)),
-        sets:from_list(riak_dt_gset:value(Current))).
-
-%% @doc Determine if a change for a given type is a strict inflation or
-%%      not.
-%%
-is_lattice_strict_inflation(riak_dt_gset, undefined, Current) ->
-    is_lattice_inflation(riak_dt_gset, undefined, Current);
-is_lattice_strict_inflation(riak_dt_gset, Previous, Current) ->
-    is_lattice_inflation(riak_dt_gset, Previous, Current) andalso
-        lists:usort(riak_dt_gset:value(Previous)) =/=
-        lists:usort(riak_dt_gset:value(Current)).
-
-%% @doc Return if something is a lattice or not.
-%%
-is_lattice(Type) ->
-    lists:member(Type, ?LATTICES).
 
 %% @doc Send responses to waiting threads, via messages.
 %%
@@ -424,6 +427,11 @@ is_lattice(Type) ->
 %%      * Mark variable as bound.
 %%      * Check thresholds and send notifications, if required.
 %%
+%%      When `NotifyFun' is supplied, override the function used to
+%%      notify when a value is written -- this is required when talking
+%%      to other tables in the system which are not the local table.
+%%
+-spec write(type(), value(), id(), id(), store()) -> ok.
 write(Type, Value, Next, Key, Store) ->
     NotifyFun = fun(Id, NewValue) ->
                         [{_, #dv{next=Next,
@@ -432,6 +440,15 @@ write(Type, Value, Next, Key, Store) ->
                 end,
     write(Type, Value, Next, Key, Store, NotifyFun).
 
+%% @doc Send responses to waiting threads, via messages.
+%%
+%%      Similar to {@link write/5}.
+%%
+%%      When `NotifyFun' is supplied, override the function used to
+%%      notify when a value is written -- this is required when talking
+%%      to other tables in the system which are not the local table.
+%%
+-spec write(type(), value(), id(), id(), store(), function()) -> ok.
 write(Type, Value, Next, Key, Store, NotifyFun) ->
     lager:info("Writing key: ~p next: ~p", [Key, Next]),
     [{_Key, #dv{waiting_threads=Threads,
@@ -449,13 +466,35 @@ write(Type, Value, Next, Key, Store, NotifyFun) ->
     notify_all(NotifyFun, BindingList, Value),
     ok.
 
+%% @TODO doc.
 %% @TODO implement.
-wait_needed(_Id, _Store) ->
-    {error, not_implemeneted}.
+-spec wait_needed(id(), store()) -> ok.
+wait_needed(Id, Store) ->
+    Self = self(),
+    ReplyFun = fun() ->
+                       ok
+               end,
+    BlockingFun = fun() ->
+                          receive
+                              X ->
+                                  X
+                          end
+                  end,
+    wait_needed(Id, Store, Self, ReplyFun, BlockingFun).
 
 %% @doc Callback wait_needed function for derflow_vnode, where we
 %%      change the reply and blocking replies.
 %%
+%%      Similar to {@link wait_needed/2}.
+%%
+%%      `BlockingFun' is used to override the handling of waiting for a
+%%      read operation to trigger on something that is waiting (lazy).
+%%
+%%      `ReplyFun' is used to override the function which is used to
+%%      notify waiting processes, for instance, if they are running on
+%%      another node.
+%%
+-spec wait_needed(id(), store(), pid(), function(), function()) -> ok.
 wait_needed(Id, Store, Self, ReplyFun, BlockingFun) ->
     lager:info("Wait needed issued for identifier: ~p", [Id]),
     [{_Key, V=#dv{waiting_threads=WT,
@@ -474,13 +513,20 @@ wait_needed(Id, Store, Self, ReplyFun, BlockingFun) ->
                 end
     end.
 
-%% @doc Notify a value and write.
+%% @doc Notify a value of a change, and write changed value.
+%%
+%%      Given the local write might need to trigger another series of
+%%      notifications, `NotifyFun' is used to specify how this process
+%%      should be done.
+%%
+-spec notify_value(id(), value(), store(), function()) -> ok.
 notify_value(Id, Value, Store, NotifyFun) ->
     [{_, #dv{next=Next, type=Type}}] = ets:lookup(Store, Id),
     write(Type, Value, Next, Id, Store, NotifyFun).
 
 %% @doc Notify a series of variables of bind.
 %%
+-spec notify_all(function(), list(#dv{}), value()) -> ok.
 notify_all(NotifyFun, [H|T], Value) ->
     NotifyFun(H, Value),
     notify_all(NotifyFun, T, Value);
@@ -490,17 +536,21 @@ notify_all(_, [], _) ->
 %% @doc Given a group of processes which are blocking on reads, notify
 %%      them of bound values or met thresholds.
 %%
+-spec reply_to_all(list(pending_threshold()), term()) ->
+    {ok, list(pending_threshold())}.
 reply_to_all(List, Result) ->
     reply_to_all(List, [], Result).
 
 %% @doc Given a group of processes which are blocking on reads, notify
 %%      them of bound values or met thresholds.
 %%
+-spec reply_to_all(list(pending_threshold()), list(pending_threshold()),
+                   term()) -> {ok, list(pending_threshold())}.
 reply_to_all([{threshold, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, Type, Value, Next}=Result) ->
     lager:info("Result: ~p, Threshold: ~p", [Result, Threshold]),
-    StillWaiting = case ?MODULE:threshold_met(Type, Value, Threshold) of
+    StillWaiting = case derflow_lattice:threshold_met(Type, Value, Threshold) of
         true ->
             lager:info("Threshold ~p met: ~p", [Threshold, Value]),
             case From of
@@ -526,15 +576,10 @@ reply_to_all([From|T], StillWaiting, Result) ->
 reply_to_all([], StillWaiting, _Result) ->
     {ok, StillWaiting}.
 
-%% @doc Given an object type from riak_dt; generate a series of
-%%      operations for that type which are representative of a partial
-%%      order of operations on this object yielding this state.
-%%
-generate_operations(riak_dt_gset, Set) ->
-    Values = riak_dt_gset:value(Set),
-    {ok, [{add, Value} || Value <- Values]}.
-
 %% @doc Harness for managing the select operation.
+%% @private
+-spec select_harness(store(), id(), function(), id(), function(),
+                     value()) -> function().
 select_harness(Variables, Id, Function, AccId, BindFun, Previous) ->
     lager:info("Select executing!"),
     {ok, Type, Value, _} = ?MODULE:read(Id, {strict, Previous}, Variables),
@@ -542,7 +587,7 @@ select_harness(Variables, Id, Function, AccId, BindFun, Previous) ->
     [{_Key, #dv{type=Type, value=Value}}] = ets:lookup(Variables, Id),
 
     %% Generate operations for given data type.
-    {ok, Operations} = ?MODULE:generate_operations(Type, Value),
+    {ok, Operations} = derflow_lattice:generate_operations(Type, Value),
     lager:info("Operations generated: ~p", [Operations]),
 
     %% Build new data structure.

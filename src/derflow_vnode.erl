@@ -301,27 +301,15 @@ handle_command({fetch, TargetId, FromId, FromP}, _From,
                 end
     end;
 
-%% @TODO: this should be implemented in derflow_ets to cut down in code
-%%        duplication.
 handle_command({reply_fetch, FromId, FromP,
-                FetchDV=#dv{value=Value, next=Next, type=Type}}, _From, 
+                #dv{value=Value, next=Next, type=Type}}, _From,
                State=#state{variables=Variables}) ->
-    case FetchDV#dv.bound of
-        true ->
-            NotifyFun = fun(Id, NewValue) ->
-                                derflow_vnode:notify_value(Id, NewValue)
-                        end,
-            derflow_ets:write(Type, Value, Next, FromId, Variables, NotifyFun),
-            {ok, _} = derflow_ets:reply_to_all([FromP], {ok, Next}),
-            ok;
-        false ->
-            [{_, DV}] = ets:lookup(Variables, FromId),
-            DV1 = DV#dv{next=FetchDV#dv.next},
-            true = ets:insert(Variables, {FromId, DV1}),
-            {ok, _} = derflow_ets:reply_to_all([FromP], {ok, FetchDV#dv.next}),
-            ok
-      end,
-      {noreply, State};
+    NotifyFun = fun(Id, NewValue) ->
+                        derflow_vnode:notify_value(Id, NewValue)
+                end,
+    derflow_ets:write(Type, Value, Next, FromId, Variables, NotifyFun),
+    {ok, _} = derflow_ets:reply_to_all([FromP], {ok, Next}),
+    {noreply, State};
 
 handle_command({notify_value, Id, Value}, _From,
                State=#state{variables=Variables}) ->

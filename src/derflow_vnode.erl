@@ -48,7 +48,8 @@
          execute/3]).
 
 %% Callbacks from the backend module.
--export([notify_value/2]).
+-export([notify_value/2,
+         reply_fetch/3]).
 
 -export([start_vnode/1,
          init/1,
@@ -146,16 +147,16 @@ declare(Id, Type) ->
                                               {declare, Id, Type},
                                               ?VNODE_MASTER).
 
-fetch(Id, FromId, FromP) ->
+fetch(Id, FromId, FromPid) ->
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:command(IndexNode,
-                                   {fetch, Id, FromId, FromP},
+                                   {fetch, Id, FromId, FromPid},
                                    ?VNODE_MASTER).
 
-reply_fetch(Id, FromP, DV) ->
+reply_fetch(Id, FromPid, DV) ->
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:command(IndexNode,
-                                   {reply_fetch, Id, FromP, DV},
+                                   {reply_fetch, Id, FromPid, DV},
                                    ?VNODE_MASTER).
 
 notify_value(Id, Value) ->
@@ -279,36 +280,37 @@ handle_command({bind, Id, Value}, _From,
 
 %% @TODO: this should be implemented in derflow_ets to cut down in code
 %%        duplication.
-handle_command({fetch, TargetId, FromId, FromP}, _From,
+handle_command({fetch, TargetId, FromId, FromPid}, _From,
                State=#state{variables=Variables}) ->
-    [{_, DV}] = ets:lookup(Variables, TargetId),
-    case DV#dv.bound of
-        true ->
-            reply_fetch(FromId, FromP, DV),
-            {noreply, State};
-        false ->
-            case DV#dv.value of
-                {id, BindId} ->
-                    fetch(BindId, FromId, FromP),
-                    {noreply, State};
-                _ ->
-                    NextKey = next_key(DV#dv.next, DV#dv.type, State),
-                    BindingList = lists:append(DV#dv.binding_list, [FromId]),
-                    DV1 = DV#dv{binding_list=BindingList, next=NextKey},
-                    true = ets:insert(Variables, {TargetId, DV1}),
-                    reply_fetch(FromId, FromP, DV1),
-                    {noreply, State}
-                end
-    end;
+    ResponseFun = fun() ->
+            {noreply, State}
+    end,
+    FetchFun = fun(_TargetId, _FromId, _FromPid) ->
+            derflow_vnode:fetch(_TargetId, _FromId, _FromPid)
+    end,
+    ReplyFetchFun = fun(_FromId, _FromPid, DV) ->
+            derflow_vnode:reply_fetch(_FromId, _FromPid, DV)
+    end,
+    NextKeyFun = fun(Next, Type) ->
+            next_key(Next, Type, State)
+    end,
+    derflow_ets:fetch(TargetId,
+                      FromId,
+                      FromPid,
+                      Variables,
+                      ResponseFun,
+                      FetchFun,
+                      ReplyFetchFun,
+                      NextKeyFun);
 
-handle_command({reply_fetch, FromId, FromP,
+handle_command({reply_fetch, FromId, FromPid,
                 #dv{value=Value, next=Next, type=Type}}, _From,
                State=#state{variables=Variables}) ->
     NotifyFun = fun(Id, NewValue) ->
                         derflow_vnode:notify_value(Id, NewValue)
                 end,
     derflow_ets:write(Type, Value, Next, FromId, Variables, NotifyFun),
-    {ok, _} = derflow_ets:reply_to_all([FromP], {ok, Next}),
+    {ok, _} = derflow_ets:reply_to_all([FromPid], {ok, Next}),
     {noreply, State};
 
 handle_command({notify_value, Id, Value}, _From,

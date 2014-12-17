@@ -44,7 +44,8 @@
          notify_value/4,
          wait_needed/5,
          read/6,
-         write/6]).
+         write/6,
+         fetch/8]).
 
 %% Exported utility functions.
 -export([threshold_met/3,
@@ -162,6 +163,61 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                 false ->
                     BlockingFun()
             end
+    end.
+
+%% @doc Fetch is responsible for retreiving the value of a
+%%      partially-bound variable from the ultimate source, if it's
+%%      bound.
+%%
+%%      When running on a local replica, this is straightforward -- it¬
+%%      can look the value up direclty up from the {@link ets:new/2}
+%%      table supplied, as seen in the {@link bind/3} function.  Fetch
+%%      is specifically used when we need to look in a series of tables,
+%%      each running in a different process at a different node.
+%%
+%%      The function is implemented here, given it relies on knowing the
+%%      structure of the table and is ets specific.  However, it's
+%%      primarily used by the distribution code located in the virtual
+%%      node.
+%%
+%%      Because of this, a number of functions need to be exported to
+%%      support this behavior.
+%%
+%%      `ResponseFun' is a function responsible for the return value, as
+%%      required by the virtual node which will call into this.
+%%
+%%      `FetchFun' is a function responsible for retreiving the value on
+%%      another node, if the value is only partially bound here --
+%%      consider the case where X is bound to Y which is bound to Z -- a
+%%      fetch on Z requires transitive fetches through Y to X.
+%%
+%%      `ReplyFetchFun' is a function responsible for sending the
+%%      response back to the originating fetch node.
+%%
+%%      `NextKeyFun' is responsible for generating the next identifier
+%%      for use in building a stream from this partially-bound variable.
+%%
+fetch(TargetId, FromId, FromPid, Store,
+      ResponseFun, FetchFun, ReplyFetchFun, NextKeyFun) ->
+    [{_, DV=#dv{bound=Bound,
+                value=Value}}] = ets:lookup(Store, TargetId),
+    case Bound of
+        true ->
+            ReplyFetchFun(FromId, FromPid, DV),
+            ResponseFun();
+        false ->
+            case Value of
+                {id, BindId} ->
+                    FetchFun(BindId, FromId, FromPid),
+                    ResponseFun();
+                _ ->
+                    NextKey = NextKeyFun(DV#dv.next, DV#dv.type),
+                    BindingList = lists:append(DV#dv.binding_list, [FromId]),
+                    DV1 = DV#dv{binding_list=BindingList, next=NextKey},
+                    true = ets:insert(Store, {TargetId, DV1}),
+                    ReplyFetchFun(FromId, FromPid, DV1),
+                    ResponseFun()
+                end
     end.
 
 %% @doc Declare a dataflow variable in a provided by identifer {@link
@@ -336,12 +392,12 @@ is_lattice(Type) ->
 
 %% @doc Send responses to waiting threads, via messages.
 %%
-%%      Perform three operations:
+%%      Perform the following operations:
 %%
-%%      1. Reply to all waiting threads via message.
-%%      2. Perform binding of any variables which are bound to just
-%%         bound variable.
-%%      3. Mark variable as bound.
+%%      * Reply to all waiting threads via message.
+%%      * Perform binding of any variables which are partially bound.
+%%      * Mark variable as bound.
+%%      * Check thresholds and send notifications, if required.
 %%
 write(Type, Value, Next, Key, Store) ->
     NotifyFun = fun(Id, NewValue) ->

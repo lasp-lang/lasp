@@ -116,9 +116,9 @@ client(Id, Ads) ->
             {ok, Updated} = riak_dt_gcounter:update(increment, Id, Value),
             {ok, _} = derflow:bind(Ad, Updated),
 
-            client(Id, Ads);
+            client(Id, tl(Ads) ++ [Ad]);
         {remove_ad, Ad} ->
             %% Remove ad.
             lager:info("Removing ad: ~p from client: ~p~n", [Ad, Id]),
-            client(Id, tl(Ads) -- [Ad])
+            client(Id, Ads -- [Ad])
     end.

@@ -54,34 +54,52 @@ confirm() ->
 -endif.
 
 test() ->
-    {ok, Id1} = derflow:declare(),
+    %% Single-assignment variables.
+    {ok, I1} = derflow:declare(),
+    {ok, I2} = derflow:declare(),
+    {ok, I3} = derflow:declare(),
 
-    {ok, Id2} = derflow:declare(),
+    V1 = 1,
 
-    {ok, _} = derflow:bind_to(Id2, Id1),
-    lager:info("Successful bind."),
+    %% Attempt pre, and post- dataflow variable bind operations.
+    {ok, _} = derflow:bind_to(I2, I1),
+    {ok, _} = derflow:bind(I1, V1),
+    {ok, _} = derflow:bind_to(I3, I1),
 
-    {ok, _} = derflow:bind(Id1, 1),
-    lager:info("Successful bind."),
+    %% Perform invalid bind.
+    error = derflow:bind(I1, 2),
 
-    {ok, _, Value1, _} = derflow:read(Id1),
-    lager:info("Successful read: ~p", [Value1]),
+    %% Verify the same value is contained by all.
+    {ok, _, V1, _} = derflow:read(I3),
+    {ok, _, V1, _} = derflow:read(I2),
+    {ok, _, V1, _} = derflow:read(I1),
 
-    error = derflow:bind(Id1, 2),
-    lager:info("Unsuccessful bind."),
+    %% G-Set variables.
+    {ok, L1} = derflow:declare(riak_dt_gset),
+    {ok, L2} = derflow:declare(riak_dt_gset),
+    {ok, L3} = derflow:declare(riak_dt_gset),
 
-    {ok, _, Value1, _} = derflow:read(Id1),
-    lager:info("Successful read: ~p", [Value1]),
+    {ok, S1} = riak_dt_gset:update({add, 1},
+                                   undefined, riak_dt_gset:new()),
 
-    {ok, _, Value1, _} = derflow:read(Id2),
-    lager:info("Successful read: ~p", [Value1]),
+    %% Attempt pre, and post- dataflow variable bind operations.
+    {ok, _} = derflow:bind_to(L2, L1),
+    {ok, _} = derflow:bind(L1, S1),
+    {ok, _} = derflow:bind_to(L3, L1),
 
-    {ok, Id3} = derflow:declare(),
+    %% Verify the same value is contained by all.
+    {ok, _, S1, _} = derflow:read(L3),
+    {ok, _, S1, _} = derflow:read(L2),
+    {ok, _, S1, _} = derflow:read(L1),
 
-    {ok, _} = derflow:bind_to(Id3, Id1),
-    lager:info("Successful bind."),
+    %% Test inflation.
+    {ok, S2} = riak_dt_gset:update({add, 2},
+                                   undefined, S1),
+    {ok, _} = derflow:bind(L1, S2),
 
-    {ok, _, Value1, _} = derflow:read(Id3),
-    lager:info("Successful read: ~p", [Value1]),
+    %% Verify the same value is contained by all.
+    {ok, _, S2, _} = derflow:read(L3),
+    {ok, _, S2, _} = derflow:read(L2),
+    {ok, _, S2, _} = derflow:read(L1),
 
     ok.

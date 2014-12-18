@@ -453,25 +453,21 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
             function(), function()) -> term().
 fetch(TargetId, FromId, FromPid, Store,
       ResponseFun, FetchFun, ReplyFetchFun, NextKeyFun) ->
-    [{_, DV=#dv{bound=Bound,
+    [{_, DV=#dv{bound=_Bound,
                 binding=Binding}}] = ets:lookup(Store, TargetId),
-    case Bound of
-        true ->
-            ReplyFetchFun(FromId, FromPid, DV),
+    case Binding of
+        undefined ->
+            NextKey = NextKeyFun(DV#dv.next, DV#dv.type),
+            BindingList = lists:append(DV#dv.binding_list, [FromId]),
+            lager:info("Updating binding_list to: ~p for ~p",
+                       [BindingList, TargetId]),
+            DV1 = DV#dv{binding_list=BindingList, next=NextKey},
+            true = ets:insert(Store, {TargetId, DV1}),
+            ReplyFetchFun(FromId, FromPid, DV1),
             ResponseFun();
-        false ->
-            case Binding of
-                undefined ->
-                    NextKey = NextKeyFun(DV#dv.next, DV#dv.type),
-                    BindingList = lists:append(DV#dv.binding_list, [FromId]),
-                    DV1 = DV#dv{binding_list=BindingList, next=NextKey},
-                    true = ets:insert(Store, {TargetId, DV1}),
-                    ReplyFetchFun(FromId, FromPid, DV1),
-                    ResponseFun();
-                BindId ->
-                    FetchFun(BindId, FromId, FromPid),
-                    ResponseFun()
-                end
+        BindId ->
+            FetchFun(BindId, FromId, FromPid),
+            ResponseFun()
     end.
 
 %% @doc Define a dataflow variable to be bound to another dataflow
@@ -676,6 +672,7 @@ write(Type, Value, Next, Key, Store, NotifyFun) ->
     lager:info("Writing key: ~p next: ~p", [Key, Next]),
     [{_Key, #dv{waiting_threads=Threads,
                 binding_list=BindingList,
+                binding=Binding,
                 lazy=Lazy}}] = ets:lookup(Store, Key),
     lager:info("Waiting threads are: ~p", [Threads]),
     lager:info("Binding list is: ~p", [BindingList]),
@@ -685,6 +682,8 @@ write(Type, Value, Next, Key, Store, NotifyFun) ->
              next=Next,
              lazy=Lazy,
              bound=true,
+             binding=Binding,
+             binding_list=BindingList,
              waiting_threads=StillWaiting},
     true = ets:insert(Store, {Key, V1}),
     notify_all(NotifyFun, BindingList, Value),

@@ -338,7 +338,6 @@ bind(Id, {id, DVId}, Store, FetchFun, FromPid) ->
 %%      value, are updated together.
 %%
 %% @TODO Implement.
-%% @TODO doc.
 -spec bind(id(), {id, id()} | value(), store()) -> {ok, id()}.
 bind(_Id, {id, _DVId}, _Store) ->
     {error, not_implemented};

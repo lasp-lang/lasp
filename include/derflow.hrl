@@ -23,7 +23,7 @@
              next,
              waiting_threads = [],
              binding_list = [],
-             creator,
+             lazy_threads = [],
              type,
              lazy = false,
              bound = false}).

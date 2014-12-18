@@ -367,8 +367,8 @@ next(Id, Store, DeclareNextFun) ->
 read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
     [{_Key, V=#dv{value=Value,
                   bound=Bound,
-                  creator=Creator,
                   lazy=Lazy,
+                  lazy_threads=LazyThreads,
                   type=Type}}] = ets:lookup(Store, Id),
     case Bound of
         true ->
@@ -410,7 +410,7 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
             true = ets:insert(Store, {Id, V#dv{waiting_threads=WT}}),
             case Lazy of
                 true ->
-                    {ok, _} = reply_to_all([Creator], ok),
+                    {ok, _} = reply_to_all(LazyThreads, ok),
                     BlockingFun();
                 false ->
                     BlockingFun()
@@ -523,6 +523,7 @@ select(Id, Function, AccId, Store, BindFun) ->
 wait_needed(Id, Store, Self, ReplyFun, BlockingFun) ->
     lager:info("Wait needed issued for identifier: ~p", [Id]),
     [{_Key, V=#dv{waiting_threads=WT,
+                  lazy_threads=LazyThreads0,
                   bound=Bound}}] = ets:lookup(Store, Id),
     case Bound of
         true ->
@@ -532,8 +533,10 @@ wait_needed(Id, Store, Self, ReplyFun, BlockingFun) ->
                 [_H|_T] ->
                     ReplyFun();
                 _ ->
+                    LazyThreads = lists:append(LazyThreads0, [Self]),
                     true = ets:insert(Store,
-                                      {Id, V#dv{lazy=true, creator=Self}}),
+                                      {Id, V#dv{lazy=true,
+                                                lazy_threads=LazyThreads}}),
                     BlockingFun()
                 end
     end.

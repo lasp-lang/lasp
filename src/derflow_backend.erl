@@ -41,9 +41,10 @@
 -callback declare(type(), store()) -> {ok, id()}.
 -callback declare(id(), type(), store()) -> {ok, id()}.
 
--callback bind(id(), {id, id()}, store(), function(), pid()) -> any().
--callback bind(id(), {id, id()} | value(), store()) -> {ok, id()}.
--callback bind(id(), {id, id()} | value(), store(), function()) -> {ok, id()}.
+-callback bind_to(id(), value(), store(), function(), pid()) -> any().
+
+-callback bind(id(), value(), store()) -> {ok, id()}.
+-callback bind(id(), value(), store(), function(), function()) -> {ok, id()}.
 
 -callback is_det(id(), store()) -> {ok, bound()}.
 

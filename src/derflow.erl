@@ -27,6 +27,7 @@
          declare/1,
          bind/2,
          bind/4,
+         bind_to/2,
          read/1,
          read/2,
          select/3,
@@ -123,6 +124,16 @@ declare(Type) ->
 -spec bind(id(), value()) -> {ok, id()} | error.
 bind(Id, Value) ->
     derflow_vnode:bind(Id, Value).
+
+%% @doc Bind a dataflow variable to another dataflow variable.
+%%
+%%      The provided `Id' is identifier of a previously declared (see:
+%%      {@link declare/0}) dataflow variable.  The `Value' provided is
+%%      the value to bind.
+%%
+-spec bind_to(id(), id()) -> {ok, id()} | error.
+bind_to(Id, TheirId) ->
+    derflow_vnode:bind_to(Id, TheirId).
 
 %% @doc Bind a dataflow variable to the result of a function call.
 %%

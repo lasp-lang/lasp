@@ -1,8 +1,9 @@
   Checking whether the PLT /Users/cmeiklejohn/.combo_dialyzer_plt is up-to-date... yes
   Checking whether the PLT .local_dialyzer_plt is up-to-date... yes
-  Compiling some key modules to native code... done in 0m31.84s
+  Compiling some key modules to native code... done in 0m36.44s
   Proceeding with analysis...
+derflow_ets.erl:157: The specification for derflow_ets:bind_to/3 states that the function might also return {'ok',atom()} but the inferred return is {'error','not_implemented'}
 derflow_execute_coverage_fsm.erl:24: Callback info about the riak_core_coverage_fsm behaviour is not available
 riak_dt_gcounter.erl:121: The specification for riak_dt_gcounter:stat/2 states that the function might also return float() but the inferred return is 'undefined' | non_neg_integer()
- done in 0m8.50s
+ done in 0m9.98s
 done (warnings were emitted)

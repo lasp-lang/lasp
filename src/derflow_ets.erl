@@ -28,6 +28,7 @@
 %% Core API.
 -export([is_det/2,
          bind/3,
+         bind_to/3,
          read/2,
          read/3,
          next/2,
@@ -43,8 +44,9 @@
 %% Exported functions for vnode integration, where callback behavior is
 %% dynamic.
 -export([next/3,
-         bind/4,
          bind/5,
+         bind_to/5,
+         notify_value/3,
          notify_value/4,
          wait_needed/5,
          read/6,
@@ -72,26 +74,6 @@ next(Id, Store) ->
     end,
     next(Id, Store, DeclareNextFun).
 
-%% @doc Given an identifier, return the next identifier.
-%%
-%%      Given `Id', return the next identifier to create a stream of
-%%      variables.
-%%
-%%      Allow for an override function for performing the generation of
-%%      the next identifier, using `DeclareNextFun'.
-%%
--spec next(id(), store(), function()) -> {ok, id()}.
-next(Id, Store, DeclareNextFun) ->
-    [{_Key, V=#dv{next=NextKey0}}] = ets:lookup(Store, Id),
-    case NextKey0 of
-        undefined ->
-            {ok, NextKey} = DeclareNextFun(V#dv.type),
-            true = ets:insert(Store, {Id, V#dv{next=NextKey}}),
-            {ok, NextKey};
-        _ ->
-            {ok, NextKey0}
-    end.
-
 %% @doc Select values from one lattice into another.
 %%
 %%      Applies the given `Function' as a filter over the items in `Id',
@@ -104,26 +86,6 @@ select(Id, Function, AccId, Store) ->
                     ?MODULE:bind(_AccId, AccValue, _Variables)
     end,
     select(Id, Function, AccId, Store, BindFun).
-
-%% @doc Select values from one lattice into another.
-%%
-%%      Applies the given `Function' as a filter over the items in `Id',
-%%      placing the result in `AccId', both of which need to be declared
-%%      variables.
-%%
-%%      Similar to {@link select/4}, however, provides an override
-%%      function for the `BindFun', which is responsible for binding the
-%%      result, for instance, when it's located in another table.
-%%
--spec select(id(), function(), id(), store(), function()) -> {ok, pid()}.
-select(Id, Function, AccId, Store, BindFun) ->
-    Pid = spawn_link(?MODULE, select_harness, [Store,
-                                               Id,
-                                               Function,
-                                               AccId,
-                                               BindFun,
-                                               undefined]),
-    {ok, Pid}.
 
 %% @doc Perform a read for a particular identifier.
 %%
@@ -156,6 +118,191 @@ read(Id, Threshold, Store) ->
                         end
                  end,
     read(Id, Threshold, Store, Self, ReplyFun, BlockingFun).
+
+%% @doc Declare a dataflow variable in a provided by identifer {@link
+%%      ets:new/2} `Store'.
+%%
+-spec declare(store()) -> {ok, id()}.
+declare(Store) ->
+    declare(undefined, Store).
+
+%% @doc Declare a dataflow variable, as a given type, in a provided by
+%%      identifer {@link ets:new/2} `Store'.
+%%
+-spec declare(type(), store()) -> {ok, id()}.
+declare(Type, Store) ->
+    declare(druuid:v4(), Type, Store).
+
+%% @doc Declare a dataflow variable in a provided by identifer {@link
+%%      ets:new/2} `Store' with a given `Type'.
+%%
+-spec declare(id(), type(), store()) -> {ok, id()}.
+declare(Id, Type, Store) ->
+    Record = case Type of
+        undefined ->
+            #dv{value=undefined, type=undefined, bound=false};
+        Type ->
+            #dv{value=Type:new(), type=Type, bound=true}
+    end,
+    true = ets:insert(Store, {Id, Record}),
+    {ok, Id}.
+
+%% @doc Define a dataflow variable to be bound to another dataflow
+%%      variable.
+%%
+%%      When `Id' is `{id, id()}', a partial bind is performed, where
+%%      one dataflow variable is bound to another and when assigned a
+%%      value, are updated together.
+%%
+-spec bind_to(id(), id(), store()) -> {ok, id()} | {error, not_implemented}.
+bind_to(_Id, _DVId, _Store) ->
+    {error, not_implemented}.
+
+%% @doc Define a dataflow variable to be bound to a value.
+%%
+-spec bind(id(), value(), store()) -> {ok, id()}.
+bind(Id, Value, Store) ->
+    NextKeyFun = fun(Type, Next) ->
+                        case Value of
+                            undefined ->
+                                undefined;
+                            _ ->
+                                next_key(Next, Type, Store)
+                        end
+                 end,
+    NotifyFun = fun(_Id, NewValue) ->
+                        ?MODULE:notify_value(_Id, NewValue, Store)
+                end,
+    bind(Id, Value, Store, NextKeyFun, NotifyFun).
+
+%% @doc Inspect the bind status of a variable.
+%%
+%%      Return the bound status of `Id'.
+%%
+%%      Operator introduces non-determinism if a choice is made using
+%%      the result.
+%%
+-spec is_det(id(), store()) -> {ok, bound()}.
+is_det(Id, Store) ->
+    [{_Key, #dv{bound=Bound}}] = ets:lookup(Store, Id),
+    {ok, Bound}.
+
+%% @doc Spawn a function.
+%%
+%%      Spawn a process executing `Module:Function(Args)'.
+%%
+-spec thread(module(), func(), args(), store()) -> {ok, pid()}.
+thread(Module, Function, Args, _Store) ->
+    Fun = fun() -> erlang:apply(Module, Function, Args) end,
+    Pid = spawn(Fun),
+    {ok, Pid}.
+
+%% Internal functions
+
+%% @doc Declare next key, if undefined.  This function assumes that the
+%%      next key will be declared in the local store.
+%%
+-spec next_key(undefined | id(), type(), store()) -> id().
+next_key(undefined, Type, Store) ->
+    {ok, NextKey} = declare(druuid:v4(), Type, Store),
+    NextKey;
+next_key(NextKey0, _, _) ->
+    NextKey0.
+
+%% Core API.
+
+%% @doc Pause execution until value requested.
+%%
+%%      Pause execution of calling thread until a read operation is
+%%      issued for the given `Id'.  Used to introduce laziness into a
+%%      computation.
+%%
+-spec wait_needed(id(), store()) -> ok.
+wait_needed(Id, Store) ->
+    Self = self(),
+    ReplyFun = fun() ->
+                       ok
+               end,
+    BlockingFun = fun() ->
+                          receive
+                              X ->
+                                  X
+                          end
+                  end,
+    wait_needed(Id, Store, Self, ReplyFun, BlockingFun).
+
+%% Callback functions.
+
+%% @doc Define a dataflow variable to be bound a value.
+%%
+%%      Similar to {@link bind/3}.
+%%
+%%      `NextKeyFun' is used to determine how to generate the next
+%%      identifier -- this is abstracted because in some settings this
+%%      next key may be located in the local store, when running code at
+%%      the replica, or located in a remote store, when running the code
+%%      at the client.
+%%
+%%      `NotifyFun' is used to notify anything in the binding list that
+%%      an update has occurred.
+%%
+-spec bind(id(), value(), store(), function(), function()) -> {ok, id()}.
+bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
+    [{_Key, V=#dv{next=Next,
+                  type=Type,
+                  bound=Bound,
+                  value=Value0}}] = ets:lookup(Store, Id),
+    NextKey = NextKeyFun(Type, Next),
+    case Bound of
+        true ->
+            case V#dv.value of
+                Value ->
+                    {ok, NextKey};
+                _ ->
+                    case derflow_lattice:is_lattice(Type) of
+                        true ->
+                            Merged = Type:merge(V#dv.value, Value),
+                            case derflow_lattice:is_inflation(Type,
+                                                              V#dv.value,
+                                                              Merged) of
+                                true ->
+                                    write(Type, Merged, NextKey, Id, Store, NotifyFun),
+                                    {ok, NextKey};
+                                false ->
+                                    lager:error("Bind failed: ~p ~p ~p~n",
+                                                [Type, Value0, Value]),
+                                    error
+                            end;
+                        false ->
+                            lager:error("Bind failed: ~p ~p ~p~n",
+                                        [Type, Value0, Value]),
+                            error
+                    end
+            end;
+        false ->
+            write(Type, Value, NextKey, Id, Store, NotifyFun),
+            {ok, NextKey}
+    end.
+
+%% @doc Given an identifier, return the next identifier.
+%%
+%%      Given `Id', return the next identifier to create a stream of
+%%      variables.
+%%
+%%      Allow for an override function for performing the generation of
+%%      the next identifier, using `DeclareNextFun'.
+%%
+-spec next(id(), store(), function()) -> {ok, id()}.
+next(Id, Store, DeclareNextFun) ->
+    [{_Key, V=#dv{next=NextKey0}}] = ets:lookup(Store, Id),
+    case NextKey0 of
+        undefined ->
+            {ok, NextKey} = DeclareNextFun(V#dv.type),
+            true = ets:insert(Store, {Id, V#dv{next=NextKey}}),
+            {ok, NextKey};
+        _ ->
+            {ok, NextKey0}
+    end.
 
 %% @doc Perform a read (or threshold read) for a particular identifier.
 %%
@@ -285,34 +432,6 @@ fetch(TargetId, FromId, FromPid, Store,
                 end
     end.
 
-%% @doc Declare a dataflow variable in a provided by identifer {@link
-%%      ets:new/2} `Store'.
-%%
--spec declare(store()) -> {ok, id()}.
-declare(Store) ->
-    declare(undefined, Store).
-
-%% @doc Declare a dataflow variable, as a given type, in a provided by
-%%      identifer {@link ets:new/2} `Store'.
-%%
--spec declare(type(), store()) -> {ok, id()}.
-declare(Type, Store) ->
-    declare(druuid:v4(), Type, Store).
-
-%% @doc Declare a dataflow variable in a provided by identifer {@link
-%%      ets:new/2} `Store' with a given `Type'.
-%%
--spec declare(id(), type(), store()) -> {ok, id()}.
-declare(Id, Type, Store) ->
-    Record = case Type of
-        undefined ->
-            #dv{value=undefined, type=undefined, bound=false};
-        Type ->
-            #dv{value=Type:new(), type=Type, bound=true}
-    end,
-    true = ets:insert(Store, {Id, Record}),
-    {ok, Id}.
-
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.
 %%
@@ -325,180 +444,30 @@ declare(Id, Type, Store) ->
 %%      `FromPid' is sent a message with the target identifiers value,
 %%      if the target identifier is already bound.
 %%
--spec bind(id(), {id, id()}, store(), function(), pid()) -> any().
-bind(Id, {id, DVId}, Store, FetchFun, FromPid) ->
+-spec bind_to(id(), value(), store(), function(), pid()) -> any().
+bind_to(Id, DVId, Store, FetchFun, FromPid) ->
     true = ets:insert(Store, {Id, #dv{value={id, DVId}}}),
     FetchFun(DVId, Id, FromPid).
 
-%% @doc Define a dataflow variable to be bound to another dataflow
-%%      variable.
+%% @doc Select values from one lattice into another.
 %%
-%%      When `Id' is `{id, id()}', a partial bind is performed, where
-%%      one dataflow variable is bound to another and when assigned a
-%%      value, are updated together.
+%%      Applies the given `Function' as a filter over the items in `Id',
+%%      placing the result in `AccId', both of which need to be declared
+%%      variables.
 %%
--spec bind(id(), {id, id()} | value(), store()) -> {ok, id()}.
-bind(_Id, {id, _DVId}, _Store) ->
-    {error, not_implemented};
-
-bind(Id, Value, Store) ->
-    NextKeyFun = fun(Type, Next) ->
-                        case Value of
-                            undefined ->
-                                undefined;
-                            _ ->
-                                next_key(Next, Type, Store)
-                        end
-                 end,
-    bind(Id, Value, Store, NextKeyFun).
-
-%% @doc Define a dataflow variable to be bound a value.
+%%      Similar to {@link select/4}, however, provides an override
+%%      function for the `BindFun', which is responsible for binding the
+%%      result, for instance, when it's located in another table.
 %%
-%%      Similar to {@link bind/3}.
-%%
-%%      `NextKeyFun' is used to determine how to generate the next
-%%      identifier -- this is abstracted because in some settings this
-%%      next key may be located in the local store, when running code at
-%%      the replica, or located in a remote store, when running the code
-%%      at the client.
-%%
--spec bind(id(), {id, id()} | value(), store(), function()) -> {ok, id()}.
-bind(Id, Value, Store, NextKeyFun) ->
-    [{_Key, V=#dv{next=Next,
-                  type=Type,
-                  bound=Bound,
-                  value=Value0}}] = ets:lookup(Store, Id),
-    NextKey = NextKeyFun(Type, Next),
-    case Bound of
-        true ->
-            case V#dv.value of
-                Value ->
-                    {ok, NextKey};
-                _ ->
-                    case derflow_lattice:is_lattice(Type) of
-                        true ->
-                            Merged = Type:merge(V#dv.value, Value),
-                            case derflow_lattice:is_inflation(Type, V#dv.value, Merged) of
-                                true ->
-                                    write(Type, Merged, NextKey, Id, Store),
-                                    {ok, NextKey};
-                                false ->
-                                    lager:error("Bind failed: ~p ~p ~p~n",
-                                                [Type, Value0, Value]),
-                                    error
-                            end;
-                        false ->
-                            lager:error("Bind failed: ~p ~p ~p~n",
-                                        [Type, Value0, Value]),
-                            error
-                    end
-            end;
-        false ->
-            write(Type, Value, NextKey, Id, Store),
-            {ok, NextKey}
-    end.
-
-%% @doc Inspect the bind status of a variable.
-%%
-%%      Return the bound status of `Id'.
-%%
-%%      Operator introduces non-determinism if a choice is made using
-%%      the result.
-%%
--spec is_det(id(), store()) -> {ok, bound()}.
-is_det(Id, Store) ->
-    [{_Key, #dv{bound=Bound}}] = ets:lookup(Store, Id),
-    {ok, Bound}.
-
-%% @doc Spawn a function.
-%%
-%%      Spawn a process executing `Module:Function(Args)'.
-%%
--spec thread(module(), func(), args(), store()) -> {ok, pid()}.
-thread(Module, Function, Args, _Store) ->
-    Fun = fun() -> erlang:apply(Module, Function, Args) end,
-    Pid = spawn(Fun),
+-spec select(id(), function(), id(), store(), function()) -> {ok, pid()}.
+select(Id, Function, AccId, Store, BindFun) ->
+    Pid = spawn_link(?MODULE, select_harness, [Store,
+                                               Id,
+                                               Function,
+                                               AccId,
+                                               BindFun,
+                                               undefined]),
     {ok, Pid}.
-
-%% Internal functions
-
-%% @doc Declare next key, if undefined.  This function assumes that the
-%%      next key will be declared in the local store.
-%%
--spec next_key(undefined | id(), type(), store()) -> id().
-next_key(undefined, Type, Store) ->
-    {ok, NextKey} = declare(druuid:v4(), Type, Store),
-    NextKey;
-next_key(NextKey0, _, _) ->
-    NextKey0.
-
-%% @doc Send responses to waiting threads, via messages.
-%%
-%%      Perform the following operations:
-%%
-%%      * Reply to all waiting threads via message.
-%%      * Perform binding of any variables which are partially bound.
-%%      * Mark variable as bound.
-%%      * Check thresholds and send notifications, if required.
-%%
-%%      When `NotifyFun' is supplied, override the function used to
-%%      notify when a value is written -- this is required when talking
-%%      to other tables in the system which are not the local table.
-%%
--spec write(type(), value(), id(), id(), store()) -> ok.
-write(Type, Value, Next, Key, Store) ->
-    NotifyFun = fun(Id, NewValue) ->
-                        [{_, #dv{next=Next,
-                                 type=Type}}] = ets:lookup(Store, Id),
-                        write(Type, NewValue, Next, Id, Store)
-                end,
-    write(Type, Value, Next, Key, Store, NotifyFun).
-
-%% @doc Send responses to waiting threads, via messages.
-%%
-%%      Similar to {@link write/5}.
-%%
-%%      When `NotifyFun' is supplied, override the function used to
-%%      notify when a value is written -- this is required when talking
-%%      to other tables in the system which are not the local table.
-%%
--spec write(type(), value(), id(), id(), store(), function()) -> ok.
-write(Type, Value, Next, Key, Store, NotifyFun) ->
-    lager:info("Writing key: ~p next: ~p", [Key, Next]),
-    [{_Key, #dv{waiting_threads=Threads,
-                binding_list=BindingList,
-                lazy=Lazy}}] = ets:lookup(Store, Key),
-    lager:info("Waiting threads are: ~p", [Threads]),
-    {ok, StillWaiting} = reply_to_all(Threads, [], {ok, Type, Value, Next}),
-    V1 = #dv{type=Type,
-             value=Value,
-             next=Next,
-             lazy=Lazy,
-             bound=true,
-             waiting_threads=StillWaiting},
-    true = ets:insert(Store, {Key, V1}),
-    notify_all(NotifyFun, BindingList, Value),
-    ok.
-
-%% @doc Pause execution until value requested.
-%%
-%%      Pause execution of calling thread until a read operation is
-%%      issued for the given `Id'.  Used to introduce laziness into a
-%%      computation.
-%%
--spec wait_needed(id(), store()) -> ok.
-wait_needed(Id, Store) ->
-    Self = self(),
-    ReplyFun = fun() ->
-                       ok
-               end,
-    BlockingFun = fun() ->
-                          receive
-                              X ->
-                                  X
-                          end
-                  end,
-    wait_needed(Id, Store, Self, ReplyFun, BlockingFun).
 
 %% @doc Callback wait_needed function for derflow_vnode, where we
 %%      change the reply and blocking replies.
@@ -541,6 +510,12 @@ wait_needed(Id, Store, Self, ReplyFun, BlockingFun) ->
 notify_value(Id, Value, Store, NotifyFun) ->
     [{_, #dv{next=Next, type=Type}}] = ets:lookup(Store, Id),
     write(Type, Value, Next, Id, Store, NotifyFun).
+
+notify_value(Id, Value, Store) ->
+    NotifyFun = fun(_Id, NewValue) ->
+                        ?MODULE:notify_value(_Id, NewValue, Store)
+                end,
+    notify_value(Id, Value, Store, NotifyFun).
 
 %% @doc Notify a series of variables of bind.
 %%
@@ -594,8 +569,9 @@ reply_to_all([From|T], StillWaiting, Result) ->
 reply_to_all([], StillWaiting, _Result) ->
     {ok, StillWaiting}.
 
+%% Internal functions.
+
 %% @doc Harness for managing the select operation.
-%% @private
 -spec select_harness(store(), id(), function(), id(), function(),
                      value()) -> function().
 select_harness(Variables, Id, Function, AccId, BindFun, Previous) ->
@@ -621,3 +597,53 @@ select_harness(Variables, Id, Function, AccId, BindFun, Previous) ->
                  end, Type:new(), Operations),
     BindFun(AccId, AccValue, Variables),
     select_harness(Variables, Id, Function, AccId, BindFun, Value).
+
+%% @doc Send responses to waiting threads, via messages.
+%%
+%%      Perform the following operations:
+%%
+%%      * Reply to all waiting threads via message.
+%%      * Perform binding of any variables which are partially bound.
+%%      * Mark variable as bound.
+%%      * Check thresholds and send notifications, if required.
+%%
+%%      When `NotifyFun' is supplied, override the function used to
+%%      notify when a value is written -- this is required when talking
+%%      to other tables in the system which are not the local table.
+%%
+-spec write(type(), value(), id(), id(), store()) -> ok.
+write(Type, Value, Next, Key, Store) ->
+    lager:info("***** Local write triggered!"),
+    NotifyFun = fun(Id, NewValue) ->
+                        [{_, #dv{next=Next,
+                                 type=Type}}] = ets:lookup(Store, Id),
+                        write(Type, NewValue, Next, Id, Store)
+                end,
+    write(Type, Value, Next, Key, Store, NotifyFun).
+
+%% @doc Send responses to waiting threads, via messages.
+%%
+%%      Similar to {@link write/5}.
+%%
+%%      When `NotifyFun' is supplied, override the function used to
+%%      notify when a value is written -- this is required when talking
+%%      to other tables in the system which are not the local table.
+%%
+-spec write(type(), value(), id(), id(), store(), function()) -> ok.
+write(Type, Value, Next, Key, Store, NotifyFun) ->
+    lager:info("Writing key: ~p next: ~p", [Key, Next]),
+    [{_Key, #dv{waiting_threads=Threads,
+                binding_list=BindingList,
+                lazy=Lazy}}] = ets:lookup(Store, Key),
+    lager:info("Waiting threads are: ~p", [Threads]),
+    lager:info("Binding list is: ~p", [BindingList]),
+    {ok, StillWaiting} = reply_to_all(Threads, [], {ok, Type, Value, Next}),
+    V1 = #dv{type=Type,
+             value=Value,
+             next=Next,
+             lazy=Lazy,
+             bound=true,
+             waiting_threads=StillWaiting},
+    true = ets:insert(Store, {Key, V1}),
+    notify_all(NotifyFun, BindingList, Value),
+    ok.

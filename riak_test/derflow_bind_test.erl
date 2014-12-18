@@ -45,7 +45,7 @@ confirm() ->
     ok = derflow_test_helpers:wait_for_cluster(Nodes),
 
     lager:info("Remotely executing the test."),
-    ?assertEqual({ok, 1, 1}, rpc:call(Node, ?MODULE, test, [])),
+    ?assertEqual(ok, rpc:call(Node, ?MODULE, test, [])),
 
     lager:info("Done!"),
 
@@ -54,18 +54,34 @@ confirm() ->
 -endif.
 
 test() ->
-    {ok, Id} = derflow:declare(),
+    {ok, Id1} = derflow:declare(),
 
-    {ok, _} = derflow:bind(Id, 1),
+    {ok, Id2} = derflow:declare(),
+
+    {ok, _} = derflow:bind_to(Id2, Id1),
     lager:info("Successful bind."),
 
-    {ok, _, Value1, _} = derflow:read(Id),
-    lager:info("Value1: ~p", [Value1]),
+    {ok, _} = derflow:bind(Id1, 1),
+    lager:info("Successful bind."),
 
-    error = derflow:bind(Id, 2),
+    {ok, _, Value1, _} = derflow:read(Id1),
+    lager:info("Successful read: ~p", [Value1]),
+
+    error = derflow:bind(Id1, 2),
     lager:info("Unsuccessful bind."),
 
-    {ok, _, Value2, _} = derflow:read(Id),
-    lager:info("Value2: ~p", [Value2]),
+    {ok, _, Value1, _} = derflow:read(Id1),
+    lager:info("Successful read: ~p", [Value1]),
 
-    {ok, Value1, Value2}.
+    {ok, _, Value1, _} = derflow:read(Id2),
+    lager:info("Successful read: ~p", [Value1]),
+
+    {ok, Id3} = derflow:declare(),
+
+    {ok, _} = derflow:bind_to(Id3, Id1),
+    lager:info("Successful bind."),
+
+    {ok, _, Value1, _} = derflow:read(Id3),
+    lager:info("Successful read: ~p", [Value1]),
+
+    ok.

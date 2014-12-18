@@ -34,6 +34,7 @@
 
 %% Language execution primitives.
 -export([bind/2,
+         bind_to/2,
          read/1,
          read/2,
          select/3,
@@ -50,6 +51,7 @@
 %% Callbacks from the backend module.
 -export([notify_value/2,
          fetch/3,
+         next_key/3,
          reply_fetch/3]).
 
 -export([start_vnode/1,
@@ -97,6 +99,14 @@ bind(Id, Value) ->
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {bind, Id, Value},
+                                              ?VNODE_MASTER).
+
+bind_to(Id, TheirId) ->
+    lager:info("Bind called by process ~p, their_id ~p, id: ~p",
+               [self(), TheirId, Id]),
+    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {bind_to, Id, TheirId},
                                               ?VNODE_MASTER).
 
 read(Id) ->
@@ -256,12 +266,12 @@ handle_command({declare, Id, Type}, _From,
     {ok, Id} = ?BACKEND:declare(Id, Type, Variables),
     {reply, {ok, Id}, State};
 
-handle_command({bind, Id, {id, DVId}}, FromPid,
+handle_command({bind_to, Id, DVId}, FromPid,
                State=#state{variables=Variables}) ->
     FetchFun = fun(_TargetId, _FromId, _FromPid) ->
             ?MODULE:fetch(_TargetId, _FromId, _FromPid)
     end,
-    ?BACKEND:bind(Id, {id, DVId}, Variables, FetchFun, FromPid),
+    ?BACKEND:bind_to(Id, DVId, Variables, FetchFun, FromPid),
     {noreply, State};
 
 handle_command({bind, Id, Value}, _From,
@@ -274,7 +284,10 @@ handle_command({bind, Id, Value}, _From,
                                 next_key(Next, Type, State)
                         end
                  end,
-    Result = ?BACKEND:bind(Id, Value, Variables, NextKeyFun),
+    NotifyFun = fun(_Id, NewValue) ->
+                        ?MODULE:notify_value(_Id, NewValue)
+                end,
+    Result = ?BACKEND:bind(Id, Value, Variables, NextKeyFun, NotifyFun),
     {reply, Result, State};
 
 handle_command({fetch, TargetId, FromId, FromPid}, _From,

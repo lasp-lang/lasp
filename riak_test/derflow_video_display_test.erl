@@ -78,7 +78,7 @@ skip1(Input, Output) ->
                 {ok, true} ->
                     skip1(Next, Output);
                 {ok, false} ->
-                    derflow:bind(Output, {id, Input})
+                    derflow:bind_to(Output, Input)
             end
     end.
 

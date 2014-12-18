@@ -23,7 +23,8 @@
 
 -include("derflow.hrl").
 
-%% @TODO: add spec for select
+-callback select(id(), function(), id(), store()) -> {ok, pid()}.
+-callback select(id(), function(), id(), store(), function()) -> {ok, pid()}.
 
 -callback next(id(), store()) -> {ok, id()}.
 -callback next(id(), store(), function()) -> {ok, id()}.

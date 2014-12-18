@@ -32,9 +32,17 @@ init() ->
     {ok, riak_dt_gset:new()}.
 
 execute(Acc) ->
+    ok = example(),
     {ok, Acc}.
 
 execute(Acc, _X) ->
+    ok = example(),
+    {ok, Acc}.
+
+merge([Reply|_]) ->
+    Reply.
+
+example() ->
     {ok, Id1} = derflow:declare(),
 
     {ok, _} = derflow:bind(Id1, 1),
@@ -46,10 +54,7 @@ execute(Acc, _X) ->
     error = derflow:bind(Id1, 2),
     lager:info("Unsuccessful bind."),
 
-    {ok, _, Value2, _} = derflow:read(Id1),
-    lager:info("Value2: ~p", [Value2]),
+    {ok, _, Value1, _} = derflow:read(Id1),
+    lager:info("Value unchanged."),
 
-    {ok, Acc}.
-
-merge([Reply|_]) ->
-    Reply.
+    ok.

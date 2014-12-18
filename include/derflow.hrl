@@ -19,6 +19,7 @@
 -define(EXECUTE_REQUEST, #derflow_execute_request_v1).
 
 -record(dv, {value,
+             binding,
              next,
              waiting_threads = [],
              binding_list = [],

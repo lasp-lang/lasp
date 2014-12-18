@@ -150,10 +150,6 @@ declare(Id, Type, Store) ->
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.
 %%
-%%      When `Id' is `{id, id()}', a partial bind is performed, where
-%%      one dataflow variable is bound to another and when assigned a
-%%      value, are updated together.
-%%
 -spec bind_to(id(), id(), store()) -> {ok, id()} | {error, not_implemented}.
 bind_to(_Id, _DVId, _Store) ->
     {error, not_implemented}.
@@ -412,22 +408,22 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
 fetch(TargetId, FromId, FromPid, Store,
       ResponseFun, FetchFun, ReplyFetchFun, NextKeyFun) ->
     [{_, DV=#dv{bound=Bound,
-                value=Value}}] = ets:lookup(Store, TargetId),
+                binding=Binding}}] = ets:lookup(Store, TargetId),
     case Bound of
         true ->
             ReplyFetchFun(FromId, FromPid, DV),
             ResponseFun();
         false ->
-            case Value of
-                {id, BindId} ->
-                    FetchFun(BindId, FromId, FromPid),
-                    ResponseFun();
-                _ ->
+            case Binding of
+                undefined ->
                     NextKey = NextKeyFun(DV#dv.next, DV#dv.type),
                     BindingList = lists:append(DV#dv.binding_list, [FromId]),
                     DV1 = DV#dv{binding_list=BindingList, next=NextKey},
                     true = ets:insert(Store, {TargetId, DV1}),
                     ReplyFetchFun(FromId, FromPid, DV1),
+                    ResponseFun();
+                BindId ->
+                    FetchFun(BindId, FromId, FromPid),
                     ResponseFun()
                 end
     end.
@@ -446,7 +442,7 @@ fetch(TargetId, FromId, FromPid, Store,
 %%
 -spec bind_to(id(), value(), store(), function(), pid()) -> any().
 bind_to(Id, DVId, Store, FetchFun, FromPid) ->
-    true = ets:insert(Store, {Id, #dv{value={id, DVId}}}),
+    true = ets:insert(Store, {Id, #dv{binding=DVId}}),
     FetchFun(DVId, Id, FromPid).
 
 %% @doc Select values from one lattice into another.

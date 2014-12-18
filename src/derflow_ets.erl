@@ -99,7 +99,7 @@ select(Id, Function, AccId, Store) ->
 read(Id, Store) ->
     read(Id, undefined, Store).
 
-%% @doc Perform a threshold read for a particular identifier.
+%% @doc Perform a monotonic read read for a particular identifier.
 %%
 %%      Given an `Id', perform a blocking read until the variable is
 %%      bound.
@@ -360,7 +360,7 @@ next(Id, Store, DeclareNextFun) ->
             {ok, NextKey0}
     end.
 
-%% @doc Perform a read (or threshold read) for a particular identifier.
+%% @doc Perform a read (or monotonic read) for a particular identifier.
 %%
 %%      Given an `Id', perform a blocking read until the variable is
 %%      bound.

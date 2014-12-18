@@ -337,7 +337,6 @@ bind(Id, {id, DVId}, Store, FetchFun, FromPid) ->
 %%      one dataflow variable is bound to another and when assigned a
 %%      value, are updated together.
 %%
-%% @TODO Implement.
 -spec bind(id(), {id, id()} | value(), store()) -> {ok, id()}.
 bind(_Id, {id, _DVId}, _Store) ->
     {error, not_implemented};

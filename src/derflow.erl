@@ -253,10 +253,29 @@ get_stream(Stream) ->
 %%      list of primary replicas for a given `Param' and registered
 %%      `VNode'.
 %%
-%% @TODO: write specification.
+-spec preflist(non_neg_integer(), term(), atom()) ->
+    riak_core_apl:preflist_ann().
 preflist(NVal, Param, VNode) ->
-    DocIdx = riak_core_util:chash_key({?BUCKET, term_to_binary(Param)}),
-    riak_core_apl:get_primary_apl(DocIdx, NVal, VNode).
+    case application:get_env(derflow, single_partition_mode) of
+        {ok, true} ->
+            lager:info("Running in single partition mode!"),
+            case riak_core_mochiglobal:get(primary_apl) of
+                undefined ->
+                    DocIdx = riak_core_util:chash_key({?BUCKET,
+                                                       term_to_binary(Param)}),
+                    Preflist = riak_core_apl:get_primary_apl(DocIdx,
+                                                             NVal,
+                                                             VNode),
+                    ok = riak_core_mochiglobal:put(primary_apl, Preflist),
+                    Preflist;
+                Preflist ->
+                    Preflist
+            end;
+        _ ->
+            DocIdx = riak_core_util:chash_key({?BUCKET,
+                                               term_to_binary(Param)}),
+            riak_core_apl:get_primary_apl(DocIdx, NVal, VNode)
+    end.
 
 %%%===================================================================
 %%% Internal Functions

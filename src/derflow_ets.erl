@@ -398,6 +398,12 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                         _ ->
                             lager:info("Threshold specified: ~p",
                                        [Threshold]),
+
+                            %% Notify all lazy processes of this read.
+                            {ok, StillLazy} = reply_to_all(LazyThreads, 
+                                                           {ok, Threshold}),
+
+                            %% Satisfy read if threshold is met.
                             case derflow_lattice:threshold_met(Type,
                                                                Value,
                                                                Threshold) of
@@ -412,7 +418,8 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                                                         Threshold}]),
                                     true = ets:insert(Store,
                                                       {Id,
-                                                       V#dv{waiting_threads=WT}}),
+                                                       V#dv{waiting_threads=WT,
+                                                            lazy_threads=StillLazy}}),
                                     BlockingFun()
                             end
                     end;
@@ -556,13 +563,12 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                   type=Type,
                   lazy_threads=LazyThreads0,
                   bound=Bound}}] = ets:lookup(Store, Id),
-    case Bound of
-        true ->
+    case {Bound, Type} of
+        {true, undefined} ->
             ReplyFun(undefined);
-        false ->
+        {_, _} ->
             case WT of
                 [_H|_T] ->
-                    %% @TODO: pretty sure this case is broken.
                     ReplyFun(undefined);
                 _ ->
                     LazyThreads = case Threshold of
@@ -579,8 +585,6 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                     true = ets:insert(Store,
                                       {Id, V#dv{lazy=true,
                                                 lazy_threads=LazyThreads}}),
-
-
                     BlockingFun()
                 end
     end.

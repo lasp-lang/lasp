@@ -92,14 +92,31 @@ test() ->
     {ok, _, S1, _} = derflow:read(L2),
     {ok, _, S1, _} = derflow:read(L1),
 
-    %% Test inflation.
+    %% Test inflations.
     {ok, S2} = riak_dt_gset:update({add, 2},
                                    undefined, S1),
+
+    Self = self(),
+
+    spawn_link(fun() ->
+                  {ok, _} = derflow:wait_needed(L1, S2),
+                  Self ! threshold_met
+               end),
+
     {ok, _} = derflow:bind(L1, S2),
 
     %% Verify the same value is contained by all.
     {ok, _, S2, _} = derflow:read(L3),
     {ok, _, S2, _} = derflow:read(L2),
     {ok, _, S2, _} = derflow:read(L1),
+
+    %% Read at the S2 threshold level.
+    {ok, _, S2, _} = derflow:read(L1, S2),
+
+    %% Wait for wait_needed to unblock.
+    receive
+        threshold_met ->
+            ok
+    end,
 
     ok.

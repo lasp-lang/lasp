@@ -66,7 +66,7 @@ test() ->
 producer(Value, N, Output) ->
     if
         (N > 0) ->
-            ok = derflow:wait_needed(Output),
+            {ok, _} = derflow:wait_needed(Output),
             {ok, Next} = derflow:produce(Output, Value),
             producer(Value + 1, N - 1,  Next);
         true ->
@@ -74,7 +74,7 @@ producer(Value, N, Output) ->
     end.
 
 loop(S1, S2, End) ->
-    ok = derflow:wait_needed(S2),
+    {ok, _} = derflow:wait_needed(S2),
     {ok, _, S1Value, S1Next} = derflow:consume(S1),
     {ok, S2Next} = derflow:produce(S2, S1Value),
     case derflow:produce(S2, S1Value) of

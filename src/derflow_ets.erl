@@ -38,6 +38,7 @@
          thread/4,
          select/4,
          wait_needed/2,
+         wait_needed/3,
          reply_to_all/2,
          reply_to_all/3]).
 
@@ -48,7 +49,7 @@
          bind_to/5,
          notify_value/3,
          notify_value/4,
-         wait_needed/5,
+         wait_needed/6,
          read/6,
          fetch/4,
          reply_fetch/4,
@@ -213,17 +214,30 @@ next_key(NextKey0, _, _) ->
 
 %% Core API.
 
-%% @doc Pause execution until value requested.
+%% @doc Pause execution until value requested with given threshold.
 %%
 %%      Pause execution of calling thread until a read operation is
 %%      issued for the given `Id'.  Used to introduce laziness into a
 %%      computation.
 %%
--spec wait_needed(id(), store()) -> ok.
+-spec wait_needed(id(), store()) -> {ok, threshold()}.
 wait_needed(Id, Store) ->
+    wait_needed(Id, undefined, Store).
+
+%% @doc Pause execution until value requested with given threshold.
+%%
+%%      Pause execution of calling thread until a read operation is
+%%      issued for the given `Id'.  Used to introduce laziness into a
+%%      computation.
+%%
+%%      This operation blocks until `Threshold' has been requested,
+%%      reading from the provided {@link ets:new/2} store, `Store'.
+%%
+-spec wait_needed(id(), threshold(), store()) -> {ok, threshold()}.
+wait_needed(Id, Threshold, Store) ->
     Self = self(),
-    ReplyFun = fun() ->
-                       ok
+    ReplyFun = fun(ReadThreshold) ->
+                       {ok, ReadThreshold}
                end,
     BlockingFun = fun() ->
                           receive
@@ -231,7 +245,7 @@ wait_needed(Id, Store) ->
                                   X
                           end
                   end,
-    wait_needed(Id, Store, Self, ReplyFun, BlockingFun).
+    wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun).
 
 %% Callback functions.
 
@@ -392,6 +406,7 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                                 false ->
                                     WT = lists:append(V#dv.waiting_threads,
                                                       [{threshold,
+                                                        read,
                                                         Self,
                                                         Type,
                                                         Threshold}]),
@@ -410,7 +425,18 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
             true = ets:insert(Store, {Id, V#dv{waiting_threads=WT}}),
             case Lazy of
                 true ->
-                    {ok, _} = reply_to_all(LazyThreads, ok),
+                    case Threshold of
+                        undefined ->
+                            {ok, StillLazy} = reply_to_all(LazyThreads, {ok, undefined}),
+                            true = ets:insert(Store, {Id,
+                                                      V#dv{waiting_threads=WT,
+                                                           lazy_threads=StillLazy}});
+                        Threshold ->
+                            {ok, StillLazy} = reply_to_all(LazyThreads, {ok, Threshold}),
+                            true = ets:insert(Store, {Id,
+                                                      V#dv{waiting_threads=WT,
+                                                           lazy_threads=StillLazy}})
+                    end,
                     BlockingFun();
                 false ->
                     BlockingFun()
@@ -519,24 +545,42 @@ select(Id, Function, AccId, Store, BindFun) ->
 %%      notify waiting processes, for instance, if they are running on
 %%      another node.
 %%
--spec wait_needed(id(), store(), pid(), function(), function()) -> ok.
-wait_needed(Id, Store, Self, ReplyFun, BlockingFun) ->
+%%      This operation blocks until `Threshold' has been requested,
+%%      reading from the provided {@link ets:new/2} store, `Store'.
+%%
+-spec wait_needed(id(), threshold(), store(), pid(), function(),
+                  function()) -> {ok, threshold()}.
+wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
     lager:info("Wait needed issued for identifier: ~p", [Id]),
     [{_Key, V=#dv{waiting_threads=WT,
+                  type=Type,
                   lazy_threads=LazyThreads0,
                   bound=Bound}}] = ets:lookup(Store, Id),
     case Bound of
         true ->
-            ReplyFun();
+            ReplyFun(undefined);
         false ->
             case WT of
                 [_H|_T] ->
-                    ReplyFun();
+                    %% @TODO: pretty sure this case is broken.
+                    ReplyFun(undefined);
                 _ ->
-                    LazyThreads = lists:append(LazyThreads0, [Self]),
+                    LazyThreads = case Threshold of
+                                    undefined ->
+                                        lists:append(LazyThreads0, [Self]);
+                                    Threshold ->
+                                        lists:append(LazyThreads0,
+                                                    [{threshold,
+                                                      wait,
+                                                      Self,
+                                                      Type,
+                                                      Threshold}])
+                    end,
                     true = ets:insert(Store,
                                       {Id, V#dv{lazy=true,
                                                 lazy_threads=LazyThreads}}),
+
+
                     BlockingFun()
                 end
     end.
@@ -580,13 +624,13 @@ reply_to_all(List, Result) ->
 %%
 -spec reply_to_all(list(pid() | pending_threshold()), list(pending_threshold()),
                    term()) -> {ok, list(pending_threshold())}.
-reply_to_all([{threshold, From, Type, Threshold}=H|T],
+reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, Type, Value, Next}=Result) ->
-    lager:info("Result: ~p, Threshold: ~p", [Result, Threshold]),
+    lager:info("Result: ~p, Read threshold: ~p", [Result, Threshold]),
     StillWaiting = case derflow_lattice:threshold_met(Type, Value, Threshold) of
         true ->
-            lager:info("Threshold ~p met: ~p", [Threshold, Value]),
+            lager:info("Read threshold ~p met: ~p", [Threshold, Value]),
             case From of
                 {server, undefined, {Address, Ref}} ->
                     gen_server:reply({Address, Ref}, {ok, Type, Value, Next});
@@ -595,7 +639,25 @@ reply_to_all([{threshold, From, Type, Threshold}=H|T],
             end,
             StillWaiting0;
         false ->
-            lager:info("Threshold ~p NOT met: ~p", [Threshold, Value]),
+            lager:info("Read threshold ~p NOT met: ~p", [Threshold, Value]),
+            StillWaiting0 ++ [H]
+    end,
+    reply_to_all(T, StillWaiting, Result);
+reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
+             StillWaiting0,
+             {ok, ReadThreshold}=Result) ->
+    StillWaiting = case derflow_lattice:threshold_met(Type, Threshold, ReadThreshold) of
+        true ->
+            lager:info("Wait threshold ~p met: ~p", [Threshold, ReadThreshold]),
+            case From of
+                {server, undefined, {Address, Ref}} ->
+                    gen_server:reply({Address, Ref}, {ok, ReadThreshold});
+                _ ->
+                    From ! Result
+            end,
+            StillWaiting0;
+        false ->
+            lager:info("Wait threshold ~p NOT met: ~p", [Threshold, ReadThreshold]),
             StillWaiting0 ++ [H]
     end,
     reply_to_all(T, StillWaiting, Result);

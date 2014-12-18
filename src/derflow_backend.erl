@@ -58,8 +58,9 @@
 -callback write(type(), value(), id(), id(), store()) -> ok.
 -callback write(type(), value(), id(), id(), store(), function()) -> ok.
 
--callback wait_needed(id(), store()) -> ok.
--callback wait_needed(id(), store(), pid(), function(), function()) -> ok.
+-callback wait_needed(id(), store()) -> {ok, threshold()}.
+-callback wait_needed(id(), threshold(), store()) -> {ok, threshold()}.
+-callback wait_needed(id(), threshold(), store(), pid(), function(), function()) -> {ok, threshold()}.
 
 -callback notify_value(id(), value(), store(), function()) -> ok.
 -callback notify_all(function(), list(#dv{}), value()) -> ok.

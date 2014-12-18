@@ -1,1 +1,2 @@
+derflow_ets.erl:574: Type specification derflow_ets:reply_to_all([pid() | pending_threshold()],term()) -> {'ok',[pending_threshold()]} is a supertype of the success typing: derflow_ets:reply_to_all([pid() | {'threshold','read',pid(),'riak_dt_gcounter' | 'riak_dt_gset',_}],_) -> {'ok',[{'threshold','read' | 'wait',pid(),'riak_dt_gcounter' | 'riak_dt_gset',_}]}
 riak_dt_gcounter.erl:121: The specification for riak_dt_gcounter:stat/2 states that the function might also return float() but the inferred return is 'undefined' | non_neg_integer()

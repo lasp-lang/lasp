@@ -37,6 +37,7 @@
          extend/1,
          is_det/1,
          wait_needed/1,
+         wait_needed/2,
          spawn_mon/4,
          thread/3,
          preflist/3,
@@ -238,6 +239,16 @@ thread(Module, Function, Args) ->
 -spec wait_needed(id()) -> ok.
 wait_needed(Id) ->
     derflow_vnode:wait_needed(Id).
+
+%% @doc Pause execution until value requested with given threshold.
+%%
+%%      Pause execution of calling thread until a read operation is
+%%      issued for the given `Id'.  Used to introduce laziness into a
+%%      computation.
+%%
+-spec wait_needed(id(), threshold()) -> ok.
+wait_needed(Id, Threshold) ->
+    derflow_vnode:wait_needed(Id, Threshold).
 
 %% @doc Spawn monitor.
 %%

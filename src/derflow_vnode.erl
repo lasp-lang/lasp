@@ -41,6 +41,7 @@
          next/1,
          is_det/1,
          wait_needed/1,
+         wait_needed/2,
          declare/2,
          thread/3]).
 
@@ -175,9 +176,12 @@ notify_value(Id, Value) ->
                                    ?VNODE_MASTER).
 
 wait_needed(Id) ->
+    wait_needed(Id, undefined).
+
+wait_needed(Id, Threshold) ->
     [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {wait_needed, Id},
+                                              {wait_needed, Id, Threshold},
                                               ?VNODE_MASTER).
 
 %% API
@@ -336,16 +340,16 @@ handle_command({thread, Module, Function, Args}, _From,
     {ok, Pid} = ?BACKEND:thread(Module, Function, Args, Variables),
     {reply, {ok, Pid}, State};
 
-handle_command({wait_needed, Id}, From,
+handle_command({wait_needed, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
     Self = From,
-    ReplyFun = fun() ->
-                       {reply, ok, State}
+    ReplyFun = fun(ReadThreshold) ->
+                       {reply, {ok, ReadThreshold}, State}
                end,
     BlockingFun = fun() ->
                         {noreply, State}
                   end,
-    ?BACKEND:wait_needed(Id, Variables, Self, ReplyFun, BlockingFun);
+    ?BACKEND:wait_needed(Id, Threshold, Variables, Self, ReplyFun, BlockingFun);
 
 handle_command({read, Id, Threshold}, From,
                State=#state{variables=Variables}) ->

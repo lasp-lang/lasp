@@ -76,7 +76,7 @@ insort(List, S) ->
 insert(X, In, Out) ->
     [{Id, C}] = ets:lookup(?TABLE, count),
     true = ets:insert(?TABLE, {Id, C+1}),
-    ok = derflow:wait_needed(Out),
+    {ok, _} = derflow:wait_needed(Out),
     case derflow:consume(In) of
         {ok, _, undefined, _} ->
             {ok, Next} = derflow:produce(Out, X),

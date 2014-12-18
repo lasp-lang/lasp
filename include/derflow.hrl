@@ -45,6 +45,6 @@
 -type stream() :: list(#dv{}).
 -type store() :: ets:tid().
 -type threshold() :: value() | {strict, value()}.
--type pending_threshold() :: {threshold, pid(), lattice(), threshold()}.
+-type pending_threshold() :: {threshold, read | wait, pid(), lattice(), threshold()}.
 -type operation() :: {atom(), value()}.
 -type operations() :: list(operation()).

@@ -50,6 +50,8 @@
          notify_value/4,
          wait_needed/5,
          read/6,
+         fetch/4,
+         reply_fetch/4,
          write/6,
          select/5,
          fetch/8]).
@@ -151,8 +153,12 @@ declare(Id, Type, Store) ->
 %%      variable.
 %%
 -spec bind_to(id(), id(), store()) -> {ok, id()} | {error, not_implemented}.
-bind_to(_Id, _DVId, _Store) ->
-    {error, not_implemented}.
+bind_to(Id, TheirId, Store) ->
+    FromPid = self(),
+    FetchFun = fun(_TheirId, _Id, _FromPid) ->
+                    ?MODULE:fetch(_TheirId, _Id, _FromPid, Store)
+               end,
+    bind_to(Id, TheirId, Store, FetchFun, FromPid).
 
 %% @doc Define a dataflow variable to be bound to a value.
 %%
@@ -228,6 +234,46 @@ wait_needed(Id, Store) ->
     wait_needed(Id, Store, Self, ReplyFun, BlockingFun).
 
 %% Callback functions.
+
+%% @doc Callback fetch function used in binding variables together.
+%%
+%%      Given a source, target, and a store, follow a series of links
+%%      and retrieve the value for the original object.
+%%
+-spec fetch(id(), id(), pid(), store()) -> {ok, id()}.
+fetch(TargetId, FromId, FromPid, Store) ->
+    ResponseFun = fun() ->
+                        receive
+                            X ->
+                                X
+                        end
+                  end,
+    FetchFun = fun(_TargetId, _FromId, _FromPid) ->
+            ?MODULE:fetch(_TargetId, _FromId, _FromPid, Store)
+    end,
+    ReplyFetchFun = fun(_FromId, _FromPid, _DV) ->
+            ?MODULE:reply_fetch(_FromId, _FromPid, _DV, Store)
+    end,
+    NextKeyFun = fun(Next, Type) ->
+            ?MODULE:next_key(Next, Type, Store)
+    end,
+    fetch(TargetId, FromId, FromPid, Store, ResponseFun, FetchFun,
+          ReplyFetchFun, NextKeyFun).
+
+%% @doc Callback function for replying to a bound variable request.
+%%
+%%      When responding to a local fetch, respond back to the waiting
+%%      process with the response.
+%%
+-spec reply_fetch(id(), pid(), #dv{}, store()) -> {ok, id()}.
+reply_fetch(FromId, FromPid,
+            #dv{next=Next, type=Type, value=Value}, Store) ->
+    NotifyFun = fun(Id, NewValue) ->
+                        ?MODULE:notify_value(Id, NewValue, Store)
+                end,
+    ?MODULE:write(Type, Value, Next, FromId, Store, NotifyFun),
+    {ok, _} = ?BACKEND:reply_to_all([FromPid], {ok, Next}),
+    {ok, Next}.
 
 %% @doc Define a dataflow variable to be bound a value.
 %%
@@ -441,9 +487,9 @@ fetch(TargetId, FromId, FromPid, Store,
 %%      if the target identifier is already bound.
 %%
 -spec bind_to(id(), value(), store(), function(), pid()) -> any().
-bind_to(Id, DVId, Store, FetchFun, FromPid) ->
-    true = ets:insert(Store, {Id, #dv{binding=DVId}}),
-    FetchFun(DVId, Id, FromPid).
+bind_to(Id, TheirId, Store, FetchFun, FromPid) ->
+    true = ets:insert(Store, {Id, #dv{binding=TheirId}}),
+    FetchFun(TheirId, Id, FromPid).
 
 %% @doc Select values from one lattice into another.
 %%
@@ -525,7 +571,7 @@ notify_all(_, [], _) ->
 %% @doc Given a group of processes which are blocking on reads, notify
 %%      them of bound values or met thresholds.
 %%
--spec reply_to_all(list(pending_threshold()), term()) ->
+-spec reply_to_all(list(pid() | pending_threshold()), term()) ->
     {ok, list(pending_threshold())}.
 reply_to_all(List, Result) ->
     reply_to_all(List, [], Result).
@@ -533,7 +579,7 @@ reply_to_all(List, Result) ->
 %% @doc Given a group of processes which are blocking on reads, notify
 %%      them of bound values or met thresholds.
 %%
--spec reply_to_all(list(pending_threshold()), list(pending_threshold()),
+-spec reply_to_all(list(pid() | pending_threshold()), list(pending_threshold()),
                    term()) -> {ok, list(pending_threshold())}.
 reply_to_all([{threshold, From, Type, Threshold}=H|T],
              StillWaiting0,

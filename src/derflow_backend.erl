@@ -34,8 +34,11 @@
 -callback read(id(), value(), store(), pid(), function(), function()) ->
     {ok, type(), value(), id()}.
 
+-callback fetch(id(), id(), pid(), store()) -> {ok, id()}.
 -callback fetch(id(), id(), pid(), store(), function(), function(),
                 function(), function()) -> term().
+
+-callback reply_fetch(id(), pid(), #dv{}, store()) -> {ok, id()}.
 
 -callback declare(store()) -> {ok, id()}.
 -callback declare(type(), store()) -> {ok, id()}.
@@ -61,10 +64,10 @@
 -callback notify_value(id(), value(), store(), function()) -> ok.
 -callback notify_all(function(), list(#dv{}), value()) -> ok.
 
--callback reply_to_all(list(pending_threshold()), term()) ->
+-callback reply_to_all(list(pid() | pending_threshold()), term()) ->
     {ok, list(pending_threshold())}.
--callback reply_to_all(list(pending_threshold()),
-                       list(pending_threshold()),
+-callback reply_to_all(list(pid() | pending_threshold()),
+                       list(pid() | pending_threshold()),
                        term()) ->
     {ok, list(pending_threshold())}.
 

@@ -45,16 +45,32 @@ merge([Reply|_]) ->
 example() ->
     {ok, Id1} = derflow:declare(),
 
+    {ok, Id2} = derflow:declare(),
+
+    {ok, _} = derflow:bind_to(Id2, Id1),
+    lager:info("Successful bind."),
+
     {ok, _} = derflow:bind(Id1, 1),
     lager:info("Successful bind."),
 
     {ok, _, Value1, _} = derflow:read(Id1),
-    lager:info("Value1: ~p", [Value1]),
+    lager:info("Successful read: ~p", [Value1]),
 
     error = derflow:bind(Id1, 2),
     lager:info("Unsuccessful bind."),
 
     {ok, _, Value1, _} = derflow:read(Id1),
-    lager:info("Value unchanged."),
+    lager:info("Successful read: ~p", [Value1]),
+
+    {ok, _, Value1, _} = derflow:read(Id2),
+    lager:info("Successful read: ~p", [Value1]),
+
+    {ok, Id3} = derflow:declare(),
+
+    {ok, _} = derflow:bind_to(Id3, Id1),
+    lager:info("Successful bind."),
+
+    {ok, _, Value1, _} = derflow:read(Id3),
+    lager:info("Successful read: ~p", [Value1]),
 
     ok.

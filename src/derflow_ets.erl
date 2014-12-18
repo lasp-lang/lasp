@@ -98,7 +98,6 @@ next(Id, Store, DeclareNextFun) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
-%% @TODO implement.
 -spec select(id(), function(), id(), store()) -> {ok, pid()}.
 select(Id, Function, AccId, Store) ->
     BindFun = fun(_AccId, AccValue, _Variables) ->

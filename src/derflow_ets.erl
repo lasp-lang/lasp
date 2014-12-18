@@ -92,14 +92,31 @@ next(Id, Store, DeclareNextFun) ->
             {ok, NextKey0}
     end.
 
-%% @TODO doc.
-%% @TODO spec.
+%% @doc Select values from one lattice into another.
+%%
+%%      Applies the given `Function' as a filter over the items in `Id',
+%%      placing the result in `AccId', both of which need to be declared
+%%      variables.
+%%
 %% @TODO implement.
-select(_Id, _Function, _AccId, _Store) ->
-    {error, not_implemented}.
+-spec select(id(), function(), id(), store()) -> {ok, pid()}.
+select(Id, Function, AccId, Store) ->
+    BindFun = fun(_AccId, AccValue, _Variables) ->
+                    ?MODULE:bind(_AccId, AccValue, _Variables)
+    end,
+    select(Id, Function, AccId, Store, BindFun).
 
-%% @TODO doc.
-%% @TODO spec.
+%% @doc Select values from one lattice into another.
+%%
+%%      Applies the given `Function' as a filter over the items in `Id',
+%%      placing the result in `AccId', both of which need to be declared
+%%      variables.
+%%
+%%      Similar to {@link select/4}, however, provides an override
+%%      function for the `BindFun', which is responsible for binding the
+%%      result, for instance, when it's located in another table.
+%%
+-spec select(id(), function(), id(), store(), function()) -> {ok, pid()}.
 select(Id, Function, AccId, Store, BindFun) ->
     Pid = spawn_link(?MODULE, select_harness, [Store,
                                                Id,

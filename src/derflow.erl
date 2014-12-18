@@ -152,8 +152,13 @@ read(Id) ->
 read(Id, Threshold) ->
     derflow_vnode:read(Id, Threshold).
 
-%% @TODO: write documentation.
-%% @TODO: write specification.
+%% @doc Select values from one lattice into another.
+%%
+%%      Applies the given `Function' as a filter over the items in `Id',
+%%      placing the result in `AccId', both of which need to be declared
+%%      variables.
+%%
+-spec select(id(), function(), id()) -> {ok, pid()}.
 select(Id, Function, AccId) ->
     derflow_vnode:select(Id, Function, AccId).
 

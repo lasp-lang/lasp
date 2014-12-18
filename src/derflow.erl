@@ -285,7 +285,6 @@ preflist(NVal, Param, VNode) ->
 %%
 %%      Helper function; used to generate a unique request identifier.
 %%
-%% @TODO: write specification.
 mk_reqid() ->
     erlang:phash2(erlang:now()).
 
@@ -294,7 +293,6 @@ mk_reqid() ->
 %%      Helper function; given a `ReqId', wait for a message within
 %%      `Timeout' seconds and return the result.
 %%
-%% @TODO: write specification.
 wait_for_reqid(ReqID, Timeout) ->
     receive
         {ReqID, ok} ->
@@ -307,7 +305,8 @@ wait_for_reqid(ReqID, Timeout) ->
 
 %% @doc Materialize all values in a stream and print to the log.
 %%
-%%      Meant primarily for debugging purposes.
+%%      Meant primarily for debugging purposes. See {@link
+%%      get_stream/1}.
 %%
 get_stream(Head, Output) ->
     lager:info("About to consume: ~p", [Head]),

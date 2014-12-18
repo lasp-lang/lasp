@@ -483,8 +483,12 @@ write(Type, Value, Next, Key, Store, NotifyFun) ->
     notify_all(NotifyFun, BindingList, Value),
     ok.
 
-%% @TODO doc.
-%% @TODO implement.
+%% @doc Pause execution until value requested.
+%%
+%%      Pause execution of calling thread until a read operation is
+%%      issued for the given `Id'.  Used to introduce laziness into a
+%%      computation.
+%%
 -spec wait_needed(id(), store()) -> ok.
 wait_needed(Id, Store) ->
     Self = self(),

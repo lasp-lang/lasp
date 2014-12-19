@@ -20,7 +20,7 @@
 
 %% @doc Advertisement counter.
 
--module(derflow_adcounter_test).
+-module(derpflow_adcounter_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -compile([export_all]).
@@ -39,10 +39,10 @@ confirm() ->
     Node = hd(Nodes),
 
     lager:info("Remotely loading code on node ~p", [Node]),
-    ok = derflow_test_helpers:load(Nodes),
+    ok = derpflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
-    ok = derflow_test_helpers:wait_for_cluster(Nodes),
+    ok = derpflow_test_helpers:wait_for_cluster(Nodes),
 
     lager:info("Remotely executing the test."),
     Result = rpc:call(Node, ?MODULE, test, []),
@@ -56,7 +56,7 @@ test() ->
     lager:info("Initialize advertisement counters..."),
     Generator = fun(_) ->
             lager:info("Generating advertisement!"),
-            {ok, Id} = derflow:declare(riak_dt_gcounter),
+            {ok, Id} = derpflow:declare(riak_dt_gcounter),
             Id
     end,
     Ads = lists:map(Generator, lists:seq(1,5)),
@@ -90,7 +90,7 @@ test() ->
 %       disable the advertisement.
 server(Ad, Clients) ->
     lager:info("Server launched for ad: ~p", [Ad]),
-    {ok, _, _, _} = derflow:read(Ad, 5),
+    {ok, _, _, _} = derpflow:read(Ad, 5),
     lager:info("Threshold reached; disable ad ~p for all clients!",
                [Ad]),
     lists:map(fun(Client) ->
@@ -112,9 +112,9 @@ client(Id, Ads) ->
             lager:info("Displaying ad: ~p from client: ~p~n", [Ad, Id]),
 
             %% Update ad by incrementing value.
-            {ok, _, Value, _} = derflow:read(Ad),
+            {ok, _, Value, _} = derpflow:read(Ad),
             {ok, Updated} = riak_dt_gcounter:update(increment, Id, Value),
-            {ok, _} = derflow:bind(Ad, Updated),
+            {ok, _} = derpflow:bind(Ad, Updated),
 
             client(Id, tl(Ads) ++ [Ad]);
         {remove_ad, Ad} ->

@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_app).
+-module(derpflow_app).
 
 -behaviour(application).
 
@@ -29,25 +29,25 @@
 %% Application callbacks
 %% ===================================================================
 
-%% @doc Start the derflow application.
+%% @doc Start the derpflow application.
 start(_StartType, _StartArgs) ->
-    case derflow_sup:start_link() of
+    case derpflow_sup:start_link() of
         {ok, Pid} ->
-            ok = riak_core:register(derflow,
-                                    [{vnode_module, derflow_vnode}]),
-            ok = riak_core_node_watcher:service_up(derflow, self()),
+            ok = riak_core:register(derpflow,
+                                    [{vnode_module, derpflow_vnode}]),
+            ok = riak_core_node_watcher:service_up(derpflow, self()),
 
             ok = riak_core_ring_events:add_guarded_handler(
-                    derflow_ring_event_handler, []),
+                    derpflow_ring_event_handler, []),
 
             ok = riak_core_node_watcher_events:add_guarded_handler(
-                    derflow_node_event_handler, []),
+                    derpflow_node_event_handler, []),
 
             {ok, Pid};
         {error, Reason} ->
             {error, Reason}
     end.
 
-%% @doc Stop the derflow application.
+%% @doc Stop the derpflow application.
 stop(_State) ->
     ok.

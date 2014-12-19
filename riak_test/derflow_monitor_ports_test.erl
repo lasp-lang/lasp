@@ -20,7 +20,7 @@
 
 %% @doc Test ports example.
 
--module(derflow_monitor_ports_test).
+-module(derpflow_monitor_ports_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([test/0,
@@ -44,10 +44,10 @@ confirm() ->
     Node = hd(Nodes),
 
     lager:info("Remotely loading code on node ~p", [Node]),
-    ok = derflow_test_helpers:load(Nodes),
+    ok = derpflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
-    ok = derflow_test_helpers:wait_for_cluster(Nodes),
+    ok = derpflow_test_helpers:wait_for_cluster(Nodes),
 
     lager:info("Remotely executing the test."),
     rpc:call(Node, ?MODULE, test, []),
@@ -56,18 +56,18 @@ confirm() ->
 -endif.
 
 test()->
-    {ok, S1} = derflow:declare(),
+    {ok, S1} = derpflow:declare(),
     Port = spawn(?MODULE, run_port ,[S1]),
     spawn(?MODULE, sensor, [Port, dc_1]),
     spawn(?MODULE, sensor, [Port, dc_2]),
     spawn(?MODULE, sensor, [Port, dc_3]),
-    {ok, S2} = derflow:declare(),
+    {ok, S2} = derpflow:declare(),
     spawn(?MODULE, dcs_monitor, [S1, S2, []]).
 
 run_port(Stream) ->
     receive
         {Message, From} ->
-            {ok, Next} = derflow:produce(Stream, {Message, From}),
+            {ok, Next} = derpflow:produce(Stream, {Message, From}),
             run_port(Next)
     end.
 
@@ -78,10 +78,10 @@ sensor(Port, Identifier) ->
     sensor(Port, Identifier).
 
 dcs_monitor(Input, Output, State) ->
-    case derflow:consume(Input) of
+    case derpflow:consume(Input) of
         {ok, _, {computer_down, Identifier}, NextInput} ->
             NewState = register_comfailure(Identifier, State),
-            {ok, NextOutput} = derflow:produce(Output, NewState),
+            {ok, NextOutput} = derpflow:produce(Output, NewState),
             dcs_monitor(NextInput, NextOutput, NewState);
         {ok, _, _, NextInput} ->
             dcs_monitor(NextInput, Output, State)

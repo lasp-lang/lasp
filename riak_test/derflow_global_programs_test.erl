@@ -20,7 +20,7 @@
 
 %% @doc Global programs test.
 
--module(derflow_global_programs_test).
+-module(derpflow_global_programs_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([test/1]).
@@ -41,13 +41,13 @@ confirm() ->
     ok = rt:wait_until_ring_converged(Nodes),
 
     lager:info("Remotely loading code on node ~p", [Node]),
-    ok = derflow_test_helpers:load(Nodes),
+    ok = derpflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
-    ok = derflow_test_helpers:wait_for_cluster(Nodes),
+    ok = derpflow_test_helpers:wait_for_cluster(Nodes),
 
     TestPaths = rt_config:get(test_paths, undefined),
-    Program = hd(TestPaths) ++ "/../derflow_example_program.erl",
+    Program = hd(TestPaths) ++ "/../derpflow_example_program.erl",
     lager:info("Program is: ~p", [Program]),
 
     lager:info("Remotely executing the test."),
@@ -60,10 +60,10 @@ confirm() ->
 test(Program) ->
     lager:info("Registering program from the test."),
 
-    ok = derflow:register(derflow_example_program, Program, global),
+    ok = derpflow:register(derpflow_example_program, Program, global),
 
     lager:info("Executing program from the test."),
 
-    {ok, Result} = derflow:execute(derflow_example_program, global),
+    {ok, Result} = derpflow:execute(derpflow_example_program, global),
 
     Result.

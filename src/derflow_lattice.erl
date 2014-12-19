@@ -18,10 +18,10 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_lattice).
+-module(derpflow_lattice).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--include("derflow.hrl").
+-include("derpflow.hrl").
 
 %% Exported utility functions.
 -export([threshold_met/3,

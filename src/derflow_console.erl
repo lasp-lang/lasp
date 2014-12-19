@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_console).
+-module(derpflow_console).
 
 -export([staged_join/1,
          down/1,

@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_threshold_read_test).
+-module(derpflow_threshold_read_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([test/0]).
@@ -37,10 +37,10 @@ confirm() ->
     Node = hd(Nodes),
 
     lager:info("Remotely loading code on node ~p", [Node]),
-    ok = derflow_test_helpers:load(Nodes),
+    ok = derpflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
-    ok = derflow_test_helpers:wait_for_cluster(Nodes),
+    ok = derpflow_test_helpers:wait_for_cluster(Nodes),
 
     lager:info("Remotely executing the test."),
     {GSet, GSet2} = rpc:call(Node, ?MODULE, test, []),
@@ -53,18 +53,18 @@ confirm() ->
 
 test() ->
     %% Create new set-based CRDT.
-    {ok, GSetId} = derflow:declare(riak_dt_gset),
+    {ok, GSetId} = derpflow:declare(riak_dt_gset),
 
     %% Determine my pid.
     Me = self(),
 
     %% Spawn fun which should block until lattice reaches [1,2,3].
-    spawn(fun() -> Me ! derflow:read(GSetId, [1,2,3]) end),
+    spawn(fun() -> Me ! derpflow:read(GSetId, [1,2,3]) end),
 
     %% Perform 4 binds, each an inflation.
-    {ok, _} = derflow:bind(GSetId, [1]),
-    {ok, _} = derflow:bind(GSetId, [1, 2]),
-    {ok, _} = derflow:bind(GSetId, [1, 2, 3]),
+    {ok, _} = derpflow:bind(GSetId, [1]),
+    {ok, _} = derpflow:bind(GSetId, [1, 2]),
+    {ok, _} = derpflow:bind(GSetId, [1, 2, 3]),
 
     %% Ensure we receive [1, 2, 3].
     GSet = receive
@@ -73,11 +73,11 @@ test() ->
     end,
 
     %% Spawn fun which should block until lattice reaches [1,2,3,4,5].
-    spawn(fun() -> Me ! derflow:read(GSetId, [1,2,3,4]) end),
+    spawn(fun() -> Me ! derpflow:read(GSetId, [1,2,3,4]) end),
 
     %% Perform another inflation.
-    {ok, _} = derflow:bind(GSetId, [1, 2, 3, 4]),
-    {ok, _} = derflow:bind(GSetId, [1, 2, 3, 4, 5]),
+    {ok, _} = derpflow:bind(GSetId, [1, 2, 3, 4]),
+    {ok, _} = derpflow:bind(GSetId, [1, 2, 3, 4, 5]),
 
     %% Ensure we receive [1, 2, 3, 4].
     GSet2 = receive

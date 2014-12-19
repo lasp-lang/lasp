@@ -18,9 +18,9 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow).
+-module(derpflow).
 
--include("derflow.hrl").
+-include("derpflow.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([declare/0,
@@ -50,7 +50,7 @@
 
 %% @doc Register an application.
 %%
-%%      Register a program with a derflow cluster.
+%%      Register a program with a derpflow cluster.
 %%
 %%      This function will, given the path to a local file on each node,
 %%      read, compile, parse_transform, and load the library into
@@ -68,15 +68,15 @@
 %%      hashed and installed on `?N' replicas; when the last argument is
 %%      `global', a copy will be installed on all replicas.
 %%
-%%      Programs must implement the `derflow_program' behavior to be
+%%      Programs must implement the `derpflow_program' behavior to be
 %%      correct.
 %%
 -spec register(module(), file(), registration()) -> ok | error.
 register(Module, File, preflist) ->
-    {ok, ReqId} = derflow_register_fsm:register(Module, File),
+    {ok, ReqId} = derpflow_register_fsm:register(Module, File),
     wait_for_reqid(ReqId, ?TIMEOUT);
 register(Module, File, global) ->
-    {ok, ReqId} = derflow_register_global_fsm:register(Module, File),
+    {ok, ReqId} = derpflow_register_global_fsm:register(Module, File),
     wait_for_reqid(ReqId, ?TIMEOUT);
 register(_Module, _File, _Registration) ->
     error.
@@ -94,10 +94,10 @@ register(_Module, _File, _Registration) ->
 %%
 -spec execute(module(), registration()) -> {ok, result()} | error.
 execute(Module, preflist) ->
-    {ok, ReqId} = derflow_execute_fsm:execute(Module),
+    {ok, ReqId} = derpflow_execute_fsm:execute(Module),
     wait_for_reqid(ReqId, ?TIMEOUT);
 execute(Module, global) ->
-    {ok, ReqId} = derflow_execute_coverage_fsm:execute(Module),
+    {ok, ReqId} = derpflow_execute_coverage_fsm:execute(Module),
     wait_for_reqid(ReqId, ?TIMEOUT);
 execute(_Module, _Registration) ->
     error.
@@ -114,7 +114,7 @@ declare() ->
 %%
 -spec declare(type()) -> {ok, id()}.
 declare(Type) ->
-    derflow_vnode:declare(druuid:v4(), Type).
+    derpflow_vnode:declare(druuid:v4(), Type).
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -124,7 +124,7 @@ declare(Type) ->
 %%
 -spec bind(id(), value()) -> {ok, id()} | error.
 bind(Id, Value) ->
-    derflow_vnode:bind(Id, Value).
+    derpflow_vnode:bind(Id, Value).
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -134,7 +134,7 @@ bind(Id, Value) ->
 %%
 -spec bind_to(id(), id()) -> {ok, id()} | error.
 bind_to(Id, TheirId) ->
-    derflow_vnode:bind_to(Id, TheirId).
+    derpflow_vnode:bind_to(Id, TheirId).
 
 %% @doc Bind a dataflow variable to the result of a function call.
 %%
@@ -152,7 +152,7 @@ bind(Id, Module, Function, Args) ->
 %%
 -spec read(id()) -> {ok, type(), value(), id()}.
 read(Id) ->
-    derflow_vnode:read(Id).
+    derpflow_vnode:read(Id).
 
 %% @doc Blocking monotonic read operation for a given dataflow variable.
 %%
@@ -162,7 +162,7 @@ read(Id) ->
 %%
 -spec read(id(), threshold()) -> {ok, type(), value(), id()}.
 read(Id, Threshold) ->
-    derflow_vnode:read(Id, Threshold).
+    derpflow_vnode:read(Id, Threshold).
 
 %% @doc Select values from one lattice into another.
 %%
@@ -172,7 +172,7 @@ read(Id, Threshold) ->
 %%
 -spec select(id(), function(), id()) -> {ok, pid()}.
 select(Id, Function, AccId) ->
-    derflow_vnode:select(Id, Function, AccId).
+    derpflow_vnode:select(Id, Function, AccId).
 
 %% @doc Produce a value in a stream.
 %%
@@ -181,7 +181,7 @@ select(Id, Function, AccId) ->
 %%
 -spec produce(id(), value()) -> {ok, id()}.
 produce(Id, Value) ->
-    derflow_vnode:bind(Id, Value).
+    derpflow_vnode:bind(Id, Value).
 
 %% @doc Produce a value in a stream.
 %%
@@ -191,7 +191,7 @@ produce(Id, Value) ->
 %%
 -spec produce(id(), module(), func(), args()) -> {ok, id()}.
 produce(Id, Module, Function, Args) ->
-    derflow_vnode:bind(Id, Module:Function(Args)).
+    derpflow_vnode:bind(Id, Module:Function(Args)).
 
 %% @doc Consume a value in the stream.
 %%
@@ -200,7 +200,7 @@ produce(Id, Module, Function, Args) ->
 %%
 -spec consume(id()) -> {ok, type(), value(), id()}.
 consume(Id) ->
-    derflow_vnode:read(Id).
+    derpflow_vnode:read(Id).
 
 %% @doc Generate the next identifier in a stream.
 %%
@@ -209,7 +209,7 @@ consume(Id) ->
 %%
 -spec extend(id()) -> id().
 extend(Id) ->
-    derflow_vnode:next(Id).
+    derpflow_vnode:next(Id).
 
 %% @doc Inspect the bind status of a variable.
 %%
@@ -220,7 +220,7 @@ extend(Id) ->
 %%
 -spec is_det(id()) -> bound().
 is_det(Id) ->
-    derflow_vnode:is_det(Id).
+    derpflow_vnode:is_det(Id).
 
 %% @doc Spawn a function.
 %%
@@ -228,7 +228,7 @@ is_det(Id) ->
 %%
 -spec thread(module(), func(), args()) -> {ok, pid()}.
 thread(Module, Function, Args) ->
-    derflow_vnode:thread(Module, Function, Args).
+    derpflow_vnode:thread(Module, Function, Args).
 
 %% @doc Pause execution until value requested.
 %%
@@ -238,7 +238,7 @@ thread(Module, Function, Args) ->
 %%
 -spec wait_needed(id()) -> ok.
 wait_needed(Id) ->
-    derflow_vnode:wait_needed(Id).
+    derpflow_vnode:wait_needed(Id).
 
 %% @doc Pause execution until value requested with given threshold.
 %%
@@ -248,11 +248,11 @@ wait_needed(Id) ->
 %%
 -spec wait_needed(id(), threshold()) -> ok.
 wait_needed(Id, Threshold) ->
-    derflow_vnode:wait_needed(Id, Threshold).
+    derpflow_vnode:wait_needed(Id, Threshold).
 
 %% @doc Spawn monitor.
 %%
-%%      Spawn a process and register the process with a given derflow
+%%      Spawn a process and register the process with a given derpflow
 %%      supervisor process.
 %%
 -spec spawn_mon(supervisor(), module(), func(), args()) -> ok.
@@ -278,7 +278,7 @@ get_stream(Stream) ->
 -spec preflist(non_neg_integer(), term(), atom()) ->
     riak_core_apl:preflist_ann().
 preflist(NVal, Param, VNode) ->
-    case application:get_env(derflow, single_partition_mode) of
+    case application:get_env(derpflow, single_partition_mode) of
         {ok, true} ->
             lager:info("Running in single partition mode!"),
             case riak_core_mochiglobal:get(primary_apl) of

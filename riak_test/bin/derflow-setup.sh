@@ -3,7 +3,7 @@
 # just bail out if things go south
 set -e
 
-: ${RTEE_DEST_DIR:="$HOME/rt/derflow"}
+: ${RTEE_DEST_DIR:="$HOME/rt/derpflow"}
 
 echo "Making $(pwd) the current release:"
 cwd=$(pwd)

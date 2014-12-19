@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_execute_coverage_fsm_sup).
+-module(derpflow_execute_coverage_fsm_sup).
 -author('Christopher Meiklejohn <cmeiklejohn@basho.com>').
 
 -behaviour(supervisor).
@@ -55,7 +55,7 @@ terminate_child(Supervisor, Pid) ->
 %% @doc Supervisor callback.
 init([]) ->
     Spec = {undefined,
-            {riak_core_coverage_fsm, start_link, [derflow_execute_coverage_fsm]},
-             temporary, 5000, worker, [derflow_execute_coverage_fsm]},
+            {riak_core_coverage_fsm, start_link, [derpflow_execute_coverage_fsm]},
+             temporary, 5000, worker, [derpflow_execute_coverage_fsm]},
 
     {ok, {{simple_one_for_one, 10, 10}, [Spec]}}.

@@ -18,12 +18,12 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc Derflow transform, for remote code loading.
+%% @doc derpflow transform, for remote code loading.
 
--module(derflow_transform).
+-module(derpflow_transform).
 -author('Christopher Meiklejohn <cmeiklejohn@basho.com>').
 
--include("derflow.hrl").
+-include("derpflow.hrl").
 
 %% Public API
 -export([parse_transform/2]).
@@ -77,7 +77,7 @@ walk_body(Acc, [H|T]) ->
 %% @private
 transform_statement({call, Line1,
                      {remote, Line2,
-                      {atom, Line3, derflow}, {atom, Line4, Func}},
+                      {atom, Line3, derpflow}, {atom, Line4, Func}},
                      Arguments}) ->
     {call, Line1,
      {remote, Line2,

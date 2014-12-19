@@ -1,6 +1,6 @@
--module(derflow_ets_eqc).
+-module(derpflow_ets_eqc).
 
--include("derflow.hrl").
+-include("derpflow.hrl").
 
 -ifdef(TEST).
 -ifdef(EQC).
@@ -17,12 +17,12 @@
 -define(SECS, 60).
 -define(NUM_TESTS, 200).
 
--define(ETS, derflow_ets_eqc).
+-define(ETS, derpflow_ets_eqc).
 
 -define(QC_OUT(P),
         eqc:on_output(fun(Str, Args) -> io:format(user, Str, Args) end, P)).
 
-derflow_ets_sequential_test_() ->
+derpflow_ets_sequential_test_() ->
     {timeout, 60,
      ?_assert(eqc:quickcheck(
                 eqc:numtests(?NUM_TESTS,
@@ -64,7 +64,7 @@ initial_state() ->
 %% Declaring new variables.
 
 declare(Type) ->
-    {ok, Id} = derflow_ets:declare(Type, ?ETS),
+    {ok, Id} = derpflow_ets:declare(Type, ?ETS),
     Id.
 
 declare_args(_S) ->
@@ -80,7 +80,7 @@ declare_next(#state{store=Store0}=S, V, [Type]) ->
 %% bound or undefined.
 
 bind(Id, Value) ->
-    derflow_ets:bind(Id, Value, ?ETS).
+    derpflow_ets:bind(Id, Value, ?ETS).
 
 bind_pre(S) ->
     has_variables(S).
@@ -108,7 +108,7 @@ bind_next(#state{store=Store0}=S, _V, [Id, NewValue]) ->
                 _ ->
                     Type:merge(Value, NewValue)
             end,
-            case derflow_lattice:is_inflation(Type, Value, Merged) of
+            case derpflow_lattice:is_inflation(Type, Value, Merged) of
                 true ->
                     dict:store(Id, Variable#variable{value=Merged}, Store0);
                 false ->
@@ -122,10 +122,10 @@ bind_post(#state{store=Store}, [Id, V], error) ->
         {ok, #variable{type=_Type, value=undefined}} ->
             false;
         {ok, #variable{type=Type, value=Value}} ->
-            case derflow_lattice:is_lattice(Type) of
+            case derpflow_lattice:is_lattice(Type) of
                 true ->
                     Merged = Type:merge(V, Value),
-                    case derflow_lattice:is_inflation(Type, Value, Merged) of
+                    case derpflow_lattice:is_inflation(Type, Value, Merged) of
                         true ->
                             false;
                         false ->
@@ -141,7 +141,7 @@ bind_post(_, _, _) ->
 %% Read variables.
 
 read(Id, Threshold) ->
-    derflow_ets:read(Id, Threshold, ?ETS).
+    derpflow_ets:read(Id, Threshold, ?ETS).
 
 read_pre(S) ->
     has_variables(S).
@@ -182,7 +182,7 @@ is_read_valid(#state{store=Store}, Id, Threshold) ->
         {ok, #variable{type=undefined}} ->
             true;
         {ok, #variable{value=Value, type=Type}} ->
-            case derflow_lattice:threshold_met(Type, Value, Threshold) of
+            case derpflow_lattice:threshold_met(Type, Value, Threshold) of
                 true ->
                     true;
                 false ->

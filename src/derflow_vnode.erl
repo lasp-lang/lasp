@@ -18,19 +18,19 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc Derflow operational vnode, which powers the data flow variable
+%% @doc derpflow operational vnode, which powers the data flow variable
 %%      assignment and read operations.
 %%
 
--module(derflow_vnode).
+-module(derpflow_vnode).
 
 -behaviour(riak_core_vnode).
 
--include("derflow.hrl").
+-include("derpflow.hrl").
 
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
--define(VNODE_MASTER, derflow_vnode_master).
+-define(VNODE_MASTER, derpflow_vnode_master).
 
 %% Language execution primitives.
 -export([bind/2,
@@ -97,7 +97,7 @@ execute(Preflist, Identity, Module) ->
 bind(Id, Value) ->
     lager:info("Bind called by process ~p, value ~p, id: ~p",
                [self(), Value, Id]),
-    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derpflow:preflist(?N, Id, derpflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {bind, Id, Value},
                                               ?VNODE_MASTER).
@@ -105,7 +105,7 @@ bind(Id, Value) ->
 bind_to(Id, TheirId) ->
     lager:info("Bind called by process ~p, their_id ~p, id: ~p",
                [self(), TheirId, Id]),
-    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derpflow:preflist(?N, Id, derpflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {bind_to, Id, TheirId},
                                               ?VNODE_MASTER).
@@ -116,7 +116,7 @@ read(Id) ->
 read(Id, Threshold) ->
     lager:info("Read by process ~p, id: ~p thresh: ~p",
                [self(), Id, Threshold]),
-    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derpflow:preflist(?N, Id, derpflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {read, Id, Threshold},
                                               ?VNODE_MASTER).
@@ -124,53 +124,53 @@ read(Id, Threshold) ->
 select(Id, Function, AccId) ->
     lager:info("Select by process ~p, id: ~p accid: ~p",
                [self(), Id, AccId]),
-    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derpflow:preflist(?N, Id, derpflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {select,
                                                Id, Function, AccId},
                                               ?VNODE_MASTER).
 
 thread(Module, Function, Args) ->
-    [{IndexNode, _Type}] = derflow:preflist(?N,
+    [{IndexNode, _Type}] = derpflow:preflist(?N,
                                             {Module, Function, Args},
-                                            derflow),
+                                            derpflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {thread,
                                                Module, Function, Args},
                                               ?VNODE_MASTER).
 
 next(Id) ->
-    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derpflow:preflist(?N, Id, derpflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {next, Id},
                                               ?VNODE_MASTER).
 
 is_det(Id) ->
-    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derpflow:preflist(?N, Id, derpflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {is_det, Id},
                                               ?VNODE_MASTER).
 
 declare(Id, Type) ->
-    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derpflow:preflist(?N, Id, derpflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {declare, Id, Type},
                                               ?VNODE_MASTER).
 
 fetch(Id, FromId, FromPid) ->
-    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derpflow:preflist(?N, Id, derpflow),
     riak_core_vnode_master:command(IndexNode,
                                    {fetch, Id, FromId, FromPid},
                                    ?VNODE_MASTER).
 
 reply_fetch(Id, FromPid, DV) ->
-    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derpflow:preflist(?N, Id, derpflow),
     riak_core_vnode_master:command(IndexNode,
                                    {reply_fetch, Id, FromPid, DV},
                                    ?VNODE_MASTER).
 
 notify_value(Id, Value) ->
-    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derpflow:preflist(?N, Id, derpflow),
     riak_core_vnode_master:command(IndexNode,
                                    {notify_value, Id, Value},
                                    ?VNODE_MASTER).
@@ -179,7 +179,7 @@ wait_needed(Id) ->
     wait_needed(Id, undefined).
 
 wait_needed(Id, Threshold) ->
-    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derpflow:preflist(?N, Id, derpflow),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {wait_needed, Id, Threshold},
                                               ?VNODE_MASTER).
@@ -227,7 +227,7 @@ handle_command({register, {ReqId, _}, Module0, File}, _From,
                                                    Module0),
         case compile:file(File, [binary,
                                  {parse_transform, lager_transform},
-                                 {parse_transform, derflow_transform},
+                                 {parse_transform, derpflow_transform},
                                  {store, Variables},
                                  {partition, Partition},
                                  {module, Module},
@@ -373,7 +373,7 @@ handle_command({select, Id, Function, AccId}, _From,
                             node=Node}) ->
     BindFun = fun(_AccId, AccValue, _Variables) ->
             %% Beware of cycles in the gen_server calls!
-            [{IndexNode, _Type}] = derflow:preflist(?N, _AccId, derflow),
+            [{IndexNode, _Type}] = derpflow:preflist(?N, _AccId, derpflow),
 
             case IndexNode of
                 {Partition, Node} ->
@@ -470,7 +470,7 @@ declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) 
     Id = druuid:v4(),
 
     %% Beware of cycles in the gen_server calls!
-    [{IndexNode, _Type}] = derflow:preflist(?N, Id, derflow),
+    [{IndexNode, _Type}] = derpflow:preflist(?N, Id, derpflow),
 
     case IndexNode of
         {Partition, Node} ->

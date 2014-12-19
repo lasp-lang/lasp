@@ -2,10 +2,10 @@
 .eunit
 deps/*
 ebin/*
-rel/derflow
+rel/derpflow
 dev
 src/*.swp
-apps/derflow/src/*
+apps/derpflow/src/*
 .local_dialyzer_plt
 tags
 log/

@@ -1,5 +1,5 @@
 %% -*- erlang -*-
-{application, derflow,
+{application, derpflow,
  [
   {description, "Distributed deterministic dataflow programming for Erlang"},
   {vsn, "1"},
@@ -9,6 +9,6 @@
                   stdlib,
                   riak_core
                  ]},
-  {mod, { derflow_app, []}},
+  {mod, { derpflow_app, []}},
   {env, []}
  ]}.

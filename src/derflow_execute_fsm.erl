@@ -18,12 +18,12 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_execute_fsm).
+-module(derpflow_execute_fsm).
 -author('Christopher Meiklejohn <cmeiklejohn@basho.com>').
 
 -behaviour(gen_fsm).
 
--include("derflow.hrl").
+-include("derpflow.hrl").
 
 %% API
 -export([start_link/3,
@@ -62,8 +62,8 @@ start_link(ReqId, From, Module) ->
 
 %% @doc Execute a module.
 execute(Module) ->
-    ReqId = derflow:mk_reqid(),
-    _ = derflow_execute_fsm_sup:start_child([ReqId, self(), Module]),
+    ReqId = derpflow:mk_reqid(),
+    _ = derpflow_execute_fsm_sup:start_child([ReqId, self(), Module]),
     {ok, ReqId}.
 
 %%%===================================================================
@@ -103,7 +103,7 @@ init([ReqId, From, Module]) ->
 
 %% @doc Prepare request by retrieving the preflist.
 prepare(timeout, #state{module=Module}=State) ->
-    Preflist = derflow:preflist(?PROGRAM_N, Module, derflow),
+    Preflist = derpflow:preflist(?PROGRAM_N, Module, derpflow),
     Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
     {next_state, execute, State#state{preflist=Preflist2}, 0}.
 
@@ -112,7 +112,7 @@ execute(timeout, #state{preflist=Preflist,
                         req_id=ReqId,
                         coordinator=Coordinator,
                         module=Module}=State) ->
-    derflow_vnode:execute(Preflist, {ReqId, Coordinator}, Module),
+    derpflow_vnode:execute(Preflist, {ReqId, Coordinator}, Module),
     {next_state, waiting, State}.
 
 waiting({ok, _ReqId, Reply},

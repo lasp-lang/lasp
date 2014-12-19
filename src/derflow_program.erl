@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_program).
+-module(derpflow_program).
 
 -type crdt() :: riak_dt:crdt().
 

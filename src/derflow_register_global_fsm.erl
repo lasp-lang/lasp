@@ -18,12 +18,12 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_register_global_fsm).
+-module(derpflow_register_global_fsm).
 -author('Christopher Meiklejohn <cmeiklejohn@basho.com>').
 
 -behaviour(gen_fsm).
 
--include("derflow.hrl").
+-include("derpflow.hrl").
 
 %% API
 -export([start_link/4,
@@ -59,8 +59,8 @@ start_link(ReqId, From, Group, Pid) ->
 
 %% @doc Register a program.
 register(Module, File) ->
-    ReqId = derflow:mk_reqid(),
-    _ = derflow_register_global_fsm_sup:start_child([ReqId, self(), Module, File]),
+    ReqId = derpflow:mk_reqid(),
+    _ = derpflow_register_global_fsm_sup:start_child([ReqId, self(), Module, File]),
     {ok, ReqId}.
 
 %%%===================================================================
@@ -109,7 +109,7 @@ execute(timeout, #state{preflist=Preflist,
                         coordinator=Coordinator,
                         module=Module,
                         file=File}=State) ->
-    derflow_vnode:register(Preflist, {ReqId, Coordinator}, Module, File),
+    derpflow_vnode:register(Preflist, {ReqId, Coordinator}, Module, File),
     {next_state, waiting, State}.
 
 %% @doc Attempt to write to every single node responsible for this

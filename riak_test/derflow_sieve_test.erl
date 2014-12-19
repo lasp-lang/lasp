@@ -20,7 +20,7 @@
 
 %% @doc Test sieve example.
 
--module(derflow_sieve_test).
+-module(derpflow_sieve_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([test/1,
@@ -42,10 +42,10 @@ confirm() ->
     Node = hd(Nodes),
 
     lager:info("Remotely loading code on node ~p", [Node]),
-    ok = derflow_test_helpers:load(Nodes),
+    ok = derpflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
-    ok = derflow_test_helpers:wait_for_cluster(Nodes),
+    ok = derpflow_test_helpers:wait_for_cluster(Nodes),
 
     lager:info("Remotely executing the test."),
     Result = rpc:call(Node, ?MODULE, test, [100]),
@@ -56,34 +56,34 @@ confirm() ->
 -endif.
 
 test(Max) ->
-    {ok, S1} = derflow:declare(),
-    spawn(derflow_sieve_test, generate, [2, Max, S1]),
-    {ok, S2} = derflow:declare(),
-    spawn(derflow_sieve_test, sieve, [S1, S2]),
-    derflow:get_stream(S2).
+    {ok, S1} = derpflow:declare(),
+    spawn(derpflow_sieve_test, generate, [2, Max, S1]),
+    {ok, S2} = derpflow:declare(),
+    spawn(derpflow_sieve_test, sieve, [S1, S2]),
+    derpflow:get_stream(S2).
 
 sieve(S1, S2) ->
-    case derflow:consume(S1) of
+    case derpflow:consume(S1) of
         {ok, _, undefined, _} ->
-            derflow:bind(S2, undefined);
+            derpflow:bind(S2, undefined);
         {ok, _, Value, Next} ->
-            {ok, SN} = derflow:declare(),
-            spawn(derflow_sieve_test, filter,
+            {ok, SN} = derpflow:declare(),
+            spawn(derpflow_sieve_test, filter,
                            [Next, fun(Y) -> Y rem Value =/= 0 end, SN]),
-            {ok, NextOutput} = derflow:produce(S2, Value),
+            {ok, NextOutput} = derpflow:produce(S2, Value),
             sieve(SN, NextOutput)
     end.
 
 filter(S1, F, S2) ->
-    case derflow:consume(S1) of
+    case derpflow:consume(S1) of
         {ok, _, undefined, _} ->
-            derflow:bind(S2, undefined);
+            derpflow:bind(S2, undefined);
         {ok, _, Value, Next} ->
             case F(Value) of
                 false ->
                     filter(Next, F, S2);
                 true->
-                    {ok, NextOutput} = derflow:produce(S2, Value),
+                    {ok, NextOutput} = derpflow:produce(S2, Value),
                     filter(Next, F, NextOutput)
             end
     end.
@@ -92,8 +92,8 @@ generate(Init, N, Output) ->
     if
         (Init =< N) ->
             timer:sleep(250),
-            {ok, Next} = derflow:produce(Output, Init),
+            {ok, Next} = derpflow:produce(Output, Init),
             generate(Init + 1, N,  Next);
         true ->
-            derflow:bind(Output, undefined)
+            derpflow:bind(Output, undefined)
     end.

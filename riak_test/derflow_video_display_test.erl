@@ -20,7 +20,7 @@
 
 %% @doc Video display test.
 
--module(derflow_video_display_test).
+-module(derpflow_video_display_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([test/0,
@@ -40,10 +40,10 @@ confirm() ->
     Node = hd(Nodes),
 
     lager:info("Remotely loading code on node ~p", [Node]),
-    ok = derflow_test_helpers:load(Nodes),
+    ok = derpflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
-    ok = derflow_test_helpers:wait_for_cluster(Nodes),
+    ok = derpflow_test_helpers:wait_for_cluster(Nodes),
 
     lager:info("Remotely executing the test."),
     Result = rpc:call(Node, ?MODULE, test, []),
@@ -53,40 +53,40 @@ confirm() ->
 -endif.
 
 test() ->
-    {ok, S1} = derflow:declare(),
-    spawn(derflow_video_display_test, sender, [0, 10, S1]),
+    {ok, S1} = derpflow:declare(),
+    spawn(derpflow_video_display_test, sender, [0, 10, S1]),
     display(S1),
-    derflow:get_stream(S1).
+    derpflow:get_stream(S1).
 
 sender(Init, N, Output) ->
     if
         N >= 0 ->
             timer:sleep(500),
-            {ok, Next} = derflow:produce(Output, Init),
+            {ok, Next} = derpflow:produce(Output, Init),
             sender(Init + 1, N - 1,  Next);
         true ->
             timer:sleep(500),
-            derflow:bind(Output, undefined)
+            derpflow:bind(Output, undefined)
     end.
 
 skip1(Input, Output) ->
-    case derflow:consume(Input) of
+    case derpflow:consume(Input) of
         {ok, _, undefined, _} ->
-            derflow:bind(Output, undefined);
+            derpflow:bind(Output, undefined);
         {ok, _, _Value, Next} ->
-            case derflow:is_det(Next) of
+            case derpflow:is_det(Next) of
                 {ok, true} ->
                     skip1(Next, Output);
                 {ok, false} ->
-                    derflow:bind_to(Output, Input)
+                    derpflow:bind_to(Output, Input)
             end
     end.
 
 display(Input) ->
     timer:sleep(1500),
-    {ok, Output} = derflow:declare(),
+    {ok, Output} = derpflow:declare(),
     skip1(Input, Output),
-    case derflow:consume(Output) of
+    case derpflow:consume(Output) of
         {ok, _, undefined, _} ->
             ok;
         {ok, _, Value, Next} ->

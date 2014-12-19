@@ -18,12 +18,12 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_execute_coverage_fsm).
+-module(derpflow_execute_coverage_fsm).
 -author('Christopher Meiklejohn <cmeiklejohn@basho.com>').
 
 -behaviour(riak_core_coverage_fsm).
 
--include_lib("derflow.hrl").
+-include_lib("derpflow.hrl").
 
 -export([execute/1,
          execute/2]).
@@ -42,14 +42,14 @@ execute(Module) ->
     execute(Module, 1).
 
 execute(Module, NVal) ->
-    ReqId = derflow:mk_reqid(),
-    _ = derflow_execute_coverage_fsm_sup:start_child([{raw, ReqId, self()}, [?TIMEOUT, NVal, Module]]),
+    ReqId = derpflow:mk_reqid(),
+    _ = derpflow_execute_coverage_fsm_sup:start_child([{raw, ReqId, self()}, [?TIMEOUT, NVal, Module]]),
     {ok, ReqId}.
 
 init(From={_, _, _}, [Timeout, NVal, Module]) ->
     lager:info("Execute coverage FSM started!"),
     Req = ?EXECUTE_REQUEST{module=Module},
-    {Req, all, NVal, 1, derflow, derflow_vnode_master, Timeout,
+    {Req, all, NVal, 1, derpflow, derpflow_vnode_master, Timeout,
      #state{from=From, module=Module}}.
 
 process_results({error, Reason}, _State) ->

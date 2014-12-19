@@ -20,7 +20,7 @@
 
 %% @doc Test that streaming bind of an insertion sort works.
 
--module(derflow_get_minimum_test).
+-module(derpflow_get_minimum_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([test/1,
@@ -43,10 +43,10 @@ confirm() ->
     Node = hd(Nodes),
 
     lager:info("Remotely loading code on node ~p", [Node]),
-    ok = derflow_test_helpers:load(Nodes),
+    ok = derpflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
-    ok = derflow_test_helpers:wait_for_cluster(Nodes),
+    ok = derpflow_test_helpers:wait_for_cluster(Nodes),
 
     lager:info("Remotely executing the test."),
     Result = rpc:call(Node, ?MODULE, test, [[1,2,3,4,5]]),
@@ -56,38 +56,38 @@ confirm() ->
 -endif.
 
 test(List) ->
-    {ok, S1} = derflow:declare(),
+    {ok, S1} = derpflow:declare(),
     ?TABLE = ets:new(?TABLE, [set, named_table, public, {write_concurrency, true}]),
     true = ets:insert(?TABLE, {count, 0}),
-    spawn(derflow_get_minimum_test, insort, [List, S1]),
-    {ok, _, V, _} = derflow:consume(S1),
+    spawn(derpflow_get_minimum_test, insort, [List, S1]),
+    {ok, _, V, _} = derpflow:consume(S1),
     V.
 
 insort(List, S) ->
     case List of
         [H|T] ->
-            {ok, OutS} = derflow:declare(),
+            {ok, OutS} = derpflow:declare(),
             insort(T, OutS),
-            spawn(derflow_get_minimum_test, insert, [H, OutS, S]);
+            spawn(derpflow_get_minimum_test, insert, [H, OutS, S]);
         [] ->
-            derflow:bind(S, undefined)
+            derpflow:bind(S, undefined)
     end.
 
 insert(X, In, Out) ->
     [{Id, C}] = ets:lookup(?TABLE, count),
     true = ets:insert(?TABLE, {Id, C+1}),
-    {ok, _} = derflow:wait_needed(Out),
-    case derflow:consume(In) of
+    {ok, _} = derpflow:wait_needed(Out),
+    case derpflow:consume(In) of
         {ok, _, undefined, _} ->
-            {ok, Next} = derflow:produce(Out, X),
-            derflow:bind(Next, undefined);
+            {ok, Next} = derpflow:produce(Out, X),
+            derpflow:bind(Next, undefined);
         {ok, _, V, SNext} ->
             if
                 X < V ->
-                    {ok, Next} = derflow:produce(Out, X),
-                    derflow:bind(Next, In);
+                    {ok, Next} = derpflow:produce(Out, X),
+                    derpflow:bind(Next, In);
                 true ->
-                    {ok, Next} = derflow:produce(Out, V),
+                    {ok, Next} = derpflow:produce(Out, V),
                     insert(X, SNext, Next)
             end
     end.

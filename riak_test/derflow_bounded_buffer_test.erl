@@ -20,7 +20,7 @@
 
 %% @doc Bounded buffer test application.
 
--module(derflow_bounded_buffer_test).
+-module(derpflow_bounded_buffer_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([test/0,
@@ -42,10 +42,10 @@ confirm() ->
     Node = hd(Nodes),
 
     lager:info("Remotely loading code on node ~p", [Node]),
-    ok = derflow_test_helpers:load(Nodes),
+    ok = derpflow_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
-    ok = derflow_test_helpers:wait_for_cluster(Nodes),
+    ok = derpflow_test_helpers:wait_for_cluster(Nodes),
 
     lager:info("Remotely executing the test."),
     Result = rpc:call(Node, ?MODULE, test, []),
@@ -55,33 +55,33 @@ confirm() ->
 -endif.
 
 test() ->
-    {ok, S1} = derflow:declare(),
-    spawn(derflow_bounded_buffer_test, producer, [0, 3, S1]),
-    {ok, S2} = derflow:declare(),
-    spawn(derflow_bounded_buffer_test, buffer, [S1, 2, S2]),
-    {ok, S3} = derflow:declare(),
+    {ok, S1} = derpflow:declare(),
+    spawn(derpflow_bounded_buffer_test, producer, [0, 3, S1]),
+    {ok, S2} = derpflow:declare(),
+    spawn(derpflow_bounded_buffer_test, buffer, [S1, 2, S2]),
+    {ok, S3} = derpflow:declare(),
     consumer(S2, 5, fun(X) -> X*2 end, S3),
-    derflow:get_stream(S3).
+    derpflow:get_stream(S3).
 
 producer(Value, N, Output) ->
     if
         (N > 0) ->
-            {ok, _} = derflow:wait_needed(Output),
-            {ok, Next} = derflow:produce(Output, Value),
+            {ok, _} = derpflow:wait_needed(Output),
+            {ok, Next} = derpflow:produce(Output, Value),
             producer(Value + 1, N - 1,  Next);
         true ->
-            derflow:bind(Output, undefined)
+            derpflow:bind(Output, undefined)
     end.
 
 loop(S1, S2, End) ->
-    {ok, _} = derflow:wait_needed(S2),
-    {ok, _, S1Value, S1Next} = derflow:consume(S1),
-    {ok, S2Next} = derflow:produce(S2, S1Value),
-    case derflow:produce(S2, S1Value) of
+    {ok, _} = derpflow:wait_needed(S2),
+    {ok, _, S1Value, S1Next} = derpflow:consume(S1),
+    {ok, S2Next} = derpflow:produce(S2, S1Value),
+    case derpflow:produce(S2, S1Value) of
         {ok, undefined} ->
             ok;
         {ok, S2Next} ->
-            case derflow:extend(End) of
+            case derpflow:extend(End) of
                 {ok, {undefined, _}} ->
                     ok;
                 {ok, EndNext} ->
@@ -98,7 +98,7 @@ drop_list(S, Size) ->
         Size == 0 ->
             S;
         true ->
-            {ok, Next} = derflow:extend(S),
+            {ok, Next} = derpflow:extend(S),
             drop_list(Next, Size - 1)
     end.
 
@@ -107,11 +107,11 @@ consumer(S2, Size, F, Output) ->
         0 ->
             ok;
         _ ->
-            case derflow:consume(S2) of
+            case derpflow:consume(S2) of
                 {ok, _, undefined, _} ->
-                    derflow:bind(Output, undefined);
+                    derpflow:bind(Output, undefined);
                 {ok, _, Value, Next} ->
-                    {ok, NextOutput} = derflow:produce(Output, F(Value)),
+                    {ok, NextOutput} = derpflow:produce(Output, F(Value)),
                     consumer(Next, Size - 1, F, NextOutput)
             end
     end.

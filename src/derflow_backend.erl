@@ -18,10 +18,10 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_backend).
+-module(derpflow_backend).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--include("derflow.hrl").
+-include("derpflow.hrl").
 
 -callback select(id(), function(), id(), store()) -> {ok, pid()}.
 -callback select(id(), function(), id(), store(), function()) -> {ok, pid()}.

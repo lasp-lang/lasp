@@ -18,9 +18,9 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc Helpers for remotely running derflow code.
+%% @doc Helpers for remotely running derpflow code.
 
--module(derflow_test_helpers).
+-module(derpflow_test_helpers).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([load/1,

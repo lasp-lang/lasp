@@ -18,9 +18,9 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc Test that a derflow cluster can be built and initialized.
+%% @doc Test that a derpflow cluster can be built and initialized.
 
--module(derflow_test).
+-module(derpflow_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -ifdef(TEST).

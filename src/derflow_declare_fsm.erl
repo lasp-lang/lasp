@@ -18,11 +18,11 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_declare_fsm).
+-module(derpflow_declare_fsm).
 
 -behaviour(gen_fsm).
 
--include("derflow.hrl").
+-include("derpflow.hrl").
 
 -export([start_link/2]).
 %% gen_fsm callbacks
@@ -55,7 +55,7 @@ init([From, Type]) ->
 %% @private
 execute(timeout, StateData=#state{type=Type}) ->
     Id = druuid:v4(),
-    derflow_vnode:declare(Id, Type),
+    derpflow_vnode:declare(Id, Type),
     {next_state, await_responses, StateData#state{key=Id}}.
 
 await_responses({ok, Id}, StateData=#state{from=Pid, results=Results0}) ->

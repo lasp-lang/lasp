@@ -1,7 +1,7 @@
 -define(TIMEOUT, 100000).
 
--define(BUCKET, <<"derflow">>).
--define(BACKEND, derflow_ets).
+-define(BUCKET, <<"derpflow">>).
+-define(BACKEND, derpflow_ets).
 
 -define(N, 1).
 -define(W, 1).
@@ -11,12 +11,12 @@
 -define(PROGRAM_W, 2).
 -define(PROGRAM_R, 2).
 
--record(derflow_execute_request_v1, {
+-record(derpflow_execute_request_v1, {
         module :: atom(),
         req_id :: non_neg_integer(),
         caller :: pid()}).
 
--define(EXECUTE_REQUEST, #derflow_execute_request_v1).
+-define(EXECUTE_REQUEST, #derpflow_execute_request_v1).
 
 -record(dv, {value,
              binding,

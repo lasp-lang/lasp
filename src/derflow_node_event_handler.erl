@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_node_event_handler).
+-module(derpflow_node_event_handler).
 
 -behaviour(gen_event).
 

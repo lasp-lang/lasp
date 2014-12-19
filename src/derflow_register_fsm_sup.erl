@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_register_fsm_sup).
+-module(derpflow_register_fsm_sup).
 -author('Christopher Meiklejohn <cmeiklejohn@basho.com>').
 
 -behaviour(supervisor).
@@ -53,8 +53,8 @@ terminate_child(Supervisor, Pid) ->
 
 %% @doc supervisor callback.
 init([]) ->
-    Spec = {derflow_register_fsm,
-            {derflow_register_fsm, start_link, []},
-             temporary, 5000, worker, [derflow_register_fsm]},
+    Spec = {derpflow_register_fsm,
+            {derpflow_register_fsm, start_link, []},
+             temporary, 5000, worker, [derpflow_register_fsm]},
 
     {ok, {{simple_one_for_one, 10, 10}, [Spec]}}.

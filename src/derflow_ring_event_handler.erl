@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_ring_event_handler).
+-module(derpflow_ring_event_handler).
 -behaviour(gen_event).
 
 %% gen_event callbacks

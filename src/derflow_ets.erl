@@ -18,12 +18,12 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_ets).
+-module(derpflow_ets).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--include("derflow.hrl").
+-include("derpflow.hrl").
 
--behaviour(derflow_backend).
+-behaviour(derpflow_backend).
 
 %% Core API.
 -export([is_det/2,
@@ -315,10 +315,10 @@ bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
                 Value ->
                     {ok, NextKey};
                 _ ->
-                    case derflow_lattice:is_lattice(Type) of
+                    case derpflow_lattice:is_lattice(Type) of
                         true ->
                             Merged = Type:merge(V#dv.value, Value),
-                            case derflow_lattice:is_inflation(Type,
+                            case derpflow_lattice:is_inflation(Type,
                                                               V#dv.value,
                                                               Merged) of
                                 true ->
@@ -388,7 +388,7 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
         true ->
             lager:info("Read received: ~p, bound: ~p, threshold: ~p",
                        [Id, V, Threshold]),
-            case derflow_lattice:is_lattice(Type) of
+            case derpflow_lattice:is_lattice(Type) of
                 true ->
                     case Threshold of
                         undefined ->
@@ -400,11 +400,11 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                                        [Threshold]),
 
                             %% Notify all lazy processes of this read.
-                            {ok, StillLazy} = reply_to_all(LazyThreads, 
+                            {ok, StillLazy} = reply_to_all(LazyThreads,
                                                            {ok, Threshold}),
 
                             %% Satisfy read if threshold is met.
-                            case derflow_lattice:threshold_met(Type,
+                            case derpflow_lattice:threshold_met(Type,
                                                                Value,
                                                                Threshold) of
                                 true ->
@@ -540,7 +540,7 @@ select(Id, Function, AccId, Store, BindFun) ->
                                                undefined]),
     {ok, Pid}.
 
-%% @doc Callback wait_needed function for derflow_vnode, where we
+%% @doc Callback wait_needed function for derpflow_vnode, where we
 %%      change the reply and blocking replies.
 %%
 %%      Similar to {@link wait_needed/2}.
@@ -632,7 +632,7 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, Type, Value, Next}=Result) ->
     lager:info("Result: ~p, Read threshold: ~p", [Result, Threshold]),
-    StillWaiting = case derflow_lattice:threshold_met(Type, Value, Threshold) of
+    StillWaiting = case derpflow_lattice:threshold_met(Type, Value, Threshold) of
         true ->
             lager:info("Read threshold ~p met: ~p", [Threshold, Value]),
             case From of
@@ -650,7 +650,7 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
 reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, ReadThreshold}=Result) ->
-    StillWaiting = case derflow_lattice:threshold_met(Type, Threshold, ReadThreshold) of
+    StillWaiting = case derpflow_lattice:threshold_met(Type, Threshold, ReadThreshold) of
         true ->
             lager:info("Wait threshold ~p met: ~p", [Threshold, ReadThreshold]),
             case From of
@@ -688,7 +688,7 @@ select_harness(Variables, Id, Function, AccId, BindFun, Previous) ->
     [{_Key, #dv{type=Type, value=Value}}] = ets:lookup(Variables, Id),
 
     %% Generate operations for given data type.
-    {ok, Operations} = derflow_lattice:generate_operations(Type, Value),
+    {ok, Operations} = derpflow_lattice:generate_operations(Type, Value),
     lager:info("Operations generated: ~p", [Operations]),
 
     %% Build new data structure.

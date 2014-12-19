@@ -18,10 +18,10 @@
 %%
 %% -------------------------------------------------------------------
 
--module(derflow_example_program).
+-module(derpflow_example_program).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--behavior(derflow_program).
+-behavior(derpflow_program).
 
 -export([init/0,
          execute/1,
@@ -44,51 +44,51 @@ merge([Reply|_]) ->
 
 example() ->
     %% Single-assignment variables.
-    {ok, I1} = derflow:declare(),
-    {ok, I2} = derflow:declare(),
-    {ok, I3} = derflow:declare(),
+    {ok, I1} = derpflow:declare(),
+    {ok, I2} = derpflow:declare(),
+    {ok, I3} = derpflow:declare(),
 
     V1 = 1,
 
     %% Attempt pre, and post- dataflow variable bind operations.
-    {ok, _} = derflow:bind_to(I2, I1),
-    {ok, _} = derflow:bind(I1, V1),
-    {ok, _} = derflow:bind_to(I3, I1),
+    {ok, _} = derpflow:bind_to(I2, I1),
+    {ok, _} = derpflow:bind(I1, V1),
+    {ok, _} = derpflow:bind_to(I3, I1),
 
     %% Perform invalid bind.
-    error = derflow:bind(I1, 2),
+    error = derpflow:bind(I1, 2),
 
     %% Verify the same value is contained by all.
-    {ok, _, V1, _} = derflow:read(I3),
-    {ok, _, V1, _} = derflow:read(I2),
-    {ok, _, V1, _} = derflow:read(I1),
+    {ok, _, V1, _} = derpflow:read(I3),
+    {ok, _, V1, _} = derpflow:read(I2),
+    {ok, _, V1, _} = derpflow:read(I1),
 
     %% G-Set variables.
-    {ok, L1} = derflow:declare(riak_dt_gset),
-    {ok, L2} = derflow:declare(riak_dt_gset),
-    {ok, L3} = derflow:declare(riak_dt_gset),
+    {ok, L1} = derpflow:declare(riak_dt_gset),
+    {ok, L2} = derpflow:declare(riak_dt_gset),
+    {ok, L3} = derpflow:declare(riak_dt_gset),
 
     {ok, S1} = riak_dt_gset:update({add, 1},
                                    undefined, riak_dt_gset:new()),
 
     %% Attempt pre, and post- dataflow variable bind operations.
-    {ok, _} = derflow:bind_to(L2, L1),
-    {ok, _} = derflow:bind(L1, S1),
-    {ok, _} = derflow:bind_to(L3, L1),
+    {ok, _} = derpflow:bind_to(L2, L1),
+    {ok, _} = derpflow:bind(L1, S1),
+    {ok, _} = derpflow:bind_to(L3, L1),
 
     %% Verify the same value is contained by all.
-    {ok, _, S1, _} = derflow:read(L3),
-    {ok, _, S1, _} = derflow:read(L2),
-    {ok, _, S1, _} = derflow:read(L1),
+    {ok, _, S1, _} = derpflow:read(L3),
+    {ok, _, S1, _} = derpflow:read(L2),
+    {ok, _, S1, _} = derpflow:read(L1),
 
     %% Test inflation.
     {ok, S2} = riak_dt_gset:update({add, 2},
                                    undefined, S1),
-    {ok, _} = derflow:bind(L1, S2),
+    {ok, _} = derpflow:bind(L1, S2),
 
     %% Verify the same value is contained by all.
-    {ok, _, S2, _} = derflow:read(L3),
-    {ok, _, S2, _} = derflow:read(L2),
-    {ok, _, S2, _} = derflow:read(L1),
+    {ok, _, S2, _} = derpflow:read(L3),
+    {ok, _, S2, _} = derpflow:read(L2),
+    {ok, _, S2, _} = derpflow:read(L1),
 
     ok.

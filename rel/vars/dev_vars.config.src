@@ -13,5 +13,5 @@
 %% etc/vm.args
 %%
 {node,         "@NODE@"}.
-{cookie, "derflow"}.
+{cookie, "lasp"}.
 

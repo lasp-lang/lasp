@@ -23,26 +23,17 @@ rel: all
 	$(REBAR) generate
 
 relclean:
-	rm -rf rel/derflow
+	rm -rf rel/lasp
 
 stage : rel
-	$(foreach dep,$(wildcard deps/*), rm -rf rel/derflow/lib/$(shell basename $(dep))-* && ln -sf $(abspath $(dep)) rel/derflow/lib;)
-	$(foreach app,$(wildcard apps/*), rm -rf rel/derflow/lib/$(shell basename $(app))-* && ln -sf $(abspath $(app)) rel/derflow/lib;)
+	$(foreach dep,$(wildcard deps/*), rm -rf rel/lasp/lib/$(shell basename $(dep))-* && ln -sf $(abspath $(dep)) rel/lasp/lib;)
+	$(foreach app,$(wildcard apps/*), rm -rf rel/lasp/lib/$(shell basename $(app))-* && ln -sf $(abspath $(app)) rel/lasp/lib;)
 
 currentdevrel: stagedevrel
-	riak_test/bin/derflow-current.sh
+	riak_test/bin/lasp-current.sh
 
 riak-test: compile compile-riak-test
-	$(foreach dep,$(wildcard riak_test/*_test.erl), ../riak_test/riak_test -v -c derflow -t $(dep);)
-
-riak-test-lattice: currentdevrel
-	../riak_test/riak_test -v -c derflow -t derflow_lattice_test
-
-riak-test-threshold: currentdevrel
-	../riak_test/riak_test -v -c derflow -t derflow_threshold_read_test
-
-riak-test-programs: compile compile-riak-test
-	../riak_test/riak_test -v -c derflow -t derflow_programs_test
+	$(foreach dep,$(wildcard riak_test/*_test.erl), ../riak_test/riak_test -v -c lasp -t $(dep);)
 
 ##
 ## Developer targets

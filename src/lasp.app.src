@@ -1,0 +1,14 @@
+%% -*- erlang -*-
+{application, lasp,
+ [
+  {description, "Distributed deterministic dataflow programming for Erlang"},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+                  riak_core
+                 ]},
+  {mod, { lasp_app, []}},
+  {env, []}
+ ]}.

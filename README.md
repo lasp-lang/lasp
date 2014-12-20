@@ -15,8 +15,8 @@ To build:
 To configure for `riak_test`:
 
 * Build development releases: `make stagedevrel`
-* Run the setup utility, once: `riak_test/bin/derflow-setup.sh`
-* As you modify your code, run `make && riak_test/bin/derflow-current.sh`; this will rebuild your local source and then configure `riak_test` to use the latest version.
+* Run the setup utility, once: `riak_test/bin/lasp-setup.sh`
+* As you modify your code, run `make && riak_test/bin/lasp-current.sh`; this will rebuild your local source and then configure `riak_test` to use the latest version.
 
 To run the tests:
 

@@ -105,7 +105,7 @@ execute(_Module, _Registration) ->
 %% @doc Declare a new single-assignment dataflow variable.
 -spec declare() -> {ok, id()}.
 declare() ->
-    declare(undefined).
+    declare(derflow_ivar).
 
 %% @doc Declare a new dataflow variable of a given type.
 %%
@@ -152,7 +152,7 @@ bind(Id, Module, Function, Args) ->
 %%
 -spec read(id()) -> {ok, type(), value(), id()}.
 read(Id) ->
-    derflow_vnode:read(Id).
+    derflow_vnode:read(Id, {strict, undefined}).
 
 %% @doc Blocking monotonic read operation for a given dataflow variable.
 %%
@@ -200,7 +200,7 @@ produce(Id, Module, Function, Args) ->
 %%
 -spec consume(id()) -> {ok, type(), value(), id()}.
 consume(Id) ->
-    derflow_vnode:read(Id).
+    derflow_vnode:read(Id, {strict, undefined}).
 
 %% @doc Generate the next identifier in a stream.
 %%
@@ -238,7 +238,7 @@ thread(Module, Function, Args) ->
 %%
 -spec wait_needed(id()) -> ok.
 wait_needed(Id) ->
-    derflow_vnode:wait_needed(Id).
+    derflow_vnode:wait_needed(Id, {strict, undefined}).
 
 %% @doc Pause execution until value requested with given threshold.
 %%
@@ -333,7 +333,7 @@ wait_for_reqid(ReqID, Timeout) ->
 get_stream(Head, Output) ->
     lager:info("About to consume: ~p", [Head]),
     case consume(Head) of
-        {ok, _, undefined, _} ->
+        {ok, _, nil, _} ->
             lager:info("Received: ~p", [undefined]),
             Output;
         {ok, _, Value, Next} ->

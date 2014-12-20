@@ -70,7 +70,7 @@ insort(List, S) ->
             insort(T, OutS),
             spawn(derflow_get_minimum_test, insert, [H, OutS, S]);
         [] ->
-            derflow:bind(S, undefined)
+            derflow:bind(S, nil)
     end.
 
 insert(X, In, Out) ->
@@ -78,9 +78,9 @@ insert(X, In, Out) ->
     true = ets:insert(?TABLE, {Id, C+1}),
     {ok, _} = derflow:wait_needed(Out),
     case derflow:consume(In) of
-        {ok, _, undefined, _} ->
+        {ok, _, nil, _} ->
             {ok, Next} = derflow:produce(Out, X),
-            derflow:bind(Next, undefined);
+            derflow:bind(Next, nil);
         {ok, _, V, SNext} ->
             if
                 X < V ->

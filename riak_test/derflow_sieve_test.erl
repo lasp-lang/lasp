@@ -64,8 +64,8 @@ test(Max) ->
 
 sieve(S1, S2) ->
     case derflow:consume(S1) of
-        {ok, _, undefined, _} ->
-            derflow:bind(S2, undefined);
+        {ok, _, nil, _} ->
+            derflow:bind(S2, nil);
         {ok, _, Value, Next} ->
             {ok, SN} = derflow:declare(),
             spawn(derflow_sieve_test, filter,
@@ -76,8 +76,8 @@ sieve(S1, S2) ->
 
 filter(S1, F, S2) ->
     case derflow:consume(S1) of
-        {ok, _, undefined, _} ->
-            derflow:bind(S2, undefined);
+        {ok, _, nil, _} ->
+            derflow:bind(S2, nil);
         {ok, _, Value, Next} ->
             case F(Value) of
                 false ->
@@ -95,5 +95,5 @@ generate(Init, N, Output) ->
             {ok, Next} = derflow:produce(Output, Init),
             generate(Init + 1, N,  Next);
         true ->
-            derflow:bind(Output, undefined)
+            derflow:bind(Output, nil)
     end.

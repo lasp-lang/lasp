@@ -66,13 +66,13 @@ sender(Init, N, Output) ->
             sender(Init + 1, N - 1,  Next);
         true ->
             timer:sleep(500),
-            derflow:bind(Output, undefined)
+            derflow:bind(Output, nil)
     end.
 
 skip1(Input, Output) ->
     case derflow:consume(Input) of
-        {ok, _, undefined, _} ->
-            derflow:bind(Output, undefined);
+        {ok, _, nil, _} ->
+            derflow:bind(Output, nil);
         {ok, _, _Value, Next} ->
             case derflow:is_det(Next) of
                 {ok, true} ->
@@ -87,7 +87,7 @@ display(Input) ->
     {ok, Output} = derflow:declare(),
     skip1(Input, Output),
     case derflow:consume(Output) of
-        {ok, _, undefined, _} ->
+        {ok, _, nil, _} ->
             ok;
         {ok, _, Value, Next} ->
             display_frame(Value),

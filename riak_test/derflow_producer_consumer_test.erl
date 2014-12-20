@@ -69,13 +69,13 @@ producer(Init, N, Output) ->
             {ok, Next} = derflow:produce(Output, Init),
             producer(Init + 1, N-1,  Next);
         true ->
-            derflow:bind(Output, undefined)
+            derflow:bind(Output, nil)
     end.
 
 consumer(S1, F, S2) ->
     case derflow:consume(S1) of
-        {ok, _, undefined, _} ->
-            derflow:bind(S2, undefined);
+        {ok, _, nil, _} ->
+            derflow:bind(S2, nil);
         {ok, _, Value, Next} ->
             {ok, NextOutput} = derflow:produce(S2, F(Value)),
             consumer(Next, F, NextOutput)

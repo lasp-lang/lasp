@@ -28,15 +28,14 @@
              lazy = false,
              bound = false}).
 
--define(LATTICES, [riak_dt_gset, riak_dt_gcounter]).
+-define(LATTICES, [derflow_ivar, riak_dt_gset, riak_dt_gcounter]).
 
 -type module() :: atom().
 -type file() :: iolist().
 -type registration() :: preflist | global.
 -type id() :: atom().
 -type result() :: term().
--type type() :: undefined | riak_dt_gset | riak_dt_gcounter.
--type lattice() :: riak_dt_gset | riak_dt_gcounter.
+-type type() :: derflow_ivar | riak_dt_gset | riak_dt_gcounter.
 -type value() :: term().
 -type func() :: atom().
 -type args() :: list().
@@ -45,6 +44,7 @@
 -type stream() :: list(#dv{}).
 -type store() :: ets:tid().
 -type threshold() :: value() | {strict, value()}.
--type pending_threshold() :: {threshold, read | wait, pid(), lattice(), threshold()}.
+-type pending_threshold() :: {threshold, read | wait, pid(), type(), threshold()}.
 -type operation() :: {atom(), value()}.
 -type operations() :: list(operation()).
+-type ivar() :: term().

@@ -125,7 +125,7 @@ word_count_map(Input, Output) ->
             {ok, Next} = derflow:produce(Output, H),
             word_count_map(T, Next);
         [] ->
-         derflow:bind(Output, undefined)
+         derflow:bind(Output, nil)
     end.
 
 word_count_reduce(Input, Tempout, Output) ->
@@ -139,13 +139,13 @@ word_count_reduce(Input, Tempout, Output) ->
                     {ok, Next} = derflow:produce(Output, H),
                     word_count_reduce([], T, Next);
                 [] ->
-                    derflow:bind(Output, undefined)
+                    derflow:bind(Output, nil)
             end
     end.
 
 loop(Elem, Output) ->
     case derflow:consume(Elem) of
-        {ok, _, undefined, _} ->
+        {ok, _, nil, _} ->
             Output;
         {ok, _, Value, Next} ->
             case lists:keysearch(Value, 1, Output) of

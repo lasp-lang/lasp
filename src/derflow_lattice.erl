@@ -25,7 +25,6 @@
 
 %% Exported utility functions.
 -export([threshold_met/3,
-         is_lattice/1,
          is_inflation/3,
          is_lattice_inflation/3,
          is_strict_inflation/3,
@@ -52,6 +51,12 @@ generate_operations(riak_dt_gset, Set) ->
 %%      `Value' and `Threshold' both should be an instance of one of the
 %%      `type()'s and not a pure value.
 %%
+threshold_met(derflow_ivar, undefined, {strict, undefined}) ->
+    false;
+threshold_met(derflow_ivar, undefined, undefined) ->
+    true;
+threshold_met(derflow_ivar, _Value, {strict, undefined}) ->
+    true;
 threshold_met(riak_dt_gset, Value, {strict, Threshold}) ->
     is_strict_inflation(riak_dt_gset, Threshold, Value);
 threshold_met(riak_dt_gset, Value, Threshold) ->
@@ -67,8 +72,7 @@ threshold_met(riak_dt_gcounter, Value, Threshold) ->
 %%      determine if `Current' is an inflation of `Previous'.
 %%
 is_inflation(Type, Previous, Current) ->
-    is_lattice(Type) andalso
-        is_lattice_inflation(Type, Previous, Current).
+    is_lattice_inflation(Type, Previous, Current).
 
 %% @doc Determine if a change is a strict inflation or not.
 %%
@@ -76,14 +80,19 @@ is_inflation(Type, Previous, Current) ->
 %%      determine if `Current' is a strict inflation of `Previous'.
 %%
 is_strict_inflation(Type, Previous, Current) ->
-    is_lattice(Type) andalso
-        is_lattice_strict_inflation(Type, Previous, Current).
+    is_lattice_strict_inflation(Type, Previous, Current).
 
 %% @doc Determine if a change for a given type is an inflation or not.
 %%
 %%      Given a particular type and two instances of that type,
 %%      determine if `Current' is an inflation of `Previous'.
 %%
+is_lattice_inflation(derflow_ivar, undefined, undefined) ->
+    true;
+is_lattice_inflation(derflow_ivar, undefined, _Current) ->
+    true;
+is_lattice_inflation(derflow_ivar, Previous, Current) when Previous =/= Current ->
+    false;
 is_lattice_inflation(riak_dt_gcounter, undefined, _) ->
     true;
 is_lattice_inflation(riak_dt_gcounter, Previous, Current) ->
@@ -110,16 +119,15 @@ is_lattice_inflation(riak_dt_gset, Previous, Current) ->
 %%      Given a particular type and two instances of that type,
 %%      determine if `Current' is a strict inflation of `Previous'.
 %%
+is_lattice_strict_inflation(derflow_ivar, undefined, undefined) ->
+    false;
+is_lattice_strict_inflation(derflow_ivar, undefined, Current) when Current =/= undefined ->
+    true;
+is_lattice_strict_inflation(derflow_ivar, _Previous, _Current) ->
+    false;
 is_lattice_strict_inflation(riak_dt_gset, undefined, Current) ->
     is_lattice_inflation(riak_dt_gset, undefined, Current);
 is_lattice_strict_inflation(riak_dt_gset, Previous, Current) ->
     is_lattice_inflation(riak_dt_gset, Previous, Current) andalso
         lists:usort(riak_dt_gset:value(Previous)) =/=
         lists:usort(riak_dt_gset:value(Current)).
-
-%% @doc Return if something is a lattice or not.
-%%
-%%      Given a type, check whether that type is a lattice or not.
-%%
-is_lattice(Type) ->
-    lists:member(Type, ?LATTICES).

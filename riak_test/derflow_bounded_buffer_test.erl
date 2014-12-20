@@ -70,7 +70,7 @@ producer(Value, N, Output) ->
             {ok, Next} = derflow:produce(Output, Value),
             producer(Value + 1, N - 1,  Next);
         true ->
-            derflow:bind(Output, undefined)
+            derflow:bind(Output, nil)
     end.
 
 loop(S1, S2, End) ->
@@ -78,11 +78,11 @@ loop(S1, S2, End) ->
     {ok, _, S1Value, S1Next} = derflow:consume(S1),
     {ok, S2Next} = derflow:produce(S2, S1Value),
     case derflow:produce(S2, S1Value) of
-        {ok, undefined} ->
+        {ok, nil} ->
             ok;
         {ok, S2Next} ->
             case derflow:extend(End) of
-                {ok, {undefined, _}} ->
+                {ok, {nil, _}} ->
                     ok;
                 {ok, EndNext} ->
                     loop(S1Next, S2Next, EndNext)
@@ -108,8 +108,8 @@ consumer(S2, Size, F, Output) ->
             ok;
         _ ->
             case derflow:consume(S2) of
-                {ok, _, undefined, _} ->
-                    derflow:bind(Output, undefined);
+                {ok, _, nil, _} ->
+                    derflow:bind(Output, nil);
                 {ok, _, Value, Next} ->
                     {ok, NextOutput} = derflow:produce(Output, F(Value)),
                     consumer(Next, Size - 1, F, NextOutput)

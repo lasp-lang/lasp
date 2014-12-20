@@ -111,7 +111,7 @@ bind_to(Id, TheirId) ->
                                               ?VNODE_MASTER).
 
 read(Id) ->
-    read(Id, undefined).
+    read(Id, {strict, undefined}).
 
 read(Id, Threshold) ->
     lager:info("Read by process ~p, id: ~p thresh: ~p",

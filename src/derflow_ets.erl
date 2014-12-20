@@ -97,7 +97,7 @@ select(Id, Function, AccId, Store) ->
 %%
 -spec read(id(), store()) -> {ok, type(), value(), id()}.
 read(Id, Store) ->
-    read(Id, undefined, Store).
+    read(Id, {strict, undefined}, Store).
 
 %% @doc Perform a monotonic read read for a particular identifier.
 %%
@@ -127,7 +127,7 @@ read(Id, Threshold, Store) ->
 %%
 -spec declare(store()) -> {ok, id()}.
 declare(Store) ->
-    declare(undefined, Store).
+    declare(derflow_ivar, Store).
 
 %% @doc Declare a dataflow variable, as a given type, in a provided by
 %%      identifer {@link ets:new/2} `Store'.
@@ -141,12 +141,7 @@ declare(Type, Store) ->
 %%
 -spec declare(id(), type(), store()) -> {ok, id()}.
 declare(Id, Type, Store) ->
-    Record = case Type of
-        undefined ->
-            #dv{value=undefined, type=undefined, bound=false};
-        Type ->
-            #dv{value=Type:new(), type=Type, bound=true}
-    end,
+    Record = #dv{value=Type:new(), type=Type, bound=true},
     true = ets:insert(Store, {Id, Record}),
     {ok, Id}.
 
@@ -222,7 +217,7 @@ next_key(NextKey0, _, _) ->
 %%
 -spec wait_needed(id(), store()) -> {ok, threshold()}.
 wait_needed(Id, Store) ->
-    wait_needed(Id, undefined, Store).
+    wait_needed(Id, {strict, undefined}, Store).
 
 %% @doc Pause execution until value requested with given threshold.
 %%
@@ -315,21 +310,23 @@ bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
                 Value ->
                     {ok, NextKey};
                 _ ->
-                    case derflow_lattice:is_lattice(Type) of
-                        true ->
-                            Merged = Type:merge(V#dv.value, Value),
-                            case derflow_lattice:is_inflation(Type,
-                                                              V#dv.value,
-                                                              Merged) of
-                                true ->
-                                    write(Type, Merged, NextKey, Id, Store, NotifyFun),
-                                    {ok, NextKey};
-                                false ->
-                                    lager:error("Bind failed: ~p ~p ~p~n",
-                                                [Type, Value0, Value]),
-                                    error
-                            end;
-                        false ->
+                    %% Merge may throw for invalid merge-types.
+                    try
+                        Merged = Type:merge(V#dv.value, Value),
+                        case derflow_lattice:is_inflation(Type,
+                                                          V#dv.value,
+                                                          Merged) of
+                            true ->
+                                write(Type, Merged, NextKey, Id, Store,
+                                      NotifyFun),
+                                {ok, NextKey};
+                            false ->
+                                lager:error("Bind failed: ~p ~p ~p~n",
+                                            [Type, Value0, Value]),
+                                error
+                        end
+                    catch
+                        _:_ ->
                             lager:error("Bind failed: ~p ~p ~p~n",
                                         [Type, Value0, Value]),
                             error
@@ -388,43 +385,32 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
         true ->
             lager:info("Read received: ~p, bound: ~p, threshold: ~p",
                        [Id, V, Threshold]),
-            case derflow_lattice:is_lattice(Type) of
+
+            %% Notify all lazy processes of this read.
+            lager:info("Notifying lazy processes: ~p", [LazyThreads]),
+            {ok, StillLazy} = reply_to_all(LazyThreads, {ok, Threshold}),
+            lager:info("Done notifying: ~p", [StillLazy]),
+
+            %% Satisfy read if threshold is met.
+            case derflow_lattice:threshold_met(Type, Value, Threshold) of
                 true ->
-                    case Threshold of
-                        undefined ->
-                            lager:info("No threshold specified: ~p",
-                                       [Threshold]),
-                            ReplyFun(Type, Value, V#dv.next);
-                        _ ->
-                            lager:info("Threshold specified: ~p",
-                                       [Threshold]),
-
-                            %% Notify all lazy processes of this read.
-                            {ok, StillLazy} = reply_to_all(LazyThreads, 
-                                                           {ok, Threshold}),
-
-                            %% Satisfy read if threshold is met.
-                            case derflow_lattice:threshold_met(Type,
-                                                               Value,
-                                                               Threshold) of
-                                true ->
-                                    ReplyFun(Type, Value, V#dv.next);
-                                false ->
-                                    WT = lists:append(V#dv.waiting_threads,
-                                                      [{threshold,
-                                                        read,
-                                                        Self,
-                                                        Type,
-                                                        Threshold}]),
-                                    true = ets:insert(Store,
-                                                      {Id,
-                                                       V#dv{waiting_threads=WT,
-                                                            lazy_threads=StillLazy}}),
-                                    BlockingFun()
-                            end
-                    end;
+                    lager:info("Replying with result: ~p",
+                               [Value]),
+                    ReplyFun(Type, Value, V#dv.next);
                 false ->
-                    ReplyFun(Type, Value, V#dv.next)
+                    lager:info("Threshold not met: ~p ~p ~p",
+                               [Type, Value, Threshold]),
+                    WT = lists:append(V#dv.waiting_threads,
+                                      [{threshold,
+                                        read,
+                                        Self,
+                                        Type,
+                                        Threshold}]),
+                    true = ets:insert(Store,
+                                      {Id,
+                                       V#dv{waiting_threads=WT,
+                                            lazy_threads=StillLazy}}),
+                    BlockingFun()
             end;
         false ->
             lager:info("Read received: ~p, unbound", [Id]),
@@ -434,12 +420,14 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                 true ->
                     case Threshold of
                         undefined ->
-                            {ok, StillLazy} = reply_to_all(LazyThreads, {ok, undefined}),
+                            {ok, StillLazy} = reply_to_all(LazyThreads,
+                                                           {ok, undefined}),
                             true = ets:insert(Store, {Id,
                                                       V#dv{waiting_threads=WT,
                                                            lazy_threads=StillLazy}});
                         Threshold ->
-                            {ok, StillLazy} = reply_to_all(LazyThreads, {ok, Threshold}),
+                            {ok, StillLazy} = reply_to_all(LazyThreads, 
+                                                           {ok, Threshold}),
                             true = ets:insert(Store, {Id,
                                                       V#dv{waiting_threads=WT,
                                                            lazy_threads=StillLazy}})

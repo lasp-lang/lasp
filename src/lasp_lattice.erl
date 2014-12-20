@@ -57,6 +57,10 @@ threshold_met(lasp_ivar, undefined, undefined) ->
     true;
 threshold_met(lasp_ivar, _Value, {strict, undefined}) ->
     true;
+threshold_met(lasp_ivar, Value, Threshold) when Value =:= Threshold ->
+    true;
+threshold_met(lasp_ivar, Value, Threshold) when Value =/= Threshold ->
+    false;
 threshold_met(riak_dt_gset, Value, {strict, Threshold}) ->
     is_strict_inflation(riak_dt_gset, Threshold, Value);
 threshold_met(riak_dt_gset, Value, Threshold) ->
@@ -93,6 +97,8 @@ is_lattice_inflation(lasp_ivar, undefined, _Current) ->
     true;
 is_lattice_inflation(lasp_ivar, Previous, Current) when Previous =/= Current ->
     false;
+is_lattice_inflation(lasp_ivar, Previous, Current) when Previous =:= Current ->
+    true;
 is_lattice_inflation(riak_dt_gcounter, undefined, _) ->
     true;
 is_lattice_inflation(riak_dt_gcounter, Previous, Current) ->

@@ -30,10 +30,8 @@ lasp_ets_sequential_test_() ->
 
 %% Generators.
 
-value(Variable, Store, DefaultValue) ->
+value(Variable, Store) ->
     case dict:find(Variable, Store) of
-        {ok, #variable{type=undefined}} ->
-            DefaultValue;
         {ok, #variable{type=Type}} ->
             ?LET({Object, Update},
                  {Type:new(), Type:gen_op()},
@@ -45,8 +43,6 @@ value(Variable, Store, DefaultValue) ->
 
 threshold(Variable, Store) ->
     case dict:find(Variable, Store) of
-        {ok, #variable{type=undefined}} ->
-            undefined;
         {ok, #variable{type=Type}} ->
             ?LET({Object, Update},
                  {Type:new(), Type:gen_op()},
@@ -68,7 +64,7 @@ declare(Type) ->
     Id.
 
 declare_args(_S) ->
-    [oneof([elements(?LATTICES), undefined])].
+    [elements(?LATTICES)].
 
 declare_next(#state{store=Store0}=S, V, [Type]) ->
     Store = dict:store(V, #variable{type=Type}, Store0),
@@ -87,11 +83,11 @@ bind_pre(S) ->
 
 bind_args(#state{store=Store}) ->
     Variables = dict:fetch_keys(Store),
-    ?LET({Variable, GeneratedValue}, {elements(Variables), nat()},
-                    begin
-                        Value = value(Variable, Store, GeneratedValue),
-                        [Variable, Value]
-                    end).
+    ?LET(Variable, elements(Variables),
+        begin
+            Value = value(Variable, Store),
+            [Variable, Value]
+        end).
 
 bind_next(#state{store=Store0}=S, _V, [Id, NewValue]) ->
     %% Only update the record, if it's in inflation or has never been
@@ -102,16 +98,21 @@ bind_next(#state{store=Store0}=S, _V, [Id, NewValue]) ->
         {ok, #variable{type=undefined}} ->
             Store0;
         {ok, #variable{type=Type, value=Value}=Variable} ->
-            Merged = case Value of
-                undefined ->
-                    NewValue;
-                _ ->
-                    Type:merge(Value, NewValue)
-            end,
-            case lasp_lattice:is_inflation(Type, Value, Merged) of
-                true ->
-                    dict:store(Id, Variable#variable{value=Merged}, Store0);
-                false ->
+            try
+                Merged = case Value of
+                    undefined ->
+                        NewValue;
+                    _ ->
+                        Type:merge(Value, NewValue)
+                end,
+                case lasp_lattice:is_inflation(Type, Value, Merged) of
+                    true ->
+                        dict:store(Id, Variable#variable{value=Merged}, Store0);
+                    false ->
+                        Store0
+                end
+            catch
+                _:_ ->
                     Store0
             end
     end,
@@ -122,17 +123,17 @@ bind_post(#state{store=Store}, [Id, V], error) ->
         {ok, #variable{type=_Type, value=undefined}} ->
             false;
         {ok, #variable{type=Type, value=Value}} ->
-            case lasp_lattice:is_lattice(Type) of
-                true ->
-                    Merged = Type:merge(V, Value),
-                    case lasp_lattice:is_inflation(Type, Value, Merged) of
-                        true ->
-                            false;
-                        false ->
-                            true
-                    end;
-                false ->
-                    V =/= Value
+            try
+                Merged = Type:merge(V, Value),
+                case lasp_lattice:is_inflation(Type, Value, Merged) of
+                    true ->
+                        false;
+                    false ->
+                        true
+                end
+            catch
+                _:_ ->
+                    true
             end
     end;
 bind_post(_, _, _) ->

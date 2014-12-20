@@ -29,12 +29,22 @@
 
 -include("lasp.hrl").
 
--export([new/0, merge/2]).
+-export([new/0, update/3, merge/2]).
+
+%% EQC API
+-ifdef(EQC).
+-include_lib("eqc/include/eqc.hrl").
+-export([gen_op/0]).
+-endif.
 
 %% @doc Create a new single-assignment variable.
 -spec new() -> undefined.
 new() ->
     undefined.
+
+%% @doc Set the value of a single-assignment variable.
+update({set, Value}, _Actor, undefined) ->
+    {ok, Value}.
 
 %% @doc Single assignment merge; undefined for two bound variables.
 -spec merge(term(), term()) -> term().
@@ -44,3 +54,18 @@ merge(undefined, B) ->
     B;
 merge(A, A) ->
     A.
+
+%% ===================================================================
+%% EUnit tests
+%% ===================================================================
+-ifdef(TEST).
+
+-ifdef(EQC).
+
+%% EQC generator
+gen_op() ->
+    oneof([{set, int()}]).
+
+-endif.
+
+-endif.

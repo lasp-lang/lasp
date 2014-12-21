@@ -385,7 +385,26 @@ handle_command({select, Id, Function, AccId}, _From,
                     ?MODULE:bind(_AccId, AccValue)
             end
     end,
-    Result = ?BACKEND:select(Id, Function, AccId, Variables, BindFun),
+    ReadFun = fun(_Id, _Threshold, _Variables) ->
+            %% Beware of cycles in the gen_server calls!
+            [{IndexNode, _Type}] = lasp:preflist(?N, _Id, lasp),
+
+            case IndexNode of
+                {Partition, Node} ->
+                    %% We're local, which means that we can interact
+                    %% directly with the data store.
+                    ?BACKEND:read(_Id, _Threshold, _Variables);
+                _ ->
+                    %% We're remote, go through all of the routing logic.
+                    ?MODULE:read(_Id, _Threshold)
+            end
+    end,
+    Result = ?BACKEND:select(Id,
+                             Function,
+                             AccId,
+                             Variables,
+                             BindFun,
+                             ReadFun),
     {reply, Result, State};
 
 handle_command({next, Id}, _From,

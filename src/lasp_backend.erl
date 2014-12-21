@@ -24,7 +24,7 @@
 -include("lasp.hrl").
 
 -callback select(id(), function(), id(), store()) -> {ok, pid()}.
--callback select(id(), function(), id(), store(), function()) -> {ok, pid()}.
+-callback select(id(), function(), id(), store(), function(), function()) -> {ok, pid()}.
 
 -callback next(id(), store()) -> {ok, id()}.
 -callback next(id(), store(), function()) -> {ok, id()}.
@@ -73,4 +73,4 @@
     {ok, list(pending_threshold())}.
 
 -callback select_harness(store(), id(), function(), id(), function(),
-                         value()) -> function().
+                         function(), value()) -> function().

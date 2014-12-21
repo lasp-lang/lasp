@@ -54,11 +54,11 @@
          fetch/4,
          reply_fetch/4,
          write/6,
-         select/5,
+         select/6,
          fetch/8]).
 
 %% Exported helper functions.
--export([select_harness/6]).
+-export([select_harness/7]).
 
 %% Exported utility functions.
 -export([next_key/3,
@@ -86,9 +86,12 @@ next(Id, Store) ->
 -spec select(id(), function(), id(), store()) -> {ok, pid()}.
 select(Id, Function, AccId, Store) ->
     BindFun = fun(_AccId, AccValue, _Variables) ->
-                    ?MODULE:bind(_AccId, AccValue, _Variables)
+            ?MODULE:bind(_AccId, AccValue, _Variables)
     end,
-    select(Id, Function, AccId, Store, BindFun).
+    ReadFun = fun(_Id, _Threshold, _Variables) ->
+            ?MODULE:read(_Id, _Threshold, _Variables)
+    end,
+    select(Id, Function, AccId, Store, BindFun, ReadFun).
 
 %% @doc Perform a read for a particular identifier.
 %%
@@ -516,13 +519,14 @@ bind_to(Id, TheirId, Store, FetchFun, FromPid) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec select(id(), function(), id(), store(), function()) -> {ok, pid()}.
-select(Id, Function, AccId, Store, BindFun) ->
+-spec select(id(), function(), id(), store(), function(), function()) -> {ok, pid()}.
+select(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Pid = spawn_link(?MODULE, select_harness, [Store,
                                                Id,
                                                Function,
                                                AccId,
                                                BindFun,
+                                               ReadFun,
                                                undefined]),
     {ok, Pid}.
 
@@ -666,10 +670,10 @@ reply_to_all([], StillWaiting, _Result) ->
 
 %% @doc Harness for managing the select operation.
 -spec select_harness(store(), id(), function(), id(), function(),
-                     value()) -> function().
-select_harness(Variables, Id, Function, AccId, BindFun, Previous) ->
+                     function(), value()) -> function().
+select_harness(Variables, Id, Function, AccId, BindFun, ReadFun, Previous) ->
     lager:info("Select executing!"),
-    {ok, Type, Value, _} = ?MODULE:read(Id, {strict, Previous}, Variables),
+    {ok, Type, Value, _} = ReadFun(Id, {strict, Previous}, Variables),
     lager:info("Threshold was met!"),
     [{_Key, #dv{type=Type, value=Value}}] = ets:lookup(Variables, Id),
 
@@ -689,7 +693,7 @@ select_harness(Variables, Id, Function, AccId, BindFun, Previous) ->
                          end
                  end, Type:new(), Operations),
     BindFun(AccId, AccValue, Variables),
-    select_harness(Variables, Id, Function, AccId, BindFun, Value).
+    select_harness(Variables, Id, Function, AccId, BindFun, ReadFun, Value).
 
 %% @doc Send responses to waiting threads, via messages.
 %%

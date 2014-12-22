@@ -58,7 +58,8 @@
          fetch/8]).
 
 %% Exported helper functions.
--export([select_harness/7]).
+-export([fold/6,
+         fold_harness/8]).
 
 %% Exported utility functions.
 -export([next_key/3,
@@ -521,13 +522,12 @@ bind_to(Id, TheirId, Store, FetchFun, FromPid) ->
 %%
 -spec select(id(), function(), id(), store(), function(), function()) -> {ok, pid()}.
 select(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Pid = spawn_link(?MODULE, select_harness, [Store,
-                                               Id,
-                                               Function,
-                                               AccId,
-                                               BindFun,
-                                               ReadFun,
-                                               undefined]),
+    Pid = spawn_link(?MODULE, fold, [Store,
+                                     Id,
+                                     Function,
+                                     AccId,
+                                     BindFun,
+                                     ReadFun]),
     {ok, Pid}.
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
@@ -668,14 +668,23 @@ reply_to_all([], StillWaiting, _Result) ->
 
 %% Internal functions.
 
-%% @doc Harness for managing the select operation.
--spec select_harness(store(), id(), function(), id(), function(),
-                     function(), value()) -> function().
-select_harness(Variables, Id, Function, AccId, BindFun, ReadFun, Previous) ->
-    lager:info("Select executing!"),
-    {ok, Type, Value, _} = ReadFun(Id, {strict, Previous}, Variables),
-    lager:info("Threshold was met!"),
-    [{_Key, #dv{type=Type, value=Value}}] = ets:lookup(Variables, Id),
+fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
+    fold_harness(Variables,
+                 Id,
+                 Function,
+                 AccId,
+                 BindFun,
+                 ReadFun,
+                 undefined,
+                 undefined).
+
+-spec fold_harness(store(), id(), function(), id(), function(), function(), value(), value()) -> function().
+fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun, PreviousValue, PreviousAccValue) ->
+    %% Blocking threshold read on source value.
+    {ok, Type, Value, _} = ReadFun(Id, {strict, PreviousValue}, Variables),
+
+    %% Read current value.
+    {ok, Type, AccValue0, _} = ReadFun(AccId, PreviousAccValue, Variables),
 
     %% Generate operations for given data type.
     {ok, Operations} = lasp_lattice:generate_operations(Type, Value),
@@ -691,9 +700,12 @@ select_harness(Variables, Id, Function, AccId, BindFun, ReadFun, Previous) ->
                              _ ->
                                  Acc
                          end
-                 end, Type:new(), Operations),
+                 end, AccValue0, Operations),
+
+    %% Update with result.
     BindFun(AccId, AccValue, Variables),
-    select_harness(Variables, Id, Function, AccId, BindFun, ReadFun, Value).
+
+    fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun, Value, AccValue).
 
 %% @doc Send responses to waiting threads, via messages.
 %%
@@ -710,7 +722,6 @@ select_harness(Variables, Id, Function, AccId, BindFun, ReadFun, Previous) ->
 %%
 -spec write(type(), value(), id(), id(), store()) -> ok.
 write(Type, Value, Next, Key, Store) ->
-    lager:info("***** Local write triggered!"),
     NotifyFun = fun(Id, NewValue) ->
                         [{_, #dv{next=Next,
                                  type=Type}}] = ets:lookup(Store, Id),

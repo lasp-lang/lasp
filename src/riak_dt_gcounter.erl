@@ -118,7 +118,7 @@ increment_by(Amount, Actor, GCnt) when is_integer(Amount), Amount > 0 ->
 stats(GCnt) ->
     [{actor_count, stat(actor_count, GCnt)}].
 
--spec stat(atom(), gcounter()) -> number() | undefined.
+-spec stat(atom(), gcounter()) -> non_neg_integer() | undefined.
 stat(actor_count, GCnt) ->
     length(GCnt);
 stat(_,_) -> undefined.

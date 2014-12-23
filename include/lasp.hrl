@@ -25,8 +25,7 @@
              binding_list = [],
              lazy_threads = [],
              type,
-             lazy = false,
-             bound = false}).
+             lazy = false}).
 
 -define(LATTICES, [lasp_ivar, riak_dt_gset, riak_dt_gcounter]).
 

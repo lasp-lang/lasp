@@ -144,7 +144,7 @@ declare(Type, Store) ->
 %%
 -spec declare(id(), type(), store()) -> {ok, id()}.
 declare(Id, Type, Store) ->
-    Record = #dv{value=Type:new(), type=Type, bound=true},
+    Record = #dv{value=Type:new(), type=Type},
     true = ets:insert(Store, {Id, Record}),
     {ok, Id}.
 
@@ -292,38 +292,31 @@ reply_fetch(FromId, FromPid,
 bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
     [{_Key, V=#dv{next=Next,
                   type=Type,
-                  bound=Bound,
                   value=Value0}}] = ets:lookup(Store, Id),
     NextKey = NextKeyFun(Type, Next),
-    case Bound of
-        true ->
-            case V#dv.value of
-                Value ->
-                    {ok, NextKey};
-                _ ->
-                    %% Merge may throw for invalid merge-types.
-                    try
-                        Merged = Type:merge(V#dv.value, Value),
-                        case lasp_lattice:is_inflation(Type, V#dv.value, Merged) of
-                            true ->
-                                write(Type, Merged, NextKey, Id, Store,
-                                      NotifyFun),
-                                {ok, NextKey};
-                            false ->
-                                lager:error("Bind failed: ~p ~p ~p~n",
-                                            [Type, Value0, Value]),
-                                error
-                        end
-                    catch
-                        _:_ ->
-                            lager:error("Bind failed: ~p ~p ~p~n",
-                                        [Type, Value0, Value]),
-                            error
-                    end
-            end;
-        false ->
-            write(Type, Value, NextKey, Id, Store, NotifyFun),
-            {ok, NextKey}
+    case V#dv.value of
+        Value ->
+            {ok, NextKey};
+        _ ->
+            %% Merge may throw for invalid merge-types.
+            try
+                Merged = Type:merge(V#dv.value, Value),
+                case lasp_lattice:is_inflation(Type, V#dv.value, Merged) of
+                    true ->
+                        write(Type, Merged, NextKey, Id, Store,
+                              NotifyFun),
+                        {ok, NextKey};
+                    false ->
+                        lager:error("Bind failed: ~p ~p ~p~n",
+                                    [Type, Value0, Value]),
+                        error
+                end
+            catch
+                _:_ ->
+                    lager:error("Bind failed: ~p ~p ~p~n",
+                                [Type, Value0, Value]),
+                    error
+            end
     end.
 
 %% @doc Given an identifier, return the next identifier.
@@ -366,65 +359,36 @@ next(Id, Store, DeclareNextFun) ->
     {ok, type(), value(), id()}.
 read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
     [{_Key, V=#dv{value=Value,
-                  bound=Bound,
-                  lazy=Lazy,
                   lazy_threads=LazyThreads,
                   type=Type}}] = ets:lookup(Store, Id),
-    case Bound of
+    lager:info("Read received: ~p, bound: ~p, threshold: ~p",
+               [Id, V, Threshold]),
+
+    %% Notify all lazy processes of this read.
+    lager:info("Notifying lazy processes: ~p", [LazyThreads]),
+    {ok, StillLazy} = reply_to_all(LazyThreads, {ok, Threshold}),
+    lager:info("Done notifying: ~p", [StillLazy]),
+
+    %% Satisfy read if threshold is met.
+    case lasp_lattice:threshold_met(Type, Value, Threshold) of
         true ->
-            lager:info("Read received: ~p, bound: ~p, threshold: ~p",
-                       [Id, V, Threshold]),
-
-            %% Notify all lazy processes of this read.
-            lager:info("Notifying lazy processes: ~p", [LazyThreads]),
-            {ok, StillLazy} = reply_to_all(LazyThreads, {ok, Threshold}),
-            lager:info("Done notifying: ~p", [StillLazy]),
-
-            %% Satisfy read if threshold is met.
-            case lasp_lattice:threshold_met(Type, Value, Threshold) of
-                true ->
-                    lager:info("Replying with result: ~p",
-                               [Value]),
-                    ReplyFun(Type, Value, V#dv.next);
-                false ->
-                    lager:info("Threshold not met: ~p ~p ~p",
-                               [Type, Value, Threshold]),
-                    WT = lists:append(V#dv.waiting_threads,
-                                      [{threshold,
-                                        read,
-                                        Self,
-                                        Type,
-                                        Threshold}]),
-                    true = ets:insert(Store,
-                                      {Id,
-                                       V#dv{waiting_threads=WT,
-                                            lazy_threads=StillLazy}}),
-                    BlockingFun()
-            end;
+            lager:info("Replying with result: ~p",
+                       [Value]),
+            ReplyFun(Type, Value, V#dv.next);
         false ->
-            lager:info("Read received: ~p, unbound", [Id]),
-            WT = lists:append(V#dv.waiting_threads, [Self]),
-            true = ets:insert(Store, {Id, V#dv{waiting_threads=WT}}),
-            case Lazy of
-                true ->
-                    case Threshold of
-                        undefined ->
-                            {ok, StillLazy} = reply_to_all(LazyThreads,
-                                                           {ok, undefined}),
-                            true = ets:insert(Store, {Id,
-                                                      V#dv{waiting_threads=WT,
-                                                           lazy_threads=StillLazy}});
-                        Threshold ->
-                            {ok, StillLazy} = reply_to_all(LazyThreads, 
-                                                           {ok, Threshold}),
-                            true = ets:insert(Store, {Id,
-                                                      V#dv{waiting_threads=WT,
-                                                           lazy_threads=StillLazy}})
-                    end,
-                    BlockingFun();
-                false ->
-                    BlockingFun()
-            end
+            lager:info("Threshold not met: ~p ~p ~p",
+                       [Type, Value, Threshold]),
+            WT = lists:append(V#dv.waiting_threads,
+                              [{threshold,
+                                read,
+                                Self,
+                                Type,
+                                Threshold}]),
+            true = ets:insert(Store,
+                              {Id,
+                               V#dv{waiting_threads=WT,
+                                    lazy_threads=StillLazy}}),
+            BlockingFun()
     end.
 
 %% @doc Fetch is responsible for retreiving the value of a
@@ -463,8 +427,7 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
             function(), function()) -> term().
 fetch(TargetId, FromId, FromPid, Store,
       ResponseFun, FetchFun, ReplyFetchFun, NextKeyFun) ->
-    [{_, DV=#dv{bound=_Bound,
-                binding=Binding}}] = ets:lookup(Store, TargetId),
+    [{_, DV=#dv{binding=Binding}}] = ets:lookup(Store, TargetId),
     case Binding of
         undefined ->
             NextKey = NextKeyFun(DV#dv.next, DV#dv.type),
@@ -539,32 +502,26 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
     lager:info("Wait needed issued for identifier: ~p", [Id]),
     [{_Key, V=#dv{waiting_threads=WT,
                   type=Type,
-                  lazy_threads=LazyThreads0,
-                  bound=Bound}}] = ets:lookup(Store, Id),
-    case {Bound, Type} of
-        {true, undefined} ->
+                  lazy_threads=LazyThreads0}}] = ets:lookup(Store, Id),
+    case WT of
+        [_H|_T] ->
             ReplyFun(undefined);
-        {_, _} ->
-            case WT of
-                [_H|_T] ->
-                    ReplyFun(undefined);
-                _ ->
-                    LazyThreads = case Threshold of
-                                    undefined ->
-                                        lists:append(LazyThreads0, [Self]);
-                                    Threshold ->
-                                        lists:append(LazyThreads0,
-                                                    [{threshold,
-                                                      wait,
-                                                      Self,
-                                                      Type,
-                                                      Threshold}])
-                    end,
-                    true = ets:insert(Store,
-                                      {Id, V#dv{lazy=true,
-                                                lazy_threads=LazyThreads}}),
-                    BlockingFun()
-                end
+        _ ->
+            LazyThreads = case Threshold of
+                            undefined ->
+                                lists:append(LazyThreads0, [Self]);
+                            Threshold ->
+                                lists:append(LazyThreads0,
+                                            [{threshold,
+                                              wait,
+                                              Self,
+                                              Type,
+                                              Threshold}])
+            end,
+            true = ets:insert(Store,
+                              {Id, V#dv{lazy=true,
+                                        lazy_threads=LazyThreads}}),
+            BlockingFun()
     end.
 
 %% @doc Notify a value of a change, and write changed value.
@@ -742,7 +699,6 @@ write(Type, Value, Next, Key, Store, NotifyFun) ->
              value=Value,
              next=Next,
              lazy=Lazy,
-             bound=true,
              binding=Binding,
              binding_list=BindingList,
              waiting_threads=StillWaiting},

@@ -519,8 +519,7 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                                               Threshold}])
             end,
             true = ets:insert(Store,
-                              {Id, V#dv{lazy=true,
-                                        lazy_threads=LazyThreads}}),
+                              {Id, V#dv{lazy_threads=LazyThreads}}),
             BlockingFun()
     end.
 
@@ -690,15 +689,13 @@ write(Type, Value, Next, Key, Store, NotifyFun) ->
     lager:info("Writing key: ~p next: ~p", [Key, Next]),
     [{_Key, #dv{waiting_threads=Threads,
                 binding_list=BindingList,
-                binding=Binding,
-                lazy=Lazy}}] = ets:lookup(Store, Key),
+                binding=Binding}}] = ets:lookup(Store, Key),
     lager:info("Waiting threads are: ~p", [Threads]),
     lager:info("Binding list is: ~p", [BindingList]),
     {ok, StillWaiting} = reply_to_all(Threads, [], {ok, Type, Value, Next}),
     V1 = #dv{type=Type,
              value=Value,
              next=Next,
-             lazy=Lazy,
              binding=Binding,
              binding_list=BindingList,
              waiting_threads=StillWaiting},

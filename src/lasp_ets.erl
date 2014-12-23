@@ -36,7 +36,7 @@
          declare/2,
          declare/3,
          thread/4,
-         select/4,
+         filter/4,
          wait_needed/2,
          wait_needed/3,
          reply_to_all/2,
@@ -54,7 +54,7 @@
          fetch/4,
          reply_fetch/4,
          write/6,
-         select/6,
+         filter/6,
          fetch/8]).
 
 %% Exported helper functions.
@@ -78,21 +78,21 @@ next(Id, Store) ->
     end,
     next(Id, Store, DeclareNextFun).
 
-%% @doc Select values from one lattice into another.
+%% @doc Filter values from one lattice into another.
 %%
 %%      Applies the given `Function' as a filter over the items in `Id',
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec select(id(), function(), id(), store()) -> {ok, pid()}.
-select(Id, Function, AccId, Store) ->
+-spec filter(id(), function(), id(), store()) -> {ok, pid()}.
+filter(Id, Function, AccId, Store) ->
     BindFun = fun(_AccId, AccValue, _Variables) ->
             ?MODULE:bind(_AccId, AccValue, _Variables)
     end,
     ReadFun = fun(_Id, _Threshold, _Variables) ->
             ?MODULE:read(_Id, _Threshold, _Variables)
     end,
-    select(Id, Function, AccId, Store, BindFun, ReadFun).
+    filter(Id, Function, AccId, Store, BindFun, ReadFun).
 
 %% @doc Perform a read for a particular identifier.
 %%
@@ -510,18 +510,19 @@ bind_to(Id, TheirId, Store, FetchFun, FromPid) ->
     true = ets:insert(Store, {Id, #dv{binding=TheirId}}),
     FetchFun(TheirId, Id, FromPid).
 
-%% @doc Select values from one lattice into another.
+%% @doc Filter values from one lattice into another.
 %%
 %%      Applies the given `Function' as a filter over the items in `Id',
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
-%%      Similar to {@link select/4}, however, provides an override
+%%      Similar to {@link filter/4}, however, provides an override
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec select(id(), function(), id(), store(), function(), function()) -> {ok, pid()}.
-select(Id, Function, AccId, Store, BindFun, ReadFun) ->
+-spec filter(id(), function(), id(), store(), function(), function()) ->
+    {ok, pid()}.
+filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Pid = spawn_link(?MODULE, fold, [Store,
                                      Id,
                                      Function,
@@ -678,8 +679,11 @@ fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
                  undefined,
                  undefined).
 
--spec fold_harness(store(), id(), function(), id(), function(), function(), value(), value()) -> function().
-fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun, PreviousValue, PreviousAccValue) ->
+
+-spec fold_harness(store(), id(), function(), id(), function(),
+                   function(), value(), value()) -> function().
+fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
+             PreviousValue, PreviousAccValue) ->
     %% Blocking threshold read on source value.
     {ok, Type, Value, _} = ReadFun(Id, {strict, PreviousValue}, Variables),
 

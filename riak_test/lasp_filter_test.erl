@@ -18,9 +18,9 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc Select test.
+%% @doc Filter test.
 
--module(lasp_select_test).
+-module(lasp_filter_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([test/1]).
@@ -70,8 +70,8 @@ test(Type) ->
     %% Create second set.
     {ok, S2} = lasp:declare(Type),
 
-    %% Apply select.
-    {ok, _Pid} = lasp:select(S1, fun(X) -> X rem 2 == 0 end, S2),
+    %% Apply filter.
+    {ok, _Pid} = lasp:filter(S1, fun(X) -> X rem 2 == 0 end, S2),
 
     %% Wait.
     timer:sleep(4000),

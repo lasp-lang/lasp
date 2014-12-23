@@ -37,7 +37,7 @@
          bind_to/2,
          read/1,
          read/2,
-         select/3,
+         filter/3,
          next/1,
          is_det/1,
          wait_needed/1,
@@ -121,12 +121,10 @@ read(Id, Threshold) ->
                                               {read, Id, Threshold},
                                               ?VNODE_MASTER).
 
-select(Id, Function, AccId) ->
-    lager:info("Select by process ~p, id: ~p accid: ~p",
-               [self(), Id, AccId]),
+filter(Id, Function, AccId) ->
     [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {select,
+                                              {filter,
                                                Id, Function, AccId},
                                               ?VNODE_MASTER).
 
@@ -367,7 +365,7 @@ handle_command({read, Id, Threshold}, From,
                   ReplyFun,
                   BlockingFun);
 
-handle_command({select, Id, Function, AccId}, _From,
+handle_command({filter, Id, Function, AccId}, _From,
                State=#state{variables=Variables,
                             partition=Partition,
                             node=Node}) ->
@@ -399,7 +397,7 @@ handle_command({select, Id, Function, AccId}, _From,
                     ?MODULE:read(_Id, _Threshold)
             end
     end,
-    Result = ?BACKEND:select(Id,
+    Result = ?BACKEND:filter(Id,
                              Function,
                              AccId,
                              Variables,

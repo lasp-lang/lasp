@@ -30,7 +30,7 @@
          bind_to/2,
          read/1,
          read/2,
-         select/3,
+         filter/3,
          produce/2,
          produce/4,
          consume/1,
@@ -164,15 +164,15 @@ read(Id) ->
 read(Id, Threshold) ->
     lasp_vnode:read(Id, Threshold).
 
-%% @doc Select values from one lattice into another.
+%% @doc Filter values from one lattice into another.
 %%
 %%      Applies the given `Function' as a filter over the items in `Id',
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec select(id(), function(), id()) -> {ok, pid()}.
-select(Id, Function, AccId) ->
-    lasp_vnode:select(Id, Function, AccId).
+-spec filter(id(), function(), id()) -> {ok, pid()}.
+filter(Id, Function, AccId) ->
+    lasp_vnode:filter(Id, Function, AccId).
 
 %% @doc Produce a value in a stream.
 %%

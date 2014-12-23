@@ -46,8 +46,6 @@
 -callback bind(id(), value(), store()) -> {ok, id()}.
 -callback bind(id(), value(), store(), function(), function()) -> {ok, id()}.
 
--callback is_det(id(), store()) -> {ok, bound()}.
-
 -callback thread(module(), func(), args(), store()) -> {ok, pid()}.
 
 -callback next_key(undefined | id(), type(), store()) -> id().

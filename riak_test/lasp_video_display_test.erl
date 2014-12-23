@@ -74,12 +74,7 @@ skip1(Input, Output) ->
         {ok, _, nil, _} ->
             lasp:bind(Output, nil);
         {ok, _, _Value, Next} ->
-            case lasp:is_det(Next) of
-                {ok, true} ->
-                    skip1(Next, Output);
-                {ok, false} ->
-                    lasp:bind_to(Output, Input)
-            end
+            skip1(Next, Output)
     end.
 
 display(Input) ->

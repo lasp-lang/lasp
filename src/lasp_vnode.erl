@@ -39,7 +39,6 @@
          read/2,
          filter/3,
          next/1,
-         is_det/1,
          wait_needed/1,
          wait_needed/2,
          declare/2,
@@ -141,12 +140,6 @@ next(Id) ->
     [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {next, Id},
-                                              ?VNODE_MASTER).
-
-is_det(Id) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {is_det, Id},
                                               ?VNODE_MASTER).
 
 declare(Id, Type) ->
@@ -411,10 +404,6 @@ handle_command({next, Id}, _From,
                             declare_next(Type, State)
                      end,
     Result = ?BACKEND:next(Id, Variables, DeclareNextFun),
-    {reply, Result, State};
-
-handle_command({is_det, Id}, _From, State=#state{variables=Variables}) ->
-    Result = ?BACKEND:is_det(Id, Variables),
     {reply, Result, State};
 
 handle_command(_Message, _Sender, State) ->

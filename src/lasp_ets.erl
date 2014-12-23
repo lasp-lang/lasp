@@ -26,8 +26,7 @@
 -behaviour(lasp_backend).
 
 %% Core API.
--export([is_det/2,
-         bind/3,
+-export([bind/3,
          bind_to/3,
          read/2,
          read/3,
@@ -176,18 +175,6 @@ bind(Id, Value, Store) ->
                         ?MODULE:notify_value(_Id, NewValue, Store)
                 end,
     bind(Id, Value, Store, NextKeyFun, NotifyFun).
-
-%% @doc Inspect the bind status of a variable.
-%%
-%%      Return the bound status of `Id'.
-%%
-%%      Operator introduces non-determinism if a choice is made using
-%%      the result.
-%%
--spec is_det(id(), store()) -> {ok, bound()}.
-is_det(Id, Store) ->
-    [{_Key, #dv{bound=Bound}}] = ets:lookup(Store, Id),
-    {ok, Bound}.
 
 %% @doc Spawn a function.
 %%

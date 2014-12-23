@@ -35,7 +35,6 @@
          produce/4,
          consume/1,
          extend/1,
-         is_det/1,
          wait_needed/1,
          wait_needed/2,
          spawn_mon/4,
@@ -210,17 +209,6 @@ consume(Id) ->
 -spec extend(id()) -> id().
 extend(Id) ->
     lasp_vnode:next(Id).
-
-%% @doc Inspect the bind status of a variable.
-%%
-%%      Return the bound status of `Id'.
-%%
-%%      Operator introduces non-determinism if a choice is made using
-%%      the result.
-%%
--spec is_det(id()) -> bound().
-is_det(Id) ->
-    lasp_vnode:is_det(Id).
 
 %% @doc Spawn a function.
 %%

@@ -121,7 +121,7 @@ read(Id, Threshold) ->
                                               ?VNODE_MASTER).
 
 filter(Id, Function, AccId) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
+    [{IndexNode, _Type}] = lasp:preflist(?N, AccId, lasp),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {filter,
                                                Id, Function, AccId},

@@ -37,7 +37,7 @@
 %%
 generate_operations(riak_dt_gset, Set) ->
     Values = riak_dt_gset:value(Set),
-    {ok, [{add, Value} || Value <- Values]}.
+    {ok, [{riak_dt_gset, {add, Value}} || Value <- Values]}.
 
 %% @doc Determine if a threshold is met.
 %%

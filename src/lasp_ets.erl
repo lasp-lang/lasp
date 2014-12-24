@@ -473,13 +473,16 @@ bind_to(Id, TheirId, Store, FetchFun, FromPid) ->
 -spec filter(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Pid = spawn_link(?MODULE, fold, [Store,
-                                     Id,
-                                     Function,
-                                     AccId,
-                                     BindFun,
-                                     ReadFun]),
-    {ok, Pid}.
+    FolderFun = fun({Type, {add, Element} = Op}, Acc) ->
+            case Function(Element) of
+                true ->
+                    {ok, NewAcc} = Type:update(Op, undefined, Acc),
+                    NewAcc;
+                _ ->
+                    Acc
+            end
+    end,
+    fold(Store, Id, FolderFun, AccId, BindFun, ReadFun).
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
 %%      change the reply and blocking replies.
@@ -612,42 +615,33 @@ reply_to_all([], StillWaiting, _Result) ->
 
 %% Internal functions.
 
+-spec fold(id(), function(), id(), store(), function(), function()) ->
+    {ok, pid()}.
 fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
-    fold_harness(Variables,
-                 Id,
-                 Function,
-                 AccId,
-                 BindFun,
-                 ReadFun,
-                 undefined,
-                 undefined).
-
+    Pid = spawn_link(?MODULE, fold_harness, [
+                Variables,
+                Id,
+                Function,
+                AccId,
+                BindFun,
+                ReadFun,
+                undefined,
+                undefined]),
+    {ok, Pid}.
 
 -spec fold_harness(store(), id(), function(), id(), function(),
                    function(), value(), value()) -> function().
 fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
-             PreviousValue, PreviousAccValue) ->
+             PreviousValue, _PreviousAccValue) ->
     %% Blocking threshold read on source value.
     {ok, Type, Value, _} = ReadFun(Id, {strict, PreviousValue}, Variables),
-
-    %% Read current value.
-    {ok, Type, AccValue0, _} = ReadFun(AccId, PreviousAccValue, Variables),
 
     %% Generate operations for given data type.
     {ok, Operations} = lasp_lattice:generate_operations(Type, Value),
     lager:info("Operations generated: ~p", [Operations]),
 
     %% Build new data structure.
-    AccValue = lists:foldl(
-                 fun({add, Element} = Op, Acc) ->
-                         case Function(Element) of
-                             true ->
-                                 {ok, NewAcc} = Type:update(Op, undefined, Acc),
-                                 NewAcc;
-                             _ ->
-                                 Acc
-                         end
-                 end, AccValue0, Operations),
+    AccValue = lists:foldl(Function, Type:new(), Operations),
 
     %% Update with result.
     BindFun(AccId, AccValue, Variables),

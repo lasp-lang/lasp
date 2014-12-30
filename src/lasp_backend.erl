@@ -70,4 +70,4 @@
 -callback filter(id(), function(), id(), store()) -> {ok, pid()}.
 -callback filter(id(), function(), id(), store(), function(), function()) -> {ok, pid()}.
 
--callback fold(store(), id(), function(), id(), function(), function()) -> function().
+-callback fold(store(), id(), function(), id(), fun(), function()) -> {ok, pid()}.

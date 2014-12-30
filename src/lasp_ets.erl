@@ -615,8 +615,7 @@ reply_to_all([], StillWaiting, _Result) ->
 
 %% Internal functions.
 
--spec fold(id(), function(), id(), store(), function(), function()) ->
-    {ok, pid()}.
+-spec fold(store(), id(), function(), id(), fun(), function()) -> {ok, pid()}.
 fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
     Pid = spawn_link(?MODULE, fold_harness, [
                 Variables,

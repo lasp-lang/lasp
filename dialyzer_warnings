@@ -1,7 +1,3 @@
   Checking whether the PLT /Users/cmeiklejohn/.combo_dialyzer_plt is up-to-date... yes
   Checking whether the PLT .local_dialyzer_plt is up-to-date... yes
-  Compiling some key modules to native code... done in 0m38.04s
-  Proceeding with analysis...
-lasp_execute_coverage_fsm.erl:24: Callback info about the riak_core_coverage_fsm behaviour is not available
- done in 0m9.08s
-done (warnings were emitted)
+  Compiling some key modules to native code...

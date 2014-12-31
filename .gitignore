@@ -2,7 +2,6 @@
 .eunit
 deps/*
 ebin/*
-rel/derflow
 dev
 src/*.swp
 apps/derflow/src/*
@@ -14,3 +13,4 @@ riak_test/ebin/*.beam
 .eqc-info
 current_counterexample.eqc
 doc/
+rel/lasp

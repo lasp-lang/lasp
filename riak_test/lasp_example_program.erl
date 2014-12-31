@@ -68,12 +68,9 @@ example() ->
     {ok, L2} = lasp:declare(riak_dt_gset),
     {ok, L3} = lasp:declare(riak_dt_gset),
 
-    {ok, S1} = riak_dt_gset:update({add, 1},
-                                   undefined, riak_dt_gset:new()),
-
     %% Attempt pre, and post- dataflow variable bind operations.
     {ok, _} = lasp:bind_to(L2, L1),
-    {ok, _} = lasp:bind(L1, S1),
+    {ok, S1, _} = lasp:update(L1, {add, 1}),
     {ok, _} = lasp:bind_to(L3, L1),
 
     %% Verify the same value is contained by all.
@@ -81,14 +78,34 @@ example() ->
     {ok, _, S1, _} = lasp:read(L2),
     {ok, _, S1, _} = lasp:read(L1),
 
-    %% Test inflation.
+    %% Test inflations.
     {ok, S2} = riak_dt_gset:update({add, 2},
                                    undefined, S1),
-    {ok, _} = lasp:bind(L1, S2),
+
+    Self = self(),
+
+    spawn_link(fun() ->
+                {ok, _} = lasp:wait_needed(L1, S2),
+                Self ! threshold_met
+                end),
+
+    {ok, S2, _} = lasp:update(L1, {add, 2}),
 
     %% Verify the same value is contained by all.
     {ok, _, S2, _} = lasp:read(L3),
     {ok, _, S2, _} = lasp:read(L2),
     {ok, _, S2, _} = lasp:read(L1),
 
-    ok.
+    %% Read at the S2 threshold level.
+    {ok, _, S2, _} = lasp:read(L1, S2),
+
+    %% Wait for wait_needed to unblock.
+    Result = receive
+        threshold_met ->
+            ok
+    after
+        10000 ->
+            error
+    end,
+
+    Result.

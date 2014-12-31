@@ -511,8 +511,14 @@ execute(Module, Programs) ->
     case dict:is_key(Module, Programs) of
         true ->
             Acc = dict:fetch(Module, Programs),
-            lager:info("Executing module: ~p", [Module]),
-            Module:execute(Acc);
+            Self = self(),
+            ReqId = lasp:mk_reqid(),
+            spawn_link(fun() ->
+                        Result = Module:execute(Acc),
+                        Self ! {ReqId, ok, Result}
+                        end),
+            {ok, Result} = lasp:wait_for_reqid(ReqId, infinity),
+            Result;
         false ->
             lager:info("Failed to execute module: ~p", [Module]),
             {error, undefined}

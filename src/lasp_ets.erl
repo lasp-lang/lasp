@@ -318,8 +318,7 @@ update(Id, Operation, Store, NextKeyFun, NotifyFun) ->
 -spec bind(id(), value(), store(), function(), function()) -> {ok, id()}.
 bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
     [{_Key, V=#dv{next=Next,
-                  type=Type,
-                  value=Value0}}] = ets:lookup(Store, Id),
+                  type=Type}}] = ets:lookup(Store, Id),
     NextKey = NextKeyFun(Type, Next),
     case V#dv.value of
         Value ->
@@ -334,14 +333,10 @@ bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
                               NotifyFun),
                         {ok, NextKey};
                     false ->
-                        lager:error("Bind failed: ~p ~p ~p~n",
-                                    [Type, Value0, Value]),
                         error
                 end
             catch
                 _:_ ->
-                    lager:error("Bind failed: ~p ~p ~p~n",
-                                [Type, Value0, Value]),
                     error
             end
     end.
@@ -450,8 +445,6 @@ fetch(TargetId, FromId, FromPid, Store,
         undefined ->
             NextKey = NextKeyFun(DV#dv.next, DV#dv.type),
             BindingList = lists:append(DV#dv.binding_list, [FromId]),
-            lager:info("Updating binding_list to: ~p for ~p",
-                       [BindingList, TargetId]),
             DV1 = DV#dv{binding_list=BindingList, next=NextKey},
             true = ets:insert(Store, {TargetId, DV1}),
             ReplyFetchFun(FromId, FromPid, DV1),
@@ -520,28 +513,35 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
 -spec wait_needed(id(), threshold(), store(), pid(), function(),
                   function()) -> {ok, threshold()}.
 wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
-    lager:info("Wait needed issued for identifier: ~p", [Id]),
     [{_Key, V=#dv{waiting_threads=WT,
                   type=Type,
+                  value=Value,
                   lazy_threads=LazyThreads0}}] = ets:lookup(Store, Id),
-    case WT of
-        [_H|_T] ->
-            ReplyFun(undefined);
-        _ ->
-            LazyThreads = case Threshold of
-                            undefined ->
-                                lists:append(LazyThreads0, [Self]);
-                            Threshold ->
-                                lists:append(LazyThreads0,
-                                            [{threshold,
-                                              wait,
-                                              Self,
-                                              Type,
-                                              Threshold}])
-            end,
-            true = ets:insert(Store,
-                              {Id, V#dv{lazy_threads=LazyThreads}}),
-            BlockingFun()
+    lager:info("Wait needed; id: ~p, value: ~p, threshold: ~p",
+               [Id, Value, Threshold]),
+    case lasp_lattice:threshold_met(Type, Value, Threshold) of
+        true ->
+            ReplyFun(Threshold);
+        false ->
+            case WT of
+                [_H|_T] ->
+                    ReplyFun(Threshold);
+                _ ->
+                    LazyThreads = case Threshold of
+                                    undefined ->
+                                        lists:append(LazyThreads0, [Self]);
+                                    Threshold ->
+                                        lists:append(LazyThreads0,
+                                                    [{threshold,
+                                                      wait,
+                                                      Self,
+                                                      Type,
+                                                      Threshold}])
+                    end,
+                    true = ets:insert(Store,
+                                      {Id, V#dv{lazy_threads=LazyThreads}}),
+                    BlockingFun()
+            end
     end.
 
 %% @doc Notify a value of a change, and write changed value.
@@ -697,7 +697,6 @@ write(Type, Value, Next, Key, Store) ->
 %%
 -spec write(type(), value(), id(), id(), store(), function()) -> ok.
 write(Type, Value, Next, Key, Store, NotifyFun) ->
-    lager:info("Writing key: ~p next: ~p", [Key, Next]),
     [{_Key, #dv{waiting_threads=Threads,
                 binding_list=BindingList,
                 binding=Binding}}] = ets:lookup(Store, Key),

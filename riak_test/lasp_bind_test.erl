@@ -79,12 +79,9 @@ test() ->
     {ok, L2} = lasp:declare(riak_dt_gset),
     {ok, L3} = lasp:declare(riak_dt_gset),
 
-    {ok, S1} = riak_dt_gset:update({add, 1},
-                                   undefined, riak_dt_gset:new()),
-
     %% Attempt pre, and post- dataflow variable bind operations.
     {ok, _} = lasp:bind_to(L2, L1),
-    {ok, _} = lasp:bind(L1, S1),
+    {ok, S1, _} = lasp:update(L1, {add, 1}),
     {ok, _} = lasp:bind_to(L3, L1),
 
     %% Verify the same value is contained by all.
@@ -103,7 +100,7 @@ test() ->
                   Self ! threshold_met
                end),
 
-    {ok, _} = lasp:bind(L1, S2),
+    {ok, S2, _} = lasp:update(L1, {add, 2}),
 
     %% Verify the same value is contained by all.
     {ok, _, S2, _} = lasp:read(L3),

@@ -25,6 +25,7 @@
 
 -export([declare/0,
          declare/1,
+         update/2,
          bind/2,
          bind/4,
          bind_to/2,
@@ -114,6 +115,16 @@ declare() ->
 -spec declare(type()) -> {ok, id()}.
 declare(Type) ->
     lasp_vnode:declare(druuid:v4(), Type).
+
+%% @doc Update a dataflow variable.
+%%
+%%      Read the given `Id' and update it given the provided
+%%      `Operation', which should be valid for the type of CRDT stored
+%%      at the given `Id'.
+%%
+-spec update(id(), operation()) -> {ok, value(), id()} | error.
+update(Id, Operation) ->
+    lasp_vnode:update(Id, Operation).
 
 %% @doc Bind a dataflow variable to a value.
 %%

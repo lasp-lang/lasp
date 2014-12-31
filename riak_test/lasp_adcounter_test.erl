@@ -112,9 +112,7 @@ client(Id, Ads) ->
             lager:info("Displaying ad: ~p from client: ~p~n", [Ad, Id]),
 
             %% Update ad by incrementing value.
-            {ok, _, Value, _} = lasp:read(Ad),
-            {ok, Updated} = riak_dt_gcounter:update(increment, Id, Value),
-            {ok, _} = lasp:bind(Ad, Updated),
+            {ok, _, _} = lasp:update(Ad, increment),
 
             client(Id, tl(Ads) ++ [Ad]);
         {remove_ad, Ad} ->

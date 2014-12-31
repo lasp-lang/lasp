@@ -35,6 +35,7 @@
 %% Language execution primitives.
 -export([bind/2,
          bind_to/2,
+         update/2,
          read/1,
          read/2,
          filter/3,
@@ -107,6 +108,12 @@ bind_to(Id, TheirId) ->
     [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {bind_to, Id, TheirId},
+                                              ?VNODE_MASTER).
+
+update(Id, Operation) ->
+    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {update, Id, Operation},
                                               ?VNODE_MASTER).
 
 read(Id) ->
@@ -272,17 +279,23 @@ handle_command({bind_to, Id, DVId}, FromPid,
 handle_command({bind, Id, Value}, _From,
                State=#state{variables=Variables}) ->
     NextKeyFun = fun(Type, Next) ->
-                        case Value of
-                            undefined ->
-                                undefined;
-                            _ ->
-                                next_key(Next, Type, State)
-                        end
+                        next_key(Next, Type, State)
                  end,
     NotifyFun = fun(_Id, NewValue) ->
                         ?MODULE:notify_value(_Id, NewValue)
                 end,
     Result = ?BACKEND:bind(Id, Value, Variables, NextKeyFun, NotifyFun),
+    {reply, Result, State};
+
+handle_command({update, Id, Operation}, _From,
+               State=#state{variables=Variables}) ->
+    NextKeyFun = fun(Type, Next) ->
+                        next_key(Next, Type, State)
+                 end,
+    NotifyFun = fun(_Id, NewValue) ->
+                        ?MODULE:notify_value(_Id, NewValue)
+                end,
+    Result = ?BACKEND:update(Id, Operation, Variables, NextKeyFun, NotifyFun),
     {reply, Result, State};
 
 handle_command({fetch, TargetId, FromId, FromPid}, _From,

@@ -57,12 +57,9 @@ test(Type) ->
     %% Create initial set.
     {ok, S1} = lasp:declare(Type),
 
-    %% Add elements to initial set.
-    {ok, _, S1V1, _} = lasp:read(S1),
-    {ok, S1V2} = Type:update({add_all, [1,2,3]}, undefined, S1V1),
-
-    %% Bind update.
-    {ok, _} = lasp:bind(S1, S1V2),
+    %% Add elements to initial set and update.
+    {ok, _, _, _} = lasp:read(S1),
+    {ok, S1V2, _} = lasp:update(S1, {add_all, [1,2,3]}),
 
     %% Read resulting value.
     {ok, _, S1V2, _} = lasp:read(S1),
@@ -77,9 +74,7 @@ test(Type) ->
     timer:sleep(4000),
 
     %% Bind again.
-    {ok, _, S1V3, _} = lasp:read(S1),
-    {ok, S1V4} = Type:update({add_all, [4,5,6]}, undefined, S1V3),
-    {ok, _} = lasp:bind(S1, S1V4),
+    {ok, _, _} = lasp:update(S1, {add_all, [4,5,6]}),
 
     %% Wait.
     timer:sleep(4000),

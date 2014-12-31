@@ -34,6 +34,7 @@
          declare/1,
          declare/2,
          declare/3,
+         update/3,
          thread/4,
          filter/4,
          wait_needed/2,
@@ -51,6 +52,7 @@
          wait_needed/6,
          read/6,
          fetch/4,
+         update/5,
          reply_fetch/4,
          write/6,
          filter/6,
@@ -164,17 +166,28 @@ bind_to(Id, TheirId, Store) ->
 -spec bind(id(), value(), store()) -> {ok, id()}.
 bind(Id, Value, Store) ->
     NextKeyFun = fun(Type, Next) ->
-                        case Value of
-                            undefined ->
-                                undefined;
-                            _ ->
-                                next_key(Next, Type, Store)
-                        end
-                 end,
+                        next_key(Next, Type, Store)
+                end,
     NotifyFun = fun(_Id, NewValue) ->
                         ?MODULE:notify_value(_Id, NewValue, Store)
                 end,
     bind(Id, Value, Store, NextKeyFun, NotifyFun).
+
+%% @doc Update a dataflow variable given an operation.
+%%
+%%      Read the given `Id' and update it given the provided
+%%      `Operation', which should be valid for the type of CRDT stored
+%%      at the given `Id'.
+%%
+-spec update(id(), operation(), store()) -> {ok, id(), value()}.
+update(Id, Operation, Store) ->
+    NextKeyFun = fun(Type, Next) ->
+                        next_key(Next, Type, Store)
+                 end,
+    NotifyFun = fun(_Id, NewValue) ->
+                        ?MODULE:notify_value(_Id, NewValue, Store)
+                end,
+    update(Id, Operation, Store, NextKeyFun, NotifyFun).
 
 %% @doc Spawn a function.
 %%
@@ -274,6 +287,20 @@ reply_fetch(FromId, FromPid,
     ?MODULE:write(Type, Value, Next, FromId, Store, NotifyFun),
     {ok, _} = ?BACKEND:reply_to_all([FromPid], {ok, Next}),
     {ok, Next}.
+
+%% @doc Update a dataflow variable given an operation.
+%%
+%%      Similar to {@link update/5}.
+%%
+%%      Read the given `Id' and update it given the provided
+%%      `Operation', which should be valid for the type of CRDT stored
+%%      at the given `Id'.
+%%
+update(Id, Operation, Store, NextKeyFun, NotifyFun) ->
+    [{_Key, #dv{value=Value0, type=Type}}] = ets:lookup(Store, Id),
+    {ok, Value} = Type:update(Operation, undefined, Value0),
+    {ok, NextId} = bind(Id, Value, Store, NextKeyFun, NotifyFun),
+    {ok, Value, NextId}.
 
 %% @doc Define a dataflow variable to be bound a value.
 %%

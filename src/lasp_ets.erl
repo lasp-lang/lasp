@@ -388,23 +388,14 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
     [{_Key, V=#dv{value=Value,
                   lazy_threads=LazyThreads,
                   type=Type}}] = ets:lookup(Store, Id),
-    lager:info("Read received: ~p, bound: ~p, threshold: ~p",
-               [Id, V, Threshold]),
-
     %% Notify all lazy processes of this read.
-    lager:info("Notifying lazy processes: ~p", [LazyThreads]),
     {ok, StillLazy} = reply_to_all(LazyThreads, {ok, Threshold}),
-    lager:info("Done notifying: ~p", [StillLazy]),
 
     %% Satisfy read if threshold is met.
     case lasp_lattice:threshold_met(Type, Value, Threshold) of
         true ->
-            lager:info("Replying with result: ~p",
-                       [Value]),
             ReplyFun(Type, Value, V#dv.next);
         false ->
-            lager:info("Threshold not met: ~p ~p ~p",
-                       [Type, Value, Threshold]),
             WT = lists:append(V#dv.waiting_threads,
                               [{threshold,
                                 read,
@@ -710,8 +701,6 @@ write(Type, Value, Next, Key, Store, NotifyFun) ->
     [{_Key, #dv{waiting_threads=Threads,
                 binding_list=BindingList,
                 binding=Binding}}] = ets:lookup(Store, Key),
-    lager:info("Waiting threads are: ~p", [Threads]),
-    lager:info("Binding list is: ~p", [BindingList]),
     {ok, StillWaiting} = reply_to_all(Threads, [], {ok, Type, Value, Next}),
     V1 = #dv{type=Type,
              value=Value,

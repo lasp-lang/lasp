@@ -44,7 +44,8 @@
          get_stream/1,
          register/3,
          execute/2,
-         mk_reqid/0]).
+         mk_reqid/0,
+         wait_for_reqid/2]).
 
 %% Public API
 

@@ -47,13 +47,11 @@ execute(Module, NVal) ->
     {ok, ReqId}.
 
 init(From={_, _, _}, [Timeout, NVal, Module]) ->
-    lager:info("Execute coverage FSM started!"),
     Req = ?EXECUTE_REQUEST{module=Module},
     {Req, all, NVal, 1, lasp, lasp_vnode_master, Timeout,
      #state{from=From, module=Module}}.
 
 process_results({error, Reason}, _State) ->
-    lager:info("Error received: ~p", [Reason]),
     {error, Reason};
 process_results({done, Result}, #state{results=Results}=State) ->
     {done, State#state{results=[Result|Results]}};
@@ -70,11 +68,7 @@ finish(clean,
        StateData=#state{from={raw, ReqId, ClientPid},
                         module=Module,
                         results=Results}) ->
-    lager:info("Finish triggered with clean!"),
-    Result = Module:merge(Results),
-    lager:info("Merged result is: ~p, replying to: ~p",
-               [Result, ClientPid]),
-    ClientPid ! {ReqId, ok, Result},
+    ClientPid ! {ReqId, ok, Module:merge(Results)},
     {stop, normal, StateData};
 finish(Message, StateData) ->
     lager:info("Unhandled finish: ~p", [Message]),

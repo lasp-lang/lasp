@@ -16,12 +16,17 @@
 
 -define(SECS, 60).
 -define(NUM_TESTS, 200).
--define(LATTICES, [lasp_ivar, riak_dt_gset, riak_dt_gcounter]).
+-define(LATTICES, [lasp_ivar,
+                   riak_dt_gset,
+                   riak_dt_orset,
+                   riak_dt_gcounter]).
 
 -define(ETS, lasp_ets_eqc).
 
 -define(QC_OUT(P),
-        eqc:on_output(fun(Str, Args) -> io:format(user, Str, Args) end, P)).
+        eqc:on_output(fun(Str, Args) ->
+                io:format(user, Str, Args)
+        end, P)).
 
 lasp_ets_sequential_test_() ->
     {timeout, 60,
@@ -37,8 +42,12 @@ value(Variable, Store) ->
             ?LET({Object, Update},
                  {Type:new(), Type:gen_op()},
                   begin
-                    {ok, X} = Type:update(Update, undefined, Object),
-                    X
+                    case Type:update(Update, undefined, Object) of
+                        {ok, X} ->
+                            X;
+                        _ ->
+                            Object
+                    end
                   end)
     end.
 
@@ -48,8 +57,12 @@ threshold(Variable, Store) ->
             ?LET({Object, Update},
                  {Type:new(), Type:gen_op()},
                   begin
-                    {ok, X} = Type:update(Update, undefined, Object),
-                    X
+                    case Type:update(Update, undefined, Object) of
+                        {ok, X} ->
+                            X;
+                        _ ->
+                            Object
+                    end
                   end)
     end.
 

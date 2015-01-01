@@ -324,7 +324,7 @@ bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
         Value ->
             {ok, NextKey};
         _ ->
-            %% Merge may throw for invalid merge-types.
+            %% Merge may throw for invalid types.
             try
                 Merged = Type:merge(V#dv.value, Value),
                 case lasp_lattice:is_inflation(Type, V#dv.value, Merged) of
@@ -336,7 +336,8 @@ bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
                         error
                 end
             catch
-                _:_ ->
+                _:Reason ->
+                    lager:info("Bind threw an exception: ~p", [Reason]),
                     error
             end
     end.

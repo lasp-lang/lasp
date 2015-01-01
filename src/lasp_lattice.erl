@@ -195,6 +195,40 @@ lasp_ivar_strict_inflation_test() ->
     %% Concurrent
     ?assertEqual(false, is_lattice_strict_inflation(lasp_ivar, A2, B2)).
 
+%% riak_dt_gset tests.
+
+riak_dt_gset_inflation_test() ->
+    A1 = riak_dt_gset:new(),
+    B1 = riak_dt_gset:new(),
+
+    {ok, A2} = riak_dt_gset:update({add, 1}, a, A1),
+    {ok, B2} = riak_dt_gset:update({add, 2}, b, B1),
+
+    %% A1 and B1 are equivalent.
+    ?assertEqual(true, is_lattice_inflation(riak_dt_gset, A1, B1)),
+
+    %% A2 after A1.
+    ?assertEqual(true, is_lattice_inflation(riak_dt_gset, A1, A2)),
+
+    %% Concurrent
+    ?assertEqual(false, is_lattice_inflation(riak_dt_gset, A2, B2)).
+
+riak_dt_gset_strict_inflation_test() ->
+    A1 = riak_dt_gset:new(),
+    B1 = riak_dt_gset:new(),
+
+    {ok, A2} = riak_dt_gset:update({add, 1}, a, A1),
+    {ok, B2} = riak_dt_gset:update({add, 2}, b, B1),
+
+    %% A1 and B1 are equivalent.
+    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_gset, A1, B1)),
+
+    %% A2 after A1.
+    ?assertEqual(true, is_lattice_strict_inflation(riak_dt_gset, A1, A2)),
+
+    %% Concurrent
+    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_gset, A2, B2)).
+
 %% riak_dt_gcounter tests.
 
 riak_dt_gcounter_inflation_test() ->

@@ -71,6 +71,11 @@ threshold_met(riak_dt_gset, Value, {strict, Threshold}) ->
 threshold_met(riak_dt_gset, Value, Threshold) ->
     is_inflation(riak_dt_gset, Threshold, Value);
 
+threshold_met(riak_dt_orset, Value, {strict, Threshold}) ->
+    is_strict_inflation(riak_dt_orset, Threshold, Value);
+threshold_met(riak_dt_orset, Value, Threshold) ->
+    is_inflation(riak_dt_orset, Threshold, Value);
+
 threshold_met(riak_dt_gcounter, Value, {strict, Threshold}) ->
     Threshold < riak_dt_gcounter:value(Value);
 threshold_met(riak_dt_gcounter, Value, Threshold) ->
@@ -97,6 +102,19 @@ is_strict_inflation(Type, Previous, Current) ->
 %%      Given a particular type and two instances of that type,
 %%      determine if `Current' is an inflation of `Previous'.
 %%
+%%      Inflation of an I-Var is moving from the undefined state to a
+%%      defined state.
+%%
+%%      Inflation of a G-Set ensures that the `Previous' sets elements
+%%      are contained by the `Current' set.
+%%
+%%      Inflation of an OR-Set ensures that the `Previous' sets elements
+%%      all exist with the same unique idenfiers as `Current'.
+%%
+%%      Inflation of a G-Counter ensure that all actors in the
+%%      `Previous' state are covered in the `Current' state with at
+%%      least the same counts.
+%%
 is_lattice_inflation(lasp_ivar, undefined, undefined) ->
     true;
 is_lattice_inflation(lasp_ivar, undefined, _Current) ->
@@ -112,6 +130,16 @@ is_lattice_inflation(riak_dt_gset, Previous, Current) ->
     sets:is_subset(
         sets:from_list(riak_dt_gset:value(Previous)),
         sets:from_list(riak_dt_gset:value(Current)));
+
+is_lattice_inflation(riak_dt_orset, Previous, Current) ->
+    lists:foldl(fun({Element, Ids}, Acc) ->
+                        case lists:keyfind(Element, 1, Current) of
+                            false ->
+                                Acc andalso false;
+                            {_, Ids1} ->
+                                Acc andalso ids_inflated(Ids, Ids1)
+                        end
+                end, true, Previous);
 
 is_lattice_inflation(riak_dt_gcounter, Previous, Current) ->
     PreviousList = lists:sort(orddict:to_list(Previous)),
@@ -131,6 +159,23 @@ is_lattice_inflation(riak_dt_gcounter, Previous, Current) ->
 %%      Given a particular type and two instances of that type,
 %%      determine if `Current' is a strict inflation of `Previous'.
 %%
+%%      Strict inflation of an I-Var is verifying it's an inflation,
+%%      along with ensuring that it's moving to a value from
+%%      `undefined'.
+%%
+%%      Strict inflation for a G-Set is verifying the change is an
+%%      inflation, along with ensuring the change introduces an
+%%      additional element.
+%%
+%%      Strict inflation for an OR-Set is verifying the change is an
+%%      inflation, along with ensuring the change does at least one of
+%%      two things: adds an additional identifer, or changes one
+%%      identifer's deleted marker from false -> true.
+%%
+%%      Strict inflation for a G-Counter is verifying the change is an
+%%      inflation, along with ensuring that at least one of the counts
+%%      has increased, or a new actor has been introduced.
+%%
 is_lattice_strict_inflation(lasp_ivar, undefined, undefined) ->
     false;
 is_lattice_strict_inflation(lasp_ivar, undefined, Current)
@@ -144,20 +189,32 @@ is_lattice_strict_inflation(riak_dt_gset, Previous, Current) ->
         lists:usort(riak_dt_gset:value(Previous)) =/=
         lists:usort(riak_dt_gset:value(Current));
 
-is_lattice_strict_inflation(riak_dt_gcounter, [], []) ->
-    false;
+is_lattice_strict_inflation(riak_dt_orset, [], Current)
+  when Current =/= []->
+    true;
+is_lattice_strict_inflation(riak_dt_orset, Previous, Current) ->
+    is_lattice_inflation(riak_dt_orset, Previous, Current) andalso
+    %% We already know that `Previous' is fully covered in `Current', so
+    %% we just need to look for a change -- removal (false -> true), or
+    %% addition of a new element.
+        lists:foldl(fun({Element, Ids}, Acc) ->
+                            {_, Ids1} = lists:keyfind(Element, 1, Current),
+                            Acc orelse Ids =/= Ids1
+                    end, false, Previous);
+
 is_lattice_strict_inflation(riak_dt_gcounter, Previous, Current) ->
-    PreviousList = lists:sort(orddict:to_list(Previous)),
-    CurrentList = lists:sort(orddict:to_list(Current)),
-    is_lattice_inflation(riak_dt_gcounter, Previous, Current) andalso
-        lists:foldl(fun({Actor, Count}, Acc) ->
-                case lists:keyfind(Actor, 1, CurrentList) of
-                    false ->
-                        Acc andalso false;
-                    {_Actor1, Count1} ->
-                        Acc andalso (Count < Count1)
-                end
-                end, true, PreviousList).
+    %% Massive shortcut here -- get the value and see if it's different.
+    riak_dt_gcounter:value(Previous) < riak_dt_gcounter:value(Current).
+
+ids_inflated(Previous, Current) ->
+    lists:foldl(fun({Id, _}, Acc) ->
+                        case lists:keyfind(Id, 1, Current) of
+                            false ->
+                                Acc andalso false;
+                            _ ->
+                                Acc andalso true
+                        end
+                end, true, Previous).
 
 -ifdef(TEST).
 
@@ -228,6 +285,48 @@ riak_dt_gset_strict_inflation_test() ->
 
     %% Concurrent
     ?assertEqual(false, is_lattice_strict_inflation(riak_dt_gset, A2, B2)).
+
+%% riak_dt_orset tests.
+
+riak_dt_orset_inflation_test() ->
+    A1 = riak_dt_orset:new(),
+    B1 = riak_dt_orset:new(),
+
+    {ok, A2} = riak_dt_orset:update({add, 1}, a, A1),
+    {ok, B2} = riak_dt_orset:update({add, 2}, b, B1),
+    {ok, A3} = riak_dt_orset:update({remove, 1}, a, A2),
+
+    %% A1 and B1 are equivalent.
+    ?assertEqual(true, is_lattice_inflation(riak_dt_orset, A1, B1)),
+
+    %% A2 after A1.
+    ?assertEqual(true, is_lattice_inflation(riak_dt_orset, A1, A2)),
+
+    %% Concurrent
+    ?assertEqual(false, is_lattice_inflation(riak_dt_orset, A2, B2)),
+
+    %% A3 after A2.
+    ?assertEqual(true, is_lattice_inflation(riak_dt_orset, A2, A3)).
+
+riak_dt_orset_strict_inflation_test() ->
+    A1 = riak_dt_orset:new(),
+    B1 = riak_dt_orset:new(),
+
+    {ok, A2} = riak_dt_orset:update({add, 1}, a, A1),
+    {ok, B2} = riak_dt_orset:update({add, 2}, b, B1),
+    {ok, A3} = riak_dt_orset:update({remove, 1}, a, A2),
+
+    %% A1 and B1 are equivalent.
+    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_orset, A1, B1)),
+
+    %% A2 after A1.
+    ?assertEqual(true, is_lattice_strict_inflation(riak_dt_orset, A1, A2)),
+
+    %% Concurrent
+    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_orset, A2, B2)),
+
+    %% A3 after A2.
+    ?assertEqual(true, is_lattice_strict_inflation(riak_dt_orset, A2, A3)).
 
 %% riak_dt_gcounter tests.
 

@@ -120,8 +120,6 @@ read(Id) ->
     read(Id, {strict, undefined}).
 
 read(Id, Threshold) ->
-    lager:info("Read by process ~p, id: ~p thresh: ~p",
-               [self(), Id, Threshold]),
     [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {read, Id, Threshold},

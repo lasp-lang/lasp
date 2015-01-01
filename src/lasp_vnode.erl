@@ -483,7 +483,6 @@ next_key(NextKey0, _, _) ->
 
 %% @doc Declare the next object for streams.
 declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) ->
-    lager:info("Current partition and node: ~p ~p", [Partition, Node]),
     Id = druuid:v4(),
 
     %% Beware of cycles in the gen_server calls!
@@ -493,11 +492,9 @@ declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) 
         {Partition, Node} ->
             %% We're local, which means that we can interact directly
             %% with the data store.
-            lager:info("Local declare triggered: ~p", [IndexNode]),
             ?BACKEND:declare(Id, Type, Variables);
         _ ->
             %% We're remote, go through all of the routing logic.
-            lager:info("Declare triggered: ~p", [IndexNode]),
             ?MODULE:declare(Id, Type)
     end.
 

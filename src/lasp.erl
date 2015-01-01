@@ -26,6 +26,7 @@
 -export([declare/0,
          declare/1,
          update/2,
+         value/1,
          bind/2,
          bind/4,
          bind_to/2,
@@ -126,6 +127,15 @@ declare(Type) ->
 -spec update(id(), operation()) -> {ok, value(), id()} | error.
 update(Id, Operation) ->
     lasp_vnode:update(Id, Operation).
+
+%% @doc Get the current value of a CRDT.
+%%
+%%      Given an `Id' of a dataflow variable, return the actual value,
+%%      not the data structure, of the CRDT.
+%%
+-spec value(id()) -> {ok, value()}.
+value(Id) ->
+    lasp_vnode:value(Id).
 
 %% @doc Bind a dataflow variable to a value.
 %%

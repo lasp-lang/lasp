@@ -36,6 +36,7 @@
 -export([bind/2,
          bind_to/2,
          update/2,
+         value/1,
          read/1,
          read/2,
          filter/3,
@@ -103,8 +104,6 @@ bind(Id, Value) ->
                                               ?VNODE_MASTER).
 
 bind_to(Id, TheirId) ->
-    lager:info("Bind called by process ~p, their_id ~p, id: ~p",
-               [self(), TheirId, Id]),
     [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {bind_to, Id, TheirId},
@@ -114,6 +113,12 @@ update(Id, Operation) ->
     [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {update, Id, Operation},
+                                              ?VNODE_MASTER).
+
+value(Id) ->
+    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {value, Id},
                                               ?VNODE_MASTER).
 
 read(Id) ->
@@ -283,6 +288,11 @@ handle_command({bind, Id, Value}, _From,
                         ?MODULE:notify_value(_Id, NewValue)
                 end,
     Result = ?BACKEND:bind(Id, Value, Variables, NextKeyFun, NotifyFun),
+    {reply, Result, State};
+
+handle_command({value, Id}, _From,
+               State=#state{variables=Variables}) ->
+    Result = ?BACKEND:value(Id, Variables),
     {reply, Result, State};
 
 handle_command({update, Id, Operation}, _From,

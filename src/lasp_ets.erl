@@ -35,6 +35,7 @@
          declare/2,
          declare/3,
          update/3,
+         value/2,
          thread/4,
          filter/4,
          wait_needed/2,
@@ -188,6 +189,16 @@ update(Id, Operation, Store) ->
                         ?MODULE:notify_value(_Id, NewValue, Store)
                 end,
     update(Id, Operation, Store, NextKeyFun, NotifyFun).
+
+%% @doc Get the current value of a CRDT.
+%%
+%%      Given an `Id' of a dataflow variable, return the actual value,
+%%      not the data structure, of the CRDT.
+%%
+-spec value(id(), store()) -> {ok, value()}.
+value(Id, Store) ->
+    [{_Key, #dv{value=Value, type=Type}}] = ets:lookup(Store, Id),
+    {ok, Type:value(Value)}.
 
 %% @doc Spawn a function.
 %%

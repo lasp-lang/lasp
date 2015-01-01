@@ -79,3 +79,5 @@
 -callback update(id(), operation(), store()) -> {ok, value(), id()}.
 -callback update(id(), operation(), store(), function(), function()) ->
     {ok, value(), id()}.
+
+-callback value(id(), store()) -> {ok, value()}.

@@ -161,7 +161,41 @@ is_lattice_strict_inflation(riak_dt_gcounter, Previous, Current) ->
 
 -ifdef(TEST).
 
-%% G-Counter tests.
+%% lasp_ivar test.
+
+lasp_ivar_inflation_test() ->
+    A1 = lasp_ivar:new(),
+    B1 = lasp_ivar:new(),
+
+    {ok, A2} = lasp_ivar:update({set, 1}, a, A1),
+    {ok, B2} = lasp_ivar:update({set, 2}, b, B1),
+
+    %% A1 and B1 are equivalent.
+    ?assertEqual(true, is_lattice_inflation(lasp_ivar, A1, B1)),
+
+    %% A2 after A1.
+    ?assertEqual(true, is_lattice_inflation(lasp_ivar, A1, A2)),
+
+    %% Concurrent
+    ?assertEqual(false, is_lattice_inflation(lasp_ivar, A2, B2)).
+
+lasp_ivar_strict_inflation_test() ->
+    A1 = lasp_ivar:new(),
+    B1 = lasp_ivar:new(),
+
+    {ok, A2} = lasp_ivar:update({set, 1}, a, A1),
+    {ok, B2} = lasp_ivar:update({set, 2}, b, B1),
+
+    %% A1 and B1 are equivalent.
+    ?assertEqual(false, is_lattice_strict_inflation(lasp_ivar, A1, B1)),
+
+    %% A2 after A1.
+    ?assertEqual(true, is_lattice_strict_inflation(lasp_ivar, A1, A2)),
+
+    %% Concurrent
+    ?assertEqual(false, is_lattice_strict_inflation(lasp_ivar, A2, B2)).
+
+%% riak_dt_gcounter tests.
 
 riak_dt_gcounter_inflation_test() ->
     A1 = riak_dt_gcounter:new(),

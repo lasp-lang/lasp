@@ -59,11 +59,11 @@ test() ->
     {ok, Ads} = lasp:declare(riak_dt_orset),
 
     %% Build an advertisement counter, and add it to the set.
-    Ads = lists:foldl(fun(_, _Ads) ->
-                    {ok, Id} = lasp:declare(riak_dt_gcounter),
-                    {ok, _, _} = lasp:update(Ads, {add, Id}),
-                    Ads
-                    end, Ads, lists:seq(1,5)),
+    lists:foldl(fun(_, _Ads) ->
+                {ok, Id} = lasp:declare(riak_dt_gcounter),
+                {ok, _, _} = lasp:update(Ads, {add, Id}),
+                Ads
+                end, Ads, lists:seq(1,5)),
 
     %% Generate a OR-set for tracking clients.
     {ok, Clients} = lasp:declare(riak_dt_orset),
@@ -103,6 +103,7 @@ test() ->
             Pid ! view_ad
     end,
     lists:map(Viewer, lists:seq(1,50)),
+
     ok.
 
 %% @doc Server functions for the advertisement counter.  After 5 views,
@@ -110,11 +111,9 @@ test() ->
 %%
 server(Ad, Ads) ->
     %% Blocking threshold read for 5 advertisement impressions.
-    %%
     {ok, _, _, _} = lasp:read(Ad, 5),
 
     %% Remove the advertisement.
-    %%
     {ok, _, _} = lasp:update(Ads, {remove, Ad}).
 
 %% @doc Client process; standard recurisve looping server.

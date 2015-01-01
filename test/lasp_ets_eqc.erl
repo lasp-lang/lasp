@@ -16,6 +16,7 @@
 
 -define(SECS, 60).
 -define(NUM_TESTS, 200).
+-define(LATTICES, [lasp_ivar, riak_dt_gset, riak_dt_gcounter]).
 
 -define(ETS, lasp_ets_eqc).
 
@@ -93,10 +94,6 @@ bind_next(#state{store=Store0}=S, _V, [Id, NewValue]) ->
     %% Only update the record, if it's in inflation or has never been
     %% updated before.
     Store = case dict:find(Id, Store0) of
-        {ok, #variable{type=undefined, value=undefined}=Variable} ->
-            dict:store(Id, Variable#variable{value=NewValue}, Store0);
-        {ok, #variable{type=undefined}} ->
-            Store0;
         {ok, #variable{type=Type, value=Value}=Variable} ->
             try
                 Merged = case Value of
@@ -180,8 +177,6 @@ is_read_valid(#state{store=Store}, Id, Threshold) ->
         {ok, #variable{value=undefined}} ->
             %% Not bound.
             false;
-        {ok, #variable{type=undefined}} ->
-            true;
         {ok, #variable{value=Value, type=Type}} ->
             case lasp_lattice:threshold_met(Type, Value, Threshold) of
                 true ->

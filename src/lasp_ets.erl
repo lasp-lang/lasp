@@ -380,10 +380,23 @@ next(Id, Store, DeclareNextFun) ->
 %%
 -spec read(id(), value(), store(), pid(), function(), function()) ->
     {ok, type(), value(), id()}.
-read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
+read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
     [{_Key, V=#dv{value=Value,
                   lazy_threads=LazyThreads,
                   type=Type}}] = ets:lookup(Store, Id),
+
+    %% When no threshold is specified, use the bottom value for the
+    %% given lattice.
+    %%
+    Threshold = case Threshold0 of
+        undefined ->
+            Type:new();
+        {strict, undefined} ->
+            {strict, Type:new()};
+        Threshold0 ->
+            Threshold0
+    end,
+
     %% Notify all lazy processes of this read.
     {ok, StillLazy} = reply_to_all(LazyThreads, {ok, Threshold}),
 
@@ -587,10 +600,8 @@ reply_to_all(List, Result) ->
 reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, Type, Value, Next}=Result) ->
-    lager:info("Result: ~p, Read threshold: ~p", [Result, Threshold]),
     StillWaiting = case lasp_lattice:threshold_met(Type, Value, Threshold) of
         true ->
-            lager:info("Read threshold ~p met: ~p", [Threshold, Value]),
             case From of
                 {server, undefined, {Address, Ref}} ->
                     gen_server:reply({Address, Ref}, {ok, Type, Value, Next});
@@ -599,7 +610,6 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
             end,
             StillWaiting0;
         false ->
-            lager:info("Read threshold ~p NOT met: ~p", [Threshold, Value]),
             StillWaiting0 ++ [H]
     end,
     reply_to_all(T, StillWaiting, Result);
@@ -608,7 +618,6 @@ reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
              {ok, ReadThreshold}=Result) ->
     StillWaiting = case lasp_lattice:threshold_met(Type, Threshold, ReadThreshold) of
         true ->
-            lager:info("Wait threshold ~p met: ~p", [Threshold, ReadThreshold]),
             case From of
                 {server, undefined, {Address, Ref}} ->
                     gen_server:reply({Address, Ref}, {ok, ReadThreshold});
@@ -617,7 +626,6 @@ reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
             end,
             StillWaiting0;
         false ->
-            lager:info("Wait threshold ~p NOT met: ~p", [Threshold, ReadThreshold]),
             StillWaiting0 ++ [H]
     end,
     reply_to_all(T, StillWaiting, Result);

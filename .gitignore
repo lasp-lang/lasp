@@ -14,3 +14,4 @@ riak_test/ebin/*.beam
 current_counterexample.eqc
 doc/
 rel/lasp
+dialyzer_warnings

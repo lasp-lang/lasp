@@ -179,7 +179,7 @@ bind(Id, Value, Store) ->
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation(), store()) -> {ok, id(), value()}.
+-spec update(id(), operation(), store()) -> {ok, value(), id()}.
 update(Id, Operation, Store) ->
     NextKeyFun = fun(Type, Next) ->
                         next_key(Next, Type, Store)
@@ -296,6 +296,8 @@ reply_fetch(FromId, FromPid,
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
+-spec update(id(), operation(), store(), function(), function()) ->
+    {ok, value(), id()}.
 update(Id, Operation, Store, NextKeyFun, NotifyFun) ->
     [{_Key, #dv{value=Value0, type=Type}}] = ets:lookup(Store, Id),
     {ok, Value} = Type:update(Operation, undefined, Value0),

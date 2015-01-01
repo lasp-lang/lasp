@@ -44,7 +44,8 @@
 -callback bind_to(id(), value(), store(), function(), pid()) -> any().
 
 -callback bind(id(), value(), store()) -> {ok, id()}.
--callback bind(id(), value(), store(), function(), function()) -> {ok, id()}.
+-callback bind(id(), value(), store(), function(), function()) ->
+    {ok, id()}.
 
 -callback thread(module(), func(), args(), store()) -> {ok, pid()}.
 
@@ -55,7 +56,8 @@
 
 -callback wait_needed(id(), store()) -> {ok, threshold()}.
 -callback wait_needed(id(), threshold(), store()) -> {ok, threshold()}.
--callback wait_needed(id(), threshold(), store(), pid(), function(), function()) -> {ok, threshold()}.
+-callback wait_needed(id(), threshold(), store(), pid(), function(),
+                      function()) -> {ok, threshold()}.
 
 -callback notify_value(id(), value(), store(), function()) -> ok.
 -callback notify_all(function(), list(#dv{}), value()) -> ok.
@@ -68,6 +70,12 @@
     {ok, list(pending_threshold())}.
 
 -callback filter(id(), function(), id(), store()) -> {ok, pid()}.
--callback filter(id(), function(), id(), store(), function(), function()) -> {ok, pid()}.
+-callback filter(id(), function(), id(), store(), function(),
+                 function()) -> {ok, pid()}.
 
--callback fold(store(), id(), function(), id(), fun(), function()) -> {ok, pid()}.
+-callback fold(store(), id(), function(), id(), fun(), function()) ->
+                    {ok, pid()}.
+
+-callback update(id(), operation(), store()) -> {ok, value(), id()}.
+-callback update(id(), operation(), store(), function(), function()) ->
+    {ok, value(), id()}.

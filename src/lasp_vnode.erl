@@ -81,23 +81,18 @@
 %% Extrenal API
 
 register(Preflist, Identity, Module, File) ->
-    lager:info("Register called for module: ~p and file: ~p",
-               [Module, File]),
     riak_core_vnode_master:command(Preflist,
                                    {register, Identity, Module, File},
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
 execute(Preflist, Identity, Module) ->
-    lager:info("Execute called for module: ~p", [Module]),
     riak_core_vnode_master:command(Preflist,
                                    {execute, Identity, Module},
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
 bind(Id, Value) ->
-    lager:info("Bind called by process ~p, value ~p, id: ~p",
-               [self(), Value, Id]),
     [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {bind, Id, Value},

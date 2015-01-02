@@ -23,7 +23,9 @@
 -module(lasp_adcounter_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--compile([export_all]).
+-export([test/0,
+         client/2,
+         server/2]).
 
 -ifdef(TEST).
 
@@ -53,70 +55,63 @@ confirm() ->
 -endif.
 
 test() ->
-    lager:info("Initialize advertisement counters..."),
+    %% Generate advertisement counters.
+
     Generator = fun(_) ->
-            lager:info("Generating advertisement!"),
             {ok, Id} = lasp:declare(riak_dt_gcounter),
             Id
     end,
     Ads = lists:map(Generator, lists:seq(1,5)),
 
-    lager:info("Launching clients..."),
-    Launcher = fun(Id) ->
-            ClientPid = spawn(?MODULE, client, [Id, Ads]),
-            lager:info("Launched client; id: ~p pid: ~p~n", [Id, ClientPid]),
-            ClientPid
-    end,
+    %% Generate a bunch of clients, which will be responsible for
+    %% displaying ads and updating the advertisement counters.
+
+    Launcher = fun(Id) -> spawn(?MODULE, client, [Id, Ads]) end,
     Clients = lists:map(Launcher, lists:seq(1,5)),
 
-    lager:info("Launch a server for each advertisement..."),
-    Server = fun(Ad) ->
-            ServerPid = spawn(?MODULE, server, [Ad, Clients]),
-            lager:info("Launched server; ad: ~p~n", [Ad]),
-            ServerPid
-    end,
-    _Servers = lists:map(Server, Ads),
+    %% Start a server process for each advertisement counter, which will
+    %% track the number of impressions and disable the advertisement
+    %% when it hits the impression limit.
 
-    lager:info("Running advertisements..."),
+    Server = fun(Ad) -> spawn(?MODULE, server, [Ad, Clients]) end,
+    lists:map(Server, Ads),
+
+    %% Begin simulation.
+
     Viewer = fun(_) ->
             Pid = lists:nth(random:uniform(5), Clients),
-            io:format("Running advertisement for pid: ~p~n", [Pid]),
             Pid ! view_ad
     end,
-    _ = lists:map(Viewer, lists:seq(1,50)),
+    lists:map(Viewer, lists:seq(1,50)),
+
     ok.
 
-%% @doc Server functions for the advertisement counter.  After 5 views,
-%       disable the advertisement.
+%% @doc Server functions for the advertisement counter.
 server(Ad, Clients) ->
-    lager:info("Server launched for ad: ~p", [Ad]),
+
+    %% Threshold read on the value of the impression counter being at
+    %% least 5.
     {ok, _, _, _} = lasp:read(Ad, 5),
-    lager:info("Threshold reached; disable ad ~p for all clients!",
-               [Ad]),
-    lists:map(fun(Client) ->
-                %% Tell clients to remove the advertisement.
-                Client ! {remove_ad, Ad}
-        end, Clients),
-    io:format("Advertisement ~p reached display limit!", [Ad]).
+
+    %% Notify all clients to remove the advertisement.
+    lists:map(fun(Client) -> Client ! {remove_ad, Ad} end, Clients).
 
 %% @doc Client process; standard recurisve looping server.
 client(Id, Ads) ->
-    lager:info("Client ~p running; ads: ~p~n", [Id, Ads]),
     receive
-        {active_ads, Pid} ->
-            Pid ! Ads,
-            client(Id, Ads);
         view_ad ->
-            %% Choose an advertisement to display.
-            Ad = hd(Ads),
-            lager:info("Displaying ad: ~p from client: ~p~n", [Ad, Id]),
+            case Ads of
+                [] ->
+                    client(Id, Ads);
+                _ ->
+                    %% Choose an advertisement to display.
+                    Ad = hd(Ads),
 
-            %% Update ad by incrementing value.
-            {ok, _, _} = lasp:update(Ad, increment),
+                    %% Update impression count.
+                    {ok, _, _} = lasp:update(Ad, increment),
 
-            client(Id, tl(Ads) ++ [Ad]);
+                    client(Id, tl(Ads) ++ [Ad])
+            end;
         {remove_ad, Ad} ->
-            %% Remove ad.
-            lager:info("Removing ad: ~p from client: ~p~n", [Ad, Id]),
             client(Id, Ads -- [Ad])
     end.

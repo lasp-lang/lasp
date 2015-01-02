@@ -131,7 +131,8 @@ client(Id, Ads) ->
                 _ ->
                     %% Select a random advertisement from the list of
                     %% active advertisements.
-                    Ad = lists:nth(random:uniform(length(AdList)), AdList),
+                    Ad = lists:nth(random:uniform(length(AdList)),
+                                   AdList),
 
                     %% Increment it.
                     {ok, _, _} = lasp:update(Ad, increment),

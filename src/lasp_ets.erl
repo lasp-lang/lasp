@@ -544,8 +544,6 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                   type=Type,
                   value=Value,
                   lazy_threads=LazyThreads0}}] = ets:lookup(Store, Id),
-    lager:info("Wait needed; id: ~p, value: ~p, threshold: ~p",
-               [Id, Value, Threshold]),
     case lasp_lattice:threshold_met(Type, Value, Threshold) of
         true ->
             ReplyFun(Threshold);

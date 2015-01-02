@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_threshold_read_test).
+-module(lasp_monotonic_read_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([test/0]).

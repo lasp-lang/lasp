@@ -58,7 +58,6 @@ test(Type) ->
     {ok, S1} = lasp:declare(Type),
 
     %% Add elements to initial set and update.
-    {ok, _, _, _} = lasp:read(S1),
     {ok, S1V2, _} = lasp:update(S1, {add_all, [1,2,3]}),
 
     %% Read resulting value.

@@ -523,11 +523,10 @@ bind_to(Id, TheirId, Store, FetchFun, FromPid) ->
 -spec filter(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    FolderFun = fun({Type, {add, Element} = Op}, Acc) ->
+    FolderFun = fun(Element, Acc) ->
             case Function(Element) of
                 true ->
-                    {ok, NewAcc} = Type:update(Op, undefined, Acc),
-                    NewAcc;
+                    Acc ++ [Element];
                 _ ->
                     Acc
             end
@@ -641,12 +640,12 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
     reply_to_all(T, SW, Result);
 reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
              StillWaiting0,
-             {ok, ReadThreshold}=Result) ->
-    SW = case lasp_lattice:threshold_met(Type, Threshold, ReadThreshold) of
+             {ok, RThreshold}=Result) ->
+    SW = case lasp_lattice:threshold_met(Type, Threshold, RThreshold) of
         true ->
             case From of
                 {server, undefined, {Address, Ref}} ->
-                    gen_server:reply({Address, Ref}, {ok, ReadThreshold});
+                    gen_server:reply({Address, Ref}, {ok, RThreshold});
                 _ ->
                     From ! Result
             end,
@@ -671,15 +670,14 @@ reply_to_all([], StillWaiting, _Result) ->
 -spec fold(store(), id(), function(), id(), fun(), function()) ->
                     {ok, pid()}.
 fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
-    Pid = spawn_link(?MODULE, fold_harness, [
-                Variables,
-                Id,
-                Function,
-                AccId,
-                BindFun,
-                ReadFun,
-                undefined,
-                undefined]),
+    Pid = spawn_link(?MODULE, fold_harness, [Variables,
+                                             Id,
+                                             Function,
+                                             AccId,
+                                             BindFun,
+                                             ReadFun,
+                                             undefined,
+                                             undefined]),
     {ok, Pid}.
 
 -spec fold_harness(store(), id(), function(), id(), function(),
@@ -691,12 +689,13 @@ fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
                                    {strict, PreviousValue},
                                    Variables),
 
-    %% Generate operations for given data type.
-    {ok, Operations} = lasp_lattice:generate_operations(Type, Value),
-    lager:info("Operations generated: ~p", [Operations]),
+    %% Generate a delta-CRDT; for now, we will use the entire object as
+    %% the delta for simplicity.  Eventually, replace this with a
+    %% smarter delta generation mechanism.
+    Delta = Value,
 
     %% Build new data structure.
-    AccValue = lists:foldl(Function, Type:new(), Operations),
+    AccValue = lists:foldl(Function, Type:new(), Delta),
 
     %% Update with result.
     {ok, _} = BindFun(AccId, AccValue, Variables),

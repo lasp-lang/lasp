@@ -32,16 +32,7 @@
          is_inflation/3,
          is_lattice_inflation/3,
          is_strict_inflation/3,
-         is_lattice_strict_inflation/3,
-         generate_operations/2]).
-
-%% @doc Given an object type from riak_dt; generate a series of
-%%      operations for that type which are representative of a partial
-%%      order of operations on this object yielding this state.
-%%
-generate_operations(riak_dt_gset, Set) ->
-    Values = riak_dt_gset:value(Set),
-    {ok, [{riak_dt_gset, {add, Value}} || Value <- Values]}.
+         is_lattice_strict_inflation/3]).
 
 %% @doc Determine if a threshold is met.
 %%

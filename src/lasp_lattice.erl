@@ -184,14 +184,18 @@ is_lattice_strict_inflation(riak_dt_orset, [], Current)
   when Current =/= []->
     true;
 is_lattice_strict_inflation(riak_dt_orset, Previous, Current) ->
-    is_lattice_inflation(riak_dt_orset, Previous, Current) andalso
     %% We already know that `Previous' is fully covered in `Current', so
     %% we just need to look for a change -- removal (false -> true), or
     %% addition of a new element.
-        lists:foldl(fun({Element, Ids}, Acc) ->
-                            {_, Ids1} = lists:keyfind(Element, 1, Current),
-                            Acc orelse Ids =/= Ids1
-                    end, false, Previous);
+    IsLatticeInflation = is_lattice_inflation(riak_dt_orset,
+                                              Previous,
+                                              Current),
+    DeletedElements = lists:foldl(fun({Element, Ids}, Acc) ->
+                    {_, Ids1} = lists:keyfind(Element, 1, Current),
+                    Acc orelse Ids =/= Ids1
+                    end, false, Previous),
+    NewElements = length(Previous) < length(Current),
+    IsLatticeInflation andalso (DeletedElements orelse NewElements);
 
 is_lattice_strict_inflation(riak_dt_gcounter, Previous, Current) ->
     %% Massive shortcut here -- get the value and see if it's different.

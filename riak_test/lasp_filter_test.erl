@@ -47,6 +47,9 @@ confirm() ->
     ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6]},
                  rpc:call(Node, ?MODULE, test, [riak_dt_gset])),
 
+    ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6]},
+                 rpc:call(Node, ?MODULE, test, [riak_dt_orset])),
+
     lager:info("Done!"),
 
     pass.
@@ -67,13 +70,16 @@ test(Type) ->
     {ok, S2} = lasp:declare(Type),
 
     %% Apply filter.
-    {ok, _Pid} = lasp:filter(S1, fun(X) -> X rem 2 == 0 end, S2),
+    {ok, _Pid} = lasp:filter(S1, fun(X) ->
+                    lager:info("boooom: ~p", [X]),
+                    X rem 2 == 0
+            end, S2),
 
     %% Wait.
     timer:sleep(4000),
 
     %% Bind again.
-    {ok, _, _} = lasp:update(S1, {add_all, [4,5,6]}),
+    {ok, S1V4, _} = lasp:update(S1, {add_all, [4,5,6]}),
 
     %% Wait.
     timer:sleep(4000),
@@ -84,4 +90,4 @@ test(Type) ->
     %% Read resulting value.
     {ok, _, S2V1, _} = lasp:read(S2),
 
-    {ok, S1V4, S2V1}.
+    {ok, Type:value(S1V4), Type:value(S2V1)}.

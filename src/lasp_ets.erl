@@ -524,7 +524,14 @@ bind_to(Id, TheirId, Store, FetchFun, FromPid) ->
     {ok, pid()}.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     FolderFun = fun(Element, Acc) ->
-            case Function(Element) of
+            Value = case Element of
+                {X, _} ->
+                    X;
+                X ->
+                    X
+            end,
+
+            case Function(Value) of
                 true ->
                     Acc ++ [Element];
                 _ ->

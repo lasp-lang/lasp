@@ -155,7 +155,7 @@ declare(Id, Type, Store) ->
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.
 %%
--spec bind_to(id(), id(), store()) -> {ok, id()} | {error, not_implemented}.
+-spec bind_to(id(), id(), store()) -> {ok, id()}.
 bind_to(Id, TheirId, Store) ->
     FromPid = self(),
     FetchFun = fun(_TheirId, _Id, _FromPid) ->
@@ -338,19 +338,21 @@ update(Id, Operation, Store, NextKeyFun, NotifyFun) ->
 %%      `NotifyFun' is used to notify anything in the binding list that
 %%      an update has occurred.
 %%
--spec bind(id(), value(), store(), function(), function()) -> {ok, id()}.
+-spec bind(id(), value(), store(), function(), function()) ->
+    {ok, id()}.
 bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
-    [{_Key, V=#dv{next=Next,
-                  type=Type}}] = ets:lookup(Store, Id),
+    [{_Key, #dv{next=Next,
+                value=Value0,
+                type=Type}}] = ets:lookup(Store, Id),
     NextKey = NextKeyFun(Type, Next),
-    case V#dv.value of
+    case Value0 of
         Value ->
             {ok, NextKey};
         _ ->
             %% Merge may throw for invalid types.
             try
-                Merged = Type:merge(V#dv.value, Value),
-                case lasp_lattice:is_inflation(Type, V#dv.value, Merged) of
+                Merged = Type:merge(Value0, Value),
+                case lasp_lattice:is_inflation(Type, Value0, Merged) of
                     true ->
                         write(Type, Merged, NextKey, Id, Store,
                               NotifyFun),
@@ -564,7 +566,8 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                 _ ->
                     LazyThreads = case Threshold of
                                     undefined ->
-                                        lists:append(LazyThreads0, [Self]);
+                                        lists:append(LazyThreads0,
+                                                     [Self]);
                                     Threshold ->
                                         lists:append(LazyThreads0,
                                                     [{threshold,
@@ -574,7 +577,8 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                                                       Threshold}])
                     end,
                     true = ets:insert(Store,
-                                      {Id, V#dv{lazy_threads=LazyThreads}}),
+                                      {Id,
+                                       V#dv{lazy_threads=LazyThreads}}),
                     BlockingFun()
             end
     end.
@@ -616,12 +620,13 @@ reply_to_all(List, Result) ->
 %% @doc Given a group of processes which are blocking on reads, notify
 %%      them of bound values or met thresholds.
 %%
--spec reply_to_all(list(pid() | pending_threshold()), list(pending_threshold()),
-                   term()) -> {ok, list(pending_threshold())}.
+-spec reply_to_all(list(pid() | pending_threshold()),
+                   list(pending_threshold()), term()) ->
+    {ok, list(pending_threshold())}.
 reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, Type, Value, Next}=Result) ->
-    StillWaiting = case lasp_lattice:threshold_met(Type, Value, Threshold) of
+    SW = case lasp_lattice:threshold_met(Type, Value, Threshold) of
         true ->
             case From of
                 {server, undefined, {Address, Ref}} ->
@@ -633,11 +638,11 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
         false ->
             StillWaiting0 ++ [H]
     end,
-    reply_to_all(T, StillWaiting, Result);
+    reply_to_all(T, SW, Result);
 reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, ReadThreshold}=Result) ->
-    StillWaiting = case lasp_lattice:threshold_met(Type, Threshold, ReadThreshold) of
+    SW = case lasp_lattice:threshold_met(Type, Threshold, ReadThreshold) of
         true ->
             case From of
                 {server, undefined, {Address, Ref}} ->
@@ -649,7 +654,7 @@ reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
         false ->
             StillWaiting0 ++ [H]
     end,
-    reply_to_all(T, StillWaiting, Result);
+    reply_to_all(T, SW, Result);
 reply_to_all([From|T], StillWaiting, Result) ->
     case From of
         {server, undefined, {Address, Ref}} ->
@@ -663,7 +668,8 @@ reply_to_all([], StillWaiting, _Result) ->
 
 %% Internal functions.
 
--spec fold(store(), id(), function(), id(), fun(), function()) -> {ok, pid()}.
+-spec fold(store(), id(), function(), id(), fun(), function()) ->
+                    {ok, pid()}.
 fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
     Pid = spawn_link(?MODULE, fold_harness, [
                 Variables,
@@ -681,7 +687,9 @@ fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
 fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
              PreviousValue, _PreviousAccValue) ->
     %% Blocking threshold read on source value.
-    {ok, Type, Value, _} = ReadFun(Id, {strict, PreviousValue}, Variables),
+    {ok, Type, Value, _} = ReadFun(Id,
+                                   {strict, PreviousValue},
+                                   Variables),
 
     %% Generate operations for given data type.
     {ok, Operations} = lasp_lattice:generate_operations(Type, Value),
@@ -691,9 +699,10 @@ fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
     AccValue = lists:foldl(Function, Type:new(), Operations),
 
     %% Update with result.
-    BindFun(AccId, AccValue, Variables),
+    {ok, _} = BindFun(AccId, AccValue, Variables),
 
-    fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun, Value, AccValue).
+    fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
+                 Value, AccValue).
 
 %% @doc Send responses to waiting threads, via messages.
 %%
@@ -730,7 +739,9 @@ write(Type, Value, Next, Key, Store, NotifyFun) ->
     [{_Key, #dv{waiting_threads=Threads,
                 binding_list=BindingList,
                 binding=Binding}}] = ets:lookup(Store, Key),
-    {ok, StillWaiting} = reply_to_all(Threads, [], {ok, Type, Value, Next}),
+    {ok, StillWaiting} = reply_to_all(Threads,
+                                      [],
+                                      {ok, Type, Value, Next}),
     V1 = #dv{type=Type,
              value=Value,
              next=Next,

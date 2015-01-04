@@ -81,3 +81,4 @@
     {ok, value(), id()}.
 
 -callback value(id(), store()) -> {ok, value()}.
+-callback type(id(), store()) -> {ok, type()}.

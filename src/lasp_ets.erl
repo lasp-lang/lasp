@@ -36,6 +36,7 @@
          declare/3,
          update/3,
          value/2,
+         type/2,
          thread/4,
          filter/4,
          wait_needed/2,
@@ -199,6 +200,15 @@ update(Id, Operation, Store) ->
 value(Id, Store) ->
     [{_Key, #dv{value=Value, type=Type}}] = ets:lookup(Store, Id),
     {ok, Type:value(Value)}.
+
+%% @doc Get the type of a CRDT.
+%%
+%%      Given an `Id' of a dataflow variable, return the type.
+%%
+-spec type(id(), store()) -> {ok, type()}.
+type(Id, Store) ->
+    [{_Key, #dv{type=Type}}] = ets:lookup(Store, Id),
+    {ok, Type}.
 
 %% @doc Spawn a function.
 %%

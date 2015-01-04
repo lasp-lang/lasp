@@ -27,6 +27,7 @@
          declare/1,
          update/2,
          value/1,
+         type/1,
          bind/2,
          bind/4,
          bind_to/2,
@@ -136,6 +137,14 @@ update(Id, Operation) ->
 -spec value(id()) -> {ok, value()}.
 value(Id) ->
     lasp_vnode:value(Id).
+
+%% @doc Get the type of a CRDT.
+%%
+%%      Given an `Id' of a dataflow variable, return the type.
+%%
+-spec type(id()) -> {ok, type()}.
+type(Id) ->
+    lasp_vnode:type(Id).
 
 %% @doc Bind a dataflow variable to a value.
 %%

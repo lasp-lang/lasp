@@ -37,6 +37,7 @@
          bind_to/2,
          update/2,
          value/1,
+         type/1,
          read/1,
          read/2,
          filter/3,
@@ -115,7 +116,11 @@ value(Id) ->
     riak_core_vnode_master:sync_spawn_command(IndexNode,
                                               {value, Id},
                                               ?VNODE_MASTER).
-
+type(Id) ->
+    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
+    riak_core_vnode_master:sync_spawn_command(IndexNode,
+                                              {type, Id},
+                                              ?VNODE_MASTER).
 read(Id) ->
     read(Id, {strict, undefined}).
 
@@ -288,6 +293,11 @@ handle_command({bind, Id, Value}, _From,
 handle_command({value, Id}, _From,
                State=#state{variables=Variables}) ->
     Result = ?BACKEND:value(Id, Variables),
+    {reply, Result, State};
+
+handle_command({type, Id}, _From,
+               State=#state{variables=Variables}) ->
+    Result = ?BACKEND:type(Id, Variables),
     {reply, Result, State};
 
 handle_command({update, Id, Operation}, _From,

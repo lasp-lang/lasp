@@ -55,9 +55,14 @@ confirm() ->
 
 test() ->
     %% Single-assignment variables.
-    {ok, I1} = lasp:declare(),
-    {ok, I2} = lasp:declare(),
-    {ok, I3} = lasp:declare(),
+    {ok, I1} = lasp:declare(lasp_ivar),
+    {ok, I2} = lasp:declare(lasp_ivar),
+    {ok, I3} = lasp:declare(lasp_ivar),
+
+    %% Check types.
+    {ok, lasp_ivar} = lasp:type(I1),
+    {ok, lasp_ivar} = lasp:type(I2),
+    {ok, lasp_ivar} = lasp:type(I3),
 
     V1 = 1,
 
@@ -78,6 +83,11 @@ test() ->
     {ok, L1} = lasp:declare(riak_dt_gset),
     {ok, L2} = lasp:declare(riak_dt_gset),
     {ok, L3} = lasp:declare(riak_dt_gset),
+
+    %% Check types.
+    {ok, riak_dt_gset} = lasp:type(L1),
+    {ok, riak_dt_gset} = lasp:type(L2),
+    {ok, riak_dt_gset} = lasp:type(L3),
 
     %% Attempt pre, and post- dataflow variable bind operations.
     {ok, _} = lasp:bind_to(L2, L1),

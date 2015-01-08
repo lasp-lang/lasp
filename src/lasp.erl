@@ -72,7 +72,8 @@
 %%      Programs must implement the `lasp_program' behavior to be
 %%      correct.
 %%
--spec register(module(), file(), registration()) -> ok | error.
+-spec register(module(), file(), registration()) ->
+    ok | {error, timeout} | error.
 register(Module, File, preflist) ->
     {ok, ReqId} = lasp_register_fsm:register(Module, File),
     wait_for_reqid(ReqId, ?TIMEOUT);
@@ -93,7 +94,8 @@ register(_Module, _File, _Registration) ->
 %%      `riak_core' to compute a minimal covering set (or specify a `?R'
 %%      value, and contact all nodes, merging the results.
 %%
--spec execute(module(), registration()) -> {ok, result()} | error.
+-spec execute(module(), registration()) ->
+    {ok, result()} | {error, timeout} | error.
 execute(Module, preflist) ->
     {ok, ReqId} = lasp_execute_fsm:execute(Module),
     wait_for_reqid(ReqId, ?TIMEOUT);
@@ -108,7 +110,7 @@ execute(_Module, _Registration) ->
 %%      Valid values for `Type' are any of lattices supporting the
 %%      `riak_dt' behavior.
 %%
--spec declare(type()) -> {ok, id()}.
+-spec declare(type()) -> {ok, id()} | {error, timeout}.
 declare(Type) ->
     Id = druuid:v4(),
     declare(Id, Type).
@@ -172,7 +174,7 @@ bind(Id, Module, Function, Args) ->
 %%      Block until the variable identified by `Id' has been bound and
 %%      then return the value.
 %%
--spec read(id()) -> {ok, {type(), value(), id()}}.
+-spec read(id()) -> {ok, {type(), value(), id()}} | {error, timeout}.
 read(Id) ->
     read(Id, {strict, undefined}).
 
@@ -182,9 +184,11 @@ read(Id) ->
 %%      is monotonically greater (as defined by the lattice) then the
 %%      provided `Threshold' value.
 %%
--spec read(id(), threshold()) -> {ok, {type(), value(), id()}}.
+-spec read(id(), threshold()) ->
+    {ok, {type(), value(), id()}} | {error, timeout}.
 read(Id, Threshold) ->
-    lasp_vnode:read(Id, Threshold).
+    {ok, ReqId} = lasp_read_fsm:read(Id, Threshold),
+    wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -192,16 +196,17 @@ read(Id, Threshold) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec filter(id(), function(), id()) -> {ok, pid()}.
+-spec filter(id(), function(), id()) -> {ok, pid()} | {error, timeout}.
 filter(Id, Function, AccId) ->
-    lasp_vnode:filter(Id, Function, AccId).
+    {ok, ReqId} = lasp_filter_fsm:filter(Id, Function, AccId),
+    wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Produce a value in a stream.
 %%
 %%      Given the `Id' of a declared value in a dataflow variable
 %%      stream, bind `Value' to it.  Similar to {@link bind/2}.
 %%
--spec produce(id(), value()) -> {ok, id()}.
+-spec produce(id(), value()) -> {ok, id()} | {error, timeout}.
 produce(Id, Value) ->
     bind(Id, Value).
 
@@ -211,7 +216,8 @@ produce(Id, Value) ->
 %%      stream, bind the result of `Module:Function(Args)' to it.
 %%      Similar to {@link produce/2}.
 %%
--spec produce(id(), module(), func(), args()) -> {ok, id()}.
+-spec produce(id(), module(), func(), args()) ->
+    {ok, id()} | {error, timeout}.
 produce(Id, Module, Function, Args) ->
     bind(Id, Module:Function(Args)).
 
@@ -220,7 +226,8 @@ produce(Id, Module, Function, Args) ->
 %%      Given the `Id' of a declared variable in a dataflow stream, read
 %%      the next value in the stream.
 %%
--spec consume(id()) -> {ok, {type(), value(), id()}}.
+-spec consume(id()) ->
+    {ok, {type(), value(), id()}} | {error, timeout}.
 consume(Id) ->
     read(Id, {strict, undefined}).
 
@@ -229,17 +236,19 @@ consume(Id) ->
 %%      Given `Id', return the next identifier needed to build a stream
 %%      after this variable.
 %%
--spec extend(id()) -> id().
+-spec extend(id()) -> {ok, id()} | {error, timeout}.
 extend(Id) ->
-    lasp_vnode:next(Id).
+    {ok, ReqId} = lasp_next_fsm:next(Id),
+    wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Spawn a function.
 %%
 %%      Spawn a process executing `Module:Function(Args)'.
 %%
--spec thread(module(), func(), args()) -> {ok, pid()}.
+-spec thread(module(), func(), args()) -> {ok, pid()} | {error, timeout}.
 thread(Module, Function, Args) ->
-    lasp_vnode:thread(Module, Function, Args).
+    {ok, ReqId} = lasp_thread_fsm:thread(Module, Function, Args),
+    wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Pause execution until value requested.
 %%
@@ -247,7 +256,7 @@ thread(Module, Function, Args) ->
 %%      issued for the given `Id'.  Used to introduce laziness into a
 %%      computation.
 %%
--spec wait_needed(id()) -> ok.
+-spec wait_needed(id()) -> ok | {error, timeout}.
 wait_needed(Id) ->
     wait_needed(Id, {strict, undefined}).
 
@@ -257,9 +266,10 @@ wait_needed(Id) ->
 %%      issued for the given `Id'.  Used to introduce laziness into a
 %%      computation.
 %%
--spec wait_needed(id(), threshold()) -> ok.
+-spec wait_needed(id(), threshold()) -> ok | {error, timeout}.
 wait_needed(Id, Threshold) ->
-    lasp_vnode:wait_needed(Id, Threshold).
+    {ok, ReqId} = lasp_wait_needed_fsm:wait_needed(Id, Threshold),
+    wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Spawn monitor.
 %%

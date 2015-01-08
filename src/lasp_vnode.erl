@@ -36,14 +36,12 @@
 -export([bind/4,
          bind_to/4,
          update/4,
-         read/1,
-         read/2,
-         filter/3,
-         next/1,
-         wait_needed/1,
-         wait_needed/2,
+         read/4,
+         filter/5,
+         next/3,
+         wait_needed/4,
          declare/4,
-         thread/3]).
+         thread/5]).
 
 %% Program execution functions.
 -export([register/4,
@@ -109,42 +107,42 @@ update(Preflist, Identity, Id, Operation) ->
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
-read(Id) ->
-    read(Id, {strict, undefined}).
+read(Preflist, Identity, Id, Threshold) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {read, Identity, Id, Threshold},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
-read(Id, Threshold) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {read, Id, Threshold},
-                                              ?VNODE_MASTER).
+filter(Preflist, Identity, Id, Function, AccId) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {filter, Identity, Id, Function, AccId},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
-filter(Id, Function, AccId) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, AccId, lasp),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {filter,
-                                               Id, Function, AccId},
-                                              ?VNODE_MASTER).
+thread(Preflist, Identity, Module, Function, Args) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {thread, Identity, Module, Function, Args},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
-thread(Module, Function, Args) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N,
-                                         {Module, Function, Args},
-                                         lasp),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {thread,
-                                               Module, Function, Args},
-                                              ?VNODE_MASTER).
-
-next(Id) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {next, Id},
-                                              ?VNODE_MASTER).
+next(Preflist, Identity, Id) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {next, Identity, Id},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
 declare(Preflist, Identity, Id, Type) ->
     riak_core_vnode_master:command(Preflist,
                                    {declare, Identity, Id, Type},
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
+
+wait_needed(Preflist, Identity, Id, Threshold) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {wait_needed, Identity, Id, Threshold},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
+
 
 fetch(Id, FromId, FromPid, ReqId) ->
     [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
@@ -163,15 +161,6 @@ notify_value(Id, Value) ->
     riak_core_vnode_master:command(IndexNode,
                                    {notify_value, Id, Value},
                                    ?VNODE_MASTER).
-
-wait_needed(Id) ->
-    wait_needed(Id, undefined).
-
-wait_needed(Id, Threshold) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {wait_needed, Id, Threshold},
-                                              ?VNODE_MASTER).
 
 %% API
 start_vnode(I) ->
@@ -332,27 +321,27 @@ handle_command({notify_value, Id, Value}, _From,
     ?BACKEND:notify_value(Id, Value, Variables, NotifyFun),
     {noreply, State};
 
-handle_command({thread, Module, Function, Args}, _From,
+handle_command({thread, {ReqId, _}, Module, Function, Args}, _From,
                #state{variables=Variables}=State) ->
     {ok, Pid} = ?BACKEND:thread(Module, Function, Args, Variables),
-    {reply, {ok, Pid}, State};
+    {reply, {ok, ReqId, Pid}, State};
 
-handle_command({wait_needed, Id, Threshold}, From,
+handle_command({wait_needed, {ReqId, _}, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
     Self = From,
     ReplyFun = fun(ReadThreshold) ->
-                       {reply, {ok, ReadThreshold}, State}
+                       {reply, {ok, ReqId, ReadThreshold}, State}
                end,
     BlockingFun = fun() ->
                         {noreply, State}
                   end,
     ?BACKEND:wait_needed(Id, Threshold, Variables, Self, ReplyFun, BlockingFun);
 
-handle_command({read, Id, Threshold}, From,
+handle_command({read, {ReqId, _}, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
     Self = From,
     ReplyFun = fun(Type, Value, Next) ->
-            {reply, {ok, {Type, Value, Next}}, State}
+            {reply, {ok, ReqId, {Type, Value, Next}}, State}
             end,
     BlockingFun = fun() ->
             {noreply, State}
@@ -364,7 +353,7 @@ handle_command({read, Id, Threshold}, From,
                   ReplyFun,
                   BlockingFun);
 
-handle_command({filter, Id, Function, AccId}, _From,
+handle_command({filter, {ReqId, _}, Id, Function, AccId}, _From,
                State=#state{variables=Variables,
                             partition=Partition,
                             node=Node}) ->
@@ -393,24 +382,20 @@ handle_command({filter, Id, Function, AccId}, _From,
                     ?BACKEND:read(_Id, _Threshold, _Variables);
                 _ ->
                     %% We're remote, go through all of the routing logic.
-                    ?MODULE:read(_Id, _Threshold)
+                    lasp:read(_Id, _Threshold)
             end
     end,
-    Result = ?BACKEND:filter(Id,
-                             Function,
-                             AccId,
-                             Variables,
-                             BindFun,
-                             ReadFun),
-    {reply, Result, State};
+    {ok, Result} = ?BACKEND:filter(Id, Function, AccId, Variables,
+                                   BindFun, ReadFun),
+    {reply, {ok, ReqId, Result}, State};
 
-handle_command({next, Id}, _From,
+handle_command({next, {ReqId, _}, Id}, _From,
                State=#state{variables=Variables}) ->
     DeclareNextFun = fun(Type) ->
                             declare_next(Type, State)
                      end,
-    Result = ?BACKEND:next(Id, Variables, DeclareNextFun),
-    {reply, Result, State};
+    {ok, Result} = ?BACKEND:next(Id, Variables, DeclareNextFun),
+    {reply, {ok, ReqId, Result}, State};
 
 handle_command(_Message, _Sender, State) ->
     {noreply, State}.

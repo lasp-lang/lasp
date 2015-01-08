@@ -48,6 +48,22 @@ init(_Args) ->
                   {lasp_declare_fsm_sup, start_link, []},
                    permanent, infinity, supervisor, [lasp_declare_fsm_sup]},
 
+    ThreadFSM = {lasp_thread_fsm_sup,
+                 {lasp_thread_fsm_sup, start_link, []},
+                  permanent, infinity, supervisor, [lasp_thread_fsm_sup]},
+
+    NextFSM = {lasp_next_fsm_sup,
+               {lasp_next_fsm_sup, start_link, []},
+                permanent, infinity, supervisor, [lasp_next_fsm_sup]},
+
+    FilterFSM = {lasp_filter_fsm_sup,
+                 {lasp_filter_fsm_sup, start_link, []},
+                  permanent, infinity, supervisor, [lasp_filter_fsm_sup]},
+
+    ReadFSM = {lasp_read_fsm_sup,
+               {lasp_read_fsm_sup, start_link, []},
+                permanent, infinity, supervisor, [lasp_read_fsm_sup]},
+
     UpdateFSM = {lasp_update_fsm_sup,
                  {lasp_update_fsm_sup, start_link, []},
                   permanent, infinity, supervisor, [lasp_update_fsm_sup]},
@@ -59,6 +75,10 @@ init(_Args) ->
     BindToFSM = {lasp_bind_to_fsm_sup,
                {lasp_bind_to_fsm_sup, start_link, []},
                 permanent, infinity, supervisor, [lasp_bind_to_fsm_sup]},
+
+    WaitNeededFSM = {lasp_wait_needed_fsm_sup,
+                     {lasp_wait_needed_fsm_sup, start_link, []},
+                      permanent, infinity, supervisor, [lasp_wait_needed_fsm_sup]},
 
     RegisterFSM = {lasp_register_fsm_sup,
                    {lasp_register_fsm_sup, start_link, []},
@@ -78,9 +98,14 @@ init(_Args) ->
 
     {ok, {{one_for_one, 5, 10}, [VMaster,
                                  DeclareFSM,
+                                 ThreadFSM,
+                                 NextFSM,
+                                 FilterFSM,
+                                 ReadFSM,
                                  UpdateFSM,
                                  BindFSM,
                                  BindToFSM,
+                                 WaitNeededFSM,
                                  RegisterFSM,
                                  RegisterGlobalFSM,
                                  ExecuteFSM,

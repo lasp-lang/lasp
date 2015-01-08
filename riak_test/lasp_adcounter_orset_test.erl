@@ -123,7 +123,7 @@ client(Id, Ads) ->
     receive
         view_ad ->
             %% Get current ad list.
-            {ok, _, AdList0, _} = lasp:read(Ads),
+            {ok, {_, AdList0, _}} = lasp:read(Ads),
             AdList = riak_dt_orset:value(AdList0),
 
             case length(AdList) of

@@ -637,6 +637,8 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
             case From of
                 {server, undefined, {Address, Ref}} ->
                     gen_server:reply({Address, Ref}, {ok, {Type, Value, Next}});
+                {fsm, undefined, Address} ->
+                    gen_fsm:send_event(Address, {ok, undefined, {Type, Value, Next}});
                 _ ->
                     From ! Result
             end,
@@ -653,6 +655,8 @@ reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
             case From of
                 {server, undefined, {Address, Ref}} ->
                     gen_server:reply({Address, Ref}, {ok, RThreshold});
+                {fsm, undefined, Address} ->
+                    gen_fsm:send_event(Address, {ok, undefined, RThreshold});
                 _ ->
                     From ! Result
             end,

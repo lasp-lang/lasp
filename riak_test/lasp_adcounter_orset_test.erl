@@ -24,7 +24,7 @@
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([test/0,
-         client/2,
+         client/3,
          server/2]).
 
 -ifdef(TEST).
@@ -71,7 +71,7 @@ test() ->
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
     lists:foldl(fun(Id, _Clients) ->
-                ClientPid = spawn(?MODULE, client, [Id, Ads]),
+                ClientPid = spawn(?MODULE, client, [Id, Ads, undefined]),
                 {ok, _} = lasp:update(Clients, {add, ClientPid}),
                 Clients
                 end, Clients, lists:seq(1,5)),
@@ -104,7 +104,7 @@ test() ->
             Pid = lists:nth(random:uniform(5), ClientList),
             Pid ! view_ad
     end,
-    lists:map(Viewer, lists:seq(1,50)),
+    lists:map(Viewer, lists:seq(1,200)),
 
     ok.
 
@@ -116,21 +116,23 @@ server(Ad, Ads) ->
     {ok, {_, _, _}} = lasp:read(Ad, 5),
 
     %% Remove the advertisement.
-    {ok, _} = lasp:update(Ads, {remove, Ad}).
+    {ok, _} = lasp:update(Ads, {remove, Ad}),
+
+    lager:info("Removing ad: ~p", [Ad]).
 
 %% @doc Client process; standard recurisve looping server.
-client(Id, Ads) ->
+client(Id, Ads, PreviousValue) ->
     receive
         view_ad ->
             %% Get current ad list.
-            {ok, {_, AdList0, _}} = lasp:read(Ads),
+            {ok, {_, AdList0, _}} = lasp:read(Ads, PreviousValue),
             AdList = riak_dt_orset:value(AdList0),
 
             case length(AdList) of
                 0 ->
                     %% No advertisements left to display; ignore
                     %% message.
-                    client(Id, Ads);
+                    client(Id, Ads, AdList0);
                 _ ->
                     %% Select a random advertisement from the list of
                     %% active advertisements.
@@ -139,7 +141,8 @@ client(Id, Ads) ->
 
                     %% Increment it.
                     {ok, _} = lasp:update(Ad, increment),
+                    lager:info("Incremented ad counter: ~p", [Ad]),
 
-                    client(Id, Ads)
+                    client(Id, Ads, AdList0)
             end
     end.

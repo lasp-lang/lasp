@@ -48,6 +48,18 @@ init(_Args) ->
                   {lasp_declare_fsm_sup, start_link, []},
                    permanent, infinity, supervisor, [lasp_declare_fsm_sup]},
 
+    UpdateFSM = {lasp_update_fsm_sup,
+                 {lasp_update_fsm_sup, start_link, []},
+                  permanent, infinity, supervisor, [lasp_update_fsm_sup]},
+
+    BindFSM = {lasp_bind_fsm_sup,
+               {lasp_bind_fsm_sup, start_link, []},
+                permanent, infinity, supervisor, [lasp_bind_fsm_sup]},
+
+    BindToFSM = {lasp_bind_to_fsm_sup,
+               {lasp_bind_to_fsm_sup, start_link, []},
+                permanent, infinity, supervisor, [lasp_bind_to_fsm_sup]},
+
     RegisterFSM = {lasp_register_fsm_sup,
                    {lasp_register_fsm_sup, start_link, []},
                     permanent, infinity, supervisor, [lasp_register_fsm_sup]},
@@ -66,6 +78,9 @@ init(_Args) ->
 
     {ok, {{one_for_one, 5, 10}, [VMaster,
                                  DeclareFSM,
+                                 UpdateFSM,
+                                 BindFSM,
+                                 BindToFSM,
                                  RegisterFSM,
                                  RegisterGlobalFSM,
                                  ExecuteFSM,

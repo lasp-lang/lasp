@@ -108,7 +108,7 @@ client(Id, Ads) ->
                     Ad = hd(Ads),
 
                     %% Update impression count.
-                    {ok, _, _} = lasp:update(Ad, increment),
+                    {ok, {_, _}} = lasp:update(Ad, increment),
 
                     client(Id, tl(Ads) ++ [Ad])
             end;

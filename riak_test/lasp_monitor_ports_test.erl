@@ -56,12 +56,12 @@ confirm() ->
 -endif.
 
 test()->
-    {ok, S1} = lasp:declare(),
+    {ok, S1} = lasp:declare(lasp_ivar),
     Port = spawn(?MODULE, run_port ,[S1]),
     spawn(?MODULE, sensor, [Port, dc_1]),
     spawn(?MODULE, sensor, [Port, dc_2]),
     spawn(?MODULE, sensor, [Port, dc_3]),
-    {ok, S2} = lasp:declare(),
+    {ok, S2} = lasp:declare(lasp_ivar),
     spawn(?MODULE, dcs_monitor, [S1, S2, []]).
 
 run_port(Stream) ->

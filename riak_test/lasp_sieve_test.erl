@@ -56,18 +56,18 @@ confirm() ->
 -endif.
 
 test(Max) ->
-    {ok, S1} = lasp:declare(),
+    {ok, S1} = lasp:declare(lasp_ivar),
     spawn(lasp_sieve_test, generate, [2, Max, S1]),
-    {ok, S2} = lasp:declare(),
+    {ok, S2} = lasp:declare(lasp_ivar),
     spawn(lasp_sieve_test, sieve, [S1, S2]),
     lasp:get_stream(S2).
 
 sieve(S1, S2) ->
     case lasp:consume(S1) of
-        {ok, _, nil, _} ->
+        {ok, {_, nil, _}} ->
             lasp:bind(S2, nil);
-        {ok, _, Value, Next} ->
-            {ok, SN} = lasp:declare(),
+        {ok, {_, Value, Next}} ->
+            {ok, SN} = lasp:declare(lasp_ivar),
             spawn(lasp_sieve_test, filter, [Next, fun(Y) -> Y rem Value =/= 0 end, SN]),
             {ok, NextOutput} = lasp:produce(S2, Value),
             sieve(SN, NextOutput)
@@ -75,9 +75,9 @@ sieve(S1, S2) ->
 
 filter(S1, F, S2) ->
     case lasp:consume(S1) of
-        {ok, _, nil, _} ->
+        {ok, {_, nil, _}} ->
             lasp:bind(S2, nil);
-        {ok, _, Value, Next} ->
+        {ok, {_, Value, Next}} ->
             case F(Value) of
                 false ->
                     filter(Next, F, S2);

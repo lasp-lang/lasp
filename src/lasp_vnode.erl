@@ -33,18 +33,16 @@
 -define(VNODE_MASTER, lasp_vnode_master).
 
 %% Language execution primitives.
--export([bind/2,
-         bind_to/2,
-         update/2,
-         value/1,
-         type/1,
+-export([bind/4,
+         bind_to/4,
+         update/4,
          read/1,
          read/2,
          filter/3,
          next/1,
          wait_needed/1,
          wait_needed/2,
-         declare/2,
+         declare/4,
          thread/3]).
 
 %% Program execution functions.
@@ -53,9 +51,9 @@
 
 %% Callbacks from the backend module.
 -export([notify_value/2,
-         fetch/3,
+         fetch/4,
          next_key/3,
-         reply_fetch/3]).
+         reply_fetch/4]).
 
 -export([start_vnode/1,
          init/1,
@@ -93,34 +91,24 @@ execute(Preflist, Identity, Module) ->
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
-bind(Id, Value) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {bind, Id, Value},
-                                              ?VNODE_MASTER).
+bind(Preflist, Identity, Id, Value) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {bind, Identity, Id, Value},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
-bind_to(Id, TheirId) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {bind_to, Id, TheirId},
-                                              ?VNODE_MASTER).
+bind_to(Preflist, Identity, Id, TheirId) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {bind_to, Identity, Id, TheirId},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
-update(Id, Operation) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {update, Id, Operation},
-                                              ?VNODE_MASTER).
+update(Preflist, Identity, Id, Operation) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {update, Identity, Id, Operation},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
 
-value(Id) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {value, Id},
-                                              ?VNODE_MASTER).
-type(Id) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {type, Id},
-                                              ?VNODE_MASTER).
 read(Id) ->
     read(Id, {strict, undefined}).
 
@@ -152,22 +140,22 @@ next(Id) ->
                                               {next, Id},
                                               ?VNODE_MASTER).
 
-declare(Id, Type) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:sync_spawn_command(IndexNode,
-                                              {declare, Id, Type},
-                                              ?VNODE_MASTER).
-
-fetch(Id, FromId, FromPid) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:command(IndexNode,
-                                   {fetch, Id, FromId, FromPid},
+declare(Preflist, Identity, Id, Type) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {declare, Identity, Id, Type},
+                                   {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
-reply_fetch(Id, FromPid, DV) ->
+fetch(Id, FromId, FromPid, ReqId) ->
     [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
     riak_core_vnode_master:command(IndexNode,
-                                   {reply_fetch, Id, FromPid, DV},
+                                   {fetch, Id, FromId, FromPid, ReqId},
+                                   ?VNODE_MASTER).
+
+reply_fetch(Id, FromPid, ReqId, DV) ->
+    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
+    riak_core_vnode_master:command(IndexNode,
+                                   {reply_fetch, Id, FromPid, ReqId, DV},
                                    ?VNODE_MASTER).
 
 notify_value(Id, Value) ->
@@ -266,20 +254,20 @@ handle_command({register, {ReqId, _}, Module0, File}, _From,
 
 %% Language handling.
 
-handle_command({declare, Id, Type}, _From,
+handle_command({declare, {ReqId, _}, Id, Type}, _From,
                #state{variables=Variables}=State) ->
     {ok, Id} = ?BACKEND:declare(Id, Type, Variables),
-    {reply, {ok, Id}, State};
+    {reply, {ok, ReqId, Id}, State};
 
-handle_command({bind_to, Id, DVId}, FromPid,
+handle_command({bind_to, {ReqId, _}, Id, DVId}, FromPid,
                State=#state{variables=Variables}) ->
     FetchFun = fun(_TargetId, _FromId, _FromPid) ->
-            ?MODULE:fetch(_TargetId, _FromId, _FromPid)
+            ?MODULE:fetch(_TargetId, _FromId, _FromPid, ReqId)
     end,
     ?BACKEND:bind_to(Id, DVId, Variables, FetchFun, FromPid),
     {noreply, State};
 
-handle_command({bind, Id, Value}, _From,
+handle_command({bind, {ReqId, _}, Id, Value}, _From,
                State=#state{variables=Variables}) ->
     NextKeyFun = fun(Type, Next) ->
                         next_key(Next, Type, State)
@@ -287,20 +275,11 @@ handle_command({bind, Id, Value}, _From,
     NotifyFun = fun(_Id, NewValue) ->
                         ?MODULE:notify_value(_Id, NewValue)
                 end,
-    Result = ?BACKEND:bind(Id, Value, Variables, NextKeyFun, NotifyFun),
-    {reply, Result, State};
+    {ok, Result} = ?BACKEND:bind(Id, Value, Variables, NextKeyFun,
+                                 NotifyFun),
+    {reply, {ok, ReqId, Result}, State};
 
-handle_command({value, Id}, _From,
-               State=#state{variables=Variables}) ->
-    Result = ?BACKEND:value(Id, Variables),
-    {reply, Result, State};
-
-handle_command({type, Id}, _From,
-               State=#state{variables=Variables}) ->
-    Result = ?BACKEND:type(Id, Variables),
-    {reply, Result, State};
-
-handle_command({update, Id, Operation}, _From,
+handle_command({update, {ReqId, _}, Id, Operation}, _From,
                State=#state{variables=Variables}) ->
     NextKeyFun = fun(Type, Next) ->
                         next_key(Next, Type, State)
@@ -308,19 +287,20 @@ handle_command({update, Id, Operation}, _From,
     NotifyFun = fun(_Id, NewValue) ->
                         ?MODULE:notify_value(_Id, NewValue)
                 end,
-    Result = ?BACKEND:update(Id, Operation, Variables, NextKeyFun, NotifyFun),
-    {reply, Result, State};
+    {ok, Result} = ?BACKEND:update(Id, Operation, Variables, NextKeyFun,
+                                   NotifyFun),
+    {reply, {ok, ReqId, Result}, State};
 
-handle_command({fetch, TargetId, FromId, FromPid}, _From,
+handle_command({fetch, TargetId, FromId, FromPid, ReqId}, _From,
                State=#state{variables=Variables}) ->
     ResponseFun = fun() ->
             {noreply, State}
     end,
     FetchFun = fun(_TargetId, _FromId, _FromPid) ->
-            ?MODULE:fetch(_TargetId, _FromId, _FromPid)
+            ?MODULE:fetch(_TargetId, _FromId, _FromPid, ReqId)
     end,
     ReplyFetchFun = fun(_FromId, _FromPid, DV) ->
-            ?MODULE:reply_fetch(_FromId, _FromPid, DV)
+            ?MODULE:reply_fetch(_FromId, _FromPid, ReqId, DV)
     end,
     NextKeyFun = fun(Next, Type) ->
             ?MODULE:next_key(Next, Type, State)
@@ -334,14 +314,14 @@ handle_command({fetch, TargetId, FromId, FromPid}, _From,
                    ReplyFetchFun,
                    NextKeyFun);
 
-handle_command({reply_fetch, FromId, FromPid,
+handle_command({reply_fetch, FromId, FromPid, ReqId,
                 #dv{value=Value, next=Next, type=Type}}, _From,
                State=#state{variables=Variables}) ->
     NotifyFun = fun(Id, NewValue) ->
                         ?MODULE:notify_value(Id, NewValue)
                 end,
     ?BACKEND:write(Type, Value, Next, FromId, Variables, NotifyFun),
-    {ok, _} = ?BACKEND:reply_to_all([FromPid], {ok, Next}),
+    {ok, _} = ?BACKEND:reply_to_all([FromPid], {ok, ReqId, Next}),
     {noreply, State};
 
 handle_command({notify_value, Id, Value}, _From,
@@ -372,11 +352,11 @@ handle_command({read, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
     Self = From,
     ReplyFun = fun(Type, Value, Next) ->
-                       {reply, {ok, Type, Value, Next}, State}
-               end,
+            {reply, {ok, {Type, Value, Next}}, State}
+            end,
     BlockingFun = fun() ->
-                        {noreply, State}
-                  end,
+            {noreply, State}
+            end,
     ?BACKEND:read(Id,
                   Threshold,
                   Variables,
@@ -399,7 +379,7 @@ handle_command({filter, Id, Function, AccId}, _From,
                     ?BACKEND:bind(_AccId, AccValue, _Variables);
                 _ ->
                     %% We're remote, go through all of the routing logic.
-                    ?MODULE:bind(_AccId, AccValue)
+                    lasp:bind(_AccId, AccValue)
             end
     end,
     ReadFun = fun(_Id, _Threshold, _Variables) ->
@@ -510,7 +490,7 @@ declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) 
             ?BACKEND:declare(Id, Type, Variables);
         _ ->
             %% We're remote, go through all of the routing logic.
-            ?MODULE:declare(Id, Type)
+            lasp:declare(Id, Type)
     end.
 
 %% Internal program execution functions.

@@ -54,9 +54,9 @@ confirm() ->
 -endif.
 
 test() ->
-    {ok, S1} = lasp:declare(),
+    {ok, S1} = lasp:declare(lasp_ivar),
     spawn(lasp_producer_consumer_test, producer, [0, 10, S1]),
-    {ok, S2} = lasp:declare(),
+    {ok, S2} = lasp:declare(lasp_ivar),
     spawn(lasp_producer_consumer_test, consumer, [S1, fun(X) -> X + 5 end, S2]),
     lasp:get_stream(S2).
 
@@ -72,9 +72,9 @@ producer(Init, N, Output) ->
 
 consumer(S1, F, S2) ->
     case lasp:consume(S1) of
-        {ok, _, nil, _} ->
+        {ok, {_, nil, _}} ->
             lasp:bind(S2, nil);
-        {ok, _, Value, Next} ->
+        {ok, {_, Value, Next}} ->
             {ok, NextOutput} = lasp:produce(S2, F(Value)),
             consumer(Next, F, NextOutput)
     end.

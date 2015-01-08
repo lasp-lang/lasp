@@ -60,7 +60,7 @@ test() ->
     Map = [{?MODULE, word_count_map}],
     Reduce = [{?MODULE, word_count_reduce}],
     Input = [[[haha,good,bad], [stupid,good,bold], [stupid,good,good]]],
-    {ok, Output} = lasp:declare(),
+    {ok, Output} = lasp:declare(lasp_ivar),
     Supervisor = spawn(?MODULE, supervisor, [dict:new()]),
     jobtracker(Supervisor, Map, Reduce, Input, [Output]),
     lasp:get_stream(Output).
@@ -83,7 +83,7 @@ jobtracker(Supervisor, MapTasks, ReduceTasks, Inputs, Outputs) ->
 spawnmap(Supervisor, Inputs, Mod, Fun, Outputs) ->
     case Inputs of
         [H|T] ->
-            {ok, S} = lasp:declare(),
+            {ok, S} = lasp:declare(lasp_ivar),
             lasp:spawn_mon(Supervisor, Mod, Fun, [H, S]),
             spawnmap(Supervisor, T, Mod, Fun, lists:append(Outputs,[S]));
         [] ->
@@ -145,9 +145,9 @@ word_count_reduce(Input, Tempout, Output) ->
 
 loop(Elem, Output) ->
     case lasp:consume(Elem) of
-        {ok, _, nil, _} ->
+        {ok, {_, nil, _}} ->
             Output;
-        {ok, _, Value, Next} ->
+        {ok, {_, Value, Next}} ->
             case lists:keysearch(Value, 1, Output) of
                 {value, {_, Count}} ->
                     NewOutput = lists:keyreplace(Value, 1, Output,

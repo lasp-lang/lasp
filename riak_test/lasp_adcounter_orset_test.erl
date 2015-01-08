@@ -61,7 +61,7 @@ test() ->
     %% Build an advertisement counter, and add it to the set.
     lists:foldl(fun(_, _Ads) ->
                 {ok, Id} = lasp:declare(riak_dt_gcounter),
-                {ok, _, _} = lasp:update(Ads, {add, Id}),
+                {ok, _} = lasp:update(Ads, {add, Id}),
                 Ads
                 end, Ads, lists:seq(1,5)),
 
@@ -72,7 +72,7 @@ test() ->
     %% from the variable store.
     lists:foldl(fun(Id, _Clients) ->
                 ClientPid = spawn(?MODULE, client, [Id, Ads]),
-                {ok, _, _} = lasp:update(Clients, {add, ClientPid}),
+                {ok, _} = lasp:update(Clients, {add, ClientPid}),
                 Clients
                 end, Clients, lists:seq(1,5)),
 
@@ -83,20 +83,22 @@ test() ->
     {ok, Servers} = lasp:declare(riak_dt_orset),
 
     %% Get the current advertisement list.
-    {ok, AdList} = lasp:value(Ads),
+    {ok, {_, AdList0, _}} = lasp:read(Ads),
+    AdList = riak_dt_orset:value(AdList0),
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
     lists:foldl(fun(Ad, _Servers) ->
                 ServerPid = spawn(?MODULE, server, [Ad, Ads]),
-                {ok, _, _} = lasp:update(Servers, {add, ServerPid}),
+                {ok, _} = lasp:update(Servers, {add, ServerPid}),
                 Servers
                 end, Servers, AdList),
 
     %% Start the client simulation.
 
     %% Get client list.
-    {ok, ClientList} = lasp:value(Clients),
+    {ok, {_, ClientList0, _}} = lasp:read(Clients),
+    ClientList = riak_dt_orset:value(ClientList0),
 
     Viewer = fun(_) ->
             Pid = lists:nth(random:uniform(5), ClientList),
@@ -111,17 +113,18 @@ test() ->
 %%
 server(Ad, Ads) ->
     %% Blocking threshold read for 5 advertisement impressions.
-    {ok, _, _, _} = lasp:read(Ad, 5),
+    {ok, {_, _, _}} = lasp:read(Ad, 5),
 
     %% Remove the advertisement.
-    {ok, _, _} = lasp:update(Ads, {remove, Ad}).
+    {ok, _} = lasp:update(Ads, {remove, Ad}).
 
 %% @doc Client process; standard recurisve looping server.
 client(Id, Ads) ->
     receive
         view_ad ->
             %% Get current ad list.
-            {ok, AdList} = lasp:value(Ads),
+            {ok, _, AdList0, _} = lasp:read(Ads),
+            AdList = riak_dt_orset:value(AdList0),
 
             case length(AdList) of
                 0 ->
@@ -135,7 +138,7 @@ client(Id, Ads) ->
                                    AdList),
 
                     %% Increment it.
-                    {ok, _, _} = lasp:update(Ad, increment),
+                    {ok, _} = lasp:update(Ad, increment),
 
                     client(Id, Ads)
             end

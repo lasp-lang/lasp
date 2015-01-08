@@ -23,11 +23,9 @@
 -include("lasp.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
--export([declare/0,
-         declare/1,
+-export([declare/1,
+         declare/2,
          update/2,
-         value/1,
-         type/1,
          bind/2,
          bind/4,
          bind_to/2,
@@ -105,11 +103,6 @@ execute(Module, global) ->
 execute(_Module, _Registration) ->
     error.
 
-%% @doc Declare a new single-assignment dataflow variable.
--spec declare() -> {ok, id()}.
-declare() ->
-    declare(lasp_ivar).
-
 %% @doc Declare a new dataflow variable of a given type.
 %%
 %%      Valid values for `Type' are any of lattices supporting the
@@ -117,7 +110,20 @@ declare() ->
 %%
 -spec declare(type()) -> {ok, id()}.
 declare(Type) ->
-    lasp_vnode:declare(druuid:v4(), Type).
+    Id = druuid:v4(),
+    declare(Id, Type).
+
+%% @doc Declare a new dataflow variable of a given type.
+%%
+%%      Valid values for `Type' are any of lattices supporting the
+%%      `riak_dt' behavior.
+%%
+%%      Type is declared with the provided `Id'.
+%%
+-spec declare(id(), type()) -> {ok, id()} | {error, timeout}.
+declare(Id, Type) ->
+    {ok, ReqId} = lasp_declare_fsm:declare(Id, Type),
+    wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Update a dataflow variable.
 %%
@@ -125,26 +131,10 @@ declare(Type) ->
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation()) -> {ok, value(), id()} | error.
+-spec update(id(), operation()) -> {ok, {value(), id()}} | {error, timeout}.
 update(Id, Operation) ->
-    lasp_vnode:update(Id, Operation).
-
-%% @doc Get the current value of a CRDT.
-%%
-%%      Given an `Id' of a dataflow variable, return the actual value,
-%%      not the data structure, of the CRDT.
-%%
--spec value(id()) -> {ok, value()}.
-value(Id) ->
-    lasp_vnode:value(Id).
-
-%% @doc Get the type of a CRDT.
-%%
-%%      Given an `Id' of a dataflow variable, return the type.
-%%
--spec type(id()) -> {ok, type()}.
-type(Id) ->
-    lasp_vnode:type(Id).
+    {ok, ReqId} = lasp_update_fsm:update(Id, Operation),
+    wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -152,9 +142,10 @@ type(Id) ->
 %%      {@link declare/0}) dataflow variable.  The `Value' provided is
 %%      the value to bind.
 %%
--spec bind(id(), value()) -> {ok, id()} | error.
+-spec bind(id(), value()) -> {ok, id()} | {error, timeout}.
 bind(Id, Value) ->
-    lasp_vnode:bind(Id, Value).
+    {ok, ReqId} = lasp_bind_fsm:bind(Id, Value),
+    wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -162,16 +153,17 @@ bind(Id, Value) ->
 %%      {@link declare/0}) dataflow variable.  The `Value' provided is
 %%      the value to bind.
 %%
--spec bind_to(id(), id()) -> {ok, id()} | error.
+-spec bind_to(id(), id()) -> {ok, id()} | {error, timeout}.
 bind_to(Id, TheirId) ->
-    lasp_vnode:bind_to(Id, TheirId).
+    {ok, ReqId} = lasp_bind_to_fsm:bind_to(Id, TheirId),
+    wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Bind a dataflow variable to the result of a function call.
 %%
 %%      Execute `Module:Function(Args)' and bind the result using {@link
 %%      bind/2}.
 %%
--spec bind(id(), module(), func(), args()) -> {ok, id()} | error.
+-spec bind(id(), module(), func(), args()) -> {ok, id()} | {error, timeout}.
 bind(Id, Module, Function, Args) ->
     bind(Id, Module:Function(Args)).
 
@@ -180,9 +172,9 @@ bind(Id, Module, Function, Args) ->
 %%      Block until the variable identified by `Id' has been bound and
 %%      then return the value.
 %%
--spec read(id()) -> {ok, type(), value(), id()}.
+-spec read(id()) -> {ok, {type(), value(), id()}}.
 read(Id) ->
-    lasp_vnode:read(Id, {strict, undefined}).
+    read(Id, {strict, undefined}).
 
 %% @doc Blocking monotonic read operation for a given dataflow variable.
 %%
@@ -190,7 +182,7 @@ read(Id) ->
 %%      is monotonically greater (as defined by the lattice) then the
 %%      provided `Threshold' value.
 %%
--spec read(id(), threshold()) -> {ok, type(), value(), id()}.
+-spec read(id(), threshold()) -> {ok, {type(), value(), id()}}.
 read(Id, Threshold) ->
     lasp_vnode:read(Id, Threshold).
 
@@ -211,7 +203,7 @@ filter(Id, Function, AccId) ->
 %%
 -spec produce(id(), value()) -> {ok, id()}.
 produce(Id, Value) ->
-    lasp_vnode:bind(Id, Value).
+    bind(Id, Value).
 
 %% @doc Produce a value in a stream.
 %%
@@ -221,16 +213,16 @@ produce(Id, Value) ->
 %%
 -spec produce(id(), module(), func(), args()) -> {ok, id()}.
 produce(Id, Module, Function, Args) ->
-    lasp_vnode:bind(Id, Module:Function(Args)).
+    bind(Id, Module:Function(Args)).
 
 %% @doc Consume a value in the stream.
 %%
 %%      Given the `Id' of a declared variable in a dataflow stream, read
 %%      the next value in the stream.
 %%
--spec consume(id()) -> {ok, type(), value(), id()}.
+-spec consume(id()) -> {ok, {type(), value(), id()}}.
 consume(Id) ->
-    lasp_vnode:read(Id, {strict, undefined}).
+    read(Id, {strict, undefined}).
 
 %% @doc Generate the next identifier in a stream.
 %%
@@ -257,7 +249,7 @@ thread(Module, Function, Args) ->
 %%
 -spec wait_needed(id()) -> ok.
 wait_needed(Id) ->
-    lasp_vnode:wait_needed(Id, {strict, undefined}).
+    wait_needed(Id, {strict, undefined}).
 
 %% @doc Pause execution until value requested with given threshold.
 %%
@@ -352,10 +344,10 @@ wait_for_reqid(ReqID, Timeout) ->
 get_stream(Head, Output) ->
     lager:info("About to consume: ~p", [Head]),
     case consume(Head) of
-        {ok, _, nil, _} ->
+        {ok, {_, nil, _}} ->
             lager:info("Received: ~p", [undefined]),
             Output;
-        {ok, _, Value, Next} ->
+        {ok, {_, Value, Next}} ->
             lager:info("Received: ~p", [Value]),
             get_stream(Next, lists:append(Output, [Value]))
     end.

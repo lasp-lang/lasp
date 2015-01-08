@@ -53,7 +53,7 @@ confirm() ->
 -endif.
 
 test() ->
-    {ok, S1} = lasp:declare(),
+    {ok, S1} = lasp:declare(lasp_ivar),
     spawn(lasp_video_display_test, sender, [0, 10, S1]),
     display(S1),
     lasp:get_stream(S1).
@@ -71,20 +71,20 @@ sender(Init, N, Output) ->
 
 skip1(Input, Output) ->
     case lasp:consume(Input) of
-        {ok, _, nil, _} ->
+        {ok, {_, nil, _}} ->
             lasp:bind(Output, nil);
-        {ok, _, _Value, Next} ->
+        {ok, {_, _Value, Next}} ->
             skip1(Next, Output)
     end.
 
 display(Input) ->
     timer:sleep(1500),
-    {ok, Output} = lasp:declare(),
+    {ok, Output} = lasp:declare(lasp_ivar),
     skip1(Input, Output),
     case lasp:consume(Output) of
-        {ok, _, nil, _} ->
+        {ok, {_, nil, _}} ->
             ok;
-        {ok, _, Value, Next} ->
+        {ok, {_, Value, Next}} ->
             display_frame(Value),
             display(Next)
     end.

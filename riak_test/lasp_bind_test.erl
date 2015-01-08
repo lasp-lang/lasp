@@ -59,11 +59,6 @@ test() ->
     {ok, I2} = lasp:declare(lasp_ivar),
     {ok, I3} = lasp:declare(lasp_ivar),
 
-    %% Check types.
-    {ok, lasp_ivar} = lasp:type(I1),
-    {ok, lasp_ivar} = lasp:type(I2),
-    {ok, lasp_ivar} = lasp:type(I3),
-
     V1 = 1,
 
     %% Attempt pre, and post- dataflow variable bind operations.
@@ -71,33 +66,29 @@ test() ->
     {ok, _} = lasp:bind(I1, V1),
     {ok, _} = lasp:bind_to(I3, I1),
 
-    %% Perform invalid bind.
-    error = lasp:bind(I1, 2),
+    %% Perform invalid bind; won't return error, just will have no
+    %% effect.
+    {ok, _} = lasp:bind(I1, 2),
 
     %% Verify the same value is contained by all.
-    {ok, _, V1, _} = lasp:read(I3),
-    {ok, _, V1, _} = lasp:read(I2),
-    {ok, _, V1, _} = lasp:read(I1),
+    {ok, {_, V1, _}} = lasp:read(I3),
+    {ok, {_, V1, _}} = lasp:read(I2),
+    {ok, {_, V1, _}} = lasp:read(I1),
 
     %% G-Set variables.
     {ok, L1} = lasp:declare(riak_dt_gset),
     {ok, L2} = lasp:declare(riak_dt_gset),
     {ok, L3} = lasp:declare(riak_dt_gset),
 
-    %% Check types.
-    {ok, riak_dt_gset} = lasp:type(L1),
-    {ok, riak_dt_gset} = lasp:type(L2),
-    {ok, riak_dt_gset} = lasp:type(L3),
-
     %% Attempt pre, and post- dataflow variable bind operations.
     {ok, _} = lasp:bind_to(L2, L1),
-    {ok, S1, _} = lasp:update(L1, {add, 1}),
+    {ok, {S1, _}} = lasp:update(L1, {add, 1}),
     {ok, _} = lasp:bind_to(L3, L1),
 
     %% Verify the same value is contained by all.
-    {ok, _, S1, _} = lasp:read(L3),
-    {ok, _, S1, _} = lasp:read(L2),
-    {ok, _, S1, _} = lasp:read(L1),
+    {ok, {_, S1, _}} = lasp:read(L3),
+    {ok, {_, S1, _}} = lasp:read(L2),
+    {ok, {_, S1, _}} = lasp:read(L1),
 
     %% Test inflations.
     {ok, S2} = riak_dt_gset:update({add, 2},
@@ -110,15 +101,15 @@ test() ->
                   Self ! threshold_met
                end),
 
-    {ok, S2, _} = lasp:update(L1, {add, 2}),
+    {ok, {S2, _}} = lasp:update(L1, {add, 2}),
 
     %% Verify the same value is contained by all.
-    {ok, _, S2, _} = lasp:read(L3),
-    {ok, _, S2, _} = lasp:read(L2),
-    {ok, _, S2, _} = lasp:read(L1),
+    {ok, {_, S2, _}} = lasp:read(L3),
+    {ok, {_, S2, _}} = lasp:read(L2),
+    {ok, {_, S2, _}} = lasp:read(L1),
 
     %% Read at the S2 threshold level.
-    {ok, _, S2, _} = lasp:read(L1, S2),
+    {ok, {_, S2, _}} = lasp:read(L1, S2),
 
     %% Wait for wait_needed to unblock.
     receive

@@ -55,11 +55,11 @@ confirm() ->
 -endif.
 
 test() ->
-    {ok, S1} = lasp:declare(),
+    {ok, S1} = lasp:declare(lasp_ivar),
     spawn(lasp_bounded_buffer_test, producer, [0, 3, S1]),
-    {ok, S2} = lasp:declare(),
+    {ok, S2} = lasp:declare(lasp_ivar),
     spawn(lasp_bounded_buffer_test, buffer, [S1, 2, S2]),
-    {ok, S3} = lasp:declare(),
+    {ok, S3} = lasp:declare(lasp_ivar),
     consumer(S2, 5, fun(X) -> X*2 end, S3),
     lasp:get_stream(S3).
 
@@ -75,7 +75,7 @@ producer(Value, N, Output) ->
 
 loop(S1, S2, End) ->
     {ok, _} = lasp:wait_needed(S2),
-    {ok, _, S1Value, S1Next} = lasp:consume(S1),
+    {ok, {_, S1Value, S1Next}} = lasp:consume(S1),
     {ok, S2Next} = lasp:produce(S2, S1Value),
     case lasp:produce(S2, S1Value) of
         {ok, nil} ->
@@ -108,9 +108,9 @@ consumer(S2, Size, F, Output) ->
             ok;
         _ ->
             case lasp:consume(S2) of
-                {ok, _, nil, _} ->
+                {ok, {_, nil, _}} ->
                     lasp:bind(Output, nil);
-                {ok, _, Value, Next} ->
+                {ok, {_, Value, Next}} ->
                     {ok, NextOutput} = lasp:produce(Output, F(Value)),
                     consumer(Next, Size - 1, F, NextOutput)
             end

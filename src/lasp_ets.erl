@@ -102,7 +102,7 @@ filter(Id, Function, AccId, Store) ->
 %%      Given an `Id', perform a blocking read until the variable is
 %%      bound.
 %%
--spec read(id(), store()) -> {ok, type(), value(), id()}.
+-spec read(id(), store()) -> {ok, {type(), value(), id()}}.
 read(Id, Store) ->
     read(Id, {strict, undefined}, Store).
 
@@ -114,19 +114,19 @@ read(Id, Store) ->
 %%      This operation blocks until `Threshold' has been reached,
 %%      reading from the provided {@link ets:new/2} store, `Store'.
 %%
--spec read(id(), value(), store()) -> {ok, type(), value(), id()}.
+-spec read(id(), value(), store()) -> {ok, {type(), value(), id()}}.
 read(Id, Threshold, Store) ->
     Self = self(),
     ReplyFun = fun(Type, Value, Next) ->
-                    {ok, Type, Value, Next}
-               end,
+            {ok, {Type, Value, Next}}
+            end,
     BlockingFun = fun() ->
-                        receive
-                            X ->
-                                lager:info("Value: ~p", [X]),
-                                X
-                        end
-                 end,
+            receive
+                X ->
+                    lager:info("Value: ~p", [X]),
+                    X
+            end
+            end,
     read(Id, Threshold, Store, Self, ReplyFun, BlockingFun).
 
 %% @doc Declare a dataflow variable in a provided by identifer {@link
@@ -181,7 +181,7 @@ bind(Id, Value, Store) ->
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation(), store()) -> {ok, value(), id()}.
+-spec update(id(), operation(), store()) -> {ok, {value(), id()}}.
 update(Id, Operation, Store) ->
     NextKeyFun = fun(Type, Next) ->
                         next_key(Next, Type, Store)
@@ -318,12 +318,12 @@ reply_fetch(FromId, FromPid,
 %%      at the given `Id'.
 %%
 -spec update(id(), operation(), store(), function(), function()) ->
-    {ok, value(), id()}.
+    {ok, {value(), id()}}.
 update(Id, Operation, Store, NextKeyFun, NotifyFun) ->
     [{_Key, #dv{value=Value0, type=Type}}] = ets:lookup(Store, Id),
     {ok, Value} = Type:update(Operation, undefined, Value0),
     {ok, NextId} = bind(Id, Value, Store, NextKeyFun, NotifyFun),
-    {ok, Value, NextId}.
+    {ok, {Value, NextId}}.
 
 %% @doc Define a dataflow variable to be bound a value.
 %%
@@ -358,12 +358,12 @@ bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
                               NotifyFun),
                         {ok, NextKey};
                     false ->
-                        error
+                        {ok, NextKey}
                 end
             catch
                 _:Reason ->
                     lager:info("Bind threw an exception: ~p", [Reason]),
-                    error
+                    {ok, NextKey}
             end
     end.
 
@@ -404,7 +404,7 @@ next(Id, Store, DeclareNextFun) ->
 %%      variable is unbound or has not met the threshold yet.
 %%
 -spec read(id(), value(), store(), pid(), function(), function()) ->
-    {ok, type(), value(), id()}.
+    {ok, {type(), value(), id()}}.
 read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
     [{_Key, V=#dv{value=Value,
                   lazy_threads=LazyThreads,
@@ -631,12 +631,12 @@ reply_to_all(List, Result) ->
     {ok, list(pending_threshold())}.
 reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
-             {ok, Type, Value, Next}=Result) ->
+             {ok, {Type, Value, Next}}=Result) ->
     SW = case lasp_lattice:threshold_met(Type, Value, Threshold) of
         true ->
             case From of
                 {server, undefined, {Address, Ref}} ->
-                    gen_server:reply({Address, Ref}, {ok, Type, Value, Next});
+                    gen_server:reply({Address, Ref}, {ok, {Type, Value, Next}});
                 _ ->
                     From ! Result
             end,
@@ -665,6 +665,8 @@ reply_to_all([From|T], StillWaiting, Result) ->
     case From of
         {server, undefined, {Address, Ref}} ->
             gen_server:reply({Address, Ref}, Result);
+        {fsm, undefined, Address} ->
+            gen_fsm:send_event(Address, Result);
         _ ->
             From ! Result
     end,
@@ -692,9 +694,9 @@ fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
 fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
              PreviousValue, _PreviousAccValue) ->
     %% Blocking threshold read on source value.
-    {ok, Type, Value, _} = ReadFun(Id,
-                                   {strict, PreviousValue},
-                                   Variables),
+    {ok, {Type, Value, _}} = ReadFun(Id,
+                                     {strict, PreviousValue},
+                                     Variables),
 
     %% Generate a delta-CRDT; for now, we will use the entire object as
     %% the delta for simplicity.  Eventually, replace this with a
@@ -747,7 +749,7 @@ write(Type, Value, Next, Key, Store, NotifyFun) ->
                 binding=Binding}}] = ets:lookup(Store, Key),
     {ok, StillWaiting} = reply_to_all(Threads,
                                       [],
-                                      {ok, Type, Value, Next}),
+                                      {ok, {Type, Value, Next}}),
     V1 = #dv{type=Type,
              value=Value,
              next=Next,

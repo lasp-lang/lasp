@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_declare_fsm).
+-module(lasp_update_fsm).
 -author('Christopher Meiklejohn <cmeiklejohn@basho.com>').
 
 -behaviour(gen_fsm).
@@ -27,7 +27,7 @@
 
 %% API
 -export([start_link/4,
-         declare/2]).
+         update/2]).
 
 %% Callbacks
 -export([init/1,
@@ -49,7 +49,7 @@
                 coordinator,
                 from,
                 id,
-                type,
+                operation,
                 num_responses,
                 replies}).
 
@@ -57,13 +57,13 @@
 %%% API
 %%%===================================================================
 
-start_link(ReqId, From, Id, Type) ->
-    gen_fsm:start_link(?MODULE, [ReqId, From, Id, Type], []).
+start_link(ReqId, From, Id, Operation) ->
+    gen_fsm:start_link(?MODULE, [ReqId, From, Id, Operation], []).
 
-%% @doc Declare a variable.
-declare(Id, Type) ->
+%% @doc Update a variable.
+update(Id, Operation) ->
     ReqId = lasp:mk_reqid(),
-    _ = lasp_declare_fsm_sup:start_child([ReqId, self(), Id, Type]),
+    _ = lasp_update_fsm_sup:start_child([ReqId, self(), Id, Operation]),
     {ok, ReqId}.
 
 %%%===================================================================
@@ -90,13 +90,13 @@ terminate(_Reason, _SN, _SD) ->
 %%%===================================================================
 
 %% @doc Initialize the request.
-init([ReqId, From, Id, Type]) ->
+init([ReqId, From, Id, Operation]) ->
     State = #state{preflist=undefined,
                    req_id=ReqId,
                    coordinator=node(),
                    from=From,
                    id=Id,
-                   type=Type,
+                   operation=Operation,
                    num_responses=0,
                    replies=[]},
     {ok, prepare, State, 0}.
@@ -111,9 +111,9 @@ prepare(timeout, #state{id=Id}=State) ->
 execute(timeout, #state{preflist=Preflist,
                         req_id=ReqId,
                         id=Id,
-                        type=Type,
+                        operation=Operation,
                         coordinator=Coordinator}=State) ->
-    lasp_vnode:declare(Preflist, {ReqId, Coordinator}, Id, Type),
+    lasp_vnode:update(Preflist, {ReqId, Coordinator}, Id, Operation),
     {next_state, waiting, State}.
 
 waiting({ok, _ReqId, Reply},

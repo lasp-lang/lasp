@@ -26,10 +26,10 @@
 -callback next(id(), store()) -> {ok, id()}.
 -callback next(id(), store(), function()) -> {ok, id()}.
 
--callback read(id(), store()) -> {ok, type(), value(), id()}.
--callback read(id(), value(), store()) -> {ok, type(), value(), id()}.
+-callback read(id(), store()) -> {ok, {type(), value(), id()}}.
+-callback read(id(), value(), store()) -> {ok, {type(), value(), id()}}.
 -callback read(id(), value(), store(), pid(), function(), function()) ->
-    {ok, type(), value(), id()}.
+    {ok, {type(), value(), id()}}.
 
 -callback fetch(id(), id(), pid(), store()) -> {ok, id()}.
 -callback fetch(id(), id(), pid(), store(), function(), function(),
@@ -76,9 +76,8 @@
 -callback fold(store(), id(), function(), id(), fun(), function()) ->
                     {ok, pid()}.
 
--callback update(id(), operation(), store()) -> {ok, value(), id()}.
+-callback update(id(), operation(), store()) -> {ok, {value(), id()}}.
 -callback update(id(), operation(), store(), function(), function()) ->
-    {ok, value(), id()}.
+    {ok, {value(), id()}}.
 
--callback value(id(), store()) -> {ok, value()}.
 -callback type(id(), store()) -> {ok, type()}.

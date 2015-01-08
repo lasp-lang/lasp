@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_declare_fsm_sup).
+-module(lasp_update_fsm_sup).
 -author('Christopher Meiklejohn <cmeiklejohn@basho.com>').
 
 -behaviour(supervisor).
@@ -53,8 +53,8 @@ terminate_child(Supervisor, Pid) ->
 
 %% @doc supervisor callback.
 init([]) ->
-    Spec = {lasp_declare_fsm,
-            {lasp_declare_fsm, start_link, []},
-             temporary, 5000, worker, [lasp_declare_fsm]},
+    Spec = {lasp_update_fsm,
+            {lasp_update_fsm, start_link, []},
+             temporary, 5000, worker, [lasp_update_fsm]},
 
     {ok, {{simple_one_for_one, 10, 10}, [Spec]}}.

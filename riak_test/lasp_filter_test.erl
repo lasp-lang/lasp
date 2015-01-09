@@ -61,7 +61,7 @@ test(Type) ->
     {ok, S1} = lasp:declare(Type),
 
     %% Add elements to initial set and update.
-    {ok, {S1V2, _}} = lasp:update(S1, {add_all, [1,2,3]}),
+    {ok, {S1V2, _}} = lasp:update(S1, {add_all, [1,2,3]}, a),
 
     %% Read resulting value.
     {ok, {_, S1V2, _}} = lasp:read(S1),
@@ -71,7 +71,6 @@ test(Type) ->
 
     %% Apply filter.
     {ok, _Pid} = lasp:filter(S1, fun(X) ->
-                    lager:info("boooom: ~p", [X]),
                     X rem 2 == 0
             end, S2),
 
@@ -79,7 +78,7 @@ test(Type) ->
     timer:sleep(4000),
 
     %% Bind again.
-    {ok, {S1V4, _}} = lasp:update(S1, {add_all, [4,5,6]}),
+    {ok, {S1V4, _}} = lasp:update(S1, {add_all, [4,5,6]}, a),
 
     %% Wait.
     timer:sleep(4000),

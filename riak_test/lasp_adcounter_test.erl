@@ -48,7 +48,7 @@ confirm() ->
 
     lager:info("Remotely executing the test."),
     Result = rpc:call(Node, ?MODULE, test, []),
-    ?assertEqual(ok, Result),
+    ?assertEqual([0,0,0,0,0], Result),
 
     pass.
 
@@ -82,36 +82,64 @@ test() ->
             Pid = lists:nth(random:uniform(5), Clients),
             Pid ! view_ad
     end,
-    lists:map(Viewer, lists:seq(1,50)),
+    lists:map(Viewer, lists:seq(1,100)),
 
-    ok.
+    timer:sleep(1000),
+
+    lager:info("Gathering totals..."),
+    Totals = fun(Ad) ->
+            {ok, {_, Value, _}} = lasp:read(Ad, 0),
+            Impressions = riak_dt_gcounter:value(Value),
+            lager:info("Advertisements: ~p impressions: ~p",
+                       [Ad, Impressions])
+    end,
+    lists:map(Totals, Ads),
+
+    %% Ensure we exhaust all available ads.
+
+    lager:info("Verifying all impressions were used."),
+    AdsRemaining = fun(Client) ->
+            Client ! {active_ads, self()},
+            receive
+                X ->
+                    length(X)
+            end
+    end,
+    lists:map(AdsRemaining, Clients).
 
 %% @doc Server functions for the advertisement counter.
 server(Ad, Clients) ->
 
     %% Threshold read on the value of the impression counter being at
     %% least 5.
-    {ok, _, _, _} = lasp:read(Ad, 5),
+    {ok, _} = lasp:read(Ad, 5),
 
     %% Notify all clients to remove the advertisement.
-    lists:map(fun(Client) -> Client ! {remove_ad, Ad} end, Clients).
+    lists:map(fun(Client) -> Client ! {remove_ad, Ad} end, Clients),
+
+    lager:info("Disabled advertisement: ~p", [Ad]).
 
 %% @doc Client process; standard recurisve looping server.
 client(Id, Ads) ->
     receive
+        {active_ads, Pid} ->
+            Pid ! Ads;
         view_ad ->
             case Ads of
                 [] ->
+                    lager:info("No advertisements to display."),
                     client(Id, Ads);
                 _ ->
                     %% Choose an advertisement to display.
                     Ad = hd(Ads),
 
                     %% Update impression count.
-                    {ok, {_, _}} = lasp:update(Ad, increment),
+                    {ok, _} = lasp:update(Ad, increment, Id),
+                    lager:info("Incremented counter for ad: ~p", [Ad]),
 
                     client(Id, tl(Ads) ++ [Ad])
             end;
         {remove_ad, Ad} ->
+            lager:info("Advertisement ~p removed!", [Ad]),
             client(Id, Ads -- [Ad])
     end.

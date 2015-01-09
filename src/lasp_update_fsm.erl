@@ -26,8 +26,8 @@
 -include("lasp.hrl").
 
 %% API
--export([start_link/4,
-         update/2]).
+-export([start_link/5,
+         update/3]).
 
 %% Callbacks
 -export([init/1,
@@ -49,6 +49,7 @@
                 coordinator,
                 from,
                 id,
+                actor,
                 operation,
                 num_responses,
                 replies}).
@@ -57,13 +58,13 @@
 %%% API
 %%%===================================================================
 
-start_link(ReqId, From, Id, Operation) ->
-    gen_fsm:start_link(?MODULE, [ReqId, From, Id, Operation], []).
+start_link(ReqId, From, Id, Operation, Actor) ->
+    gen_fsm:start_link(?MODULE, [ReqId, From, Id, Operation, Actor], []).
 
 %% @doc Update a variable.
-update(Id, Operation) ->
+update(Id, Operation, Actor) ->
     ReqId = lasp:mk_reqid(),
-    _ = lasp_update_fsm_sup:start_child([ReqId, self(), Id, Operation]),
+    _ = lasp_update_fsm_sup:start_child([ReqId, self(), Id, Operation, Actor]),
     {ok, ReqId}.
 
 %%%===================================================================
@@ -90,12 +91,13 @@ terminate(_Reason, _SN, _SD) ->
 %%%===================================================================
 
 %% @doc Initialize the request.
-init([ReqId, From, Id, Operation]) ->
+init([ReqId, From, Id, Operation, Actor]) ->
     State = #state{preflist=undefined,
                    req_id=ReqId,
                    coordinator=node(),
                    from=From,
                    id=Id,
+                   actor=Actor,
                    operation=Operation,
                    num_responses=0,
                    replies=[]},
@@ -111,9 +113,11 @@ prepare(timeout, #state{id=Id}=State) ->
 execute(timeout, #state{preflist=Preflist,
                         req_id=ReqId,
                         id=Id,
+                        actor=Actor,
                         operation=Operation,
                         coordinator=Coordinator}=State) ->
-    lasp_vnode:update(Preflist, {ReqId, Coordinator}, Id, Operation),
+    lasp_vnode:update(Preflist, {ReqId, Coordinator}, Id, Operation,
+                      Actor),
     {next_state, waiting, State}.
 
 waiting({ok, _ReqId, Reply},

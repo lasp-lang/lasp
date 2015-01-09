@@ -44,3 +44,4 @@
 -type operation() :: {atom(), value()}.
 -type operations() :: list(operation()).
 -type ivar() :: term().
+-type actor() :: term().

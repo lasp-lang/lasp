@@ -35,7 +35,7 @@
 %% Language execution primitives.
 -export([bind/4,
          bind_to/4,
-         update/4,
+         update/5,
          read/4,
          filter/5,
          next/3,
@@ -101,9 +101,10 @@ bind_to(Preflist, Identity, Id, TheirId) ->
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
-update(Preflist, Identity, Id, Operation) ->
+update(Preflist, Identity, Id, Operation, Actor) ->
     riak_core_vnode_master:command(Preflist,
-                                   {update, Identity, Id, Operation},
+                                   {update, Identity, Id, Operation,
+                                    Actor},
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
@@ -268,7 +269,7 @@ handle_command({bind, {ReqId, _}, Id, Value}, _From,
                                  NotifyFun),
     {reply, {ok, ReqId, Result}, State};
 
-handle_command({update, {ReqId, _}, Id, Operation}, _From,
+handle_command({update, {ReqId, _}, Id, Operation, Actor}, _From,
                State=#state{variables=Variables}) ->
     NextKeyFun = fun(Type, Next) ->
                         next_key(Next, Type, State)
@@ -276,8 +277,8 @@ handle_command({update, {ReqId, _}, Id, Operation}, _From,
     NotifyFun = fun(_Id, NewValue) ->
                         ?MODULE:notify_value(_Id, NewValue)
                 end,
-    {ok, Result} = ?BACKEND:update(Id, Operation, Variables, NextKeyFun,
-                                   NotifyFun),
+    {ok, Result} = ?BACKEND:update(Id, Operation, Actor, Variables,
+                                   NextKeyFun, NotifyFun),
     {reply, {ok, ReqId, Result}, State};
 
 handle_command({fetch, TargetId, FromId, FromPid, ReqId}, _From,

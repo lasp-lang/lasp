@@ -70,7 +70,7 @@ example() ->
 
     %% Attempt pre, and post- dataflow variable bind operations.
     {ok, _} = lasp:bind_to(L2, L1),
-    {ok, {S1, _}} = lasp:update(L1, {add, 1}),
+    {ok, {S1, _}} = lasp:update(L1, {add, 1}, a),
     {ok, _} = lasp:bind_to(L3, L1),
 
     %% Verify the same value is contained by all.
@@ -79,8 +79,7 @@ example() ->
     {ok, {_, S1, _}} = lasp:read(L1),
 
     %% Test inflations.
-    {ok, S2} = riak_dt_gset:update({add, 2},
-                                   undefined, S1),
+    {ok, S2} = riak_dt_gset:update({add, 2}, a, S1),
 
     Self = self(),
 
@@ -89,7 +88,7 @@ example() ->
                 Self ! threshold_met
                 end),
 
-    {ok, {S2, _}} = lasp:update(L1, {add, 2}),
+    {ok, {S2, _}} = lasp:update(L1, {add, 2}, a),
 
     %% Verify the same value is contained by all.
     {ok, {_, S2, _}} = lasp:read(L3),

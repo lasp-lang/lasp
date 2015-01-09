@@ -76,8 +76,9 @@
 -callback fold(store(), id(), function(), id(), fun(), function()) ->
                     {ok, pid()}.
 
--callback update(id(), operation(), store()) -> {ok, {value(), id()}}.
--callback update(id(), operation(), store(), function(), function()) ->
+-callback update(id(), actor(), operation(), store()) ->
     {ok, {value(), id()}}.
+-callback update(id(), actor(), operation(), store(), function(),
+                 function()) -> {ok, {value(), id()}}.
 
 -callback type(id(), store()) -> {ok, type()}.

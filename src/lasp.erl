@@ -25,7 +25,7 @@
 
 -export([declare/1,
          declare/2,
-         update/2,
+         update/3,
          bind/2,
          bind/4,
          bind_to/2,
@@ -133,9 +133,10 @@ declare(Id, Type) ->
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation()) -> {ok, {value(), id()}} | {error, timeout}.
-update(Id, Operation) ->
-    {ok, ReqId} = lasp_update_fsm:update(Id, Operation),
+-spec update(id(), operation(), actor()) ->
+    {ok, {value(), id()}} | {error, timeout}.
+update(Id, Operation, Actor) ->
+    {ok, ReqId} = lasp_update_fsm:update(Id, Operation, Actor),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Bind a dataflow variable to a value.

@@ -34,7 +34,7 @@
          declare/1,
          declare/2,
          declare/3,
-         update/3,
+         update/4,
          value/2,
          type/2,
          thread/4,
@@ -54,7 +54,7 @@
          wait_needed/6,
          read/6,
          fetch/4,
-         update/5,
+         update/6,
          reply_fetch/4,
          write/6,
          filter/6,
@@ -123,7 +123,6 @@ read(Id, Threshold, Store) ->
     BlockingFun = fun() ->
             receive
                 X ->
-                    lager:info("Value: ~p", [X]),
                     X
             end
             end,
@@ -181,15 +180,15 @@ bind(Id, Value, Store) ->
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation(), store()) -> {ok, {value(), id()}}.
-update(Id, Operation, Store) ->
+-spec update(id(), operation(), actor(), store()) -> {ok, {value(), id()}}.
+update(Id, Operation, Actor, Store) ->
     NextKeyFun = fun(Type, Next) ->
                         next_key(Next, Type, Store)
                  end,
     NotifyFun = fun(_Id, NewValue) ->
                         ?MODULE:notify_value(_Id, NewValue, Store)
                 end,
-    update(Id, Operation, Store, NextKeyFun, NotifyFun).
+    update(Id, Operation, Actor, Store, NextKeyFun, NotifyFun).
 
 %% @doc Get the current value of a CRDT.
 %%
@@ -317,11 +316,11 @@ reply_fetch(FromId, FromPid,
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation(), store(), function(), function()) ->
+-spec update(id(), operation(), actor(), store(), function(), function()) ->
     {ok, {value(), id()}}.
-update(Id, Operation, Store, NextKeyFun, NotifyFun) ->
+update(Id, Operation, Actor, Store, NextKeyFun, NotifyFun) ->
     [{_Key, #dv{value=Value0, type=Type}}] = ets:lookup(Store, Id),
-    {ok, Value} = Type:update(Operation, undefined, Value0),
+    {ok, Value} = Type:update(Operation, Actor, Value0),
     {ok, NextId} = bind(Id, Value, Store, NextKeyFun, NotifyFun),
     {ok, {Value, NextId}}.
 

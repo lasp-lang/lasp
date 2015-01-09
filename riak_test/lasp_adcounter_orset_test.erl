@@ -48,7 +48,7 @@ confirm() ->
 
     lager:info("Remotely executing the test."),
     Result = rpc:call(Node, ?MODULE, test, []),
-    ?assertEqual(ok, Result),
+    ?assertEqual([], Result),
 
     pass.
 
@@ -59,11 +59,11 @@ test() ->
     {ok, Ads} = lasp:declare(riak_dt_orset),
 
     %% Build an advertisement counter, and add it to the set.
-    lists:foldl(fun(_, _Ads) ->
+    OriginalAdList = lists:foldl(fun(_, Acc) ->
                 {ok, Id} = lasp:declare(riak_dt_gcounter),
-                {ok, _} = lasp:update(Ads, {add, Id}),
-                Ads
-                end, Ads, lists:seq(1,5)),
+                {ok, _} = lasp:update(Ads, {add, Id}, undefined),
+                [Id] ++ Acc
+                end, [], lists:seq(1,5)),
 
     %% Generate a OR-set for tracking clients.
     {ok, Clients} = lasp:declare(riak_dt_orset),
@@ -71,8 +71,10 @@ test() ->
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
     lists:foldl(fun(Id, _Clients) ->
-                ClientPid = spawn(?MODULE, client, [Id, Ads, undefined]),
-                {ok, _} = lasp:update(Clients, {add, ClientPid}),
+                ClientPid = spawn_link(?MODULE, client,
+                                       [Id, Ads, undefined]),
+                {ok, _} = lasp:update(Clients, {add, ClientPid},
+                                      undefined),
                 Clients
                 end, Clients, lists:seq(1,5)),
 
@@ -89,8 +91,9 @@ test() ->
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
     lists:foldl(fun(Ad, _Servers) ->
-                ServerPid = spawn(?MODULE, server, [Ad, Ads]),
-                {ok, _} = lasp:update(Servers, {add, ServerPid}),
+                ServerPid = spawn_link(?MODULE, server, [Ad, Ads]),
+                {ok, _} = lasp:update(Servers, {add, ServerPid},
+                                      undefined),
                 Servers
                 end, Servers, AdList),
 
@@ -104,19 +107,32 @@ test() ->
             Pid = lists:nth(random:uniform(5), ClientList),
             Pid ! view_ad
     end,
-    lists:map(Viewer, lists:seq(1,200)),
+    lists:map(Viewer, lists:seq(1,100)),
 
-    ok.
+    timer:sleep(1000),
+
+    lager:info("Gathering totals..."),
+    Totals = fun(Ad) ->
+            {ok, {_, Value, _}} = lasp:read(Ad, 0),
+            Impressions = riak_dt_gcounter:value(Value),
+            lager:info("Advertisements: ~p impressions: ~p",
+                       [Ad, Impressions])
+    end,
+    lists:map(Totals, OriginalAdList),
+
+    lager:info("Verifying all impressions were used."),
+    {ok, {_, FinalAdList0, _}} = lasp:read(Ads),
+    riak_dt_orset:value(FinalAdList0).
 
 %% @doc Server functions for the advertisement counter.  After 5 views,
 %%      disable the advertisement.
 %%
 server(Ad, Ads) ->
     %% Blocking threshold read for 5 advertisement impressions.
-    {ok, {_, _, _}} = lasp:read(Ad, 5),
+    {ok, _} = lasp:read(Ad, 5),
 
     %% Remove the advertisement.
-    {ok, _} = lasp:update(Ads, {remove, Ad}),
+    {ok, _} = lasp:update(Ads, {remove, Ad}, Ad),
 
     lager:info("Removing ad: ~p", [Ad]).
 
@@ -140,7 +156,7 @@ client(Id, Ads, PreviousValue) ->
                                    AdList),
 
                     %% Increment it.
-                    {ok, _} = lasp:update(Ad, increment),
+                    {ok, _} = lasp:update(Ad, increment, Id),
                     lager:info("Incremented ad counter: ~p", [Ad]),
 
                     client(Id, Ads, AdList0)

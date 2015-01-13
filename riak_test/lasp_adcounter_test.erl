@@ -66,14 +66,14 @@ test() ->
     %% Generate a bunch of clients, which will be responsible for
     %% displaying ads and updating the advertisement counters.
 
-    Launcher = fun(Id) -> spawn(?MODULE, client, [Id, Ads]) end,
+    Launcher = fun(Id) -> spawn_link(?MODULE, client, [Id, Ads]) end,
     Clients = lists:map(Launcher, lists:seq(1,5)),
 
     %% Start a server process for each advertisement counter, which will
     %% track the number of impressions and disable the advertisement
     %% when it hits the impression limit.
 
-    Server = fun(Ad) -> spawn(?MODULE, server, [Ad, Clients]) end,
+    Server = fun(Ad) -> spawn_link(?MODULE, server, [Ad, Clients]) end,
     lists:map(Server, Ads),
 
     %% Begin simulation.

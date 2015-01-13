@@ -1,4 +1,5 @@
 -module(lasp_ets_eqc).
+-author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -include("lasp.hrl").
 
@@ -168,7 +169,7 @@ read_args(#state{store=Store}) ->
                         [Variable, Threshold]
                     end).
 
-read_post(#state{store=Store}, [Id, _Threshold], {ok, _, V, _}) ->
+read_post(#state{store=Store}, [Id, _Threshold], {ok, {_, V, _}}) ->
     case dict:find(Id, Store) of
         {ok, #variable{value=Value}} ->
             Value == V;

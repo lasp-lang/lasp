@@ -73,6 +73,10 @@
 -callback filter(id(), function(), id(), store(), function(),
                  function()) -> {ok, pid()}.
 
+-callback map(id(), function(), id(), store()) -> {ok, pid()}.
+-callback map(id(), function(), id(), store(), function(), function())
+    -> {ok, pid()}.
+
 -callback fold(store(), id(), function(), id(), fun(), function()) ->
                     {ok, pid()}.
 

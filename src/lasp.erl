@@ -32,6 +32,7 @@
          read/1,
          read/2,
          filter/3,
+         map/3,
          produce/2,
          produce/4,
          consume/1,
@@ -189,6 +190,17 @@ read(Id) ->
     {ok, {type(), value(), id()}} | {error, timeout}.
 read(Id, Threshold) ->
     {ok, ReqId} = lasp_read_fsm:read(Id, Threshold),
+    wait_for_reqid(ReqId, ?TIMEOUT).
+
+%% @doc Map values from one lattice into another.
+%%
+%%      Applies the given `Function' as a map over the items in `Id',
+%%      placing the result in `AccId', both of which need to be declared
+%%      variables.
+%%
+-spec map(id(), function(), id()) -> {ok, pid()} | {error, timeout}.
+map(Id, Function, AccId) ->
+    {ok, ReqId} = lasp_map_fsm:map(Id, Function, AccId),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Filter values from one lattice into another.

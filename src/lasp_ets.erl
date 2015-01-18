@@ -39,6 +39,7 @@
          type/2,
          thread/4,
          filter/4,
+         map/4,
          wait_needed/2,
          wait_needed/3,
          reply_to_all/2,
@@ -58,6 +59,7 @@
          reply_fetch/4,
          write/6,
          filter/6,
+         map/6,
          fetch/8]).
 
 %% Exported helper functions.
@@ -96,6 +98,22 @@ filter(Id, Function, AccId, Store) ->
             ?MODULE:read(_Id, _Threshold, _Variables)
     end,
     filter(Id, Function, AccId, Store, BindFun, ReadFun).
+
+%% @doc Map values from one lattice into another.
+%%
+%%      Applies the given `Function' as a map over the items in `Id',
+%%      placing the result in `AccId', both of which need to be declared
+%%      variables.
+%%
+-spec map(id(), function(), id(), store()) -> {ok, pid()}.
+map(Id, Function, AccId, Store) ->
+    BindFun = fun(_AccId, AccValue, _Variables) ->
+            ?MODULE:bind(_AccId, AccValue, _Variables)
+    end,
+    ReadFun = fun(_Id, _Threshold, _Variables) ->
+            ?MODULE:read(_Id, _Threshold, _Variables)
+    end,
+    map(Id, Function, AccId, Store, BindFun, ReadFun).
 
 %% @doc Perform a read for a particular identifier.
 %%
@@ -509,6 +527,33 @@ bind_to(Id, TheirId, Store, FetchFun, FromPid) ->
     true = ets:insert(Store, {Id, #dv{binding=TheirId}}),
     FetchFun(TheirId, Id, FromPid).
 
+%% @doc map values from one lattice into another.
+%%
+%%      Applies the given `Function' as a map over the items in `Id',
+%%      placing the result in `AccId', both of which need to be declared
+%%      variables.
+%%
+%%      Similar to {@link map/4}, however, provides an override
+%%      function for the `BindFun', which is responsible for binding the
+%%      result, for instance, when it's located in another table.
+%%
+-spec map(id(), function(), id(), store(), function(), function()) ->
+    {ok, pid()}.
+map(Id, Function, AccId, Store, BindFun, ReadFun) ->
+    FolderFun = fun(Element, Acc) ->
+            Value = case Element of
+                {X, Causality} ->
+                    %% riak_dt_orset
+                    {Function(X), Causality};
+                X ->
+                    %% riak_dt_gset
+                    Function(X)
+            end,
+
+            Acc ++ [Value]
+    end,
+    fold(Store, Id, FolderFun, AccId, BindFun, ReadFun).
+
 %% @doc Filter values from one lattice into another.
 %%
 %%      Applies the given `Function' as a filter over the items in `Id',
@@ -525,8 +570,10 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     FolderFun = fun(Element, Acc) ->
             Value = case Element of
                 {X, _} ->
+                    %% riak_dt_orset
                     X;
                 X ->
+                    %% riak_dt_gset
                     X
             end,
 

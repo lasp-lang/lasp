@@ -56,6 +56,10 @@ init(_Args) ->
                {lasp_next_fsm_sup, start_link, []},
                 permanent, infinity, supervisor, [lasp_next_fsm_sup]},
 
+    MapFSM = {lasp_map_fsm_sup,
+              {lasp_map_fsm_sup, start_link, []},
+               permanent, infinity, supervisor, [lasp_map_fsm_sup]},
+
     FilterFSM = {lasp_filter_fsm_sup,
                  {lasp_filter_fsm_sup, start_link, []},
                   permanent, infinity, supervisor, [lasp_filter_fsm_sup]},
@@ -100,6 +104,7 @@ init(_Args) ->
                                  DeclareFSM,
                                  ThreadFSM,
                                  NextFSM,
+                                 MapFSM,
                                  FilterFSM,
                                  ReadFSM,
                                  UpdateFSM,

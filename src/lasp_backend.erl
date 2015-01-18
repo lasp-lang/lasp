@@ -77,8 +77,12 @@
 -callback map(id(), function(), id(), store(), function(), function())
     -> {ok, pid()}.
 
--callback fold(store(), id(), function(), id(), fun(), function()) ->
-                    {ok, pid()}.
+-callback fold(id(), function(), id(), store()) -> {ok, pid()}.
+-callback fold(id(), function(), id(), store(), function(), function())
+    -> {ok, pid()}.
+
+-callback internal_fold(store(), id(), function(), id(), fun(),
+                    function()) -> {ok, pid()}.
 
 -callback update(id(), actor(), operation(), store()) ->
     {ok, {value(), id()}}.

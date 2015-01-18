@@ -40,6 +40,7 @@
          thread/4,
          filter/4,
          map/4,
+         fold/4,
          wait_needed/2,
          wait_needed/3,
          reply_to_all/2,
@@ -60,11 +61,12 @@
          write/6,
          filter/6,
          map/6,
+         fold/6,
          fetch/8]).
 
 %% Exported helper functions.
--export([fold/6,
-         fold_harness/8]).
+-export([internal_fold/6,
+         internal_fold_harness/8]).
 
 %% Exported utility functions.
 -export([next_key/3,
@@ -98,6 +100,22 @@ filter(Id, Function, AccId, Store) ->
             ?MODULE:read(_Id, _Threshold, _Variables)
     end,
     filter(Id, Function, AccId, Store, BindFun, ReadFun).
+
+%% @doc Fold values from one lattice into another.
+%%
+%%      Applies the given `Function' as a fold over the items in `Id',
+%%      placing the result in `AccId', both of which need to be declared
+%%      variables.
+%%
+-spec fold(id(), function(), id(), store()) -> {ok, pid()}.
+fold(Id, Function, AccId, Store) ->
+    BindFun = fun(_AccId, AccValue, _Variables) ->
+            ?MODULE:bind(_AccId, AccValue, _Variables)
+    end,
+    ReadFun = fun(_Id, _Threshold, _Variables) ->
+            ?MODULE:read(_Id, _Threshold, _Variables)
+    end,
+    fold(Id, Function, AccId, Store, BindFun, ReadFun).
 
 %% @doc Map values from one lattice into another.
 %%
@@ -527,7 +545,34 @@ bind_to(Id, TheirId, Store, FetchFun, FromPid) ->
     true = ets:insert(Store, {Id, #dv{binding=TheirId}}),
     FetchFun(TheirId, Id, FromPid).
 
-%% @doc map values from one lattice into another.
+%% @doc Fold values from one lattice into another.
+%%
+%%      Applies the given `Function' as a fold over the items in `Id',
+%%      placing the result in `AccId', both of which need to be declared
+%%      variables.
+%%
+%%      Similar to {@link fold/4}, however, provides an override
+%%      function for the `BindFun', which is responsible for binding the
+%%      result, for instance, when it's located in another table.
+%%
+-spec fold(id(), function(), id(), store(), function(), function()) ->
+    {ok, pid()}.
+fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
+    FolderFun = fun(Element, Acc) ->
+            Values = case Element of
+                {X, Causality} ->
+                    %% riak_dt_orset
+                    [{Value, Causality} || Value <- Function(X)];
+                X ->
+                    %% riak_dt_gset
+                    Function(X)
+            end,
+
+            Acc ++ Values
+    end,
+    internal_fold(Store, Id, FolderFun, AccId, BindFun, ReadFun).
+
+%% @doc Lap values from one lattice into another.
 %%
 %%      Applies the given `Function' as a map over the items in `Id',
 %%      placing the result in `AccId', both of which need to be declared
@@ -552,7 +597,7 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 
             Acc ++ [Value]
     end,
-    fold(Store, Id, FolderFun, AccId, BindFun, ReadFun).
+    internal_fold(Store, Id, FolderFun, AccId, BindFun, ReadFun).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -584,7 +629,7 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
                     Acc
             end
     end,
-    fold(Store, Id, FolderFun, AccId, BindFun, ReadFun).
+    internal_fold(Store, Id, FolderFun, AccId, BindFun, ReadFun).
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
 %%      change the reply and blocking replies.
@@ -726,23 +771,23 @@ reply_to_all([], StillWaiting, _Result) ->
 
 %% Internal functions.
 
--spec fold(store(), id(), function(), id(), fun(), function()) ->
-                    {ok, pid()}.
-fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
-    Pid = spawn_link(?MODULE, fold_harness, [Variables,
-                                             Id,
-                                             Function,
-                                             AccId,
-                                             BindFun,
-                                             ReadFun,
-                                             undefined,
-                                             undefined]),
+-spec internal_fold(store(), id(), function(), id(), fun(), function())
+                    -> {ok, pid()}.
+internal_fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
+    Pid = spawn_link(?MODULE, internal_fold_harness, [Variables,
+                                                      Id,
+                                                      Function,
+                                                      AccId,
+                                                      BindFun,
+                                                      ReadFun,
+                                                      undefined,
+                                                      undefined]),
     {ok, Pid}.
 
--spec fold_harness(store(), id(), function(), id(), function(),
-                   function(), value(), value()) -> function().
-fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
-             PreviousValue, _PreviousAccValue) ->
+-spec internal_fold_harness(store(), id(), function(), id(), function(),
+                            function(), value(), value()) -> function().
+internal_fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
+                      PreviousValue, _PreviousAccValue) ->
     %% Blocking threshold read on source value.
     {ok, {Type, Value, _}} = ReadFun(Id,
                                      {strict, PreviousValue},
@@ -759,8 +804,8 @@ fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
     %% Update with result.
     {ok, _} = BindFun(AccId, AccValue, Variables),
 
-    fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
-                 Value, AccValue).
+    internal_fold_harness(Variables, Id, Function, AccId, BindFun,
+                          ReadFun, Value, AccValue).
 
 %% @doc Send responses to waiting threads, via messages.
 %%

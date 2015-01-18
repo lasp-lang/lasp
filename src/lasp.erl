@@ -33,6 +33,7 @@
          read/2,
          filter/3,
          map/3,
+         fold/3,
          produce/2,
          produce/4,
          consume/1,
@@ -201,6 +202,17 @@ read(Id, Threshold) ->
 -spec map(id(), function(), id()) -> {ok, pid()} | {error, timeout}.
 map(Id, Function, AccId) ->
     {ok, ReqId} = lasp_map_fsm:map(Id, Function, AccId),
+    wait_for_reqid(ReqId, ?TIMEOUT).
+
+%% @doc Fold values from one lattice into another.
+%%
+%%      Applies the given `Function' as a fold over the items in `Id',
+%%      placing the result in `AccId', both of which need to be declared
+%%      variables.
+%%
+-spec fold(id(), function(), id()) -> {ok, pid()} | {error, timeout}.
+fold(Id, Function, AccId) ->
+    {ok, ReqId} = lasp_fold_fsm:fold(Id, Function, AccId),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Filter values from one lattice into another.

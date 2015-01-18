@@ -56,6 +56,10 @@ init(_Args) ->
                {lasp_next_fsm_sup, start_link, []},
                 permanent, infinity, supervisor, [lasp_next_fsm_sup]},
 
+    FoldFSM = {lasp_fold_fsm_sup,
+               {lasp_fold_fsm_sup, start_link, []},
+                permanent, infinity, supervisor, [lasp_fold_fsm_sup]},
+
     MapFSM = {lasp_map_fsm_sup,
               {lasp_map_fsm_sup, start_link, []},
                permanent, infinity, supervisor, [lasp_map_fsm_sup]},
@@ -105,6 +109,7 @@ init(_Args) ->
                                  ThreadFSM,
                                  NextFSM,
                                  MapFSM,
+                                 FoldFSM,
                                  FilterFSM,
                                  ReadFSM,
                                  UpdateFSM,

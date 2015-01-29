@@ -40,6 +40,7 @@
          thread/4,
          filter/4,
          map/4,
+         product/4,
          fold/4,
          wait_needed/2,
          wait_needed/3,
@@ -61,6 +62,7 @@
          write/6,
          filter/6,
          map/6,
+         product/7,
          fold/6,
          fetch/8]).
 
@@ -132,6 +134,25 @@ map(Id, Function, AccId, Store) ->
             ?MODULE:read(_Id, _Threshold, _Variables)
     end,
     map(Id, Function, AccId, Store, BindFun, ReadFun).
+
+%% @doc Compute the cartesian product of two sets.
+%%
+%%      Computes the cartestian product of two sets and bind the result
+%%      to a third.
+%%
+-spec product(id(), id(), id(), store()) -> {ok, pid()}.
+product(Left, Right, Product, Store) ->
+    BindFun = fun(_AccId, AccValue, _Variables) ->
+            ?MODULE:bind(_AccId, AccValue, _Variables)
+    end,
+    ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
+            ?MODULE:read(_Left, _Threshold, _Variables)
+    end,
+    ReadRightFun = fun(_Right, _Threshold, _Variables) ->
+            ?MODULE:read(_Right, _Threshold, _Variables)
+    end,
+    product(Left, Right, Product, Store, BindFun, ReadLeftFun,
+            ReadRightFun).
 
 %% @doc Perform a read for a particular identifier.
 %%
@@ -572,6 +593,53 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
     end,
     internal_fold(Store, Id, FolderFun, AccId, BindFun, ReadFun).
 
+%% @doc Compute the cartesian product of two sets.
+%%
+%%      Computes the cartestian product of two sets and bind the result
+%%      to a third.
+%%
+%%      Similar to {@link product/4}, however, provides an override
+%%      function for the `BindFun', which is responsible for binding the
+%%      result, for instance, when it's located in another table.
+%%
+-spec product(id(), id(), id(), store(), function(), function(),
+              function()) -> {ok, pid()}.
+product(Left, Right, Product, Store, BindFun, ReadLeftFun, _ReadRightFun) ->
+    FolderLeftFun = fun(Element, Acc) ->
+            %% Read current value of right.
+            %% @TODO: need to ensure this is a monotonic read.
+            {ok, {_, RValue, _}} = lasp:read(Right, undefined),
+
+            %% @TODO: naive; assumes same type-to-type product
+            Values = case Element of
+                {X, XCausality} ->
+                    %% riak_dt_orset
+                    [{[X, Y], orset_causal_product(XCausality, YCausality)}
+                     || {Y, YCausality} <- RValue];
+                X ->
+                    %% riak_dt_gset
+                    [[X, Y] || Y  <- RValue]
+            end,
+
+            Acc ++ Values
+    end,
+    %% @TODO: needs to be for both reads; left and right.
+    %% @TODO: currently only folds left.
+    internal_fold(Store, Left, FolderLeftFun, Product, BindFun, ReadLeftFun).
+
+%% @doc Compute a cartesian product from causal metadata stored in the
+%%      orset.
+%%
+%%      Computes product of `Xs' and `Ys' and map deleted through using
+%%      an or operation.
+%%
+orset_causal_product(Xs, Ys) ->
+    lists:foldl(fun({X, XDeleted}, XAcc) ->
+                lists:foldl(fun({Y, YDeleted}, YAcc) ->
+                            [{[X, Y], XDeleted orelse YDeleted}] ++ YAcc
+                    end, [], Ys) ++ XAcc
+        end, [], Xs).
+
 %% @doc Lap values from one lattice into another.
 %%
 %%      Applies the given `Function' as a map over the items in `Id',
@@ -793,9 +861,9 @@ internal_fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
                                      {strict, PreviousValue},
                                      Variables),
 
-    %% Generate a delta-CRDT; for now, we will use the entire object as
-    %% the delta for simplicity.  Eventually, replace this with a
-    %% smarter delta generation mechanism.
+    %% @TODO: Generate a delta-CRDT; for now, we will use the entire
+    %% object as the delta for simplicity.  Eventually, replace this
+    %% with a smarter delta generation mechanism.
     Delta = Value,
 
     %% Build new data structure.

@@ -64,6 +64,10 @@ init(_Args) ->
               {lasp_map_fsm_sup, start_link, []},
                permanent, infinity, supervisor, [lasp_map_fsm_sup]},
 
+    ProductFSM = {lasp_product_fsm_sup,
+                  {lasp_product_fsm_sup, start_link, []},
+                   permanent, infinity, supervisor, [lasp_product_fsm_sup]},
+
     FilterFSM = {lasp_filter_fsm_sup,
                  {lasp_filter_fsm_sup, start_link, []},
                   permanent, infinity, supervisor, [lasp_filter_fsm_sup]},
@@ -109,6 +113,7 @@ init(_Args) ->
                                  ThreadFSM,
                                  NextFSM,
                                  MapFSM,
+                                 ProductFSM,
                                  FoldFSM,
                                  FilterFSM,
                                  ReadFSM,

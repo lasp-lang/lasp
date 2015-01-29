@@ -39,6 +39,7 @@
          read/4,
          filter/5,
          map/5,
+         product/5,
          fold/5,
          next/3,
          wait_needed/4,
@@ -125,6 +126,12 @@ filter(Preflist, Identity, Id, Function, AccId) ->
 map(Preflist, Identity, Id, Function, AccId) ->
     riak_core_vnode_master:command(Preflist,
                                    {map, Identity, Id, Function, AccId},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
+
+product(Preflist, Identity, Left, Right, Product) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {product, Identity, Left, Right, Product},
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
@@ -402,6 +409,56 @@ handle_command({filter, {ReqId, _}, Id, Function, AccId}, _From,
     end,
     {ok, Result} = ?BACKEND:filter(Id, Function, AccId, Variables,
                                    BindFun, ReadFun),
+    {reply, {ok, ReqId, Result}, State};
+
+handle_command({product, {ReqId, _}, Left, Right, Product}, _From,
+               State=#state{variables=Variables,
+                            partition=Partition,
+                            node=Node}) ->
+    BindFun = fun(_Product, AccValue, _Variables) ->
+            %% Beware of cycles in the gen_server calls!
+            [{IndexNode, _Type}] = lasp:preflist(?N, _Product, lasp),
+
+            case IndexNode of
+                {Partition, Node} ->
+                    %% We're local, which means that we can interact
+                    %% directly with the data store.
+                    ?BACKEND:bind(_Product, AccValue, _Variables);
+                _ ->
+                    %% We're remote, go through all of the routing logic.
+                    lasp:bind(_Product, AccValue)
+            end
+    end,
+    ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
+            %% Beware of cycles in the gen_server calls!
+            [{IndexNode, _Type}] = lasp:preflist(?N, Left, lasp),
+
+            case IndexNode of
+                {Partition, Node} ->
+                    %% We're local, which means that we can interact
+                    %% directly with the data store.
+                    ?BACKEND:read(Left, _Threshold, _Variables);
+                _ ->
+                    %% We're remote, go through all of the routing logic.
+                    lasp:read(Left, _Threshold)
+            end
+    end,
+    ReadRightFun = fun(_Right, _Threshold, _Variables) ->
+            %% Beware of cycles in the gen_server calls!
+            [{IndexNode, _Type}] = lasp:preflist(?N, Right, lasp),
+
+            case IndexNode of
+                {Partition, Node} ->
+                    %% We're local, which means that we can interact
+                    %% directly with the data store.
+                    ?BACKEND:read(Right, _Threshold, _Variables);
+                _ ->
+                    %% We're remote, go through all of the routing logic.
+                    lasp:read(Right, _Threshold)
+            end
+    end,
+    {ok, Result} = ?BACKEND:product(Left, Right, Product, Variables,
+                                    BindFun, ReadLeftFun, ReadRightFun),
     {reply, {ok, ReqId, Result}, State};
 
 handle_command({map, {ReqId, _}, Id, Function, AccId}, _From,

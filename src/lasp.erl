@@ -33,6 +33,7 @@
          read/2,
          filter/3,
          map/3,
+         product/3,
          fold/3,
          produce/2,
          produce/4,
@@ -191,6 +192,16 @@ read(Id) ->
     {ok, {type(), value(), id()}} | {error, timeout}.
 read(Id, Threshold) ->
     {ok, ReqId} = lasp_read_fsm:read(Id, Threshold),
+    wait_for_reqid(ReqId, ?TIMEOUT).
+
+%% @doc Compute the cartesian product of two sets.
+%%
+%%      Computes the cartestian product of two sets and bind the result
+%%      to a third.
+%%
+-spec product(id(), id(), id()) -> {ok, pid()} | {error, timeout}.
+product(Left, Right, Product) ->
+    {ok, ReqId} = lasp_product_fsm:product(Left, Right, Product),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Map values from one lattice into another.

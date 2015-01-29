@@ -90,3 +90,7 @@
                  function()) -> {ok, {value(), id()}}.
 
 -callback type(id(), store()) -> {ok, type()}.
+
+-callback product(id(), id(), id(), store()) -> {ok, pid()}.
+-callback product(id(), id(), id(), store(), function(), function(),
+              function()) -> {ok, pid()}.

@@ -72,6 +72,11 @@ threshold_met(riak_dt_orswot, Value, {strict, Threshold}) ->
 threshold_met(riak_dt_orswot, Value, Threshold) ->
     is_inflation(riak_dt_orswot, Threshold, Value);
 
+threshold_met(riak_dt_map, Value, {strict, Threshold}) ->
+    is_strict_inflation(riak_dt_map, Threshold, Value);
+threshold_met(riak_dt_map, Value, Threshold) ->
+    is_inflation(riak_dt_map, Threshold, Value);
+
 threshold_met(riak_dt_gcounter, Value, {strict, Threshold}) ->
     Threshold < riak_dt_gcounter:value(Value);
 threshold_met(riak_dt_gcounter, Value, Threshold) ->
@@ -138,6 +143,9 @@ is_lattice_inflation(riak_dt_orset, Previous, Current) ->
                 end, true, Previous);
 
 is_lattice_inflation(riak_dt_orswot, {Previous, _, _}, {Current, _, _}) ->
+    riak_dt_vclock:descends(Current, Previous);
+
+is_lattice_inflation(riak_dt_map, {Previous, _, _}, {Current, _, _}) ->
     riak_dt_vclock:descends(Current, Previous);
 
 is_lattice_inflation(riak_dt_gcounter, Previous, Current) ->
@@ -210,6 +218,15 @@ is_lattice_strict_inflation(riak_dt_orset, Previous, Current) ->
     IsLatticeInflation andalso (DeletedElements orelse NewElements);
 
 is_lattice_strict_inflation(riak_dt_orswot, {PV, PE, _}=Previous, {CV, CE, _}=Current) ->
+    IsLatticeInflation = is_lattice_inflation(riak_dt_orswot, Previous, Current),
+    DeletedElements = orddict:size(PE) > orddict:size(CE),
+    DominatedClock = riak_dt_vclock:dominates(CV, PV),
+    EqualClocks = riak_dt_vclock:equal(CV, PV),
+    IsLatticeInflation andalso (
+        (EqualClocks andalso DeletedElements) orelse
+        DominatedClock);
+
+is_lattice_strict_inflation(riak_dt_map, {PV, PE, _}=Previous, {CV, CE, _}=Current) ->
     IsLatticeInflation = is_lattice_inflation(riak_dt_orswot, Previous, Current),
     DeletedElements = orddict:size(PE) > orddict:size(CE),
     DominatedClock = riak_dt_vclock:dominates(CV, PV),
@@ -446,5 +463,48 @@ riak_dt_orswot_strict_inflation_test() ->
 
     %% A3 after A2.
     ?assertEqual(true, is_lattice_strict_inflation(riak_dt_orswot, A2, A3)).
+
+%% riak_dt_map tests.
+
+riak_dt_map_inflation_test() ->
+    A1 = riak_dt_map:new(),
+    B1 = riak_dt_map:new(),
+
+    {ok, A2} = riak_dt_map:update({update, [{update, {'X', riak_dt_orset}, {add, 1}}]}, a, A1),
+    {ok, B2} = riak_dt_map:update({update, [{update, {'X', riak_dt_orset}, {add, 2}}]}, b, B1),
+    {ok, A3} = riak_dt_map:update({update, [{update, {'X', riak_dt_orset}, {remove, 1}}]}, a, A2),
+
+    %% A1 and B1 are equivalent.
+    ?assertEqual(true, is_lattice_inflation(riak_dt_map, A1, B1)),
+
+    %% A2 after A1.
+    ?assertEqual(true, is_lattice_inflation(riak_dt_map, A1, A2)),
+
+    %% Concurrent
+    ?assertEqual(false, is_lattice_inflation(riak_dt_map, A2, B2)),
+
+    %% A3 after A2.
+    ?assertEqual(true, is_lattice_inflation(riak_dt_map, A2, A3)).
+
+riak_dt_map_strict_inflation_test() ->
+    A1 = riak_dt_map:new(),
+    B1 = riak_dt_map:new(),
+
+    {ok, A2} = riak_dt_map:update({update, [{update, {'X', riak_dt_orset}, {add, 1}}]}, a, A1),
+    {ok, B2} = riak_dt_map:update({update, [{update, {'X', riak_dt_orset}, {add, 2}}]}, b, B1),
+    {ok, A3} = riak_dt_map:update({update, [{update, {'X', riak_dt_orset}, {remove, 1}}]}, a, A2),
+
+    %% A1 and B1 are equivalent.
+    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_map, A1, B1)),
+
+    %% A2 after A1.
+    ?assertEqual(true, is_lattice_strict_inflation(riak_dt_map, A1, A2)),
+
+    %% Concurrent
+    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_map, A2, B2)),
+
+    %% A3 after A2.
+    ?assertEqual(true, is_lattice_strict_inflation(riak_dt_map, A2, A3)).
+
 
 -endif.

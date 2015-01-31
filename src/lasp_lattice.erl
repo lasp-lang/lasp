@@ -191,8 +191,12 @@ is_lattice_strict_inflation(riak_dt_orset, Previous, Current) ->
                                               Previous,
                                               Current),
     DeletedElements = lists:foldl(fun({Element, Ids}, Acc) ->
-                    {_, Ids1} = lists:keyfind(Element, 1, Current),
-                    Acc orelse Ids =/= Ids1
+                    case lists:keyfind(Element, 1, Current) of
+                        false ->
+                            Acc;
+                        {_, Ids1} ->
+                            Acc orelse Ids =/= Ids1
+                    end
                     end, false, Previous),
     NewElements = length(Previous) < length(Current),
     IsLatticeInflation andalso (DeletedElements orelse NewElements);

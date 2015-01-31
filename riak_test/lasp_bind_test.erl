@@ -54,6 +54,14 @@ confirm() ->
 -endif.
 
 test() ->
+    test_ivars(),
+    test_lattice(riak_dt_gset),
+    test_lattice(riak_dt_orset),
+    test_lattice(riak_dt_orswot),
+    ok.
+
+%% @doc Test single-assignment variables.
+test_ivars() ->
     %% Single-assignment variables.
     {ok, I1} = lasp:declare(lasp_ivar),
     {ok, I2} = lasp:declare(lasp_ivar),
@@ -75,10 +83,14 @@ test() ->
     {ok, {_, V1, _}} = lasp:read(I2),
     {ok, {_, V1, _}} = lasp:read(I1),
 
+    ok.
+
+%% @doc Test lattice-based variables.
+test_lattice(Type) ->
     %% G-Set variables.
-    {ok, L1} = lasp:declare(riak_dt_gset),
-    {ok, L2} = lasp:declare(riak_dt_gset),
-    {ok, L3} = lasp:declare(riak_dt_gset),
+    {ok, L1} = lasp:declare(Type),
+    {ok, L2} = lasp:declare(Type),
+    {ok, L3} = lasp:declare(Type),
 
     %% Attempt pre, and post- dataflow variable bind operations.
     {ok, _} = lasp:bind_to(L2, L1),
@@ -91,7 +103,7 @@ test() ->
     {ok, {_, S1, _}} = lasp:read(L1),
 
     %% Test inflations.
-    {ok, S2} = riak_dt_gset:update({add, 2}, a, S1),
+    {ok, S2} = Type:update({add, 2}, a, S1),
 
     Self = self(),
 
@@ -100,7 +112,7 @@ test() ->
                   Self ! threshold_met
                end),
 
-    {ok, {S2, _}} = lasp:update(L1, {add, 2}, a),
+    {ok, _} = lasp:bind(L1, S2),
 
     %% Verify the same value is contained by all.
     {ok, {_, S2, _}} = lasp:read(L3),

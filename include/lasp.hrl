@@ -34,7 +34,7 @@
 -type id() :: atom().
 -type idx() :: term().
 -type result() :: term().
--type type() :: lasp_ivar | riak_dt_gset | riak_dt_orset | riak_dt_gcounter.
+-type type() :: lasp_ivar | riak_dt_gset | riak_dt_orset | riak_dt_orswot | riak_dt_gcounter.
 -type value() :: term().
 -type func() :: atom().
 -type args() :: list().

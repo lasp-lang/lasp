@@ -20,6 +20,7 @@
 -define(LATTICES, [lasp_ivar,
                    riak_dt_gset,
                    riak_dt_orset,
+                   riak_dt_orswot,
                    riak_dt_gcounter]).
 
 -define(ETS, lasp_ets_eqc).

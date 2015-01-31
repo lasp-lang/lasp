@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_example_program).
+-module(lasp_example_keylist_program).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -behavior(lasp_program).
@@ -29,27 +29,34 @@
          merge/1,
          sum/1]).
 
--record(state, {id}).
+-record(state, {type, id, previous}).
 
 -define(TYPE, riak_dt_gset).
 
+%% @doc Initialize an or-set as an accumulator.
 init() ->
     {ok, Id} = lasp:declare(?TYPE),
     {ok, #state{id=Id}}.
 
-process(Object, _Reason, Actor, #state{id=Id}=State) ->
-    {ok, _} = lasp:update(Id, {add, Object}, Actor),
+%% @doc Notification from the system of an event.
+process(Object, _Reason, Idx, #state{id=Id}=State) ->
+    {ok, _} = lasp:update(Id, {add, Object}, Idx),
     {ok, State}.
 
-execute(#state{id=Id}) ->
-    {ok, {_, Value, _}} = lasp:read(Id, undefined),
+%% @doc Return the result.
+execute(#state{id=Id, previous=Previous}) ->
+    {ok, {_, Value, _}} = lasp:read(Id, Previous),
     {ok, Value}.
 
+%% @doc Given a series of outputs, take each one and merge it.
 merge(Outputs) ->
     Value = ?TYPE:new(),
     Merged = lists:foldl(fun(X, Acc) -> ?TYPE:merge(X, Acc) end, Value, Outputs),
     {ok, Merged}.
 
+%% @doc Computing a sum accorss nodes is the same as as performing the
+%%      merge of outputs between a replica, when dealing with the
+%%      set.
 sum(Outputs) ->
     Value = ?TYPE:new(),
     Sum = lists:foldl(fun(X, Acc) -> X ++ Acc end, Value, Outputs),

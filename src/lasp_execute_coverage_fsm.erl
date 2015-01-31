@@ -32,7 +32,7 @@
          process_results/2,
          finish/2]).
 
--record(state, {from, module, results}).
+-record(state, {from, module, results=[]}).
 
 %% ===================================================================
 %% API functions
@@ -43,7 +43,8 @@ execute(Module) ->
 
 execute(Module, NVal) ->
     ReqId = lasp:mk_reqid(),
-    _ = lasp_execute_coverage_fsm_sup:start_child([{raw, ReqId, self()}, [?TIMEOUT, NVal, Module]]),
+    _ = lasp_execute_coverage_fsm_sup:start_child([{raw, ReqId, self()},
+                                                   [?TIMEOUT, NVal, Module]]),
     {ok, ReqId}.
 
 init(From={_, _, _}, [Timeout, NVal, Module]) ->
@@ -68,7 +69,8 @@ finish(clean,
        StateData=#state{from={raw, ReqId, ClientPid},
                         module=Module,
                         results=Results}) ->
-    ClientPid ! {ReqId, ok, Module:merge(Results)},
+    {ok, Sum} = Module:sum(Results),
+    ClientPid ! {ReqId, ok, Sum},
     {stop, normal, StateData};
 finish(Message, StateData) ->
     lager:info("Unhandled finish: ~p", [Message]),

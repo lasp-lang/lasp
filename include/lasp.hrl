@@ -11,6 +11,8 @@
 -define(PROGRAM_W, 2).
 -define(PROGRAM_R, 2).
 
+-define(PROCESS_R, 1).
+
 -record(lasp_execute_request_v1, {
         module :: atom(),
         req_id :: non_neg_integer(),
@@ -30,6 +32,7 @@
 -type file() :: iolist().
 -type registration() :: preflist | global.
 -type id() :: atom().
+-type idx() :: term().
 -type result() :: term().
 -type type() :: lasp_ivar | riak_dt_gset | riak_dt_orset | riak_dt_gcounter.
 -type value() :: term().

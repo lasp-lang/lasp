@@ -47,7 +47,7 @@
 -callback bind(id(), value(), store(), function(), function()) ->
     {ok, id()}.
 
--callback thread(module(), func(), args(), store()) -> {ok, pid()}.
+-callback thread(module(), func(), args(), store()) -> ok.
 
 -callback next_key(undefined | id(), type(), store()) -> id().
 
@@ -69,20 +69,16 @@
                        term()) ->
     {ok, list(pending_threshold())}.
 
--callback filter(id(), function(), id(), store()) -> {ok, pid()}.
--callback filter(id(), function(), id(), store(), function(),
-                 function()) -> {ok, pid()}.
+-callback filter(id(), function(), id(), store()) -> ok.
+-callback filter(id(), function(), id(), store(), function(), function()) -> ok.
 
--callback map(id(), function(), id(), store()) -> {ok, pid()}.
--callback map(id(), function(), id(), store(), function(), function())
-    -> {ok, pid()}.
+-callback map(id(), function(), id(), store()) -> ok.
+-callback map(id(), function(), id(), store(), function(), function()) -> ok.
 
--callback fold(id(), function(), id(), store()) -> {ok, pid()}.
--callback fold(id(), function(), id(), store(), function(), function())
-    -> {ok, pid()}.
+-callback fold(id(), function(), id(), store()) -> ok.
+-callback fold(id(), function(), id(), store(), function(), function()) -> ok.
 
--callback internal_fold(store(), id(), function(), id(), fun(),
-                    function()) -> {ok, pid()}.
+-callback internal_fold(store(), id(), function(), id(), fun(), function()) -> ok.
 
 -callback update(id(), actor(), operation(), store()) ->
     {ok, {value(), id()}}.
@@ -91,6 +87,5 @@
 
 -callback type(id(), store()) -> {ok, type()}.
 
--callback product(id(), id(), id(), store()) -> {ok, pid()}.
--callback product(id(), id(), id(), store(), function(), function(),
-              function()) -> {ok, pid()}.
+-callback product(id(), id(), id(), store()) -> ok.
+-callback product(id(), id(), id(), store(), function(), function(), function()) -> ok.

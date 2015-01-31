@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_execute_fsm).
+-module(lasp_process_fsm).
 -author('Christopher Meiklejohn <cmeiklejohn@basho.com>').
 
 -behaviour(gen_fsm).
@@ -26,8 +26,8 @@
 -include("lasp.hrl").
 
 %% API
--export([start_link/3,
-         execute/1]).
+-export([start_link/7,
+         process/5]).
 
 %% Callbacks
 -export([init/1,
@@ -49,6 +49,10 @@
                 coordinator,
                 from,
                 module,
+                object,
+                reason,
+                idx,
+                node,
                 num_responses,
                 replies,
                 pids}).
@@ -57,13 +61,13 @@
 %%% API
 %%%===================================================================
 
-start_link(ReqId, From, Module) ->
-    gen_fsm:start_link(?MODULE, [ReqId, From, Module], []).
+start_link(ReqId, From, Module, Object, Reason, Idx, Node) ->
+    gen_fsm:start_link(?MODULE, [ReqId, From, Module, Object, Reason, Idx, Node], []).
 
-%% @doc Execute a module.
-execute(Module) ->
+%% @doc Process a notification.
+process(Module, Object, Reason, Idx, Node) ->
     ReqId = lasp:mk_reqid(),
-    _ = lasp_execute_fsm_sup:start_child([ReqId, self(), Module]),
+    _ = lasp_process_fsm_sup:start_child([ReqId, self(), Module, Object, Reason, Idx, Node]),
     {ok, ReqId}.
 
 %%%===================================================================
@@ -90,52 +94,51 @@ terminate(_Reason, _SN, _SD) ->
 %%%===================================================================
 
 %% @doc Initialize the request.
-init([ReqId, From, Module]) ->
+init([ReqId, From, Module, Object, Reason, Idx, Node]) ->
     State = #state{preflist=undefined,
                    req_id=ReqId,
                    coordinator=node(),
                    from=From,
                    module=Module,
+                   object=Object,
+                   reason=Reason,
+                   idx=Idx,
+                   node=Node,
                    num_responses=0,
                    pids=[],
                    replies=[]},
     {ok, prepare, State, 0}.
 
 %% @doc Prepare request by retrieving the preflist.
-prepare(timeout, #state{module=Module}=State) ->
-    Preflist = lasp:preflist(?PROGRAM_N, Module, lasp),
-    Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
+prepare(timeout, #state{idx=Idx, node=Node}=State) ->
+    Preflist2 = [{Idx, Node}],
     {next_state, execute, State#state{preflist=Preflist2}, 0}.
 
 %% @doc Execute the request.
 execute(timeout, #state{preflist=Preflist,
                         req_id=ReqId,
                         coordinator=Coordinator,
-                        module=Module}=State) ->
-    lasp_vnode:execute(Preflist, {ReqId, Coordinator}, Module),
+                        module=Module,
+                        object=Object,
+                        reason=Reason,
+                        idx=Idx}=State) ->
+    lasp_vnode:process(Preflist, {ReqId, Coordinator}, Module, Object, Reason, Idx),
     {next_state, waiting, State}.
 
 waiting({ok, _ReqId, Reply},
         #state{from=From,
                req_id=ReqId,
-               module=Module,
                num_responses=NumResponses0,
                replies=Replies0}=State0) ->
     NumResponses = NumResponses0 + 1,
     Replies = [Reply|Replies0],
     State = State0#state{num_responses=NumResponses, replies=Replies},
 
-    case NumResponses =:= ?PROGRAM_R of
+    case NumResponses =:= ?PROCESS_R of
         true ->
-            {ok, Result} = Module:merge(Replies),
-            From ! {ReqId, ok, Result},
-
-            case NumResponses =:= ?PROGRAM_N of
-                true ->
-                    {next_state, finalize, State, 0};
-                false ->
-                    {next_state, waiting_n, State}
-            end;
+            lager:info("responding with ok"),
+            From ! {ReqId, ok},
+            {next_state, finalize, State, 0};
         false ->
             {next_state, waiting, State}
     end.

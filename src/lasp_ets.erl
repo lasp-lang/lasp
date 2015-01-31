@@ -93,7 +93,7 @@ next(Id, Store) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec filter(id(), function(), id(), store()) -> {ok, pid()}.
+-spec filter(id(), function(), id(), store()) -> ok.
 filter(Id, Function, AccId, Store) ->
     BindFun = fun(_AccId, AccValue, _Variables) ->
             ?MODULE:bind(_AccId, AccValue, _Variables)
@@ -109,7 +109,7 @@ filter(Id, Function, AccId, Store) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec fold(id(), function(), id(), store()) -> {ok, pid()}.
+-spec fold(id(), function(), id(), store()) -> ok.
 fold(Id, Function, AccId, Store) ->
     BindFun = fun(_AccId, AccValue, _Variables) ->
             ?MODULE:bind(_AccId, AccValue, _Variables)
@@ -125,7 +125,7 @@ fold(Id, Function, AccId, Store) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec map(id(), function(), id(), store()) -> {ok, pid()}.
+-spec map(id(), function(), id(), store()) -> ok.
 map(Id, Function, AccId, Store) ->
     BindFun = fun(_AccId, AccValue, _Variables) ->
             ?MODULE:bind(_AccId, AccValue, _Variables)
@@ -140,7 +140,7 @@ map(Id, Function, AccId, Store) ->
 %%      Computes the cartestian product of two sets and bind the result
 %%      to a third.
 %%
--spec product(id(), id(), id(), store()) -> {ok, pid()}.
+-spec product(id(), id(), id(), store()) -> ok.
 product(Left, Right, Product, Store) ->
     BindFun = fun(_AccId, AccValue, _Variables) ->
             ?MODULE:bind(_AccId, AccValue, _Variables)
@@ -270,11 +270,11 @@ type(Id, Store) ->
 %%
 %%      Spawn a process executing `Module:Function(Args)'.
 %%
--spec thread(module(), func(), args(), store()) -> {ok, pid()}.
+-spec thread(module(), func(), args(), store()) -> ok.
 thread(Module, Function, Args, _Store) ->
     Fun = fun() -> erlang:apply(Module, Function, Args) end,
-    Pid = spawn(Fun),
-    {ok, Pid}.
+    spawn(Fun),
+    ok.
 
 %% Internal functions
 
@@ -576,8 +576,7 @@ bind_to(Id, TheirId, Store, FetchFun, FromPid) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec fold(id(), function(), id(), store(), function(), function()) ->
-    {ok, pid()}.
+-spec fold(id(), function(), id(), store(), function(), function()) -> ok.
 fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
     FolderFun = fun(Element, Acc) ->
             Values = case Element of
@@ -602,8 +601,7 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec product(id(), id(), id(), store(), function(), function(),
-              function()) -> {ok, pid()}.
+-spec product(id(), id(), id(), store(), function(), function(), function()) -> ok.
 product(Left, Right, Product, Store, BindFun, ReadLeftFun, _ReadRightFun) ->
     FolderLeftFun = fun(Element, Acc) ->
             %% Read current value of right.
@@ -650,8 +648,7 @@ orset_causal_product(Xs, Ys) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec map(id(), function(), id(), store(), function(), function()) ->
-    {ok, pid()}.
+-spec map(id(), function(), id(), store(), function(), function()) -> ok.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
     FolderFun = fun(Element, Acc) ->
             Value = case Element of
@@ -677,8 +674,7 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec filter(id(), function(), id(), store(), function(), function()) ->
-    {ok, pid()}.
+-spec filter(id(), function(), id(), store(), function(), function()) -> ok.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     FolderFun = fun(Element, Acc) ->
             Value = case Element of
@@ -839,18 +835,17 @@ reply_to_all([], StillWaiting, _Result) ->
 
 %% Internal functions.
 
--spec internal_fold(store(), id(), function(), id(), fun(), function())
-                    -> {ok, pid()}.
+-spec internal_fold(store(), id(), function(), id(), fun(), function()) -> ok.
 internal_fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
-    Pid = spawn_link(?MODULE, internal_fold_harness, [Variables,
-                                                      Id,
-                                                      Function,
-                                                      AccId,
-                                                      BindFun,
-                                                      ReadFun,
-                                                      undefined,
-                                                      undefined]),
-    {ok, Pid}.
+    spawn_link(?MODULE, internal_fold_harness, [Variables,
+                                                Id,
+                                                Function,
+                                                AccId,
+                                                BindFun,
+                                                ReadFun,
+                                                undefined,
+                                                undefined]),
+    ok.
 
 -spec internal_fold_harness(store(), id(), function(), id(), function(),
                             function(), value(), value()) -> function().

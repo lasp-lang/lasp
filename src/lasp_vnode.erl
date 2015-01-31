@@ -48,7 +48,8 @@
 
 %% Program execution functions.
 -export([register/4,
-         execute/3]).
+         execute/3,
+         process/6]).
 
 %% Callbacks from the backend module.
 -export([notify_value/2,
@@ -89,6 +90,12 @@ register(Preflist, Identity, Module, File) ->
 execute(Preflist, Identity, Module) ->
     riak_core_vnode_master:command(Preflist,
                                    {execute, Identity, Module},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
+
+process(Preflist, Identity, Module, Object, Reason, Idx) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {process, Identity, Module, Object, Reason, Idx},
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
@@ -214,14 +221,35 @@ handle_command({execute, {ReqId, _}, Module0}, _From,
             {reply, {error, ReqId}, State}
     end;
 
+handle_command({process, {ReqId, _}, Module0, Object, Reason, Idx}, _From,
+               #state{programs=Programs0,
+                      node=Node,
+                      partition=Partition}=State) ->
+    Module = generate_unique_module_identifier(Partition,
+                                               Node,
+                                               Module0),
+    case process(Module, Object, Reason, Idx, Programs0) of
+        {ok, Result, Programs} ->
+            {reply, {ok, ReqId, Result}, State#state{programs=Programs}};
+        {error, undefined} ->
+            {reply, {error, ReqId}, State}
+    end;
+
 handle_command({register, {ReqId, _}, Module0, File}, _From,
                #state{partition=Partition,
                       node=Node,
                       variables=Variables,
                       programs=Programs0}=State) ->
     try
-        lager:info("Partition registration for module: ~p, partition: ~p",
-                   [Module0, Partition]),
+        %% Compile under original name, for the pure functions like
+        %% `sum' and `merge'.
+        %%
+        {ok, _, Bin0} = compile:file(File, [binary,
+                                            {parse_transform, lager_transform}]),
+        {module, Module0} = code:load_binary(Module0, File, Bin0),
+
+        %% Compile under unique name for vnode.
+        %%
         Module = generate_unique_module_identifier(Partition,
                                                    Node,
                                                    Module0),
@@ -345,8 +373,8 @@ handle_command({notify_value, Id, Value}, _From,
 
 handle_command({thread, {ReqId, _}, Module, Function, Args}, _From,
                #state{variables=Variables}=State) ->
-    {ok, Pid} = ?BACKEND:thread(Module, Function, Args, Variables),
-    {reply, {ok, ReqId, Pid}, State};
+    ok = ?BACKEND:thread(Module, Function, Args, Variables),
+    {reply, {ok, ReqId, ok}, State};
 
 handle_command({wait_needed, {ReqId, _}, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
@@ -407,9 +435,8 @@ handle_command({filter, {ReqId, _}, Id, Function, AccId}, _From,
                     lasp:read(_Id, _Threshold)
             end
     end,
-    {ok, Result} = ?BACKEND:filter(Id, Function, AccId, Variables,
-                                   BindFun, ReadFun),
-    {reply, {ok, ReqId, Result}, State};
+    ok = ?BACKEND:filter(Id, Function, AccId, Variables, BindFun, ReadFun),
+    {reply, {ok, ReqId, ok}, State};
 
 handle_command({product, {ReqId, _}, Left, Right, Product}, _From,
                State=#state{variables=Variables,
@@ -457,9 +484,8 @@ handle_command({product, {ReqId, _}, Left, Right, Product}, _From,
                     lasp:read(Right, _Threshold)
             end
     end,
-    {ok, Result} = ?BACKEND:product(Left, Right, Product, Variables,
-                                    BindFun, ReadLeftFun, ReadRightFun),
-    {reply, {ok, ReqId, Result}, State};
+    ok = ?BACKEND:product(Left, Right, Product, Variables, BindFun, ReadLeftFun, ReadRightFun),
+    {reply, {ok, ReqId, ok}, State};
 
 handle_command({map, {ReqId, _}, Id, Function, AccId}, _From,
                State=#state{variables=Variables,
@@ -493,9 +519,8 @@ handle_command({map, {ReqId, _}, Id, Function, AccId}, _From,
                     lasp:read(_Id, _Threshold)
             end
     end,
-    {ok, Result} = ?BACKEND:map(Id, Function, AccId, Variables, BindFun,
-                                ReadFun),
-    {reply, {ok, ReqId, Result}, State};
+    ok = ?BACKEND:map(Id, Function, AccId, Variables, BindFun, ReadFun),
+    {reply, {ok, ReqId, ok}, State};
 
 handle_command({fold, {ReqId, _}, Id, Function, AccId}, _From,
                State=#state{variables=Variables,
@@ -529,9 +554,8 @@ handle_command({fold, {ReqId, _}, Id, Function, AccId}, _From,
                     lasp:read(_Id, _Threshold)
             end
     end,
-    {ok, Result} = ?BACKEND:fold(Id, Function, AccId, Variables,
-                                 BindFun, ReadFun),
-    {reply, {ok, ReqId, Result}, State};
+    ok = ?BACKEND:fold(Id, Function, AccId, Variables, BindFun, ReadFun),
+    {reply, {ok, ReqId, ok}, State};
 
 handle_command({next, {ReqId, _}, Id}, _From,
                State=#state{variables=Variables}) ->
@@ -577,8 +601,6 @@ handle_coverage(?EXECUTE_REQUEST{module=Module0}, _KeySpaces, _Sender,
                 #state{programs=Programs,
                        node=Node,
                        partition=Partition}=State) ->
-    lager:info("Coverage execute request received for module: ~p",
-               [Module0]),
     Module = generate_unique_module_identifier(Partition,
                                                Node,
                                                Module0),
@@ -606,7 +628,9 @@ next_key(NextKey0, _, _) ->
     NextKey0.
 
 %% @doc Declare the next object for streams.
-declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) ->
+declare_next(Type, #state{partition=Partition,
+                          node=Node,
+                          variables=Variables}) ->
     Id = druuid:v4(),
 
     %% Beware of cycles in the gen_server calls!
@@ -626,18 +650,36 @@ declare_next(Type, #state{partition=Partition, node=Node, variables=Variables}) 
 
 %% @doc Execute a given program.
 execute(Module, Programs) ->
-    lager:info("Execute triggered for module: ~p", [Module]),
     case dict:is_key(Module, Programs) of
         true ->
-            Acc = dict:fetch(Module, Programs),
+            State = dict:fetch(Module, Programs),
             Self = self(),
             ReqId = lasp:mk_reqid(),
             spawn_link(fun() ->
-                        Result = Module:execute(Acc),
+                        Result = Module:execute(State),
                         Self ! {ReqId, ok, Result}
                         end),
             {ok, Result} = lasp:wait_for_reqid(ReqId, infinity),
             Result;
+        false ->
+            lager:info("Failed to execute module: ~p", [Module]),
+            {error, undefined}
+    end.
+
+%% @doc Process a given program.
+process(Module, Object, Reason, Idx, Programs0) ->
+    case dict:is_key(Module, Programs0) of
+        true ->
+            State0 = dict:fetch(Module, Programs0),
+            Self = self(),
+            ReqId = lasp:mk_reqid(),
+            spawn_link(fun() ->
+                        {ok, State} = Module:process(Object, Reason, Idx, State0),
+                        Programs = dict:store(Module, State, Programs0),
+                        Self ! {ReqId, ok, {ok, Programs}}
+                        end),
+            {ok, {Result, Programs}} = lasp:wait_for_reqid(ReqId, infinity),
+            {ok, Result, Programs};
         false ->
             lager:info("Failed to execute module: ~p", [Module]),
             {error, undefined}

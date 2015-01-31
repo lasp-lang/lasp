@@ -21,6 +21,7 @@
 -module(lasp).
 
 -include("lasp.hrl").
+-include("lasp_program.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([declare/1,
@@ -47,6 +48,7 @@
          get_stream/1,
          register/3,
          execute/2,
+         process/6,
          mk_reqid/0,
          wait_for_reqid/2]).
 
@@ -107,6 +109,17 @@ execute(Module, global) ->
     wait_for_reqid(ReqId, ?TIMEOUT);
 execute(_Module, _Registration) ->
     error.
+
+%% @doc Notification of value change.
+%%
+%%      Notify a given partition at a given node that an object has
+%%      changed for a particular reason.
+%%
+-spec process(module(), registration(), object(), reason(), idx(),
+              node()) -> {ok, result()} | {error, timeout}.
+process(Module, global, Object, Reason, Idx, Node) ->
+    {ok, ReqId} = lasp_process_fsm:process(Module, Object, Reason, Idx, Node),
+    wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Declare a new dataflow variable of a given type.
 %%

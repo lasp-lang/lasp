@@ -21,7 +21,6 @@
 -module(lasp).
 
 -include("lasp.hrl").
--include("lasp_program.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([declare/1,

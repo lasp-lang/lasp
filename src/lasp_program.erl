@@ -18,23 +18,9 @@
 %%
 %% -------------------------------------------------------------------
 
-% -module(lasp_program).
+-module(lasp_program).
 
-%% @doc Only CRDTs are able to be processed.
--type crdt() :: riak_dt:crdt().
-
-%% @doc Output of program must be a CRDT.
--type output() :: crdt().
-
-%% @doc Any state that needs to be tracked from one execution to the
-%%      next execution.
--type state() :: term().
-
-%% @doc Reasons provided by the riak_kv vnode for change.
--type reason() :: put | handoff | delete.
-
-%% @doc The type of objects that we can be notified about.
--type object() :: crdt().
+-include("lasp.hrl").
 
 %% @doc Initialize the program.  Perform whatever initial configuration
 %%      is required.

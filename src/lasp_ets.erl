@@ -30,6 +30,7 @@
          bind_to/3,
          read/2,
          read/3,
+         read_either/2,
          next/2,
          declare/1,
          declare/2,
@@ -174,9 +175,7 @@ read(Id, Store) ->
 -spec read(id(), value(), store()) -> {ok, {type(), value(), id()}}.
 read(Id, Threshold, Store) ->
     Self = self(),
-    ReplyFun = fun(Type, Value, Next) ->
-            {ok, {Type, Value, Next}}
-            end,
+    ReplyFun = fun(Type, Value, Next) -> {ok, {Type, Value, Next}} end,
     BlockingFun = fun() ->
             receive
                 X ->
@@ -184,6 +183,22 @@ read(Id, Threshold, Store) ->
             end
             end,
     read(Id, Threshold, Store, Self, ReplyFun, BlockingFun).
+
+%% @doc Perform a monotonic read for a series of given idenfitiers --
+%%      first response wins.
+%%
+-spec read_either([{id(), value()}], store()) -> {ok, {type(), value(), id()}}.
+read_either(Reads, Store) ->
+    Self = self(),
+    case read_either(Reads, Self, Store) of
+        {ok, not_available_yet} ->
+            receive
+                X ->
+                    X
+            end;
+        {ok, {Type, Value, Next}} ->
+            {ok, {Type, Value, Next}}
+    end.
 
 %% @doc Declare a dataflow variable in a provided by identifer {@link
 %%      ets:new/2} `Store'.
@@ -499,6 +514,65 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
             BlockingFun()
     end.
 
+%% @doc Perform a read (or monotonic read) for a series of particular
+%%      identifiers.
+%%
+-spec read_either([{id(), value()}], pid(), store()) ->
+    {ok, {type(), value(), id()}}.
+read_either(Reads, Self, Store) ->
+    Found = lists:foldl(fun({Id, Threshold0}, AlreadyFound) ->
+       case AlreadyFound of
+           false ->
+               [{_Key, V=#dv{value=Value,
+                             lazy_threads=LazyThreads,
+                             type=Type}}] = ets:lookup(Store, Id),
+
+               %% When no threshold is specified, use the bottom
+               %% value for the given lattice.
+               %%
+               Threshold = case Threshold0 of
+                   undefined ->
+                       Type:new();
+                   {strict, undefined} ->
+                       {strict, Type:new()};
+                   Threshold0 ->
+                       Threshold0
+               end,
+
+               %% Notify all lazy processes of this read.
+               {ok, StillLazy} = reply_to_all(LazyThreads,
+                                              {ok, Threshold}),
+
+               %% Satisfy read if threshold is met.
+               case lasp_lattice:threshold_met(Type,
+                                               Value,
+                                               Threshold) of
+                   true ->
+                       {Type, Value, V#dv.next};
+                   false ->
+                       WT = lists:append(V#dv.waiting_threads,
+                                         [{threshold,
+                                           read,
+                                           Self,
+                                           Type,
+                                           Threshold}]),
+                       true = ets:insert(Store,
+                                         {Id,
+                                          V#dv{waiting_threads=WT,
+                                               lazy_threads=StillLazy}}),
+                       false
+               end;
+           Result ->
+               Result
+           end
+       end, false, Reads),
+       case Found of
+           false ->
+               {ok, not_available_yet};
+           Value ->
+               {ok, Value}
+       end.
+
 %% @doc Fetch is responsible for retreiving the value of a
 %%      partially-bound variable from the ultimate source, if it's
 %%      bound.
@@ -603,6 +677,10 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
 %%
 -spec product(id(), id(), id(), store(), function(), function(), function()) -> ok.
 product(Left, Right, Product, Store, BindFun, ReadLeftFun, _ReadRightFun) ->
+    %% @TODO: internal_fold needs to take a readfun which will do a read_many
+    %% on the left and right variables.
+    ReadFun = ReadLeftFun,
+
     FolderLeftFun = fun(Element, Acc) ->
             %% Read current value of right.
             %% @TODO: need to ensure this is a monotonic read.
@@ -623,7 +701,7 @@ product(Left, Right, Product, Store, BindFun, ReadLeftFun, _ReadRightFun) ->
     end,
     %% @TODO: needs to be for both reads; left and right.
     %% @TODO: currently only folds left.
-    internal_fold(Store, Left, FolderLeftFun, Product, BindFun, ReadLeftFun).
+    internal_fold(Store, Left, FolderLeftFun, Product, BindFun, ReadFun).
 
 %% @doc Compute a cartesian product from causal metadata stored in the
 %%      orset.

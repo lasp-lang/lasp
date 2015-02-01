@@ -128,4 +128,20 @@ test_lattice(Type) ->
             ok
     end,
 
+    {ok, L5} = lasp:declare(Type),
+    {ok, L6} = lasp:declare(Type),
+
+    spawn_link(fun() ->
+                lasp:read_either([{L5, {strict, undefined}},
+                                  {L6, {strict, undefined}}]),
+                Self ! read_either
+        end),
+
+    {ok, _} = lasp:update(L5, {add, 1}, a),
+
+    receive
+        read_either ->
+            ok
+    end,
+
     ok.

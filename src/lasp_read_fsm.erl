@@ -27,7 +27,8 @@
 
 %% API
 -export([start_link/4,
-         read/2]).
+         read/2,
+         read/3]).
 
 %% Callbacks
 -export([init/1,
@@ -65,6 +66,11 @@ read(Id, Threshold) ->
     ReqId = lasp:mk_reqid(),
     _ = lasp_read_fsm_sup:start_child([ReqId, self(), Id, Threshold]),
     {ok, ReqId}.
+
+%% @doc Read a variable.
+read(Id, Threshold, ReqId) ->
+    _ = lasp_read_fsm_sup:start_child([ReqId, self(), Id, Threshold]),
+    ok.
 
 %%%===================================================================
 %%% Callbacks

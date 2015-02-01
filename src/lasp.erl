@@ -32,6 +32,7 @@
          bind_to/2,
          read/1,
          read/2,
+         read_either/1,
          filter/3,
          map/3,
          product/3,
@@ -205,6 +206,16 @@ read(Id) ->
     {ok, {type(), value(), id()}} | {error, timeout}.
 read(Id, Threshold) ->
     {ok, ReqId} = lasp_read_fsm:read(Id, Threshold),
+    wait_for_reqid(ReqId, ?TIMEOUT).
+
+%% @doc Blocking monotonic read operation for a list of given dataflow
+%%      variables.
+%%
+-spec read_either([{id(), threshold()}]) ->
+    {ok, {type(), value(), id()}} | {error, timeout}.
+read_either(Reads) ->
+    ReqId = mk_reqid(),
+    _ = [lasp_read_fsm:read(Id, Threshold, ReqId) || {Id, Threshold} <- Reads],
     wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Compute the cartesian product of two sets.

@@ -518,7 +518,7 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
 %%      identifiers.
 %%
 -spec read_either([{id(), value()}], pid(), store()) ->
-    {ok, {type(), value(), id()}}.
+    {ok, {type(), value(), id()}} | {ok, not_available_yet}.
 read_either(Reads, Self, Store) ->
     Found = lists:foldl(fun({Id, Threshold0}, AlreadyFound) ->
        case AlreadyFound of

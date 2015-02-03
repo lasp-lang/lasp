@@ -690,11 +690,11 @@ product(Left, Right, Product, Store, BindFun, ReadLeftFun, _ReadRightFun) ->
             Values = case Element of
                 {X, XCausality} ->
                     %% riak_dt_orset
-                    [{[X, Y], orset_causal_product(XCausality, YCausality)}
+                    [{{X, Y}, orset_causal_product(XCausality, YCausality)}
                      || {Y, YCausality} <- RValue];
                 X ->
                     %% riak_dt_gset
-                    [[X, Y] || Y  <- RValue]
+                    [{X, Y} || Y  <- RValue]
             end,
 
             Acc ++ Values

@@ -155,7 +155,7 @@ test() ->
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
-    lists:map(fun({#ad{counter=Ad}, _}) ->
+    lists:map(fun(Ad) ->
                 ServerPid = spawn_link(?MODULE, server, [Ad, Ads]),
                 {ok, _} = lasp:update(Servers,
                                       {add, ServerPid},
@@ -177,9 +177,9 @@ test() ->
 %% @doc Server functions for the advertisement counter.  After 5 views,
 %%      disable the advertisement.
 %%
-server(Ad, Ads) ->
+server({#ad{counter=Counter}=Ad, _}, Ads) ->
     %% Blocking threshold read for 5 advertisement impressions.
-    {ok, _} = lasp:read(Ad, 5),
+    {ok, _} = lasp:read(Counter, 5),
 
     %% Remove the advertisement.
     {ok, _} = lasp:update(Ads, {remove, Ad}, Ad),

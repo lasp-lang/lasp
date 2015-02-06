@@ -204,18 +204,16 @@ is_read_valid(#state{store=Store}, Id, Threshold) ->
 %% Properties for the state machine.
 
 prop_sequential() ->
-    eqc:testing_time(?SECS,
-                     ?SETUP(fun() ->
+    eqc:quickcheck(?SETUP(fun() ->
                                  setup(),
                                  fun teardown/0
-                            end,
+                          end,
                          ?FORALL(Cmds, commands(?MODULE),
                                  begin
                                      {H, S, Res} = run_commands(?MODULE, Cmds),
-                                     ?WHENFAIL(
-                                         io:format("History: ~p~nState: ~p~nRes: ~p~n", [H, S, Res]),
-                                         Res == ok)
-                     end))).
+                                     pretty_commands(?MODULE, Cmds, {H, S, Res},
+                                        aggregate(command_names(Cmds), Res == ok))
+                                 end))).
 
 setup() ->
     ?ETS = ets:new(?ETS, [public, set, named_table,

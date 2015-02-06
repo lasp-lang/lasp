@@ -15,13 +15,12 @@
 -record(state, {store}).
 -record(variable, {type, value}).
 
--define(SECS, 60).
--define(NUM_TESTS, 200).
 -define(LATTICES, [lasp_ivar,
                    riak_dt_gset,
+                   riak_dt_gcounter,
                    riak_dt_orset,
-                   riak_dt_orswot,
-                   riak_dt_gcounter]).
+                   riak_dt_map,
+                   riak_dt_orswot]).
 
 -define(ETS, lasp_ets_eqc).
 
@@ -32,9 +31,7 @@
 
 lasp_ets_sequential_test_() ->
     {timeout, 60,
-     ?_assert(eqc:quickcheck(
-                eqc:numtests(?NUM_TESTS,
-                             ?QC_OUT(?MODULE:prop_sequential()))))}.
+     ?_assert(eqc:quickcheck(?QC_OUT(?MODULE:prop_sequential())))}.
 
 %% Generators.
 

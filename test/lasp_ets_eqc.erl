@@ -178,6 +178,13 @@ read_post(#state{store=Store}, [Id, _Threshold], {ok, {_, V, _}}) ->
             false
     end.
 
+%% Weights.
+
+weight(_, declare) -> 1;
+weight(_, bind) -> 1;
+weight(_, read) -> 2;
+weight(_, _) -> 3.
+
 %% Predicates.
 
 has_variables(#state{store=Store}) ->

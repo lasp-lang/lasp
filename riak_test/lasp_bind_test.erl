@@ -57,7 +57,6 @@ test() ->
     test_ivars(),
     test_lattice(riak_dt_gset),
     test_lattice(riak_dt_orset),
-    test_lattice(riak_dt_orswot),
     ok.
 
 %% @doc Test single-assignment variables.

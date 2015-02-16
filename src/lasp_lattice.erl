@@ -219,7 +219,7 @@ is_lattice_strict_inflation(riak_dt_orset, Previous, Current) ->
 
 is_lattice_strict_inflation(riak_dt_orswot, {PV, PE, _}=Previous, {CV, CE, _}=Current) ->
     IsLatticeInflation = is_lattice_inflation(riak_dt_orswot, Previous, Current),
-    DeletedElements = orddict:size(PE) > orddict:size(CE),
+    DeletedElements = dict:size(PE) > dict:size(CE),
     DominatedClock = riak_dt_vclock:dominates(CV, PV),
     EqualClocks = riak_dt_vclock:equal(CV, PV),
     IsLatticeInflation andalso (
@@ -228,7 +228,7 @@ is_lattice_strict_inflation(riak_dt_orswot, {PV, PE, _}=Previous, {CV, CE, _}=Cu
 
 is_lattice_strict_inflation(riak_dt_map, {PV, PE, _}=Previous, {CV, CE, _}=Current) ->
     IsLatticeInflation = is_lattice_inflation(riak_dt_orswot, Previous, Current),
-    DeletedElements = orddict:size(PE) > orddict:size(CE),
+    DeletedElements = dict:size(PE) > dict:size(CE),
     DominatedClock = riak_dt_vclock:dominates(CV, PV),
     EqualClocks = riak_dt_vclock:equal(CV, PV),
     IsLatticeInflation andalso (

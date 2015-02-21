@@ -221,7 +221,7 @@ read_either(Reads) ->
 %%      Computes the cartestian product of two sets and bind the result
 %%      to a third.
 %%
--spec product(id(), id(), id()) -> {ok, pid()} | {error, timeout}.
+-spec product(id(), id(), id()) -> ok | {error, timeout}.
 product(Left, Right, Product) ->
     {ok, ReqId} = lasp_product_fsm:product(Left, Right, Product),
     wait_for_reqid(ReqId, ?TIMEOUT).
@@ -232,7 +232,7 @@ product(Left, Right, Product) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec map(id(), function(), id()) -> {ok, pid()} | {error, timeout}.
+-spec map(id(), function(), id()) -> ok | {error, timeout}.
 map(Id, Function, AccId) ->
     {ok, ReqId} = lasp_map_fsm:map(Id, Function, AccId),
     wait_for_reqid(ReqId, ?TIMEOUT).
@@ -243,7 +243,7 @@ map(Id, Function, AccId) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec fold(id(), function(), id()) -> {ok, pid()} | {error, timeout}.
+-spec fold(id(), function(), id()) -> ok | {error, timeout}.
 fold(Id, Function, AccId) ->
     {ok, ReqId} = lasp_fold_fsm:fold(Id, Function, AccId),
     wait_for_reqid(ReqId, ?TIMEOUT).
@@ -254,7 +254,7 @@ fold(Id, Function, AccId) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec filter(id(), function(), id()) -> {ok, pid()} | {error, timeout}.
+-spec filter(id(), function(), id()) -> ok | {error, timeout}.
 filter(Id, Function, AccId) ->
     {ok, ReqId} = lasp_filter_fsm:filter(Id, Function, AccId),
     wait_for_reqid(ReqId, ?TIMEOUT).
@@ -303,7 +303,7 @@ extend(Id) ->
 %%
 %%      Spawn a process executing `Module:Function(Args)'.
 %%
--spec thread(module(), func(), args()) -> {ok, pid()} | {error, timeout}.
+-spec thread(module(), func(), args()) -> ok | {error, timeout}.
 thread(Module, Function, Args) ->
     {ok, ReqId} = lasp_thread_fsm:thread(Module, Function, Args),
     wait_for_reqid(ReqId, ?TIMEOUT).

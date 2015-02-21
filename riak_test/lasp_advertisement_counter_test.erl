@@ -105,7 +105,7 @@ test() ->
 
     %% Compute the Cartesian product of both ads and contracts.
     {ok, AdsContracts} = lasp:declare(?SET),
-    {ok, _} = lasp:product(Ads, Contracts, AdsContracts),
+    ok = lasp:product(Ads, Contracts, AdsContracts),
 
     %% Debug; print the product.
     timer:sleep(500),
@@ -118,7 +118,7 @@ test() ->
     FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
         Id1 =:= Id2
     end,
-    {ok, _} = lasp:filter(AdsContracts, FilterFun, AdsWithContracts),
+    ok = lasp:filter(AdsContracts, FilterFun, AdsWithContracts),
 
     %% Debug; print the filtered.
     timer:sleep(500),

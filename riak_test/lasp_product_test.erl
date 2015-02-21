@@ -69,7 +69,7 @@ test(Type) ->
     {ok, _} = lasp:update(S2, {add_all, [a,b,c]}, a),
 
     %% Apply product.
-    {ok, _Pid} = lasp:product(S1, S2, S3),
+    ok = lasp:product(S1, S2, S3),
 
     %% Sleep.
     timer:sleep(400),

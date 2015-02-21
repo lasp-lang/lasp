@@ -70,9 +70,7 @@ test(Type) ->
     {ok, S2} = lasp:declare(Type),
 
     %% Apply filter.
-    {ok, _Pid} = lasp:filter(S1, fun(X) ->
-                    X rem 2 == 0
-            end, S2),
+    ok = lasp:filter(S1, fun(X) -> X rem 2 == 0 end, S2),
 
     %% Wait.
     timer:sleep(4000),

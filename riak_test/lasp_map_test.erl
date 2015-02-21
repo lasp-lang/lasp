@@ -70,7 +70,7 @@ test(Type) ->
     {ok, S2} = lasp:declare(Type),
 
     %% Apply map.
-    {ok, _Pid} = lasp:map(S1, fun(X) -> X * 2 end, S2),
+    ok = lasp:map(S1, fun(X) -> X * 2 end, S2),
 
     %% Wait.
     timer:sleep(4000),

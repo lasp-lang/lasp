@@ -70,7 +70,7 @@ test(Type) ->
     {ok, S2} = lasp:declare(Type),
 
     %% Apply fold.
-    {ok, _Pid} = lasp:fold(S1, fun(X) -> [X,X,X] end, S2),
+    ok = lasp:fold(S1, fun(X) -> [X,X,X] end, S2),
 
     %% Wait.
     timer:sleep(4000),

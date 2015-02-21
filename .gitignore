@@ -15,3 +15,4 @@ current_counterexample.eqc
 doc/
 rel/lasp
 dialyzer_warnings
+.rebar/

@@ -29,8 +29,6 @@
 
 -export([confirm/0]).
 
--compile(export_all).
-
 -define(HARNESS, (rt_config:get(rt_harness))).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -56,9 +54,9 @@ confirm() ->
 -endif.
 
 test() ->
-    % test_ivars(),
-    % test_lattice(riak_dt_gset),
-    % test_lattice(riak_dt_orset),
+    test_ivars(),
+    test_lattice(riak_dt_gset),
+    test_lattice(riak_dt_orset),
     ok.
 
 %% @doc Test single-assignment variables.

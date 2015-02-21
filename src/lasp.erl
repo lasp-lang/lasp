@@ -42,7 +42,6 @@
          extend/1,
          wait_needed/1,
          wait_needed/2,
-         spawn_mon/4,
          thread/3,
          preflist/3,
          get_stream/1,
@@ -329,17 +328,6 @@ wait_needed(Id) ->
 wait_needed(Id, Threshold) ->
     {ok, ReqId} = lasp_wait_needed_fsm:wait_needed(Id, Threshold),
     wait_for_reqid(ReqId, ?TIMEOUT).
-
-%% @doc Spawn monitor.
-%%
-%%      Spawn a process and register the process with a given lasp
-%%      supervisor process.
-%%
--spec spawn_mon(supervisor(), module(), func(), args()) -> ok.
-spawn_mon(Supervisor, Module, Function, Args) ->
-    {ok, Pid} = thread(Module, Function, Args),
-    Supervisor ! {'SUPERVISE', Pid, Module, Function, Args},
-    ok.
 
 %% @doc Materialize all values in a stream and print to the log.
 %%

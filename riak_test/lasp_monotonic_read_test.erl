@@ -44,8 +44,8 @@ confirm() ->
 
     lager:info("Remotely executing the test."),
     {GSet, GSet2} = rpc:call(Node, ?MODULE, test, []),
-    ?assertMatch({ok, {_, [1,2,3], _}}, GSet),
-    ?assertMatch({ok, {_, [1,2,3,4], _}}, GSet2),
+    ?assertMatch({ok, {_, _, [1,2,3], _}}, GSet),
+    ?assertMatch({ok, {_, _, [1,2,3,4], _}}, GSet2),
 
     pass.
 
@@ -68,7 +68,7 @@ test() ->
 
     %% Ensure we receive [1, 2, 3].
     GSet = receive
-        {ok, {_, [1, 2, 3], _}} = V ->
+        {ok, {_, _, [1, 2, 3], _}} = V ->
             V
     end,
 
@@ -81,7 +81,7 @@ test() ->
 
     %% Ensure we receive [1, 2, 3, 4].
     GSet2 = receive
-        {ok, {_, [1, 2, 3, 4], _}} = V1 ->
+        {ok, {_, _, [1, 2, 3, 4], _}} = V1 ->
             V1
     end,
 

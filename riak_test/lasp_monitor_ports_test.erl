@@ -79,11 +79,11 @@ sensor(Port, Identifier) ->
 
 dcs_monitor(Input, Output, State) ->
     case lasp:consume(Input) of
-        {ok, _, {computer_down, Identifier}, NextInput} ->
+        {ok, _, _, {computer_down, Identifier}, NextInput} ->
             NewState = register_comfailure(Identifier, State),
             {ok, NextOutput} = lasp:produce(Output, NewState),
             dcs_monitor(NextInput, NextOutput, NewState);
-        {ok, _, _, NextInput} ->
+        {ok, _, _, _, NextInput} ->
             dcs_monitor(NextInput, Output, State)
     end.
 

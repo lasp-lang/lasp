@@ -49,6 +49,9 @@
 -type ivar() :: term().
 -type actor() :: term().
 
+%% @doc Result of a read operation.
+-type var() :: {id(), type(), value(), id()}.
+
 %% @doc Only CRDTs are able to be processed.
 -type crdt() :: riak_dt:crdt().
 

@@ -75,7 +75,7 @@ producer(Value, N, Output) ->
 
 loop(S1, S2, End) ->
     {ok, _} = lasp:wait_needed(S2),
-    {ok, {_, S1Value, S1Next}} = lasp:consume(S1),
+    {ok, {_, _, S1Value, S1Next}} = lasp:consume(S1),
     {ok, S2Next} = lasp:produce(S2, S1Value),
     case lasp:produce(S2, S1Value) of
         {ok, nil} ->
@@ -108,9 +108,9 @@ consumer(S2, Size, F, Output) ->
             ok;
         _ ->
             case lasp:consume(S2) of
-                {ok, {_, nil, _}} ->
+                {ok, {_, _, nil, _}} ->
                     lasp:bind(Output, nil);
-                {ok, {_, Value, Next}} ->
+                {ok, {_, _, Value, Next}} ->
                     {ok, NextOutput} = lasp:produce(Output, F(Value)),
                     consumer(Next, Size - 1, F, NextOutput)
             end

@@ -190,7 +190,7 @@ bind(Id, Module, Function, Args) ->
 %%      Block until the variable identified by `Id' has been bound and
 %%      then return the value.
 %%
--spec read(id()) -> {ok, {type(), value(), id()}} | {error, timeout}.
+-spec read(id()) -> {ok, var()} | {error, timeout}.
 read(Id) ->
     read(Id, {strict, undefined}).
 
@@ -200,8 +200,7 @@ read(Id) ->
 %%      is monotonically greater (as defined by the lattice) then the
 %%      provided `Threshold' value.
 %%
--spec read(id(), threshold()) ->
-    {ok, {type(), value(), id()}} | {error, timeout}.
+-spec read(id(), threshold()) -> {ok, var()} | {error, timeout}.
 read(Id, Threshold) ->
     {ok, ReqId} = lasp_read_fsm:read(Id, Threshold),
     wait_for_reqid(ReqId, ?TIMEOUT).
@@ -209,8 +208,7 @@ read(Id, Threshold) ->
 %% @doc Blocking monotonic read operation for a list of given dataflow
 %%      variables.
 %%
--spec read_either([{id(), threshold()}]) ->
-    {ok, {type(), value(), id()}} | {error, timeout}.
+-spec read_either([{id(), threshold()}]) -> {ok, var()} | {error, timeout}.
 read_either(Reads) ->
     ReqId = mk_reqid(),
     _ = [lasp_read_fsm:read(Id, Threshold, ReqId) || {Id, Threshold} <- Reads],
@@ -284,8 +282,7 @@ produce(Id, Module, Function, Args) ->
 %%      Given the `Id' of a declared variable in a dataflow stream, read
 %%      the next value in the stream.
 %%
--spec consume(id()) ->
-    {ok, {type(), value(), id()}} | {error, timeout}.
+-spec consume(id()) -> {ok, var()} | {error, timeout}.
 consume(Id) ->
     read(Id, {strict, undefined}).
 
@@ -401,10 +398,10 @@ wait_for_reqid(ReqID, Timeout) ->
 get_stream(Head, Output) ->
     lager:info("About to consume: ~p", [Head]),
     case consume(Head) of
-        {ok, {_, nil, _}} ->
+        {ok, {_, _, nil, _}} ->
             lager:info("Received: ~p", [undefined]),
             Output;
-        {ok, {_, Value, Next}} ->
+        {ok, {_, _, Value, Next}} ->
             lager:info("Received: ~p", [Value]),
             get_stream(Next, lists:append(Output, [Value]))
     end.

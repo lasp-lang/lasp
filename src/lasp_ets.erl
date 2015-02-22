@@ -160,7 +160,7 @@ product(Left, Right, Product, Store) ->
 %%      Given an `Id', perform a blocking read until the variable is
 %%      bound.
 %%
--spec read(id(), store()) -> {ok, {type(), value(), id()}}.
+-spec read(id(), store()) -> {ok, var()}.
 read(Id, Store) ->
     read(Id, {strict, undefined}, Store).
 
@@ -172,10 +172,12 @@ read(Id, Store) ->
 %%      This operation blocks until `Threshold' has been reached,
 %%      reading from the provided {@link ets:new/2} store, `Store'.
 %%
--spec read(id(), value(), store()) -> {ok, {type(), value(), id()}}.
+-spec read(id(), value(), store()) -> {ok, var()}.
 read(Id, Threshold, Store) ->
     Self = self(),
-    ReplyFun = fun(Type, Value, Next) -> {ok, {Type, Value, Next}} end,
+    ReplyFun = fun(_Id, Type, Value, Next) ->
+            {ok, {_Id, Type, Value, Next}}
+    end,
     BlockingFun = fun() ->
             receive
                 X ->
@@ -187,7 +189,7 @@ read(Id, Threshold, Store) ->
 %% @doc Perform a monotonic read for a series of given idenfitiers --
 %%      first response wins.
 %%
--spec read_either([{id(), value()}], store()) -> {ok, {type(), value(), id()}}.
+-spec read_either([{id(), value()}], store()) -> {ok, var()}.
 read_either(Reads, Store) ->
     Self = self(),
     case read_either(Reads, Self, Store) of
@@ -196,8 +198,8 @@ read_either(Reads, Store) ->
                 X ->
                     X
             end;
-        {ok, {Type, Value, Next}} ->
-            {ok, {Type, Value, Next}}
+        {ok, {Id, Type, Value, Next}} ->
+            {ok, {Id, Type, Value, Next}}
     end.
 
 %% @doc Declare a dataflow variable in a provided by identifer {@link
@@ -475,7 +477,7 @@ next(Id, Store, DeclareNextFun) ->
 %%      variable is unbound or has not met the threshold yet.
 %%
 -spec read(id(), value(), store(), pid(), function(), function()) ->
-    {ok, {type(), value(), id()}}.
+    {ok, var()}.
 read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
     [{_Key, V=#dv{value=Value,
                   lazy_threads=LazyThreads,
@@ -499,7 +501,7 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
     %% Satisfy read if threshold is met.
     case lasp_lattice:threshold_met(Type, Value, Threshold) of
         true ->
-            ReplyFun(Type, Value, V#dv.next);
+            ReplyFun(Id, Type, Value, V#dv.next);
         false ->
             WT = lists:append(V#dv.waiting_threads,
                               [{threshold,
@@ -518,7 +520,7 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
 %%      identifiers.
 %%
 -spec read_either([{id(), value()}], pid(), store()) ->
-    {ok, {type(), value(), id()}} | {ok, not_available_yet}.
+    {ok, var()} | {ok, not_available_yet}.
 read_either(Reads, Self, Store) ->
     Found = lists:foldl(fun({Id, Threshold0}, AlreadyFound) ->
        case AlreadyFound of
@@ -548,7 +550,7 @@ read_either(Reads, Self, Store) ->
                                                Value,
                                                Threshold) of
                    true ->
-                       {Type, Value, V#dv.next};
+                       {Id, Type, Value, V#dv.next};
                    false ->
                        WT = lists:append(V#dv.waiting_threads,
                                          [{threshold,
@@ -684,7 +686,7 @@ product(Left, Right, Product, Store, BindFun, ReadLeftFun, _ReadRightFun) ->
     FolderLeftFun = fun(Element, Acc) ->
             %% Read current value of right.
             %% @TODO: need to ensure this is a monotonic read.
-            {ok, {_, RValue, _}} = lasp:read(Right, undefined),
+            {ok, {_, _, RValue, _}} = lasp:read(Right, undefined),
 
             %% @TODO: naive; assumes same type-to-type product
             Values = case Element of
@@ -864,14 +866,14 @@ reply_to_all(List, Result) ->
     {ok, list(pending_threshold())}.
 reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
-             {ok, {Type, Value, Next}}=Result) ->
+             {ok, {Id, Type, Value, Next}}=Result) ->
     SW = case lasp_lattice:threshold_met(Type, Value, Threshold) of
         true ->
             case From of
                 {server, undefined, {Address, Ref}} ->
-                    gen_server:reply({Address, Ref}, {ok, {Type, Value, Next}});
+                    gen_server:reply({Address, Ref}, {ok, {Id, Type, Value, Next}});
                 {fsm, undefined, Address} ->
-                    gen_fsm:send_event(Address, {ok, undefined, {Type, Value, Next}});
+                    gen_fsm:send_event(Address, {ok, undefined, {Id, Type, Value, Next}});
                 _ ->
                     From ! Result
             end,
@@ -930,9 +932,9 @@ internal_fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
 internal_fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
                       PreviousValue, _PreviousAccValue) ->
     %% Blocking threshold read on source value.
-    {ok, {Type, Value, _}} = ReadFun(Id,
-                                     {strict, PreviousValue},
-                                     Variables),
+    {ok, {Id, Type, Value, _}} = ReadFun(Id,
+                                         {strict, PreviousValue},
+                                         Variables),
 
     %% @TODO: Generate a delta-CRDT; for now, we will use the entire
     %% object as the delta for simplicity.  Eventually, replace this
@@ -985,7 +987,7 @@ write(Type, Value, Next, Key, Store, NotifyFun) ->
                 binding=Binding}}] = ets:lookup(Store, Key),
     {ok, StillWaiting} = reply_to_all(Threads,
                                       [],
-                                      {ok, {Type, Value, Next}}),
+                                      {ok, {Key, Type, Value, Next}}),
     V1 = #dv{type=Type,
              value=Value,
              next=Next,

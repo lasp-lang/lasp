@@ -42,7 +42,7 @@ process(Object, _Reason, Actor, #state{id=Id}=State) ->
     {ok, State}.
 
 execute(#state{id=Id}) ->
-    {ok, {_, Value, _}} = lasp:read(Id, undefined),
+    {ok, {_, _, Value, _}} = lasp:read(Id, undefined),
     {ok, Value}.
 
 merge(Outputs) ->

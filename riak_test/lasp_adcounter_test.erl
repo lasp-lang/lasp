@@ -88,7 +88,7 @@ test() ->
 
     lager:info("Gathering totals..."),
     Totals = fun(Ad) ->
-            {ok, {_, Value, _}} = lasp:read(Ad, 0),
+            {ok, {_, _, Value, _}} = lasp:read(Ad, 0),
             Impressions = riak_dt_gcounter:value(Value),
             lager:info("Advertisements: ~p impressions: ~p",
                        [Ad, Impressions])

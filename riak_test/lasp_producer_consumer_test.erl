@@ -72,9 +72,9 @@ producer(Init, N, Output) ->
 
 consumer(S1, F, S2) ->
     case lasp:consume(S1) of
-        {ok, {_, nil, _}} ->
+        {ok, {_, _, nil, _}} ->
             lasp:bind(S2, nil);
-        {ok, {_, Value, Next}} ->
+        {ok, {_, _, Value, Next}} ->
             {ok, NextOutput} = lasp:produce(S2, F(Value)),
             consumer(Next, F, NextOutput)
     end.

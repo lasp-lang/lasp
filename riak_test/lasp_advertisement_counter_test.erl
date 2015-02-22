@@ -86,7 +86,7 @@ test() ->
                 end, Ids),
 
     %% Debug; print the list of advertisements to the log.
-    {ok, {_, Ads0, _}} = lasp:read(Ads, undefined),
+    {ok, {_, _, Ads0, _}} = lasp:read(Ads, undefined),
     lager:info("Current advertisements: ~p",
                [?SET:value(Ads0)]),
 
@@ -99,7 +99,7 @@ test() ->
                 end, Ids),
 
     %% Debug; print the list of advertisements to the log.
-    {ok, {_, Contracts0, _}} = lasp:read(Contracts, undefined),
+    {ok, {_, _, Contracts0, _}} = lasp:read(Contracts, undefined),
     lager:info("Current contracts: ~p",
                [?SET:value(Contracts0)]),
 
@@ -109,7 +109,7 @@ test() ->
 
     %% Debug; print the product.
     timer:sleep(500),
-    {ok, {_, AdsContracts0, _}} = lasp:read(AdsContracts, undefined),
+    {ok, {_, _, AdsContracts0, _}} = lasp:read(AdsContracts, undefined),
     lager:info("Current ads-contracts: ~p",
                [?SET:value(AdsContracts0)]),
 
@@ -122,8 +122,8 @@ test() ->
 
     %% Debug; print the filtered.
     timer:sleep(500),
-    {ok, {_, AdsWithContracts0, _}} = lasp:read(AdsWithContracts,
-                                                undefined),
+    {ok, {_, _, AdsWithContracts0, _}} = lasp:read(AdsWithContracts,
+                                                   undefined),
     lager:info("Current ads with contracts: ~p",
                [?SET:value(AdsWithContracts0)]),
 
@@ -150,7 +150,7 @@ test() ->
     {ok, Servers} = lasp:declare(?SET),
 
     %% Get the current advertisement list.
-    {ok, {_, AdList0, _}} = lasp:read(AdsWithContracts),
+    {ok, {_, _, AdList0, _}} = lasp:read(AdsWithContracts),
     AdList = riak_dt_orset:value(AdList0),
 
     %% For each advertisement, launch one server for tracking it's
@@ -163,7 +163,7 @@ test() ->
                 end, AdList),
 
     %% Get client list.
-    {ok, {_, ClientList0, _}} = lasp:read(Clients),
+    {ok, {_, _, ClientList0, _}} = lasp:read(Clients),
     ClientList = ?SET:value(ClientList0),
 
     Viewer = fun(_) ->
@@ -191,8 +191,8 @@ client(Id, AdsWithContracts, PreviousValue) ->
     receive
         view_ad ->
             %% Get current ad list.
-            {ok, {_, AdList0, _}} = lasp:read(AdsWithContracts,
-                                              PreviousValue),
+            {ok, {_, _, AdList0, _}} = lasp:read(AdsWithContracts,
+                                                 PreviousValue),
             AdList = riak_dt_orset:value(AdList0),
 
             case length(AdList) of

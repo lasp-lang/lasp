@@ -60,7 +60,7 @@ test(List) ->
     ?TABLE = ets:new(?TABLE, [set, named_table, public, {write_concurrency, true}]),
     true = ets:insert(?TABLE, {count, 0}),
     spawn(lasp_get_minimum_test, insort, [List, S1]),
-    {ok, {_, V, _}} = lasp:consume(S1),
+    {ok, {_, _, V, _}} = lasp:consume(S1),
     V.
 
 insort(List, S) ->
@@ -78,10 +78,10 @@ insert(X, In, Out) ->
     true = ets:insert(?TABLE, {Id, C+1}),
     {ok, _} = lasp:wait_needed(Out),
     case lasp:consume(In) of
-        {ok, {_, nil, _}} ->
+        {ok, {_, _, nil, _}} ->
             {ok, Next} = lasp:produce(Out, X),
             lasp:bind(Next, nil);
-        {ok, {_, V, SNext}} ->
+        {ok, {_, _, V, SNext}} ->
             if
                 X < V ->
                     {ok, Next} = lasp:produce(Out, X),

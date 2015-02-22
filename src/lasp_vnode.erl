@@ -390,8 +390,8 @@ handle_command({wait_needed, {ReqId, _}, Id, Threshold}, From,
 handle_command({read, {ReqId, _}, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
     Self = From,
-    ReplyFun = fun(Type, Value, Next) ->
-            {reply, {ok, ReqId, {Type, Value, Next}}, State}
+    ReplyFun = fun(_Id, Type, Value, Next) ->
+            {reply, {ok, ReqId, {_Id, Type, Value, Next}}, State}
             end,
     BlockingFun = fun() ->
             {noreply, State}

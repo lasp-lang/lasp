@@ -31,7 +31,7 @@
          bind_to/2,
          read/1,
          read/2,
-         read_either/1,
+         read_any/1,
          filter/3,
          map/3,
          product/3,
@@ -208,8 +208,8 @@ read(Id, Threshold) ->
 %% @doc Blocking monotonic read operation for a list of given dataflow
 %%      variables.
 %%
--spec read_either([{id(), threshold()}]) -> {ok, var()} | {error, timeout}.
-read_either(Reads) ->
+-spec read_any([{id(), threshold()}]) -> {ok, var()} | {error, timeout}.
+read_any(Reads) ->
     ReqId = mk_reqid(),
     _ = [lasp_read_fsm:read(Id, Threshold, ReqId) || {Id, Threshold} <- Reads],
     wait_for_reqid(ReqId, ?TIMEOUT).

@@ -131,15 +131,14 @@ test_lattice(Type) ->
     {ok, L6} = lasp:declare(Type),
 
     spawn_link(fun() ->
-                lasp:read_either([{L5, {strict, undefined}},
-                                  {L6, {strict, undefined}}]),
-                Self ! read_either
+                {ok, _} = lasp:read_any([{L5, {strict, undefined}}, {L6, {strict, undefined}}]),
+                Self ! read_any
         end),
 
     {ok, _} = lasp:update(L5, {add, 1}, a),
 
     receive
-        read_either ->
+        read_any ->
             ok
     end,
 

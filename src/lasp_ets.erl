@@ -30,7 +30,7 @@
          bind_to/3,
          read/2,
          read/3,
-         read_either/2,
+         read_any/2,
          next/2,
          declare/1,
          declare/2,
@@ -189,10 +189,10 @@ read(Id, Threshold, Store) ->
 %% @doc Perform a monotonic read for a series of given idenfitiers --
 %%      first response wins.
 %%
--spec read_either([{id(), value()}], store()) -> {ok, var()}.
-read_either(Reads, Store) ->
+-spec read_any([{id(), value()}], store()) -> {ok, var()}.
+read_any(Reads, Store) ->
     Self = self(),
-    case read_either(Reads, Self, Store) of
+    case read_any(Reads, Self, Store) of
         {ok, not_available_yet} ->
             receive
                 X ->
@@ -519,9 +519,9 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
 %% @doc Perform a read (or monotonic read) for a series of particular
 %%      identifiers.
 %%
--spec read_either([{id(), value()}], pid(), store()) ->
+-spec read_any([{id(), value()}], pid(), store()) ->
     {ok, var()} | {ok, not_available_yet}.
-read_either(Reads, Self, Store) ->
+read_any(Reads, Self, Store) ->
     Found = lists:foldl(fun({Id, Threshold0}, AlreadyFound) ->
        case AlreadyFound of
            false ->

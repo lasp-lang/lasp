@@ -69,7 +69,7 @@
 
 %% Exported helper functions.
 -export([internal_fold/6,
-         internal_fold_harness/7]).
+         internal_fold_harness/5]).
 
 %% Exported utility functions.
 -export([next_key/3,
@@ -871,9 +871,12 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
         true ->
             case From of
                 {server, undefined, {Address, Ref}} ->
-                    gen_server:reply({Address, Ref}, {ok, {Id, Type, Value, Next}});
+                    gen_server:reply({Address, Ref},
+                                     {ok, {Id, Type, Value, Next}});
                 {fsm, undefined, Address} ->
-                    gen_fsm:send_event(Address, {ok, undefined, {Id, Type, Value, Next}});
+                    gen_fsm:send_event(Address,
+                                       {ok, undefined,
+                                        {Id, Type, Value, Next}});
                 _ ->
                     From ! Result
             end,
@@ -891,7 +894,8 @@ reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
                 {server, undefined, {Address, Ref}} ->
                     gen_server:reply({Address, Ref}, {ok, RThreshold});
                 {fsm, undefined, Address} ->
-                    gen_fsm:send_event(Address, {ok, undefined, RThreshold});
+                    gen_fsm:send_event(Address,
+                                       {ok, undefined, RThreshold});
                 _ ->
                     From ! Result
             end,
@@ -915,25 +919,40 @@ reply_to_all([], StillWaiting, _Result) ->
 
 %% Internal functions.
 
+-record(read, {id :: id(),
+               value :: value(),
+               read_fun :: function()}).
+
 -spec internal_fold(store(), id(), function(), id(), fun(), function()) -> ok.
-internal_fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
+internal_fold(Variables, Id, Function, AccId, BindFun, _ReadFun) ->
+    ReadDict = dict:store(Id,
+                          #read{id=Id},
+                          dict:new()),
     spawn_link(?MODULE, internal_fold_harness, [Variables,
-                                                Id,
+                                                ReadDict,
                                                 Function,
                                                 AccId,
-                                                BindFun,
-                                                ReadFun,
-                                                undefined]),
+                                                BindFun]),
     ok.
 
--spec internal_fold_harness(store(), id(), function(), id(), function(),
-                            function(), value()) -> function().
-internal_fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
-                      PreviousValue) ->
-    %% Blocking threshold read on source value.
-    {ok, {Id, Type, Value, _}} = ReadFun(Id,
-                                         {strict, PreviousValue},
-                                         Variables),
+-spec internal_fold_harness(store(), dict(), function(), id(),
+                            function()) -> function().
+internal_fold_harness(Variables, ReadDict0, Function, AccId, BindFun) ->
+
+    %% Perform a read against all variables in the dict.
+    Reads = [{Id, {strict, Value}} ||
+             {Id, #read{value=Value}} <- dict:to_list(ReadDict0)],
+
+    lager:info("About to issue read for: ~p", [Reads]),
+
+    %% Wait for one of the variables to be modified.
+    %% @TODO: Assume objects all have the same type.
+    {ok, {Id, Type, Value, _}} = lasp:read_any(Reads),
+
+    lager:info("Read succeeded for: ~p with value ~p", [Id, Value]),
+
+    %% Store updated value in the dict.
+    ReadDict = dict:store(Id, #read{id=Id, value=Value}, ReadDict0),
 
     %% @TODO: Generate a delta-CRDT; for now, we will use the entire
     %% object as the delta for simplicity.  Eventually, replace this
@@ -946,8 +965,7 @@ internal_fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
     %% Update with result.
     {ok, _} = BindFun(AccId, AccValue, Variables),
 
-    internal_fold_harness(Variables, Id, Function, AccId, BindFun,
-                          ReadFun, Value).
+    internal_fold_harness(Variables, ReadDict, Function, AccId, BindFun).
 
 %% @doc Send responses to waiting threads, via messages.
 %%

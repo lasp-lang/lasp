@@ -69,7 +69,7 @@
 
 %% Exported helper functions.
 -export([internal_fold/6,
-         internal_fold_harness/8]).
+         internal_fold_harness/7]).
 
 %% Exported utility functions.
 -export([next_key/3,
@@ -923,14 +923,13 @@ internal_fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
                                                 AccId,
                                                 BindFun,
                                                 ReadFun,
-                                                undefined,
                                                 undefined]),
     ok.
 
 -spec internal_fold_harness(store(), id(), function(), id(), function(),
-                            function(), value(), value()) -> function().
+                            function(), value()) -> function().
 internal_fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
-                      PreviousValue, _PreviousAccValue) ->
+                      PreviousValue) ->
     %% Blocking threshold read on source value.
     {ok, {Id, Type, Value, _}} = ReadFun(Id,
                                          {strict, PreviousValue},
@@ -948,7 +947,7 @@ internal_fold_harness(Variables, Id, Function, AccId, BindFun, ReadFun,
     {ok, _} = BindFun(AccId, AccValue, Variables),
 
     internal_fold_harness(Variables, Id, Function, AccId, BindFun,
-                          ReadFun, Value, AccValue).
+                          ReadFun, Value).
 
 %% @doc Send responses to waiting threads, via messages.
 %%

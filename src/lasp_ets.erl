@@ -923,11 +923,12 @@ reply_to_all([], StillWaiting, _Result) ->
                value :: value(),
                read_fun :: function()}).
 
--spec internal_fold(store(), id(), function(), id(), fun(), function()) -> ok.
-internal_fold(Variables, Id, Function, AccId, BindFun, _ReadFun) ->
-    ReadDict = dict:store(Id,
-                          #read{id=Id},
-                          dict:new()),
+internal_fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
+    internal_fold(Variables, [{Id, ReadFun}], Function, AccId, BindFun).
+
+internal_fold(Variables, Reads, Function, AccId, BindFun) ->
+    ReadDict = dict:from_list([{Id, #read{id=Id, read_fun=Fun}}
+                               || {Id, Fun} <- Reads]),
     spawn_link(?MODULE, internal_fold_harness, [Variables,
                                                 ReadDict,
                                                 Function,
@@ -952,7 +953,8 @@ internal_fold_harness(Variables, ReadDict0, Function, AccId, BindFun) ->
     lager:info("Read succeeded for: ~p with value ~p", [Id, Value]),
 
     %% Store updated value in the dict.
-    ReadDict = dict:store(Id, #read{id=Id, value=Value}, ReadDict0),
+    ReadRecord = dict:fetch(Id, ReadDict0),
+    ReadDict = dict:store(Id, ReadRecord#read{value=Value}, ReadDict0),
 
     %% @TODO: Generate a delta-CRDT; for now, we will use the entire
     %% object as the delta for simplicity.  Eventually, replace this

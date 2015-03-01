@@ -68,6 +68,10 @@ init(_Args) ->
                   {lasp_product_fsm_sup, start_link, []},
                    permanent, infinity, supervisor, [lasp_product_fsm_sup]},
 
+    UnionFSM = {lasp_union_fsm_sup,
+                  {lasp_union_fsm_sup, start_link, []},
+                   permanent, infinity, supervisor, [lasp_union_fsm_sup]},
+
     FilterFSM = {lasp_filter_fsm_sup,
                  {lasp_filter_fsm_sup, start_link, []},
                   permanent, infinity, supervisor, [lasp_filter_fsm_sup]},
@@ -118,6 +122,7 @@ init(_Args) ->
                                  NextFSM,
                                  MapFSM,
                                  ProductFSM,
+                                 UnionFSM,
                                  FoldFSM,
                                  FilterFSM,
                                  ReadFSM,

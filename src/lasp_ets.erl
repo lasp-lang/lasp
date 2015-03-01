@@ -42,6 +42,7 @@
          filter/4,
          map/4,
          product/4,
+         union/4,
          fold/4,
          wait_needed/2,
          wait_needed/3,
@@ -64,6 +65,7 @@
          filter/6,
          map/6,
          product/7,
+         union/7,
          fold/6,
          fetch/8]).
 
@@ -139,6 +141,24 @@ map(Id, Function, AccId, Store) ->
             ?MODULE:read(_Id, _Threshold, _Variables)
     end,
     map(Id, Function, AccId, Store, BindFun, ReadFun).
+
+%% @doc Compute the union of two sets.
+%%
+%%      Computes the union of two sets and bind the result
+%%      to a third.
+%%
+-spec union(id(), id(), id(), store()) -> ok.
+union(Left, Right, Union, Store) ->
+    BindFun = fun(_AccId, AccValue, _Variables) ->
+            ?MODULE:bind(_AccId, AccValue, _Variables)
+    end,
+    ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
+            ?MODULE:read(_Left, _Threshold, _Variables)
+    end,
+    ReadRightFun = fun(_Right, _Threshold, _Variables) ->
+            ?MODULE:read(_Right, _Threshold, _Variables)
+    end,
+    union(Left, Right, Union, Store, BindFun, ReadLeftFun, ReadRightFun).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -725,6 +745,37 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 
                 %% Apply change.
                 AccValue = lists:foldl(FolderFun, Type:new(), LValue),
+
+                %% Bind new value back.
+                {ok, _} = BindFun(AccId, AccValue, Store)
+        end
+    end,
+    notify(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
+
+%% @doc Compute the union of two sets.
+%%
+%%      Computes the union of two sets and bind the result
+%%      to a third.
+%%
+%%      Similar to {@link union/4}, however, provides an override
+%%      function for the `BindFun', which is responsible for binding the
+%%      result, for instance, when it's located in another table.
+%%
+-spec union(id(), id(), id(), store(), function(), function(), function()) -> ok.
+union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
+    Fun = fun(Scope) ->
+        %% Read current value from the scope.
+        #read{value=LValue} = dict:fetch(Left, Scope),
+        #read{value=RValue} = dict:fetch(Right, Scope),
+
+        case {LValue, RValue} of
+            {undefined, _} ->
+                ok;
+            {_, undefined} ->
+                ok;
+            {_, _} ->
+                %% Apply change.
+                AccValue = LValue ++ RValue,
 
                 %% Bind new value back.
                 {ok, _} = BindFun(AccId, AccValue, Store)

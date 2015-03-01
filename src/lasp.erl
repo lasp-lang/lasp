@@ -35,6 +35,7 @@
          filter/3,
          map/3,
          product/3,
+         union/3,
          fold/3,
          produce/2,
          produce/4,
@@ -222,6 +223,16 @@ read_any(Reads) ->
 -spec product(id(), id(), id()) -> ok | {error, timeout}.
 product(Left, Right, Product) ->
     {ok, ReqId} = lasp_product_fsm:product(Left, Right, Product),
+    wait_for_reqid(ReqId, ?TIMEOUT).
+
+%% @doc Compute the union of two sets.
+%%
+%%      Computes the union of two sets and bind the result
+%%      to a third.
+%%
+-spec union(id(), id(), id()) -> ok | {error, timeout}.
+union(Left, Right, Union) ->
+    {ok, ReqId} = lasp_union_fsm:union(Left, Right, Union),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
 %% @doc Map values from one lattice into another.

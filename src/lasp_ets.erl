@@ -68,13 +68,17 @@
          fetch/8]).
 
 %% Exported helper functions.
--export([internal_fold/6,
+-export([internal_fold/5,
          internal_fold_harness/5]).
 
 %% Exported utility functions.
 -export([next_key/3,
          notify_all/3,
          write/5]).
+
+-record(read, {id :: id(),
+               value :: value(),
+               read_fun :: function()}).
 
 %% @doc Given an identifier, return the next identifier.
 %%
@@ -666,7 +670,7 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
 
             Acc ++ Values
     end,
-    internal_fold(Store, Id, FolderFun, AccId, BindFun, ReadFun).
+    internal_fold(Store, [{Id, ReadFun}], FolderFun, AccId, BindFun).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -703,7 +707,7 @@ product(Left, Right, Product, Store, BindFun, ReadLeftFun, _ReadRightFun) ->
     end,
     %% @TODO: needs to be for both reads; left and right.
     %% @TODO: currently only folds left.
-    internal_fold(Store, Left, FolderLeftFun, Product, BindFun, ReadFun).
+    internal_fold(Store, [{Left, ReadFun}], FolderLeftFun, Product, BindFun).
 
 %% @doc Compute a cartesian product from causal metadata stored in the
 %%      orset.
@@ -742,7 +746,7 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 
             Acc ++ [Value]
     end,
-    internal_fold(Store, Id, FolderFun, AccId, BindFun, ReadFun).
+    internal_fold(Store, [{Id, ReadFun}], FolderFun, AccId, BindFun).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -773,7 +777,7 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
                     Acc
             end
     end,
-    internal_fold(Store, Id, FolderFun, AccId, BindFun, ReadFun).
+    internal_fold(Store, [{Id, ReadFun}], FolderFun, AccId, BindFun).
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
 %%      change the reply and blocking replies.
@@ -919,13 +923,8 @@ reply_to_all([], StillWaiting, _Result) ->
 
 %% Internal functions.
 
--record(read, {id :: id(),
-               value :: value(),
-               read_fun :: function()}).
-
-internal_fold(Variables, Id, Function, AccId, BindFun, ReadFun) ->
-    internal_fold(Variables, [{Id, ReadFun}], Function, AccId, BindFun).
-
+-spec internal_fold(store(), [{id(), function()}], function(), id(),
+                    function()) -> ok.
 internal_fold(Variables, Reads, Function, AccId, BindFun) ->
     ReadDict = dict:from_list([{Id, #read{id=Id, read_fun=Fun}}
                                || {Id, Fun} <- Reads]),

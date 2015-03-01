@@ -77,7 +77,7 @@
 -callback fold(id(), function(), id(), store()) -> ok.
 -callback fold(id(), function(), id(), store(), function(), function()) -> ok.
 
--callback internal_fold(store(), [{id(), function()}], function(), id(), fun()) -> ok.
+-callback notify(store(), [{id(), function()}] | dict(), function()) -> ok.
 
 -callback update(id(), actor(), operation(), store()) ->
     {ok, {value(), id()}}.

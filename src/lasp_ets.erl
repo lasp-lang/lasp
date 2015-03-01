@@ -68,8 +68,7 @@
          fetch/8]).
 
 %% Exported helper functions.
--export([internal_fold/5,
-         internal_fold_harness/5]).
+-export([notify/3]).
 
 %% Exported utility functions.
 -export([next_key/3,
@@ -77,6 +76,7 @@
          write/5]).
 
 -record(read, {id :: id(),
+               type :: type(),
                value :: value(),
                read_fun :: function()}).
 
@@ -658,19 +658,32 @@ bind_to(Id, TheirId, Store, FetchFun, FromPid) ->
 %%
 -spec fold(id(), function(), id(), store(), function(), function()) -> ok.
 fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    FolderFun = fun(Element, Acc) ->
-            Values = case Element of
-                {X, Causality} ->
-                    %% riak_dt_orset
-                    [{Value, Causality} || Value <- Function(X)];
-                X ->
-                    %% riak_dt_gset
-                    Function(X)
-            end,
+    Fun = fun(Scope) ->
+        %% Read current value from the scope.
+        #read{type=Type, value=Value} = dict:fetch(Id, Scope),
 
-            Acc ++ Values
+        %% Iterator to map the data structure over.
+        FolderFun = fun(Element, Acc) ->
+                Values = case Element of
+                    {X, Causality} ->
+                        %% riak_dt_orset
+                        [{V, Causality} || V <- Function(X)];
+                    X ->
+                        %% riak_dt_gset
+                        Function(X)
+                end,
+
+                Acc ++ Values
+        end,
+
+        %% Apply change.
+        AccValue = lists:foldl(FolderFun, Type:new(), Value),
+
+        %% Bind new value back.
+        {ok, _} = BindFun(AccId, AccValue, Store)
+
     end,
-    internal_fold(Store, [{Id, ReadFun}], FolderFun, AccId, BindFun).
+    notify(Store, [{Id, ReadFun}], Fun).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -681,33 +694,43 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec product(id(), id(), id(), store(), function(), function(), function()) -> ok.
-product(Left, Right, Product, Store, BindFun, ReadLeftFun, _ReadRightFun) ->
-    %% @TODO: internal_fold needs to take a readfun which will do a read_many
-    %% on the left and right variables.
-    ReadFun = ReadLeftFun,
+-spec product(id(), id(), id(), store(), function(), function(),
+              function()) -> ok.
+product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
+    Fun = fun(Scope) ->
+        %% Read current value from the scope.
+        #read{type=Type, value=LValue} = dict:fetch(Left, Scope),
+        #read{type=_Type, value=RValue} = dict:fetch(Right, Scope),
 
-    FolderLeftFun = fun(Element, Acc) ->
-            %% Read current value of right.
-            %% @TODO: need to ensure this is a monotonic read.
-            {ok, {_, _, RValue, _}} = lasp:read(Right, undefined),
+        case {LValue, RValue} of
+            {undefined, _} ->
+                ok;
+            {_, undefined} ->
+                ok;
+            {_, _} ->
+                %% Iterator to map the data structure over.
+                FolderFun = fun(Element, Acc) ->
+                        Values = case Element of
+                            {X, XCausality} ->
+                                %% riak_dt_orset
+                                [{{X, Y}, orset_causal_product(XCausality, YCausality)}
+                                 || {Y, YCausality} <- RValue];
+                            X ->
+                                %% riak_dt_gset
+                                [{X, Y} || Y  <- RValue]
+                        end,
 
-            %% @TODO: naive; assumes same type-to-type product
-            Values = case Element of
-                {X, XCausality} ->
-                    %% riak_dt_orset
-                    [{{X, Y}, orset_causal_product(XCausality, YCausality)}
-                     || {Y, YCausality} <- RValue];
-                X ->
-                    %% riak_dt_gset
-                    [{X, Y} || Y  <- RValue]
-            end,
+                        Acc ++ Values
+                end,
 
-            Acc ++ Values
+                %% Apply change.
+                AccValue = lists:foldl(FolderFun, Type:new(), LValue),
+
+                %% Bind new value back.
+                {ok, _} = BindFun(AccId, AccValue, Store)
+        end
     end,
-    %% @TODO: needs to be for both reads; left and right.
-    %% @TODO: currently only folds left.
-    internal_fold(Store, [{Left, ReadFun}], FolderLeftFun, Product, BindFun).
+    notify(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
 
 %% @doc Compute a cartesian product from causal metadata stored in the
 %%      orset.
@@ -734,19 +757,32 @@ orset_causal_product(Xs, Ys) ->
 %%
 -spec map(id(), function(), id(), store(), function(), function()) -> ok.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    FolderFun = fun(Element, Acc) ->
-            Value = case Element of
-                {X, Causality} ->
-                    %% riak_dt_orset
-                    {Function(X), Causality};
-                X ->
-                    %% riak_dt_gset
-                    Function(X)
-            end,
+    Fun = fun(Scope) ->
+        %% Read current value from the scope.
+        #read{type=Type, value=Value} = dict:fetch(Id, Scope),
 
-            Acc ++ [Value]
+        %% Iterator to map the data structure over.
+        FolderFun = fun(Element, Acc) ->
+                V = case Element of
+                    {X, Causality} ->
+                        %% riak_dt_orset
+                        {Function(X), Causality};
+                    X ->
+                        %% riak_dt_gset
+                        Function(X)
+                end,
+
+                Acc ++ [V]
+        end,
+
+        %% Apply change.
+        AccValue = lists:foldl(FolderFun, Type:new(), Value),
+
+        %% Bind new value back.
+        {ok, _} = BindFun(AccId, AccValue, Store)
+
     end,
-    internal_fold(Store, [{Id, ReadFun}], FolderFun, AccId, BindFun).
+    notify(Store, [{Id, ReadFun}], Fun).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -758,26 +794,40 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec filter(id(), function(), id(), store(), function(), function()) -> ok.
+-spec filter(id(), function(), id(), store(), function(), function()) ->
+    ok.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    FolderFun = fun(Element, Acc) ->
-            Value = case Element of
-                {X, _} ->
-                    %% riak_dt_orset
-                    X;
-                X ->
-                    %% riak_dt_gset
-                    X
-            end,
+    Fun = fun(Scope) ->
+        %% Read current value from the scope.
+        #read{type=Type, value=Value} = dict:fetch(Id, Scope),
 
-            case Function(Value) of
-                true ->
-                    Acc ++ [Element];
-                _ ->
-                    Acc
-            end
+        %% Iterator to map the data structure over.
+        FolderFun = fun(Element, Acc) ->
+                V = case Element of
+                    {X, _} ->
+                        %% riak_dt_orset
+                        X;
+                    X ->
+                        %% riak_dt_gset
+                        X
+                end,
+
+                case Function(V) of
+                    true ->
+                        Acc ++ [Element];
+                    _ ->
+                        Acc
+                end
+        end,
+
+        %% Apply change.
+        AccValue = lists:foldl(FolderFun, Type:new(), Value),
+
+        %% Bind new value back.
+        {ok, _} = BindFun(AccId, AccValue, Store)
+
     end,
-    internal_fold(Store, [{Id, ReadFun}], FolderFun, AccId, BindFun).
+    notify(Store, [{Id, ReadFun}], Fun).
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
 %%      change the reply and blocking replies.
@@ -923,50 +973,33 @@ reply_to_all([], StillWaiting, _Result) ->
 
 %% Internal functions.
 
--spec internal_fold(store(), [{id(), function()}], function(), id(),
-                    function()) -> ok.
-internal_fold(Variables, Reads, Function, AccId, BindFun) ->
-    ReadDict = dict:from_list([{Id, #read{id=Id, read_fun=Fun}}
-                               || {Id, Fun} <- Reads]),
-    spawn_link(?MODULE, internal_fold_harness, [Variables,
-                                                ReadDict,
-                                                Function,
-                                                AccId,
-                                                BindFun]),
-    ok.
+-spec notify(store(), [{id(), function()}] | dict(), function()) -> ok.
+notify(Variables, Reads, Function) when is_list(Reads) ->
+    Scope = dict:from_list([{Id, #read{id=Id, read_fun=Fun}}
+                            || {Id, Fun} <- Reads]),
+    spawn_link(?MODULE, notify, [Variables, Scope, Function]),
+    ok;
 
--spec internal_fold_harness(store(), dict(), function(), id(),
-                            function()) -> function().
-internal_fold_harness(Variables, ReadDict0, Function, AccId, BindFun) ->
-
+notify(Variables, Scope0, Function) ->
     %% Perform a read against all variables in the dict.
     Reads = [{Id, {strict, Value}} ||
-             {Id, #read{value=Value}} <- dict:to_list(ReadDict0)],
+             {Id, #read{value=Value}} <- dict:to_list(Scope0)],
 
     lager:info("About to issue read for: ~p", [Reads]),
 
     %% Wait for one of the variables to be modified.
-    %% @TODO: Assume objects all have the same type.
     {ok, {Id, Type, Value, _}} = lasp:read_any(Reads),
 
     lager:info("Read succeeded for: ~p with value ~p", [Id, Value]),
 
     %% Store updated value in the dict.
-    ReadRecord = dict:fetch(Id, ReadDict0),
-    ReadDict = dict:store(Id, ReadRecord#read{value=Value}, ReadDict0),
+    ReadRecord = dict:fetch(Id, Scope0),
+    Scope = dict:store(Id, ReadRecord#read{value=Value, type=Type}, Scope0),
 
-    %% @TODO: Generate a delta-CRDT; for now, we will use the entire
-    %% object as the delta for simplicity.  Eventually, replace this
-    %% with a smarter delta generation mechanism.
-    Delta = Value,
+    %% Apply function with updated scope.
+    Function(Scope),
 
-    %% Build new data structure.
-    AccValue = lists:foldl(Function, Type:new(), Delta),
-
-    %% Update with result.
-    {ok, _} = BindFun(AccId, AccValue, Variables),
-
-    internal_fold_harness(Variables, ReadDict, Function, AccId, BindFun).
+    notify(Variables, Scope, Function).
 
 %% @doc Send responses to waiting threads, via messages.
 %%

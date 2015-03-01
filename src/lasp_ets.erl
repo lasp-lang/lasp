@@ -1115,12 +1115,8 @@ notify(Variables, Scope0, Function) ->
     Reads = [{Id, {strict, Value}} ||
              {Id, #read{value=Value}} <- dict:to_list(Scope0)],
 
-    lager:info("About to issue read for: ~p", [Reads]),
-
     %% Wait for one of the variables to be modified.
     {ok, {Id, Type, Value, _}} = lasp:read_any(Reads),
-
-    lager:info("Read succeeded for: ~p with value ~p", [Id, Value]),
 
     %% Store updated value in the dict.
     ReadRecord = dict:fetch(Id, Scope0),

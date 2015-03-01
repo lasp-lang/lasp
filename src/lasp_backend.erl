@@ -91,3 +91,6 @@
 
 -callback union(id(), id(), id(), store()) -> ok.
 -callback union(id(), id(), id(), store(), function(), function(), function()) -> ok.
+
+-callback intersection(id(), id(), id(), store()) -> ok.
+-callback intersection(id(), id(), id(), store(), function(), function(), function()) -> ok.

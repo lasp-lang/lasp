@@ -43,6 +43,7 @@
          map/4,
          product/4,
          union/4,
+         intersection/4,
          fold/4,
          wait_needed/2,
          wait_needed/3,
@@ -66,6 +67,7 @@
          map/6,
          product/7,
          union/7,
+         intersection/7,
          fold/6,
          fetch/8]).
 
@@ -141,6 +143,24 @@ map(Id, Function, AccId, Store) ->
             ?MODULE:read(_Id, _Threshold, _Variables)
     end,
     map(Id, Function, AccId, Store, BindFun, ReadFun).
+
+%% @doc Compute the intersection of two sets.
+%%
+%%      Computes the intersection of two sets and bind the result
+%%      to a third.
+%%
+-spec intersection(id(), id(), id(), store()) -> ok.
+intersection(Left, Right, Intersection, Store) ->
+    BindFun = fun(_AccId, AccValue, _Variables) ->
+            ?MODULE:bind(_AccId, AccValue, _Variables)
+    end,
+    ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
+            ?MODULE:read(_Left, _Threshold, _Variables)
+    end,
+    ReadRightFun = fun(_Right, _Threshold, _Variables) ->
+            ?MODULE:read(_Right, _Threshold, _Variables)
+    end,
+    intersection(Left, Right, Intersection, Store, BindFun, ReadLeftFun, ReadRightFun).
 
 %% @doc Compute the union of two sets.
 %%
@@ -752,6 +772,61 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     end,
     notify(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
 
+%% @doc Compute the intersection of two sets.
+%%
+%%      Computes the intersection of two sets and bind the result
+%%      to a third.
+%%
+%%      Similar to {@link intersection/4}, however, provides an override
+%%      function for the `BindFun', which is responsible for binding the
+%%      result, for instance, when it's located in another table.
+%%
+-spec intersection(id(), id(), id(), store(), function(), function(), function()) -> ok.
+intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
+    Fun = fun(Scope) ->
+        %% Read current value from the scope.
+        #read{type=Type, value=LValue} = dict:fetch(Left, Scope),
+        #read{type=_Type, value=RValue} = dict:fetch(Right, Scope),
+
+        case {LValue, RValue} of
+            {undefined, _} ->
+                ok;
+            {_, undefined} ->
+                ok;
+            {_, _} ->
+                %% Iterator to map the data structure over.
+                FolderFun = fun(Element, Acc) ->
+                        Values = case Element of
+                            {X, XCausality} ->
+                                %% riak_dt_orset
+                                case lists:keyfind(X, 1, RValue) of
+                                    {_Y, YCausality} ->
+                                        [{X, orset_causal_union(XCausality, YCausality)}];
+                                    false ->
+                                        []
+                                end;
+                            X ->
+                                %% riak_dt_gset
+                                case lists:member(X, RValue) of
+                                    true ->
+                                        [X];
+                                    false ->
+                                        []
+                                end
+                        end,
+
+                        Acc ++ Values
+                end,
+
+                %% Apply change.
+                AccValue = lists:foldl(FolderFun, Type:new(), LValue),
+
+                %% Bind new value back.
+                {ok, _} = BindFun(AccId, AccValue, Store)
+        end
+    end,
+    notify(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
+
 %% @doc Compute the union of two sets.
 %%
 %%      Computes the union of two sets and bind the result
@@ -795,6 +870,10 @@ orset_causal_product(Xs, Ys) ->
                             [{[X, Y], XDeleted orelse YDeleted}] ++ YAcc
                     end, [], Ys) ++ XAcc
         end, [], Xs).
+
+%% @doc Compute the union of causal metadata.
+orset_causal_union(Xs, Ys) ->
+    Xs ++ Ys.
 
 %% @doc Lap values from one lattice into another.
 %%

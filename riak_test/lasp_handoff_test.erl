@@ -23,8 +23,7 @@
 -module(lasp_handoff_test).
 -author("Loïc Schils <loic.schils@student.uclouvain.be>").
 
--export([declare/0,
-         test/0]).
+-export([declare/0]).
 
 -ifdef(TEST).
 
@@ -49,14 +48,18 @@ confirm() ->
     ?assertEqual({ok, [4, 8, 8, 4]},
                  rpc:call(Node, ?MODULE, declare, [])),
 
+    %%% TEST %%%
+    % Not Working
+    %{{ok, _}, State} = riak_core_send_msg:send_event_unreliable(lasp_vnode, {get_dict, {0, 0},?MODULE}),
+
+    % Arguments are not correct but it's just for the test
+    riak_core_send_msg:send_event_unreliable(lasp_vnode, {get_dict, {0, 0},?MODULE}),
+    %lager:info("State : ~p", [State]),
+
     % Remove a node from the cluster (Handoff will be perform)
     lager:info("Removing node ~p from cluster", [Node]),
     rt:leave(Node),
     ?assertEqual(ok, rt:wait_until_unpingable(Node)),
-
-    OtherNode = lists:last(Nodes),
-    ?assertEqual({ok},
-                rpc:call(OtherNode, ?MODULE, test, [])),
 
     pass.
 -endif.
@@ -87,9 +90,3 @@ declare() ->
 
     % Return
     {ok, L1}.
-
-test() ->
-
-    %TODO
-
-    {ok}.

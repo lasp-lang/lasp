@@ -72,6 +72,8 @@
          handle_coverage/4,
          handle_exit/3]).
 
+%-export([handle_event/2]).
+
 -ignore_xref([start_vnode/1]).
 
 -record(state, {node,
@@ -204,6 +206,12 @@ init([Partition]) ->
                 programs=dict:new(),
                 node=Node,
                 variables=Variables}}.
+
+%% Backdoor
+handle_command({get_dict, {ReqId, _}, _}, _From,
+               state=State) ->
+    lager:info("TEST1 : ~p", [State]),
+    {reply, {ok, ReqId}, State};
 
 %% Program execution handling.
 

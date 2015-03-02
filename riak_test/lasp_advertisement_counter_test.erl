@@ -67,8 +67,14 @@ test() ->
     %% advertisements.
 
     %% Generate a series of unique identifiers.
-    Ids = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
-    lager:info("Identifiers are: ~p", [Ids]),
+    RovioAdIds = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
+    lager:info("Rovio Ad Identifiers are: ~p", [RovioAdIds]),
+
+    TriforkAdIds = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
+    lager:info("Trifork Ad Identifiers are: ~p", [TriforkAdIds]),
+
+    Ids = RovioAdIds ++ TriforkAdIds,
+    lager:info("Ad Identifiers are: ~p", [Ids]),
 
     %% Generate Rovio's advertisements.
     {ok, RovioAds} = lasp:declare(?SET),
@@ -81,7 +87,7 @@ test() ->
                                       {add, #ad{id=Id, counter=CounterId}},
                                       undefined)
 
-                end, lists:sublist(Ids, 1, 5)),
+                end, RovioAdIds),
 
     %% Generate Trifork's advertisements.
     {ok, TriforkAds} = lasp:declare(?SET),
@@ -94,7 +100,7 @@ test() ->
                                       {add, #ad{id=Id, counter=CounterId}},
                                       undefined)
 
-                end, lists:sublist(Ids, 6, 10)),
+                end, TriforkAdIds),
 
     %% Union ads.
     {ok, Ads} = lasp:declare(?SET),

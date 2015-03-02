@@ -77,7 +77,7 @@
 -callback fold(id(), function(), id(), store()) -> ok.
 -callback fold(id(), function(), id(), store(), function(), function()) -> ok.
 
--callback internal_fold(store(), id(), function(), id(), fun(), function()) -> ok.
+-callback notify(store(), [{id(), function()}] | dict(), function()) -> ok.
 
 -callback update(id(), actor(), operation(), store()) ->
     {ok, {value(), id()}}.
@@ -88,3 +88,9 @@
 
 -callback product(id(), id(), id(), store()) -> ok.
 -callback product(id(), id(), id(), store(), function(), function(), function()) -> ok.
+
+-callback union(id(), id(), id(), store()) -> ok.
+-callback union(id(), id(), id(), store(), function(), function(), function()) -> ok.
+
+-callback intersection(id(), id(), id(), store()) -> ok.
+-callback intersection(id(), id(), id(), store(), function(), function(), function()) -> ok.

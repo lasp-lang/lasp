@@ -63,28 +63,51 @@ confirm() ->
 -record(contract, {id}).
 
 test() ->
-
     %% Setup lists of advertisements and lists of contracts for
     %% advertisements.
 
     %% Generate a series of unique identifiers.
-    Ids = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 5)),
-    lager:info("Identifiers are: ~p", [Ids]),
+    RovioAdIds = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
+    lager:info("Rovio Ad Identifiers are: ~p", [RovioAdIds]),
 
-    %% For each identifier, generate an advertisement.
-    {ok, Ads} = lasp:declare(?SET),
+    TriforkAdIds = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
+    lager:info("Trifork Ad Identifiers are: ~p", [TriforkAdIds]),
+
+    Ids = RovioAdIds ++ TriforkAdIds,
+    lager:info("Ad Identifiers are: ~p", [Ids]),
+
+    %% Generate Rovio's advertisements.
+    {ok, RovioAds} = lasp:declare(?SET),
     lists:map(fun(Id) ->
                 %% Generate a G-Counter.
                 {ok, CounterId} = lasp:declare(?COUNTER),
 
                 %% Add it to the advertisement set.
-                {ok, _} = lasp:update(Ads,
+                {ok, _} = lasp:update(RovioAds,
                                       {add, #ad{id=Id, counter=CounterId}},
                                       undefined)
 
-                end, Ids),
+                end, RovioAdIds),
+
+    %% Generate Trifork's advertisements.
+    {ok, TriforkAds} = lasp:declare(?SET),
+    lists:map(fun(Id) ->
+                %% Generate a G-Counter.
+                {ok, CounterId} = lasp:declare(?COUNTER),
+
+                %% Add it to the advertisement set.
+                {ok, _} = lasp:update(TriforkAds,
+                                      {add, #ad{id=Id, counter=CounterId}},
+                                      undefined)
+
+                end, TriforkAdIds),
+
+    %% Union ads.
+    {ok, Ads} = lasp:declare(?SET),
+    ok = lasp:union(RovioAds, TriforkAds, Ads),
 
     %% Debug; print the list of advertisements to the log.
+    timer:sleep(500),
     {ok, {_, _, Ads0, _}} = lasp:read(Ads, undefined),
     lager:info("Current advertisements: ~p",
                [?SET:value(Ads0)]),

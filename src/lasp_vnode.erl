@@ -40,6 +40,8 @@
          filter/5,
          map/5,
          product/5,
+         union/5,
+         intersection/5,
          fold/5,
          next/3,
          wait_needed/4,
@@ -135,6 +137,18 @@ filter(Preflist, Identity, Id, Function, AccId) ->
 map(Preflist, Identity, Id, Function, AccId) ->
     riak_core_vnode_master:command(Preflist,
                                    {map, Identity, Id, Function, AccId},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
+
+union(Preflist, Identity, Left, Right, Union) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {union, Identity, Left, Right, Union},
+                                   {fsm, undefined, self()},
+                                   ?VNODE_MASTER).
+
+intersection(Preflist, Identity, Left, Right, Intersection) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {intersection, Identity, Left, Right, Intersection},
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
@@ -493,6 +507,104 @@ handle_command({product, {ReqId, _}, Left, Right, Product}, _From,
             end
     end,
     ok = ?BACKEND:product(Left, Right, Product, Variables, BindFun, ReadLeftFun, ReadRightFun),
+    {reply, {ok, ReqId, ok}, State};
+
+handle_command({intersection, {ReqId, _}, Left, Right, Intersection}, _From,
+               State=#state{variables=Variables,
+                            partition=Partition,
+                            node=Node}) ->
+    BindFun = fun(_Intersection, AccValue, _Variables) ->
+            %% Beware of cycles in the gen_server calls!
+            [{IndexNode, _Type}] = lasp:preflist(?N, _Intersection, lasp),
+
+            case IndexNode of
+                {Partition, Node} ->
+                    %% We're local, which means that we can interact
+                    %% directly with the data store.
+                    ?BACKEND:bind(_Intersection, AccValue, _Variables);
+                _ ->
+                    %% We're remote, go through all of the routing logic.
+                    lasp:bind(_Intersection, AccValue)
+            end
+    end,
+    ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
+            %% Beware of cycles in the gen_server calls!
+            [{IndexNode, _Type}] = lasp:preflist(?N, Left, lasp),
+
+            case IndexNode of
+                {Partition, Node} ->
+                    %% We're local, which means that we can interact
+                    %% directly with the data store.
+                    ?BACKEND:read(Left, _Threshold, _Variables);
+                _ ->
+                    %% We're remote, go through all of the routing logic.
+                    lasp:read(Left, _Threshold)
+            end
+    end,
+    ReadRightFun = fun(_Right, _Threshold, _Variables) ->
+            %% Beware of cycles in the gen_server calls!
+            [{IndexNode, _Type}] = lasp:preflist(?N, Right, lasp),
+
+            case IndexNode of
+                {Partition, Node} ->
+                    %% We're local, which means that we can interact
+                    %% directly with the data store.
+                    ?BACKEND:read(Right, _Threshold, _Variables);
+                _ ->
+                    %% We're remote, go through all of the routing logic.
+                    lasp:read(Right, _Threshold)
+            end
+    end,
+    ok = ?BACKEND:intersection(Left, Right, Intersection, Variables, BindFun, ReadLeftFun, ReadRightFun),
+    {reply, {ok, ReqId, ok}, State};
+
+handle_command({union, {ReqId, _}, Left, Right, Union}, _From,
+               State=#state{variables=Variables,
+                            partition=Partition,
+                            node=Node}) ->
+    BindFun = fun(_Union, AccValue, _Variables) ->
+            %% Beware of cycles in the gen_server calls!
+            [{IndexNode, _Type}] = lasp:preflist(?N, _Union, lasp),
+
+            case IndexNode of
+                {Partition, Node} ->
+                    %% We're local, which means that we can interact
+                    %% directly with the data store.
+                    ?BACKEND:bind(_Union, AccValue, _Variables);
+                _ ->
+                    %% We're remote, go through all of the routing logic.
+                    lasp:bind(_Union, AccValue)
+            end
+    end,
+    ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
+            %% Beware of cycles in the gen_server calls!
+            [{IndexNode, _Type}] = lasp:preflist(?N, Left, lasp),
+
+            case IndexNode of
+                {Partition, Node} ->
+                    %% We're local, which means that we can interact
+                    %% directly with the data store.
+                    ?BACKEND:read(Left, _Threshold, _Variables);
+                _ ->
+                    %% We're remote, go through all of the routing logic.
+                    lasp:read(Left, _Threshold)
+            end
+    end,
+    ReadRightFun = fun(_Right, _Threshold, _Variables) ->
+            %% Beware of cycles in the gen_server calls!
+            [{IndexNode, _Type}] = lasp:preflist(?N, Right, lasp),
+
+            case IndexNode of
+                {Partition, Node} ->
+                    %% We're local, which means that we can interact
+                    %% directly with the data store.
+                    ?BACKEND:read(Right, _Threshold, _Variables);
+                _ ->
+                    %% We're remote, go through all of the routing logic.
+                    lasp:read(Right, _Threshold)
+            end
+    end,
+    ok = ?BACKEND:union(Left, Right, Union, Variables, BindFun, ReadLeftFun, ReadRightFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({map, {ReqId, _}, Id, Function, AccId}, _From,

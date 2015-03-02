@@ -850,7 +850,10 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                 ok;
             {_, _} ->
                 %% Apply change.
-                AccValue = LValue ++ RValue,
+                AccValue = orddict:merge(
+                            fun(_Key, L, _R) ->
+                                    L
+                            end, LValue, RValue),
 
                 %% Bind new value back.
                 {ok, _} = BindFun(AccId, AccValue, Store)

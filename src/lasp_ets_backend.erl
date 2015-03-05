@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_ets).
+-module(lasp_ets_backend).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -include("lasp.hrl").
@@ -753,7 +753,7 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                         Values = case Element of
                             {X, XCausality} ->
                                 %% riak_dt_orset
-                                [{{X, Y}, orset_causal_product(XCausality, YCausality)}
+                                [{{X, Y}, lasp_lattice:orset_causal_product(XCausality, YCausality)}
                                  || {Y, YCausality} <- RValue];
                             X ->
                                 %% riak_dt_gset
@@ -801,7 +801,7 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                                 %% riak_dt_orset
                                 case lists:keyfind(X, 1, RValue) of
                                     {_Y, YCausality} ->
-                                        [{X, orset_causal_union(XCausality, YCausality)}];
+                                        [{X, lasp_lattice:orset_causal_union(XCausality, YCausality)}];
                                     false ->
                                         []
                                 end;
@@ -840,7 +840,9 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
-        #read{value=LValue} = dict:fetch(Left, Scope),
+        %% @TODO: assume for the time being source and destination are
+        %% the same type.
+        #read{type=Type, value=LValue} = dict:fetch(Left, Scope),
         #read{value=RValue} = dict:fetch(Right, Scope),
 
         case {LValue, RValue} of
@@ -849,34 +851,18 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
             {_, undefined} ->
                 ok;
             {_, _} ->
-                %% Apply change.
-                AccValue = orddict:merge(
-                            fun(_Key, L, _R) ->
-                                    L
-                            end, LValue, RValue),
+                AccValue = case Type of
+                    riak_dt_orset ->
+                        orddict:merge(fun(_Key, L, _R) -> L end, LValue, RValue);
+                    riak_dt_gset ->
+                        LValue ++ RValue
+                end,
 
                 %% Bind new value back.
                 {ok, _} = BindFun(AccId, AccValue, Store)
         end
     end,
     notify(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
-
-%% @doc Compute a cartesian product from causal metadata stored in the
-%%      orset.
-%%
-%%      Computes product of `Xs' and `Ys' and map deleted through using
-%%      an or operation.
-%%
-orset_causal_product(Xs, Ys) ->
-    lists:foldl(fun({X, XDeleted}, XAcc) ->
-                lists:foldl(fun({Y, YDeleted}, YAcc) ->
-                            [{[X, Y], XDeleted orelse YDeleted}] ++ YAcc
-                    end, [], Ys) ++ XAcc
-        end, [], Xs).
-
-%% @doc Compute the union of causal metadata.
-orset_causal_union(Xs, Ys) ->
-    Xs ++ Ys.
 
 %% @doc Lap values from one lattice into another.
 %%

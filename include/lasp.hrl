@@ -1,7 +1,10 @@
 -define(TIMEOUT, 100000).
 
+-define(APP, lasp).
+-define(VNODE, lasp).
+
 -define(BUCKET, <<"lasp">>).
--define(BACKEND, lasp_ets).
+-define(BACKEND, lasp_ets_backend).
 
 -define(N, 1).
 -define(W, 1).

@@ -32,7 +32,9 @@
          is_inflation/3,
          is_lattice_inflation/3,
          is_strict_inflation/3,
-         is_lattice_strict_inflation/3]).
+         is_lattice_strict_inflation/3,
+         orset_causal_product/2,
+         orset_causal_union/2]).
 
 %% @doc Determine if a threshold is met.
 %%
@@ -248,6 +250,23 @@ ids_inflated(Previous, Current) ->
                                 Acc andalso true
                         end
                 end, true, Previous).
+
+%% @doc Compute a cartesian product from causal metadata stored in the
+%%      orset.
+%%
+%%      Computes product of `Xs' and `Ys' and map deleted through using
+%%      an or operation.
+%%
+orset_causal_product(Xs, Ys) ->
+    lists:foldl(fun({X, XDeleted}, XAcc) ->
+                lists:foldl(fun({Y, YDeleted}, YAcc) ->
+                            [{[X, Y], XDeleted orelse YDeleted}] ++ YAcc
+                    end, [], Ys) ++ XAcc
+        end, [], Xs).
+
+%% @doc Compute the union of causal metadata.
+orset_causal_union(Xs, Ys) ->
+    Xs ++ Ys.
 
 -ifdef(TEST).
 

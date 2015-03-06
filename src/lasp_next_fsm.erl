@@ -126,7 +126,7 @@ waiting({ok, _ReqId, Reply},
         true ->
             From ! {ReqId, ok, Reply},
 
-            case NumResponses =:= ?R of
+            case NumResponses =:= ?N of
                 true ->
                     {next_state, finalize, State, 0};
                 false ->

@@ -29,7 +29,7 @@
 
 -include("lasp.hrl").
 
--export([new/0, update/3, merge/2]).
+-export([new/0, update/3, merge/2, equal/2]).
 
 %% EQC API
 -ifdef(EQC).
@@ -54,6 +54,12 @@ merge(undefined, B) ->
     B;
 merge(A, A) ->
     A.
+
+%% @doc Test for equality.
+equal(A, A) ->
+    true;
+equal(_, _) ->
+    false.
 
 %% ===================================================================
 %% EUnit tests

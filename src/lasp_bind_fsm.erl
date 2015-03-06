@@ -49,9 +49,12 @@
                 coordinator,
                 from,
                 id,
+                type,
+                next,
                 value,
+                values = [],
                 num_responses,
-                replies}).
+                replies = []}).
 
 %%%===================================================================
 %%% API
@@ -116,14 +119,21 @@ execute(timeout, #state{preflist=Preflist,
     lasp_vnode:bind(Preflist, {ReqId, Coordinator}, Id, Value),
     {next_state, waiting, State}.
 
-waiting({ok, _ReqId, Reply},
+waiting({ok, _ReqId, IndexNode, {Id, Type, Value, Next} = Reply},
         #state{from=From,
                req_id=ReqId,
+               values=Values0,
                num_responses=NumResponses0,
                replies=Replies0}=State0) ->
     NumResponses = NumResponses0 + 1,
-    Replies = [Reply|Replies0],
-    State = State0#state{num_responses=NumResponses, replies=Replies},
+    Values = [{IndexNode, Value}|Values0],
+    Replies = [{IndexNode, Reply}|Replies0],
+    State = State0#state{num_responses=NumResponses,
+                         replies=Replies,
+                         id=Id,
+                         next=Next,
+                         type=Type,
+                         values=Values},
 
     case NumResponses =:= ?R of
         true ->
@@ -139,12 +149,19 @@ waiting({ok, _ReqId, Reply},
             {next_state, waiting, State}
     end.
 
-waiting_n({ok, _ReqId, Reply},
+waiting_n({ok, _ReqId, IndexNode, {Id, Type, Value, Next} = Reply},
         #state{num_responses=NumResponses0,
+               values=Values0,
                replies=Replies0}=State0) ->
     NumResponses = NumResponses0 + 1,
-    Replies = [Reply|Replies0],
-    State = State0#state{num_responses=NumResponses, replies=Replies},
+    Values = [{IndexNode, Value}|Values0],
+    Replies = [{IndexNode, Reply}|Replies0],
+    State = State0#state{num_responses=NumResponses,
+                         replies=Replies,
+                         id=Id,
+                         next=Next,
+                         type=Type,
+                         values=Values},
 
     case NumResponses =:= ?N of
         true ->
@@ -153,9 +170,46 @@ waiting_n({ok, _ReqId, Reply},
             {next_state, waiting_n, State}
     end.
 
-finalize(timeout, State) ->
-    {stop, normal, State}.
+finalize(timeout, #state{type=Type, values=Values}=State) ->
+    MObj = merge(Type, Values),
+    case needs_repair(Type, MObj, Values) of
+        true ->
+            repair(State, MObj, Values),
+            {stop, normal, State};
+        false ->
+            {stop, normal, State}
+    end.
 
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
+
+%% @doc Merge a series of replies.
+merge(Type, Values) ->
+    Objs = [Obj || {_, Obj} <- Values],
+    lists:foldl(fun(X, Acc) -> Type:merge(X, Acc) end,
+                Type:new(), Objs).
+
+%% @doc Given the merged object `MObj' and a list of `Values'
+%%      determine if repair is needed.
+needs_repair(Type, MObj, Values) ->
+    Objs = [Obj || {_, Obj} <- Values],
+    lists:any(different(Type, MObj), Objs).
+
+%% @doc Determine if two objects are different.
+different(Type, A) ->
+    fun(B) ->
+        not Type:equal(A,B)
+    end.
+
+%% @doc Repair any vnodes that do not have the correct object.
+repair(_, _, []) -> io;
+
+repair(#state{id=Id, type=Type, next=Next}=State, MObj, [{IdxNode, Obj}|T]) ->
+    case Type:equal(MObj, Obj) of
+        true ->
+            repair(State, MObj, T);
+        false ->
+            lasp_vnode:repair(IdxNode, Id, Type, MObj, Next),
+            repair(State, MObj, T)
+    end.

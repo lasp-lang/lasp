@@ -45,6 +45,7 @@
          fold/5,
          next/3,
          wait_needed/4,
+         repair/5,
          declare/4,
          thread/5]).
 
@@ -82,6 +83,12 @@
                 programs}).
 
 %% Extrenal API
+
+repair(IdxNode, Id, Type, Value, Next) ->
+    riak_core_vnode_master:command(IdxNode,
+                                   {repair, undefined, Id, Type, Value, Next},
+                                   ignore,
+                                   ?VNODE_MASTER).
 
 register(Preflist, Identity, Module, File) ->
     riak_core_vnode_master:command(Preflist,
@@ -221,6 +228,14 @@ init([Partition]) ->
 
 %% Program execution handling.
 
+handle_command({repair, undefined, Id, Type, Value, Next}, _From,
+               #state{variables=Variables}=State) ->
+    NotifyFun = fun(_Id, NewValue) ->
+                        ?MODULE:notify_value(_Id, NewValue)
+                end,
+    ?BACKEND:write(Type, Value, Next, Id, Variables, NotifyFun),
+    {noreply, State};
+
 handle_command({execute, {ReqId, _}, Module0}, _From,
                #state{programs=Programs,
                       node=Node,
@@ -321,7 +336,7 @@ handle_command({bind_to, {ReqId, _}, Id, DVId}, FromPid,
     {noreply, State};
 
 handle_command({bind, {ReqId, _}, Id, Value}, _From,
-               State=#state{variables=Variables}) ->
+               State=#state{partition=Partition, node=Node, variables=Variables}) ->
     NextKeyFun = fun(Type, Next) ->
                         next_key(Next, Type, State)
                  end,
@@ -330,10 +345,10 @@ handle_command({bind, {ReqId, _}, Id, Value}, _From,
                 end,
     {ok, Result} = ?BACKEND:bind(Id, Value, Variables, NextKeyFun,
                                  NotifyFun),
-    {reply, {ok, ReqId, Result}, State};
+    {reply, {ok, ReqId, {Partition, Node}, Result}, State};
 
 handle_command({update, {ReqId, _}, Id, Operation, Actor}, _From,
-               State=#state{variables=Variables}) ->
+               State=#state{partition=Partition, node=Node, variables=Variables}) ->
     NextKeyFun = fun(Type, Next) ->
                         next_key(Next, Type, State)
                  end,
@@ -342,7 +357,7 @@ handle_command({update, {ReqId, _}, Id, Operation, Actor}, _From,
                 end,
     {ok, Result} = ?BACKEND:update(Id, Operation, Actor, Variables,
                                    NextKeyFun, NotifyFun),
-    {reply, {ok, ReqId, Result}, State};
+    {reply, {ok, ReqId, {Partition, Node}, Result}, State};
 
 handle_command({fetch, TargetId, FromId, FromPid, ReqId}, _From,
                State=#state{variables=Variables}) ->
@@ -392,28 +407,31 @@ handle_command({thread, {ReqId, _}, Module, Function, Args}, _From,
 
 handle_command({wait_needed, {ReqId, _}, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
-    Self = From,
     ReplyFun = fun(ReadThreshold) ->
-                       {reply, {ok, ReqId, ReadThreshold}, State}
+                        {reply, {ok, ReqId, ReadThreshold}, State}
                end,
     BlockingFun = fun() ->
                         {noreply, State}
                   end,
-    ?BACKEND:wait_needed(Id, Threshold, Variables, Self, ReplyFun, BlockingFun);
+    ?BACKEND:wait_needed(Id,
+                         Threshold,
+                         Variables,
+                         From,
+                         ReplyFun,
+                         BlockingFun);
 
 handle_command({read, {ReqId, _}, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
-    Self = From,
     ReplyFun = fun(_Id, Type, Value, Next) ->
-            {reply, {ok, ReqId, {_Id, Type, Value, Next}}, State}
-            end,
+                    {reply, {ok, ReqId, {_Id, Type, Value, Next}}, State}
+               end,
     BlockingFun = fun() ->
-            {noreply, State}
-            end,
+                    {noreply, State}
+                  end,
     ?BACKEND:read(Id,
                   Threshold,
                   Variables,
-                  Self,
+                  From,
                   ReplyFun,
                   BlockingFun);
 
@@ -422,18 +440,7 @@ handle_command({filter, {ReqId, _}, Id, Function, AccId}, _From,
                             partition=Partition,
                             node=Node}) ->
     BindFun = fun(_AccId, AccValue, _Variables) ->
-            %% Beware of cycles in the gen_server calls!
-            [{IndexNode, _Type}] = lasp:preflist(?N, _AccId, lasp),
-
-            case IndexNode of
-                {Partition, Node} ->
-                    %% We're local, which means that we can interact
-                    %% directly with the data store.
-                    ?BACKEND:bind(_AccId, AccValue, _Variables);
-                _ ->
-                    %% We're remote, go through all of the routing logic.
-                    lasp:bind(_AccId, AccValue)
-            end
+            lasp:bind(_AccId, AccValue)
     end,
     ReadFun = fun(_Id, _Threshold, _Variables) ->
             %% Beware of cycles in the gen_server calls!
@@ -505,19 +512,8 @@ handle_command({intersection, {ReqId, _}, Left, Right, Intersection}, _From,
                State=#state{variables=Variables,
                             partition=Partition,
                             node=Node}) ->
-    BindFun = fun(_Intersection, AccValue, _Variables) ->
-            %% Beware of cycles in the gen_server calls!
-            [{IndexNode, _Type}] = lasp:preflist(?N, _Intersection, lasp),
-
-            case IndexNode of
-                {Partition, Node} ->
-                    %% We're local, which means that we can interact
-                    %% directly with the data store.
-                    ?BACKEND:bind(_Intersection, AccValue, _Variables);
-                _ ->
-                    %% We're remote, go through all of the routing logic.
-                    lasp:bind(_Intersection, AccValue)
-            end
+    BindFun = fun(_Intersection, _AccValue, _Variables) ->
+            lasp:bind(_Intersection, _AccValue)
     end,
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
             %% Beware of cycles in the gen_server calls!
@@ -554,19 +550,8 @@ handle_command({union, {ReqId, _}, Left, Right, Union}, _From,
                State=#state{variables=Variables,
                             partition=Partition,
                             node=Node}) ->
-    BindFun = fun(_Union, AccValue, _Variables) ->
-            %% Beware of cycles in the gen_server calls!
-            [{IndexNode, _Type}] = lasp:preflist(?N, _Union, lasp),
-
-            case IndexNode of
-                {Partition, Node} ->
-                    %% We're local, which means that we can interact
-                    %% directly with the data store.
-                    ?BACKEND:bind(_Union, AccValue, _Variables);
-                _ ->
-                    %% We're remote, go through all of the routing logic.
-                    lasp:bind(_Union, AccValue)
-            end
+    BindFun = fun(_Union, _AccValue, _Variables) ->
+            lasp:bind(_Union, _AccValue)
     end,
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
             %% Beware of cycles in the gen_server calls!
@@ -604,18 +589,7 @@ handle_command({map, {ReqId, _}, Id, Function, AccId}, _From,
                             partition=Partition,
                             node=Node}) ->
     BindFun = fun(_AccId, AccValue, _Variables) ->
-            %% Beware of cycles in the gen_server calls!
-            [{IndexNode, _Type}] = lasp:preflist(?N, _AccId, lasp),
-
-            case IndexNode of
-                {Partition, Node} ->
-                    %% We're local, which means that we can interact
-                    %% directly with the data store.
-                    ?BACKEND:bind(_AccId, AccValue, _Variables);
-                _ ->
-                    %% We're remote, go through all of the routing logic.
-                    lasp:bind(_AccId, AccValue)
-            end
+            lasp:bind(_AccId, AccValue)
     end,
     ReadFun = fun(_Id, _Threshold, _Variables) ->
             %% Beware of cycles in the gen_server calls!
@@ -638,19 +612,8 @@ handle_command({fold, {ReqId, _}, Id, Function, AccId}, _From,
                State=#state{variables=Variables,
                             partition=Partition,
                             node=Node}) ->
-    BindFun = fun(_AccId, AccValue, _Variables) ->
-            %% Beware of cycles in the gen_server calls!
-            [{IndexNode, _Type}] = lasp:preflist(?N, _AccId, lasp),
-
-            case IndexNode of
-                {Partition, Node} ->
-                    %% We're local, which means that we can interact
-                    %% directly with the data store.
-                    ?BACKEND:bind(_AccId, AccValue, _Variables);
-                _ ->
-                    %% We're remote, go through all of the routing logic.
-                    lasp:bind(_AccId, AccValue)
-            end
+    BindFun = fun(_AccId, _AccValue, _Variables) ->
+            lasp:bind(_AccId, _AccValue)
     end,
     ReadFun = fun(_Id, _Threshold, _Variables) ->
             %% Beware of cycles in the gen_server calls!
@@ -746,6 +709,7 @@ declare_next(Type, #state{partition=Partition,
     Id = druuid:v4(),
 
     %% Beware of cycles in the gen_server calls!
+    %% @TODO: Needs to be resolved.
     [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
 
     case IndexNode of
@@ -756,7 +720,9 @@ declare_next(Type, #state{partition=Partition,
         _ ->
             %% We're remote, go through all of the routing logic.
             lasp:declare(Id, Type)
-    end.
+    end,
+
+    {ok, Id}.
 
 %% Internal program execution functions.
 

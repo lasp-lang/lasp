@@ -367,7 +367,6 @@ get_stream(Stream) ->
 preflist(NVal, Param, VNode) ->
     case application:get_env(lasp, single_partition_mode) of
         {ok, true} ->
-            lager:info("Running in single partition mode!"),
             case riak_core_mochiglobal:get(primary_apl) of
                 undefined ->
                     DocIdx = riak_core_util:chash_key({?BUCKET,

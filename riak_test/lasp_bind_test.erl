@@ -93,7 +93,7 @@ test_lattice(Type) ->
 
     %% Attempt pre, and post- dataflow variable bind operations.
     {ok, _} = lasp:bind_to(L2, L1),
-    {ok, {S1, _}} = lasp:update(L1, {add, 1}, a),
+    {ok, _} = lasp:update(L1, {add, 1}, a),
     {ok, _} = lasp:bind_to(L3, L1),
 
     %% Verify the same value is contained by all.

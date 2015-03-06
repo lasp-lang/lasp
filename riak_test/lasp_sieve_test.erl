@@ -69,7 +69,7 @@ sieve(S1, S2) ->
         {ok, {_, _, Value, Next}} ->
             {ok, SN} = lasp:declare(lasp_ivar),
             spawn(lasp_sieve_test, filter, [Next, fun(Y) -> Y rem Value =/= 0 end, SN]),
-            {ok, NextOutput} = lasp:produce(S2, Value),
+            {ok, {_, _, _, NextOutput}} = lasp:produce(S2, Value),
             sieve(SN, NextOutput)
     end.
 
@@ -82,7 +82,7 @@ filter(S1, F, S2) ->
                 false ->
                     filter(Next, F, S2);
                 true->
-                    {ok, NextOutput} = lasp:produce(S2, Value),
+                    {ok, {_, _, _, NextOutput}} = lasp:produce(S2, Value),
                     filter(Next, F, NextOutput)
             end
     end.
@@ -91,7 +91,7 @@ generate(Init, N, Output) ->
     if
         (Init =< N) ->
             timer:sleep(250),
-            {ok, Next} = lasp:produce(Output, Init),
+            {ok, {_, _, _, Next}} = lasp:produce(Output, Init),
             generate(Init + 1, N,  Next);
         true ->
             lasp:bind(Output, nil)

@@ -62,7 +62,7 @@ sender(Init, N, Output) ->
     if
         N >= 0 ->
             timer:sleep(500),
-            {ok, Next} = lasp:produce(Output, Init),
+            {ok, {_, _, _, Next}} = lasp:produce(Output, Init),
             sender(Init + 1, N - 1,  Next);
         true ->
             timer:sleep(500),

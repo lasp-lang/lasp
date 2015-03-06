@@ -79,15 +79,15 @@ insert(X, In, Out) ->
     {ok, _} = lasp:wait_needed(Out),
     case lasp:consume(In) of
         {ok, {_, _, nil, _}} ->
-            {ok, Next} = lasp:produce(Out, X),
+            {ok, {_, _, _, Next}} = lasp:produce(Out, X),
             lasp:bind(Next, nil);
         {ok, {_, _, V, SNext}} ->
             if
                 X < V ->
-                    {ok, Next} = lasp:produce(Out, X),
+                    {ok, {_, _, _, Next}} = lasp:produce(Out, X),
                     lasp:bind(Next, In);
                 true ->
-                    {ok, Next} = lasp:produce(Out, V),
+                    {ok, {_, _, _, Next}} = lasp:produce(Out, V),
                     insert(X, SNext, Next)
             end
     end.

@@ -282,7 +282,7 @@ bind_to(Id, TheirId, Store) ->
 
 %% @doc Define a dataflow variable to be bound to a value.
 %%
--spec bind(id(), value(), store()) -> {ok, id()}.
+-spec bind(id(), value(), store()) -> {ok, {id(), type(), value(), id()}}.
 bind(Id, Value, Store) ->
     NextKeyFun = fun(Type, Next) ->
                         next_key(Next, Type, Store)
@@ -298,7 +298,7 @@ bind(Id, Value, Store) ->
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation(), actor(), store()) -> {ok, {value(), id()}}.
+-spec update(id(), operation(), actor(), store()) -> {ok, {id(), type(), value(), id()}}.
 update(Id, Operation, Actor, Store) ->
     NextKeyFun = fun(Type, Next) ->
                         next_key(Next, Type, Store)
@@ -435,12 +435,11 @@ reply_fetch(FromId, FromPid,
 %%      at the given `Id'.
 %%
 -spec update(id(), operation(), actor(), store(), function(), function()) ->
-    {ok, {value(), id()}}.
+    {ok, {id(), type(), value(), id()}}.
 update(Id, Operation, Actor, Store, NextKeyFun, NotifyFun) ->
     [{_Key, #dv{value=Value0, type=Type}}] = ets:lookup(Store, Id),
     {ok, Value} = Type:update(Operation, Actor, Value0),
-    {ok, NextId} = bind(Id, Value, Store, NextKeyFun, NotifyFun),
-    {ok, {Value, NextId}}.
+    bind(Id, Value, Store, NextKeyFun, NotifyFun).
 
 %% @doc Define a dataflow variable to be bound a value.
 %%
@@ -456,7 +455,7 @@ update(Id, Operation, Actor, Store, NextKeyFun, NotifyFun) ->
 %%      an update has occurred.
 %%
 -spec bind(id(), value(), store(), function(), function()) ->
-    {ok, id()}.
+    {ok, {id(), type(), value(), id()}}.
 bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
     [{_Key, #dv{next=Next,
                 value=Value0,
@@ -464,7 +463,7 @@ bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
     NextKey = NextKeyFun(Type, Next),
     case Value0 of
         Value ->
-            {ok, NextKey};
+            {ok, {Id, Type, Value, NextKey}};
         _ ->
             %% Merge may throw for invalid types.
             try
@@ -473,14 +472,14 @@ bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
                     true ->
                         write(Type, Merged, NextKey, Id, Store,
                               NotifyFun),
-                        {ok, NextKey};
+                        {ok, {Id, Type, Value, NextKey}};
                     false ->
-                        {ok, NextKey}
+                        {ok, {Id, Type, Value, NextKey}}
                 end
             catch
                 _:Reason ->
                     lager:info("Bind threw an exception: ~p", [Reason]),
-                    {ok, NextKey}
+                    {ok, {Id, Type, Value, NextKey}}
             end
     end.
 
@@ -913,8 +912,7 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec filter(id(), function(), id(), store(), function(), function()) ->
-    ok.
+-spec filter(id(), function(), id(), store(), function(), function()) -> ok.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.

@@ -42,9 +42,8 @@
 
 -callback bind_to(id(), value(), store(), function(), pid()) -> any().
 
--callback bind(id(), value(), store()) -> {ok, id()}.
--callback bind(id(), value(), store(), function(), function()) ->
-    {ok, id()}.
+-callback bind(id(), value(), store()) -> {ok, {id(), type(), value(), id()}}.
+-callback bind(id(), value(), store(), function(), function()) -> {ok, {id(), type(), value(), id()}}.
 
 -callback thread(module(), func(), args(), store()) -> ok.
 
@@ -79,10 +78,8 @@
 
 -callback notify(store(), [{id(), function()}] | dict(), function()) -> ok.
 
--callback update(id(), actor(), operation(), store()) ->
-    {ok, {value(), id()}}.
--callback update(id(), actor(), operation(), store(), function(),
-                 function()) -> {ok, {value(), id()}}.
+-callback update(id(), actor(), operation(), store()) -> {ok, {id(), type(), value(), id()}}.
+-callback update(id(), actor(), operation(), store(), function(), function()) -> {ok, {id(), type(), value(), id()}}.
 
 -callback type(id(), store()) -> {ok, type()}.
 

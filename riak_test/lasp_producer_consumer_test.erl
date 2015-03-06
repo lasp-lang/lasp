@@ -64,7 +64,7 @@ producer(Init, N, Output) ->
     if
         (N > 0) ->
             timer:sleep(1000),
-            {ok, Next} = lasp:produce(Output, Init),
+            {ok, {_, _, _, Next}} = lasp:produce(Output, Init),
             producer(Init + 1, N-1,  Next);
         true ->
             lasp:bind(Output, nil)
@@ -75,6 +75,6 @@ consumer(S1, F, S2) ->
         {ok, {_, _, nil, _}} ->
             lasp:bind(S2, nil);
         {ok, {_, _, Value, Next}} ->
-            {ok, NextOutput} = lasp:produce(S2, F(Value)),
+            {ok, {_, _, _, NextOutput}} = lasp:produce(S2, F(Value)),
             consumer(Next, F, NextOutput)
     end.

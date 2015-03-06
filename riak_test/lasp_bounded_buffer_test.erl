@@ -67,7 +67,7 @@ producer(Value, N, Output) ->
     if
         (N > 0) ->
             {ok, _} = lasp:wait_needed(Output),
-            {ok, Next} = lasp:produce(Output, Value),
+            {ok, {_, _, _, Next}} = lasp:produce(Output, Value),
             producer(Value + 1, N - 1,  Next);
         true ->
             lasp:bind(Output, nil)
@@ -76,11 +76,11 @@ producer(Value, N, Output) ->
 loop(S1, S2, End) ->
     {ok, _} = lasp:wait_needed(S2),
     {ok, {_, _, S1Value, S1Next}} = lasp:consume(S1),
-    {ok, S2Next} = lasp:produce(S2, S1Value),
+    {ok, {_, _, _, S2Next}} = lasp:produce(S2, S1Value),
     case lasp:produce(S2, S1Value) of
-        {ok, nil} ->
+        {ok, {_, _, _, nil}} ->
             ok;
-        {ok, S2Next} ->
+        {ok, {_, _, _, S2Next}} ->
             case lasp:extend(End) of
                 {ok, {nil, _}} ->
                     ok;
@@ -111,7 +111,7 @@ consumer(S2, Size, F, Output) ->
                 {ok, {_, _, nil, _}} ->
                     lasp:bind(Output, nil);
                 {ok, {_, _, Value, Next}} ->
-                    {ok, NextOutput} = lasp:produce(Output, F(Value)),
+                    {ok, {_, _, _, NextOutput}} = lasp:produce(Output, F(Value)),
                     consumer(Next, Size - 1, F, NextOutput)
             end
     end.

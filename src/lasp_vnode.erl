@@ -323,7 +323,9 @@ handle_command({register, {ReqId, _}, Module0, File}, _From,
 %% Language handling.
 
 handle_command({declare, {ReqId, _}, Id, Type}, _From,
-               #state{variables=Variables}=State) ->
+               #state{variables=Variables, partition=Partition}=State) ->
+    lager:info("Declare called for id: ~p on partition: ~p",
+               [Id, Partition]),
     {ok, Id} = ?BACKEND:declare(Id, Type, Variables),
     {reply, {ok, ReqId, Id}, State};
 
@@ -706,23 +708,41 @@ next_key(NextKey0, _, _) ->
 declare_next(Type, #state{partition=Partition,
                           node=Node,
                           variables=Variables}) ->
+    %% Generate identifier.
     Id = druuid:v4(),
 
-    %% Beware of cycles in the gen_server calls!
-    %% @TODO: Needs to be resolved.
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
+    %% Generate preference list.
+    Preflist = lasp:preflist(?N, Id, lasp),
+    Preflist2 = [{I, N} || {{I, N}, _} <- Preflist],
 
-    case IndexNode of
-        {Partition, Node} ->
-            %% We're local, which means that we can interact directly
-            %% with the data store.
-            ?BACKEND:declare(Id, Type, Variables);
-        _ ->
-            %% We're remote, go through all of the routing logic.
-            lasp:declare(Id, Type)
+    lager:info("Node: ~p", [Node]),
+    lager:info("Partition: ~p", [Partition]),
+    lager:info("Preflist2: ~p", [Preflist2]),
+
+    %% Determine if we need to write locally as one of the preference
+    %% list members, and if so, execute the local write.
+    Preflist3 = case lists:member({Partition, Node}, Preflist2) of
+        true ->
+            lager:info("Local vnode is a member of Preflist2!"),
+            {ok, _} = ?BACKEND:declare(Id, Type, Variables),
+            Preflist2 -- [{Partition, Node}];
+        false ->
+            Preflist2
     end,
 
-    {ok, Id}.
+    lager:info("Preflist3: ~p", [Preflist3]),
+
+    %% Fire network request for the remainder.
+    case Preflist3 of
+        [] ->
+            lager:info("Execution completed; no other nodes."),
+            {ok, Id};
+        _ ->
+            {ok, ReqId} = lasp_declare_fsm:declare(Preflist3, Id, Type),
+            {ok, Id} = lasp:wait_for_reqid(ReqId, ?TIMEOUT),
+            lager:info("Execution completed."),
+            {ok, Id}
+    end.
 
 %% Internal program execution functions.
 

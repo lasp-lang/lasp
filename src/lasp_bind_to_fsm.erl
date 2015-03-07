@@ -153,6 +153,10 @@ waiting_n({ok, _ReqId, Reply},
             {next_state, waiting_n, State}
     end.
 
+finalize({ok, _ReqId, _Reply}, State) ->
+    %% Ignore additional replies, if they happen to come in late.
+    {stop, normal, State};
+
 finalize(timeout, State) ->
     {stop, normal, State}.
 

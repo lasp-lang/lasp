@@ -195,20 +195,23 @@ wait_needed(Preflist, Identity, Id, Threshold) ->
 
 
 fetch(Id, FromId, FromPid, ReqId) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:command(IndexNode,
+    Preflist = lasp:preflist(?N, Id, lasp),
+    Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
+    riak_core_vnode_master:command(Preflist2,
                                    {fetch, Id, FromId, FromPid, ReqId},
                                    ?VNODE_MASTER).
 
 reply_fetch(Id, FromPid, ReqId, DV) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:command(IndexNode,
+    Preflist = lasp:preflist(?N, Id, lasp),
+    Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
+    riak_core_vnode_master:command(Preflist2,
                                    {reply_fetch, Id, FromPid, ReqId, DV},
                                    ?VNODE_MASTER).
 
 notify_value(Id, Value) ->
-    [{IndexNode, _Type}] = lasp:preflist(?N, Id, lasp),
-    riak_core_vnode_master:command(IndexNode,
+    Preflist = lasp:preflist(?N, Id, lasp),
+    Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
+    riak_core_vnode_master:command(Preflist2,
                                    {notify_value, Id, Value},
                                    ?VNODE_MASTER).
 
@@ -323,9 +326,7 @@ handle_command({register, {ReqId, _}, Module0, File}, _From,
 %% Language handling.
 
 handle_command({declare, {ReqId, _}, Id, Type}, _From,
-               #state{variables=Variables, partition=Partition}=State) ->
-    lager:info("Declare called for id: ~p on partition: ~p",
-               [Id, Partition]),
+               #state{variables=Variables, partition=_Partition}=State) ->
     {ok, Id} = ?BACKEND:declare(Id, Type, Variables),
     {reply, {ok, ReqId, Id}, State};
 
@@ -715,32 +716,23 @@ declare_next(Type, #state{partition=Partition,
     Preflist = lasp:preflist(?N, Id, lasp),
     Preflist2 = [{I, N} || {{I, N}, _} <- Preflist],
 
-    lager:info("Node: ~p", [Node]),
-    lager:info("Partition: ~p", [Partition]),
-    lager:info("Preflist2: ~p", [Preflist2]),
-
     %% Determine if we need to write locally as one of the preference
     %% list members, and if so, execute the local write.
     Preflist3 = case lists:member({Partition, Node}, Preflist2) of
         true ->
-            lager:info("Local vnode is a member of Preflist2!"),
             {ok, _} = ?BACKEND:declare(Id, Type, Variables),
             Preflist2 -- [{Partition, Node}];
         false ->
             Preflist2
     end,
 
-    lager:info("Preflist3: ~p", [Preflist3]),
-
     %% Fire network request for the remainder.
     case Preflist3 of
         [] ->
-            lager:info("Execution completed; no other nodes."),
             {ok, Id};
         _ ->
             {ok, ReqId} = lasp_declare_fsm:declare(Preflist3, Id, Type),
             {ok, Id} = lasp:wait_for_reqid(ReqId, ?TIMEOUT),
-            lager:info("Execution completed."),
             {ok, Id}
     end.
 

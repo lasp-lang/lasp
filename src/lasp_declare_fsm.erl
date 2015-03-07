@@ -26,8 +26,9 @@
 -include("lasp.hrl").
 
 %% API
--export([start_link/4,
-         declare/2]).
+-export([start_link/5,
+         declare/2,
+         declare/3]).
 
 %% Callbacks
 -export([init/1,
@@ -57,13 +58,19 @@
 %%% API
 %%%===================================================================
 
-start_link(ReqId, From, Id, Type) ->
-    gen_fsm:start_link(?MODULE, [ReqId, From, Id, Type], []).
+start_link(ReqId, From, Preflist, Id, Type) ->
+    gen_fsm:start_link(?MODULE, [ReqId, From, Preflist, Id, Type], []).
 
 %% @doc Declare a variable.
 declare(Id, Type) ->
     ReqId = lasp:mk_reqid(),
-    _ = lasp_declare_fsm_sup:start_child([ReqId, self(), Id, Type]),
+    _ = lasp_declare_fsm_sup:start_child([ReqId, self(), undefined, Id, Type]),
+    {ok, ReqId}.
+
+%% @doc Declare a variable at a given preference list.
+declare(Preflist, Id, Type) ->
+    ReqId = lasp:mk_reqid(),
+    _ = lasp_declare_fsm_sup:start_child([ReqId, self(), Preflist, Id, Type]),
     {ok, ReqId}.
 
 %%%===================================================================
@@ -90,8 +97,8 @@ terminate(_Reason, _SN, _SD) ->
 %%%===================================================================
 
 %% @doc Initialize the request.
-init([ReqId, From, Id, Type]) ->
-    State = #state{preflist=undefined,
+init([ReqId, From, Preflist, Id, Type]) ->
+    State = #state{preflist=Preflist,
                    req_id=ReqId,
                    coordinator=node(),
                    from=From,
@@ -102,9 +109,14 @@ init([ReqId, From, Id, Type]) ->
     {ok, prepare, State, 0}.
 
 %% @doc Prepare request by retrieving the preflist.
-prepare(timeout, #state{id=Id}=State) ->
-    Preflist = lasp:preflist(?N, Id, lasp),
-    Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
+prepare(timeout, #state{id=Id, preflist=Preflist0}=State) ->
+    Preflist2 = case Preflist0 of
+        undefined ->
+            Preflist = lasp:preflist(?N, Id, lasp),
+            [{Index, Node} || {{Index, Node}, _Type} <- Preflist];
+        _ ->
+            Preflist0
+    end,
     {next_state, execute, State#state{preflist=Preflist2}, 0}.
 
 %% @doc Execute the request.

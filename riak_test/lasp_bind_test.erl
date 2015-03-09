@@ -107,7 +107,7 @@ test_lattice(Type) ->
     Self = self(),
 
     spawn_link(fun() ->
-                  {ok, _} = lasp:wait_needed(L1, S2),
+                  {ok, _} = lasp:wait_needed(L1, {strict, S1}),
                   Self ! threshold_met
                end),
 

@@ -23,6 +23,8 @@
 
 -include("lasp.hrl").
 
+-callback start(atom()) -> atom().
+
 -callback read(id(), store()) -> {ok, var()}.
 -callback read(id(), value(), store()) -> {ok, var()}.
 -callback read(id(), value(), store(), pid(), function(), function()) -> {ok, var()}.

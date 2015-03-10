@@ -215,8 +215,7 @@ start_vnode(I) ->
 init([Partition]) ->
     Node = node(),
     Variables = generate_unique_partition_identifier(Partition, Node),
-    Variables = ets:new(Variables, [set, named_table, public,
-                                    {write_concurrency, true}]),
+    Variables = ?BACKEND:start(Variables),
     {ok, #state{partition=Partition,
                 programs=dict:new(),
                 node=Node,

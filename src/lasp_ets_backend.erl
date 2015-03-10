@@ -26,7 +26,8 @@
 -behaviour(lasp_backend).
 
 %% Core API.
--export([bind/3,
+-export([start/1,
+         bind/3,
          bind_to/3,
          read/2,
          read/3,
@@ -81,6 +82,11 @@
                type :: type(),
                value :: value(),
                read_fun :: function()}).
+
+-spec start(atom()) -> atom().
+start(Identifier) ->
+    Identifier = ets:new(Identifier, [set, named_table, public,
+                                      {write_concurrency, true}]).
 
 %% @doc Filter values from one lattice into another.
 %%

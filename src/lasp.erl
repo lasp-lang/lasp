@@ -38,15 +38,10 @@
          union/3,
          intersection/3,
          fold/3,
-         produce/2,
-         produce/4,
-         consume/1,
-         extend/1,
          wait_needed/1,
          wait_needed/2,
          thread/3,
          preflist/3,
-         get_stream/1,
          register/3,
          execute/2,
          process/6,
@@ -279,45 +274,6 @@ filter(Id, Function, AccId) ->
     {ok, ReqId} = lasp_filter_fsm:filter(Id, Function, AccId),
     wait_for_reqid(ReqId, ?TIMEOUT).
 
-%% @doc Produce a value in a stream.
-%%
-%%      Given the `Id' of a declared value in a dataflow variable
-%%      stream, bind `Value' to it.  Similar to {@link bind/2}.
-%%
--spec produce(id(), value()) -> {ok, id()} | {error, timeout}.
-produce(Id, Value) ->
-    bind(Id, Value).
-
-%% @doc Produce a value in a stream.
-%%
-%%      Given the `Id' of a declared variable in a dataflow variable
-%%      stream, bind the result of `Module:Function(Args)' to it.
-%%      Similar to {@link produce/2}.
-%%
--spec produce(id(), module(), func(), args()) ->
-    {ok, id()} | {error, timeout}.
-produce(Id, Module, Function, Args) ->
-    bind(Id, Module:Function(Args)).
-
-%% @doc Consume a value in the stream.
-%%
-%%      Given the `Id' of a declared variable in a dataflow stream, read
-%%      the next value in the stream.
-%%
--spec consume(id()) -> {ok, var()} | {error, timeout}.
-consume(Id) ->
-    read(Id, {strict, undefined}).
-
-%% @doc Generate the next identifier in a stream.
-%%
-%%      Given `Id', return the next identifier needed to build a stream
-%%      after this variable.
-%%
--spec extend(id()) -> {ok, id()} | {error, timeout}.
-extend(Id) ->
-    {ok, ReqId} = lasp_next_fsm:next(Id),
-    wait_for_reqid(ReqId, ?TIMEOUT).
-
 %% @doc Spawn a function.
 %%
 %%      Spawn a process executing `Module:Function(Args)'.
@@ -347,14 +303,6 @@ wait_needed(Id) ->
 wait_needed(Id, Threshold) ->
     {ok, ReqId} = lasp_wait_needed_fsm:wait_needed(Id, Threshold),
     wait_for_reqid(ReqId, ?TIMEOUT).
-
-%% @doc Materialize all values in a stream and print to the log.
-%%
-%%      Meant primarily for debugging purposes.
-%%
--spec get_stream(id()) -> stream().
-get_stream(Stream) ->
-    get_stream(Stream, []).
 
 %% @doc Generate a preference list.
 %%
@@ -409,20 +357,4 @@ wait_for_reqid(ReqID, Timeout) ->
             {ok, Val}
     after Timeout ->
         {error, timeout}
-    end.
-
-%% @doc Materialize all values in a stream and print to the log.
-%%
-%%      Meant primarily for debugging purposes. See {@link
-%%      get_stream/1}.
-%%
-get_stream(Head, Output) ->
-    lager:info("About to consume: ~p", [Head]),
-    case consume(Head) of
-        {ok, {_, _, nil, _}} ->
-            lager:info("Received: ~p", [undefined]),
-            Output;
-        {ok, {_, _, Value, Next}} ->
-            lager:info("Received: ~p", [Value]),
-            get_stream(Next, lists:append(Output, [Value]))
     end.

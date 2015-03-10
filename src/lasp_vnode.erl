@@ -43,7 +43,6 @@
          union/5,
          intersection/5,
          fold/5,
-         next/3,
          wait_needed/4,
          repair/5,
          declare/4,
@@ -172,12 +171,6 @@ fold(Preflist, Identity, Id, Function, AccId) ->
 thread(Preflist, Identity, Module, Function, Args) ->
     riak_core_vnode_master:command(Preflist,
                                    {thread, Identity, Module, Function, Args},
-                                   {fsm, undefined, self()},
-                                   ?VNODE_MASTER).
-
-next(Preflist, Identity, Id) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {next, Identity, Id},
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
@@ -634,14 +627,6 @@ handle_command({fold, {ReqId, _}, Id, Function, AccId}, _From,
     end,
     ok = ?BACKEND:fold(Id, Function, AccId, Variables, BindFun, ReadFun),
     {reply, {ok, ReqId, ok}, State};
-
-handle_command({next, {ReqId, _}, Id}, _From,
-               State=#state{variables=Variables}) ->
-    DeclareNextFun = fun(Type) ->
-                            declare_next(Type, State)
-                     end,
-    {ok, Result} = ?BACKEND:next(Id, Variables, DeclareNextFun),
-    {reply, {ok, ReqId, Result}, State};
 
 handle_command(_Message, _Sender, State) ->
     {noreply, State}.

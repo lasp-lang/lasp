@@ -52,10 +52,6 @@ init(_Args) ->
                  {lasp_thread_fsm_sup, start_link, []},
                   permanent, infinity, supervisor, [lasp_thread_fsm_sup]},
 
-    NextFSM = {lasp_next_fsm_sup,
-               {lasp_next_fsm_sup, start_link, []},
-                permanent, infinity, supervisor, [lasp_next_fsm_sup]},
-
     FoldFSM = {lasp_fold_fsm_sup,
                {lasp_fold_fsm_sup, start_link, []},
                 permanent, infinity, supervisor, [lasp_fold_fsm_sup]},
@@ -123,7 +119,6 @@ init(_Args) ->
     {ok, {{one_for_one, 5, 10}, [VMaster,
                                  DeclareFSM,
                                  ThreadFSM,
-                                 NextFSM,
                                  MapFSM,
                                  ProductFSM,
                                  UnionFSM,

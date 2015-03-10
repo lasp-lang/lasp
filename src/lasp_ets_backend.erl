@@ -31,7 +31,6 @@
          read/2,
          read/3,
          read_any/2,
-         next/2,
          declare/1,
          declare/2,
          declare/3,
@@ -52,8 +51,7 @@
 
 %% Exported functions for vnode integration, where callback behavior is
 %% dynamic.
--export([next/3,
-         bind/5,
+-export([bind/5,
          bind_to/5,
          notify_value/3,
          notify_value/4,
@@ -83,18 +81,6 @@
                type :: type(),
                value :: value(),
                read_fun :: function()}).
-
-%% @doc Given an identifier, return the next identifier.
-%%
-%%      Given `Id', return the next identifier to create a stream of
-%%      variables.
-%%
--spec next(id(), store()) -> {ok, id()}.
-next(Id, Store) ->
-    DeclareNextFun = fun(Type) ->
-            declare(Type, Store)
-    end,
-    next(Id, Store, DeclareNextFun).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -481,26 +467,6 @@ bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
                     lager:info("Bind threw an exception: ~p", [Reason]),
                     {ok, {Id, Type, Value, NextKey}}
             end
-    end.
-
-%% @doc Given an identifier, return the next identifier.
-%%
-%%      Given `Id', return the next identifier to create a stream of
-%%      variables.
-%%
-%%      Allow for an override function for performing the generation of
-%%      the next identifier, using `DeclareNextFun'.
-%%
--spec next(id(), store(), function()) -> {ok, id()}.
-next(Id, Store, DeclareNextFun) ->
-    [{_Key, V=#dv{next=NextKey0}}] = ets:lookup(Store, Id),
-    case NextKey0 of
-        undefined ->
-            {ok, NextKey} = DeclareNextFun(V#dv.type),
-            true = ets:insert(Store, {Id, V#dv{next=NextKey}}),
-            {ok, NextKey};
-        _ ->
-            {ok, NextKey0}
     end.
 
 %% @doc Perform a read (or monotonic read) for a particular identifier.

@@ -672,42 +672,11 @@ terminate(_Reason, _State) ->
 
 %% Internal language functions.
 
-next_key(undefined, Type, State) ->
-    {ok, NextKey} = declare_next(Type, State),
-    NextKey;
+next_key(undefined, _Type, _State) ->
+    NextKey = druuid:v4(),
+    {ok, NextKey};
 next_key(NextKey0, _, _) ->
     NextKey0.
-
-%% @doc Declare the next object for streams.
-declare_next(Type, #state{partition=Partition,
-                          node=Node,
-                          variables=Variables}) ->
-    %% Generate identifier.
-    Id = druuid:v4(),
-
-    %% Generate preference list.
-    Preflist = lasp:preflist(?N, Id, lasp),
-    Preflist2 = [{I, N} || {{I, N}, _} <- Preflist],
-
-    %% Determine if we need to write locally as one of the preference
-    %% list members, and if so, execute the local write.
-    Preflist3 = case lists:member({Partition, Node}, Preflist2) of
-        true ->
-            {ok, _} = ?BACKEND:declare(Id, Type, Variables),
-            Preflist2 -- [{Partition, Node}];
-        false ->
-            Preflist2
-    end,
-
-    %% Fire network request for the remainder.
-    case Preflist3 of
-        [] ->
-            {ok, Id};
-        _ ->
-            {ok, ReqId} = lasp_declare_fsm:declare(Preflist3, Id, Type),
-            {ok, Id} = lasp:wait_for_reqid(ReqId, ?TIMEOUT),
-            {ok, Id}
-    end.
 
 %% Internal program execution functions.
 

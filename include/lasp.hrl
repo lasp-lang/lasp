@@ -6,9 +6,9 @@
 -define(BUCKET, <<"lasp">>).
 -define(BACKEND, lasp_ets_backend).
 
--define(N, 1).
--define(W, 1).
--define(R, 1).
+-define(N, 3).
+-define(W, 2).
+-define(R, 2).
 
 -define(PROGRAM_N, 3).
 -define(PROGRAM_W, 2).
@@ -70,4 +70,3 @@
 
 %% @doc The type of objects that we can be notified about.
 -type object() :: crdt().
-

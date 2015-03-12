@@ -44,7 +44,7 @@
          intersection/5,
          fold/5,
          wait_needed/4,
-         repair/5,
+         repair/4,
          declare/4,
          thread/5]).
 
@@ -52,12 +52,6 @@
 -export([register/4,
          execute/3,
          process/6]).
-
-%% Callbacks from the backend module.
--export([notify_value/2,
-         fetch/4,
-         next_key/3,
-         reply_fetch/4]).
 
 -export([start_vnode/1,
          init/1,
@@ -83,9 +77,9 @@
 
 %% Extrenal API
 
-repair(IdxNode, Id, Type, Value, Next) ->
+repair(IdxNode, Id, Type, Value) ->
     riak_core_vnode_master:command(IdxNode,
-                                   {repair, undefined, Id, Type, Value, Next},
+                                   {repair, undefined, Id, Type, Value},
                                    ignore,
                                    ?VNODE_MASTER).
 
@@ -186,28 +180,6 @@ wait_needed(Preflist, Identity, Id, Threshold) ->
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
-
-fetch(Id, FromId, FromPid, ReqId) ->
-    Preflist = lasp:preflist(?N, Id, lasp),
-    Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
-    riak_core_vnode_master:command(Preflist2,
-                                   {fetch, Id, FromId, FromPid, ReqId},
-                                   ?VNODE_MASTER).
-
-reply_fetch(Id, FromPid, ReqId, DV) ->
-    Preflist = lasp:preflist(?N, Id, lasp),
-    Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
-    riak_core_vnode_master:command(Preflist2,
-                                   {reply_fetch, Id, FromPid, ReqId, DV},
-                                   ?VNODE_MASTER).
-
-notify_value(Id, Value) ->
-    Preflist = lasp:preflist(?N, Id, lasp),
-    Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
-    riak_core_vnode_master:command(Preflist2,
-                                   {notify_value, Id, Value},
-                                   ?VNODE_MASTER).
-
 %% API
 start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
@@ -223,12 +195,9 @@ init([Partition]) ->
 
 %% Program execution handling.
 
-handle_command({repair, undefined, Id, Type, Value, Next}, _From,
+handle_command({repair, undefined, Id, Type, Value}, _From,
                #state{variables=Variables}=State) ->
-    NotifyFun = fun(_Id, NewValue) ->
-                        ?MODULE:notify_value(_Id, NewValue)
-                end,
-    ?BACKEND:write(Type, Value, Next, Id, Variables, NotifyFun),
+    ?BACKEND:write(Type, Value, Id, Variables),
     {noreply, State};
 
 handle_command({execute, {ReqId, _}, Module0}, _From,
@@ -322,78 +291,23 @@ handle_command({declare, {ReqId, _}, Id, Type}, _From,
     {ok, Id} = ?BACKEND:declare(Id, Type, Variables),
     {reply, {ok, ReqId, Id}, State};
 
-handle_command({bind_to, {ReqId, _}, Id, DVId}, FromPid,
+handle_command({bind_to, {ReqId, _}, Id, DVId}, _From,
                State=#state{variables=Variables}) ->
-    FetchFun = fun(_TargetId, _FromId, _FromPid) ->
-            ?MODULE:fetch(_TargetId, _FromId, _FromPid, ReqId)
+    BindFun = fun(_AccId, _AccValue, _Variables) ->
+            lasp:bind(_AccId, _AccValue)
     end,
-    ?BACKEND:bind_to(Id, DVId, Variables, FetchFun, FromPid),
-    {noreply, State};
+    ok = ?BACKEND:bind_to(Id, DVId, Variables, BindFun),
+    {reply, {ok, ReqId, ok}, State};
 
 handle_command({bind, {ReqId, _}, Id, Value}, _From,
                State=#state{partition=Partition, node=Node, variables=Variables}) ->
-    NextKeyFun = fun(Type, Next) ->
-                        next_key(Next, Type, State)
-                 end,
-    NotifyFun = fun(_Id, NewValue) ->
-                        ?MODULE:notify_value(_Id, NewValue)
-                end,
-    {ok, Result} = ?BACKEND:bind(Id, Value, Variables, NextKeyFun,
-                                 NotifyFun),
+    {ok, Result} = ?BACKEND:bind(Id, Value, Variables),
     {reply, {ok, ReqId, {Partition, Node}, Result}, State};
 
 handle_command({update, {ReqId, _}, Id, Operation, Actor}, _From,
                State=#state{partition=Partition, node=Node, variables=Variables}) ->
-    NextKeyFun = fun(Type, Next) ->
-                        next_key(Next, Type, State)
-                 end,
-    NotifyFun = fun(_Id, NewValue) ->
-                        ?MODULE:notify_value(_Id, NewValue)
-                end,
-    {ok, Result} = ?BACKEND:update(Id, Operation, Actor, Variables,
-                                   NextKeyFun, NotifyFun),
+    {ok, Result} = ?BACKEND:update(Id, Operation, Actor, Variables),
     {reply, {ok, ReqId, {Partition, Node}, Result}, State};
-
-handle_command({fetch, TargetId, FromId, FromPid, ReqId}, _From,
-               State=#state{variables=Variables}) ->
-    ResponseFun = fun() ->
-            {noreply, State}
-    end,
-    FetchFun = fun(_TargetId, _FromId, _FromPid) ->
-            ?MODULE:fetch(_TargetId, _FromId, _FromPid, ReqId)
-    end,
-    ReplyFetchFun = fun(_FromId, _FromPid, DV) ->
-            ?MODULE:reply_fetch(_FromId, _FromPid, ReqId, DV)
-    end,
-    NextKeyFun = fun(Next, Type) ->
-            ?MODULE:next_key(Next, Type, State)
-    end,
-    ?BACKEND:fetch(TargetId,
-                   FromId,
-                   FromPid,
-                   Variables,
-                   ResponseFun,
-                   FetchFun,
-                   ReplyFetchFun,
-                   NextKeyFun);
-
-handle_command({reply_fetch, FromId, FromPid, ReqId,
-                #dv{value=Value, next=Next, type=Type}}, _From,
-               State=#state{variables=Variables}) ->
-    NotifyFun = fun(Id, NewValue) ->
-                        ?MODULE:notify_value(Id, NewValue)
-                end,
-    ?BACKEND:write(Type, Value, Next, FromId, Variables, NotifyFun),
-    {ok, _} = ?BACKEND:reply_to_all([FromPid], {ok, ReqId, Next}),
-    {noreply, State};
-
-handle_command({notify_value, Id, Value}, _From,
-               State=#state{variables=Variables}) ->
-    NotifyFun = fun(_Id, NewValue) ->
-                        ?MODULE:notify_value(_Id, NewValue)
-                end,
-    ?BACKEND:notify_value(Id, Value, Variables, NotifyFun),
-    {noreply, State};
 
 handle_command({thread, {ReqId, _}, Module, Function, Args}, _From,
                #state{variables=Variables}=State) ->
@@ -417,8 +331,8 @@ handle_command({wait_needed, {ReqId, _}, Id, Threshold}, From,
 
 handle_command({read, {ReqId, _}, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
-    ReplyFun = fun(_Id, Type, Value, Next) ->
-                    {reply, {ok, ReqId, {_Id, Type, Value, Next}}, State}
+    ReplyFun = fun(_Id, Type, Value) ->
+                    {reply, {ok, ReqId, {_Id, Type, Value}}, State}
                end,
     BlockingFun = fun() ->
                     {noreply, State}
@@ -619,11 +533,9 @@ handle_command({fold, {ReqId, _}, Id, Function, AccId}, _From,
 handle_command(_Message, _Sender, State) ->
     {noreply, State}.
 
-handle_handoff_command(?FOLD_REQ{foldfun=FoldFun, acc0=Acc0}, _Sender,
-                       #state{variables=Variables}=State) ->
-    F = fun({Key, Operation}, Acc) -> FoldFun(Key, Operation, Acc) end,
-    Acc = ets:foldl(F, Acc0, Variables),
-    {reply, Acc, State}.
+handle_handoff_command(?FOLD_REQ{}, _Sender, State) ->
+    %% Ignore handoff.
+    {reply, ok, State}.
 
 handoff_starting(_TargetNode, State) ->
     {true, State}.
@@ -634,9 +546,8 @@ handoff_cancelled(State) ->
 handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
-handle_handoff_data(Data, State=#state{variables=Variables}) ->
-    {Key, Operation} = binary_to_term(Data),
-    true = ets:insert_new(Variables, {Key, Operation}),
+handle_handoff_data(_Data, State) ->
+    %% Ignore handoff.
     {reply, ok, State}.
 
 encode_handoff_item(Key, Operation) ->
@@ -669,14 +580,6 @@ handle_exit(_Pid, _Reason, State) ->
 
 terminate(_Reason, _State) ->
     ok.
-
-%% Internal language functions.
-
-next_key(undefined, _Type, _State) ->
-    NextKey = druuid:v4(),
-    {ok, NextKey};
-next_key(NextKey0, _, _) ->
-    NextKey0.
 
 %% Internal program execution functions.
 

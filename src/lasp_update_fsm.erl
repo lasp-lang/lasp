@@ -50,7 +50,6 @@
                 from,
                 id,
                 type,
-                next,
                 actor,
                 values = [],
                 operation,
@@ -123,7 +122,7 @@ execute(timeout, #state{preflist=Preflist,
                       Actor),
     {next_state, waiting, State}.
 
-waiting({ok, _ReqId, IndexNode, {Id, Type, Value, Next} = Reply},
+waiting({ok, _ReqId, IndexNode, {Id, Type, Value} = Reply},
         #state{from=From,
                req_id=ReqId,
                values=Values0,
@@ -135,7 +134,6 @@ waiting({ok, _ReqId, IndexNode, {Id, Type, Value, Next} = Reply},
     State = State0#state{num_responses=NumResponses,
                          replies=Replies,
                          id=Id,
-                         next=Next,
                          type=Type,
                          values=Values},
 
@@ -153,7 +151,7 @@ waiting({ok, _ReqId, IndexNode, {Id, Type, Value, Next} = Reply},
             {next_state, waiting, State}
     end.
 
-waiting_n({ok, _ReqId, IndexNode, {Id, Type, Value, Next} = Reply},
+waiting_n({ok, _ReqId, IndexNode, {Id, Type, Value} = Reply},
         #state{num_responses=NumResponses0,
                values=Values0,
                replies=Replies0}=State0) ->
@@ -163,7 +161,6 @@ waiting_n({ok, _ReqId, IndexNode, {Id, Type, Value, Next} = Reply},
     State = State0#state{num_responses=NumResponses,
                          replies=Replies,
                          id=Id,
-                         next=Next,
                          type=Type,
                          values=Values},
 
@@ -209,11 +206,11 @@ different(Type, A) ->
 %% @doc Repair any vnodes that do not have the correct object.
 repair(_, _, []) -> io;
 
-repair(#state{id=Id, type=Type, next=Next}=State, MObj, [{IdxNode, Obj}|T]) ->
+repair(#state{id=Id, type=Type}=State, MObj, [{IdxNode, Obj}|T]) ->
     case Type:equal(MObj, Obj) of
         true ->
             repair(State, MObj, T);
         false ->
-            lasp_vnode:repair(IdxNode, Id, Type, MObj, Next),
+            lasp_vnode:repair(IdxNode, Id, Type, MObj),
             repair(State, MObj, T)
     end.

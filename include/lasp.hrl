@@ -24,10 +24,7 @@
 -define(EXECUTE_REQUEST, #lasp_execute_request_v1).
 
 -record(dv, {value,
-             binding,
-             next,
              waiting_threads = [],
-             binding_list = [],
              lazy_threads = [],
              type}).
 
@@ -53,7 +50,7 @@
 -type actor() :: term().
 
 %% @doc Result of a read operation.
--type var() :: {id(), type(), value(), id()}.
+-type var() :: {id(), type(), value()}.
 
 %% @doc Only CRDTs are able to be processed.
 -type crdt() :: riak_dt:crdt().

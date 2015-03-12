@@ -52,31 +52,19 @@
 
 %% Exported functions for vnode integration, where callback behavior is
 %% dynamic.
--export([bind/5,
-         bind_to/5,
-         notify_value/3,
-         notify_value/4,
+-export([bind_to/4,
          wait_needed/6,
          read/6,
-         fetch/4,
-         update/6,
-         reply_fetch/4,
-         write/6,
+         write/4,
          filter/6,
          map/6,
          product/7,
          union/7,
          intersection/7,
-         fold/6,
-         fetch/8]).
+         fold/6]).
 
 %% Exported helper functions.
 -export([notify/3]).
-
-%% Exported utility functions.
--export([next_key/3,
-         notify_all/3,
-         write/5]).
 
 -record(read, {id :: id(),
                type :: type(),
@@ -211,14 +199,12 @@ read(Id, Store) ->
 -spec read(id(), value(), store()) -> {ok, var()}.
 read(Id, Threshold, Store) ->
     Self = self(),
-    ReplyFun = fun(_Id, Type, Value, Next) ->
-            {ok, {_Id, Type, Value, Next}}
-    end,
+    ReplyFun = fun(_Id, Type, Value) -> {ok, {_Id, Type, Value}} end,
     BlockingFun = fun() ->
-            receive
-                X ->
-                    X
-            end
+                receive
+                    X ->
+                        X
+                end
             end,
     read(Id, Threshold, Store, Self, ReplyFun, BlockingFun).
 
@@ -234,8 +220,8 @@ read_any(Reads, Store) ->
                 X ->
                     X
             end;
-        {ok, {Id, Type, Value, Next}} ->
-            {ok, {Id, Type, Value, Next}}
+        {ok, {Id, Type, Value}} ->
+            {ok, {Id, Type, Value}}
     end.
 
 %% @doc Declare a dataflow variable in a provided by identifer {@link
@@ -264,41 +250,12 @@ declare(Id, Type, Store) ->
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.
 %%
--spec bind_to(id(), id(), store()) -> {ok, id()}.
+-spec bind_to(id(), id(), store()) -> ok.
 bind_to(Id, TheirId, Store) ->
-    FromPid = self(),
-    FetchFun = fun(_TheirId, _Id, _FromPid) ->
-                    ?MODULE:fetch(_TheirId, _Id, _FromPid, Store)
-               end,
-    bind_to(Id, TheirId, Store, FetchFun, FromPid).
-
-%% @doc Define a dataflow variable to be bound to a value.
-%%
--spec bind(id(), value(), store()) -> {ok, {id(), type(), value(), id()}}.
-bind(Id, Value, Store) ->
-    NextKeyFun = fun(Type, Next) ->
-                        next_key(Next, Type, Store)
-                end,
-    NotifyFun = fun(_Id, NewValue) ->
-                        ?MODULE:notify_value(_Id, NewValue, Store)
-                end,
-    bind(Id, Value, Store, NextKeyFun, NotifyFun).
-
-%% @doc Update a dataflow variable given an operation.
-%%
-%%      Read the given `Id' and update it given the provided
-%%      `Operation', which should be valid for the type of CRDT stored
-%%      at the given `Id'.
-%%
--spec update(id(), operation(), actor(), store()) -> {ok, {id(), type(), value(), id()}}.
-update(Id, Operation, Actor, Store) ->
-    NextKeyFun = fun(Type, Next) ->
-                        next_key(Next, Type, Store)
-                 end,
-    NotifyFun = fun(_Id, NewValue) ->
-                        ?MODULE:notify_value(_Id, NewValue, Store)
-                end,
-    update(Id, Operation, Actor, Store, NextKeyFun, NotifyFun).
+    BindFun = fun(_AccId, _AccValue, _Variables) ->
+            ?MODULE:bind(_AccId, _AccValue, _Variables)
+    end,
+    bind_to(Id, TheirId, Store, BindFun).
 
 %% @doc Get the current value of a CRDT.
 %%
@@ -330,16 +287,6 @@ thread(Module, Function, Args, _Store) ->
     ok.
 
 %% Internal functions
-
-%% @doc Declare next key, if undefined.  This function assumes that the
-%%      next key will be declared in the local store.
-%%
--spec next_key(undefined | id(), type(), store()) -> id().
-next_key(undefined, Type, Store) ->
-    {ok, NextKey} = declare(druuid:v4(), Type, Store),
-    NextKey;
-next_key(NextKey0, _, _) ->
-    NextKey0.
 
 %% Core API.
 
@@ -378,46 +325,6 @@ wait_needed(Id, Threshold, Store) ->
 
 %% Callback functions.
 
-%% @doc Callback fetch function used in binding variables together.
-%%
-%%      Given a source, target, and a store, follow a series of links
-%%      and retrieve the value for the original object.
-%%
--spec fetch(id(), id(), pid(), store()) -> {ok, id()}.
-fetch(TargetId, FromId, FromPid, Store) ->
-    ResponseFun = fun() ->
-                        receive
-                            X ->
-                                X
-                        end
-                  end,
-    FetchFun = fun(_TargetId, _FromId, _FromPid) ->
-            ?MODULE:fetch(_TargetId, _FromId, _FromPid, Store)
-    end,
-    ReplyFetchFun = fun(_FromId, _FromPid, _DV) ->
-            ?MODULE:reply_fetch(_FromId, _FromPid, _DV, Store)
-    end,
-    NextKeyFun = fun(Next, Type) ->
-            ?MODULE:next_key(Next, Type, Store)
-    end,
-    fetch(TargetId, FromId, FromPid, Store, ResponseFun, FetchFun,
-          ReplyFetchFun, NextKeyFun).
-
-%% @doc Callback function for replying to a bound variable request.
-%%
-%%      When responding to a local fetch, respond back to the waiting
-%%      process with the response.
-%%
--spec reply_fetch(id(), pid(), #dv{}, store()) -> {ok, id()}.
-reply_fetch(FromId, FromPid,
-            #dv{next=Next, type=Type, value=Value}, Store) ->
-    NotifyFun = fun(Id, NewValue) ->
-                        ?MODULE:notify_value(Id, NewValue, Store)
-                end,
-    ?MODULE:write(Type, Value, Next, FromId, Store, NotifyFun),
-    {ok, _} = ?BACKEND:reply_to_all([FromPid], {ok, Next}),
-    {ok, Next}.
-
 %% @doc Update a dataflow variable given an operation.
 %%
 %%      Similar to {@link update/5}.
@@ -426,52 +333,34 @@ reply_fetch(FromId, FromPid,
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation(), actor(), store(), function(), function()) ->
-    {ok, {id(), type(), value(), id()}}.
-update(Id, Operation, Actor, Store, NextKeyFun, NotifyFun) ->
+-spec update(id(), operation(), actor(), store()) -> {ok, var()}.
+update(Id, Operation, Actor, Store) ->
     [{_Key, #dv{value=Value0, type=Type}}] = ets:lookup(Store, Id),
     {ok, Value} = Type:update(Operation, Actor, Value0),
-    bind(Id, Value, Store, NextKeyFun, NotifyFun).
+    bind(Id, Value, Store).
 
 %% @doc Define a dataflow variable to be bound a value.
 %%
-%%      Similar to {@link bind/3}.
-%%
-%%      `NextKeyFun' is used to determine how to generate the next
-%%      identifier -- this is abstracted because in some settings this
-%%      next key may be located in the local store, when running code at
-%%      the replica, or located in a remote store, when running the code
-%%      at the client.
-%%
-%%      `NotifyFun' is used to notify anything in the binding list that
-%%      an update has occurred.
-%%
--spec bind(id(), value(), store(), function(), function()) ->
-    {ok, {id(), type(), value(), id()}}.
-bind(Id, Value, Store, NextKeyFun, NotifyFun) ->
-    [{_Key, #dv{next=Next,
-                value=Value0,
-                type=Type}}] = ets:lookup(Store, Id),
-    NextKey = NextKeyFun(Type, Next),
+-spec bind(id(), value(), store()) -> {ok, var()}.
+bind(Id, Value, Store) ->
+    [{_Key, #dv{value=Value0, type=Type}}] = ets:lookup(Store, Id),
     case Value0 of
         Value ->
-            {ok, {Id, Type, Value, NextKey}};
+            {ok, {Id, Type, Value}};
         _ ->
             %% Merge may throw for invalid types.
             try
                 Merged = Type:merge(Value0, Value),
                 case lasp_lattice:is_inflation(Type, Value0, Merged) of
                     true ->
-                        write(Type, Merged, NextKey, Id, Store,
-                              NotifyFun),
-                        {ok, {Id, Type, Value, NextKey}};
+                        write(Type, Merged, Id, Store),
+                        {ok, {Id, Type, Value}};
                     false ->
-                        {ok, {Id, Type, Value, NextKey}}
+                        {ok, {Id, Type, Value}}
                 end
             catch
-                _:Reason ->
-                    lager:info("Bind threw an exception: ~p", [Reason]),
-                    {ok, {Id, Type, Value, NextKey}}
+                _:_Reason ->
+                    {ok, {Id, Type, Value}}
             end
     end.
 
@@ -516,7 +405,7 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
     %% Satisfy read if threshold is met.
     case lasp_lattice:threshold_met(Type, Value, Threshold) of
         true ->
-            ReplyFun(Id, Type, Value, V#dv.next);
+            ReplyFun(Id, Type, Value);
         false ->
             WT = lists:append(V#dv.waiting_threads,
                               [{threshold,
@@ -565,7 +454,7 @@ read_any(Reads, Self, Store) ->
                                                Value,
                                                Threshold) of
                    true ->
-                       {Id, Type, Value, V#dv.next};
+                       {Id, Type, Value};
                    false ->
                        WT = lists:append(V#dv.waiting_threads,
                                          [{threshold,
@@ -590,56 +479,6 @@ read_any(Reads, Self, Store) ->
                {ok, Value}
        end.
 
-%% @doc Fetch is responsible for retreiving the value of a
-%%      partially-bound variable from the ultimate source, if it's
-%%      bound.
-%%
-%%      When running on a local replica, this is straightforward -- it¬
-%%      can look the value up direclty up from the {@link ets:new/2}
-%%      table supplied, as seen in the {@link bind/3} function.  Fetch
-%%      is specifically used when we need to look in a series of tables,
-%%      each running in a different process at a different node.
-%%
-%%      The function is implemented here, given it relies on knowing the
-%%      structure of the table and is ets specific.  However, it's
-%%      primarily used by the distribution code located in the virtual
-%%      node.
-%%
-%%      Because of this, a number of functions need to be exported to
-%%      support this behavior.
-%%
-%%      `ResponseFun' is a function responsible for the return value, as
-%%      required by the virtual node which will call into this.
-%%
-%%      `FetchFun' is a function responsible for retreiving the value on
-%%      another node, if the value is only partially bound here --
-%%      consider the case where X is bound to Y which is bound to Z -- a
-%%      fetch on Z requires transitive fetches through Y to X.
-%%
-%%      `ReplyFetchFun' is a function responsible for sending the
-%%      response back to the originating fetch node.
-%%
-%%      `NextKeyFun' is responsible for generating the next identifier
-%%      for use in building a stream from this partially-bound variable.
-%%
--spec fetch(id(), id(), pid(), store(), function(), function(),
-            function(), function()) -> term().
-fetch(TargetId, FromId, FromPid, Store,
-      ResponseFun, FetchFun, ReplyFetchFun, NextKeyFun) ->
-    [{_, DV=#dv{binding=Binding}}] = ets:lookup(Store, TargetId),
-    case Binding of
-        undefined ->
-            NextKey = NextKeyFun(DV#dv.next, DV#dv.type),
-            BindingList = lists:append(DV#dv.binding_list, [FromId]),
-            DV1 = DV#dv{binding_list=BindingList, next=NextKey},
-            true = ets:insert(Store, {TargetId, DV1}),
-            ReplyFetchFun(FromId, FromPid, DV1),
-            ResponseFun();
-        BindId ->
-            FetchFun(BindId, FromId, FromPid),
-            ResponseFun()
-    end.
-
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.
 %%
@@ -652,10 +491,16 @@ fetch(TargetId, FromId, FromPid, Store,
 %%      `FromPid' is sent a message with the target identifiers value,
 %%      if the target identifier is already bound.
 %%
--spec bind_to(id(), value(), store(), function(), pid()) -> any().
-bind_to(Id, TheirId, Store, FetchFun, FromPid) ->
-    true = ets:insert(Store, {Id, #dv{binding=TheirId}}),
-    FetchFun(TheirId, Id, FromPid).
+-spec bind_to(id(), id(), store(), function()) -> ok.
+bind_to(AccId, Id, Store, BindFun) ->
+    Fun = fun(Scope) ->
+        %% Read current value from the scope.
+        #read{value=Value} = dict:fetch(Id, Scope),
+
+        %% Bind new value back.
+        {ok, _} = BindFun(AccId, Value, Store)
+    end,
+    notify(Store, [{Id, fun() -> 1 end}], Fun).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -967,32 +812,6 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
             end
     end.
 
-%% @doc Notify a value of a change, and write changed value.
-%%
-%%      Given the local write might need to trigger another series of
-%%      notifications, `NotifyFun' is used to specify how this process
-%%      should be done.
-%%
--spec notify_value(id(), value(), store(), function()) -> ok.
-notify_value(Id, Value, Store, NotifyFun) ->
-    [{_, #dv{next=Next, type=Type}}] = ets:lookup(Store, Id),
-    write(Type, Value, Next, Id, Store, NotifyFun).
-
-notify_value(Id, Value, Store) ->
-    NotifyFun = fun(_Id, NewValue) ->
-                        ?MODULE:notify_value(_Id, NewValue, Store)
-                end,
-    notify_value(Id, Value, Store, NotifyFun).
-
-%% @doc Notify a series of variables of bind.
-%%
--spec notify_all(function(), list(#dv{}), value()) -> ok.
-notify_all(NotifyFun, [H|T], Value) ->
-    NotifyFun(H, Value),
-    notify_all(NotifyFun, T, Value);
-notify_all(_, [], _) ->
-    ok.
-
 %% @doc Given a group of processes which are blocking on reads, notify
 %%      them of bound values or met thresholds.
 %%
@@ -1009,17 +828,17 @@ reply_to_all(List, Result) ->
     {ok, list(pending_threshold())}.
 reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
-             {ok, {Id, Type, Value, Next}}=Result) ->
+             {ok, {Id, Type, Value}}=Result) ->
     SW = case lasp_lattice:threshold_met(Type, Value, Threshold) of
         true ->
             case From of
                 {server, undefined, {Address, Ref}} ->
                     gen_server:reply({Address, Ref},
-                                     {ok, {Id, Type, Value, Next}});
+                                     {ok, {Id, Type, Value}});
                 {fsm, undefined, Address} ->
                     gen_fsm:send_event(Address,
                                        {ok, undefined,
-                                        {Id, Type, Value, Next}});
+                                        {Id, Type, Value}});
                 _ ->
                     From ! Result
             end,
@@ -1075,7 +894,7 @@ notify(Variables, Scope0, Function) ->
              {Id, #read{value=Value}} <- dict:to_list(Scope0)],
 
     %% Wait for one of the variables to be modified.
-    {ok, {Id, Type, Value, _}} = lasp:read_any(Reads),
+    {ok, {Id, Type, Value}} = lasp:read_any(Reads),
 
     %% Store updated value in the dict.
     ReadRecord = dict:fetch(Id, Scope0),
@@ -1095,41 +914,10 @@ notify(Variables, Scope0, Function) ->
 %%      * Mark variable as bound.
 %%      * Check thresholds and send notifications, if required.
 %%
-%%      When `NotifyFun' is supplied, override the function used to
-%%      notify when a value is written -- this is required when talking
-%%      to other tables in the system which are not the local table.
-%%
--spec write(type(), value(), id(), id(), store()) -> ok.
-write(Type, Value, Next, Key, Store) ->
-    NotifyFun = fun(Id, NewValue) ->
-                        [{_, #dv{next=Next,
-                                 type=Type}}] = ets:lookup(Store, Id),
-                        write(Type, NewValue, Next, Id, Store)
-                end,
-    write(Type, Value, Next, Key, Store, NotifyFun).
-
-%% @doc Send responses to waiting threads, via messages.
-%%
-%%      Similar to {@link write/5}.
-%%
-%%      When `NotifyFun' is supplied, override the function used to
-%%      notify when a value is written -- this is required when talking
-%%      to other tables in the system which are not the local table.
-%%
--spec write(type(), value(), id(), id(), store(), function()) -> ok.
-write(Type, Value, Next, Key, Store, NotifyFun) ->
-    [{_Key, #dv{waiting_threads=Threads,
-                binding_list=BindingList,
-                binding=Binding}}] = ets:lookup(Store, Key),
-    {ok, StillWaiting} = reply_to_all(Threads,
-                                      [],
-                                      {ok, {Key, Type, Value, Next}}),
-    V1 = #dv{type=Type,
-             value=Value,
-             next=Next,
-             binding=Binding,
-             binding_list=BindingList,
-             waiting_threads=StillWaiting},
+-spec write(type(), value(), id(), store()) -> ok.
+write(Type, Value, Key, Store) ->
+    [{_Key, #dv{waiting_threads=WT}}] = ets:lookup(Store, Key),
+    {ok, StillWaiting} = reply_to_all(WT, [], {ok, {Key, Type, Value}}),
+    V1 = #dv{type=Type, value=Value, waiting_threads=StillWaiting},
     true = ets:insert(Store, {Key, V1}),
-    notify_all(NotifyFun, BindingList, Value),
     ok.

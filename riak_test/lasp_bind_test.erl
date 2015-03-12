@@ -78,9 +78,9 @@ test_ivars() ->
     {ok, _} = lasp:bind(I1, 2),
 
     %% Verify the same value is contained by all.
-    {ok, {_, _, V1, _}} = lasp:read(I3),
-    {ok, {_, _, V1, _}} = lasp:read(I2),
-    {ok, {_, _, V1, _}} = lasp:read(I1),
+    {ok, {_, _, V1}} = lasp:read(I3),
+    {ok, {_, _, V1}} = lasp:read(I2),
+    {ok, {_, _, V1}} = lasp:read(I1),
 
     ok.
 
@@ -96,16 +96,19 @@ test_lattice(Type) ->
     {ok, _} = lasp:update(L1, {add, 1}, a),
     {ok, _} = lasp:bind_to(L3, L1),
 
+    timer:sleep(4000),
+
     %% Verify the same value is contained by all.
-    {ok, {_, _, S1, _}} = lasp:read(L3),
-    {ok, {_, _, S1, _}} = lasp:read(L2),
-    {ok, {_, _, S1, _}} = lasp:read(L1),
+    {ok, {_, _, S1}} = lasp:read(L3),
+    {ok, {_, _, S1}} = lasp:read(L2),
+    {ok, {_, _, S1}} = lasp:read(L1),
 
     %% Test inflations.
     {ok, S2} = Type:update({add, 2}, a, S1),
 
     Self = self(),
 
+    lager:info("About to spawn wait_needed function..."),
     spawn_link(fun() ->
                   {ok, _} = lasp:wait_needed(L1, {strict, S1}),
                   Self ! threshold_met
@@ -113,13 +116,15 @@ test_lattice(Type) ->
 
     {ok, _} = lasp:bind(L1, S2),
 
+    timer:sleep(4000),
+
     %% Verify the same value is contained by all.
-    {ok, {_, _, S2, _}} = lasp:read(L3),
-    {ok, {_, _, S2, _}} = lasp:read(L2),
-    {ok, {_, _, S2, _}} = lasp:read(L1),
+    {ok, {_, _, S2}} = lasp:read(L3),
+    {ok, {_, _, S2}} = lasp:read(L2),
+    {ok, {_, _, S2}} = lasp:read(L1),
 
     %% Read at the S2 threshold level.
-    {ok, {_, _, S2, _}} = lasp:read(L1, S2),
+    {ok, {_, _, S2}} = lasp:read(L1, S2),
 
     %% Wait for wait_needed to unblock.
     receive
@@ -130,6 +135,7 @@ test_lattice(Type) ->
     {ok, L5} = lasp:declare(Type),
     {ok, L6} = lasp:declare(Type),
 
+    lager:info("About to spawn read_any function..."),
     spawn_link(fun() ->
                 {ok, _} = lasp:read_any([{L5, {strict, undefined}}, {L6, {strict, undefined}}]),
                 Self ! read_any

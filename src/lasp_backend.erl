@@ -29,35 +29,23 @@
 -callback read(id(), value(), store()) -> {ok, var()}.
 -callback read(id(), value(), store(), pid(), function(), function()) -> {ok, var()}.
 
--callback fetch(id(), id(), pid(), store()) -> {ok, id()}.
--callback fetch(id(), id(), pid(), store(), function(), function(),
-                function(), function()) -> term().
-
--callback reply_fetch(id(), pid(), #dv{}, store()) -> {ok, id()}.
-
 -callback declare(store()) -> {ok, id()}.
 -callback declare(type(), store()) -> {ok, id()}.
 -callback declare(id(), type(), store()) -> {ok, id()}.
 
--callback bind_to(id(), value(), store(), function(), pid()) -> any().
+-callback bind_to(id(), value(), store(), function()) -> any().
 
--callback bind(id(), value(), store()) -> {ok, {id(), type(), value(), id()}}.
--callback bind(id(), value(), store(), function(), function()) -> {ok, {id(), type(), value(), id()}}.
+-callback bind(id(), value(), store()) -> {ok, var()}.
 
 -callback thread(module(), func(), args(), store()) -> ok.
 
--callback next_key(undefined | id(), type(), store()) -> id().
-
--callback write(type(), value(), id(), id(), store()) -> ok.
--callback write(type(), value(), id(), id(), store(), function()) -> ok.
+-callback write(type(), value(), id(), store()) -> ok.
 
 -callback wait_needed(id(), store()) -> {ok, threshold()}.
 -callback wait_needed(id(), threshold(), store()) -> {ok, threshold()}.
 -callback wait_needed(id(), threshold(), store(), pid(), function(),
                       function()) -> {ok, threshold()}.
 
--callback notify_value(id(), value(), store(), function()) -> ok.
--callback notify_all(function(), list(#dv{}), value()) -> ok.
 
 -callback reply_to_all(list(pid() | pending_threshold()), term()) ->
     {ok, list(pending_threshold())}.
@@ -77,8 +65,7 @@
 
 -callback notify(store(), [{id(), function()}] | dict(), function()) -> ok.
 
--callback update(id(), actor(), operation(), store()) -> {ok, {id(), type(), value(), id()}}.
--callback update(id(), actor(), operation(), store(), function(), function()) -> {ok, {id(), type(), value(), id()}}.
+-callback update(id(), actor(), operation(), store()) -> {ok, var()}.
 
 -callback type(id(), store()) -> {ok, type()}.
 

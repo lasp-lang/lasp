@@ -45,7 +45,7 @@ process(Object, _Reason, Idx, #state{id=Id}=State) ->
 
 %% @doc Return the result.
 execute(#state{id=Id, previous=Previous}) ->
-    {ok, {_, _, Value, _}} = lasp:read(Id, Previous),
+    {ok, {_, _, Value}} = lasp:read(Id, Previous),
     {ok, Value}.
 
 %% @doc Given a series of outputs, take each one and merge it.

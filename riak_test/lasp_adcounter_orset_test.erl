@@ -85,7 +85,7 @@ test() ->
     {ok, Servers} = lasp:declare(riak_dt_orset),
 
     %% Get the current advertisement list.
-    {ok, {_, _, AdList0, _}} = lasp:read(Ads),
+    {ok, {_, _, AdList0}} = lasp:read(Ads),
     AdList = riak_dt_orset:value(AdList0),
 
     %% For each advertisement, launch one server for tracking it's
@@ -100,7 +100,7 @@ test() ->
     %% Start the client simulation.
 
     %% Get client list.
-    {ok, {_, _, ClientList0, _}} = lasp:read(Clients),
+    {ok, {_, _, ClientList0}} = lasp:read(Clients),
     ClientList = riak_dt_orset:value(ClientList0),
 
     Viewer = fun(_) ->
@@ -113,7 +113,7 @@ test() ->
 
     lager:info("Gathering totals..."),
     Totals = fun(Ad) ->
-            {ok, {_, _, Value, _}} = lasp:read(Ad, 0),
+            {ok, {_, _, Value}} = lasp:read(Ad, 0),
             Impressions = riak_dt_gcounter:value(Value),
             lager:info("Advertisements: ~p impressions: ~p",
                        [Ad, Impressions])
@@ -121,7 +121,7 @@ test() ->
     lists:map(Totals, OriginalAdList),
 
     lager:info("Verifying all impressions were used."),
-    {ok, {_, _, FinalAdList0, _}} = lasp:read(Ads),
+    {ok, {_, _, FinalAdList0}} = lasp:read(Ads),
     riak_dt_orset:value(FinalAdList0).
 
 %% @doc Server functions for the advertisement counter.  After 5 views,
@@ -141,7 +141,7 @@ client(Id, Ads, PreviousValue) ->
     receive
         view_ad ->
             %% Get current ad list.
-            {ok, {_, _, AdList0, _}} = lasp:read(Ads, PreviousValue),
+            {ok, {_, _, AdList0}} = lasp:read(Ads, PreviousValue),
             AdList = riak_dt_orset:value(AdList0),
 
             case length(AdList) of

@@ -187,7 +187,7 @@ start_vnode(I) ->
 init([Partition]) ->
     Node = node(),
     Variables = generate_unique_partition_identifier(Partition, Node),
-    Variables = ?BACKEND:start(Variables),
+    Variables = ?BACKEND_COMMON:start(Variables),
     {ok, #state{partition=Partition,
                 programs=dict:new(),
                 node=Node,
@@ -197,7 +197,7 @@ init([Partition]) ->
 
 handle_command({repair, undefined, Id, Type, Value}, _From,
                #state{variables=Variables}=State) ->
-    ?BACKEND:write(Type, Value, Id, Variables),
+    ?BACKEND_COMMON:write(Type, Value, Id, Variables),
     {noreply, State};
 
 handle_command({execute, {ReqId, _}, Module0}, _From,
@@ -288,7 +288,7 @@ handle_command({register, {ReqId, _}, Module0, File}, _From,
 
 handle_command({declare, {ReqId, _}, Id, Type}, _From,
                #state{variables=Variables, partition=_Partition}=State) ->
-    {ok, Id} = ?BACKEND:declare(Id, Type, Variables),
+    {ok, Id} = ?BACKEND_COMMON:declare(Id, Type, Variables),
     {reply, {ok, ReqId, Id}, State};
 
 handle_command({bind_to, {ReqId, _}, Id, DVId}, _From,
@@ -296,22 +296,22 @@ handle_command({bind_to, {ReqId, _}, Id, DVId}, _From,
     BindFun = fun(_AccId, _AccValue, _Variables) ->
             lasp:bind(_AccId, _AccValue)
     end,
-    ok = ?BACKEND:bind_to(Id, DVId, Variables, BindFun),
+    ok = ?BACKEND_COMMON:bind_to(Id, DVId, Variables, BindFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({bind, {ReqId, _}, Id, Value}, _From,
                State=#state{partition=Partition, node=Node, variables=Variables}) ->
-    {ok, Result} = ?BACKEND:bind(Id, Value, Variables),
+    {ok, Result} = ?BACKEND_COMMON:bind(Id, Value, Variables),
     {reply, {ok, ReqId, {Partition, Node}, Result}, State};
 
 handle_command({update, {ReqId, _}, Id, Operation, Actor}, _From,
                State=#state{partition=Partition, node=Node, variables=Variables}) ->
-    {ok, Result} = ?BACKEND:update(Id, Operation, Actor, Variables),
+    {ok, Result} = ?BACKEND_COMMON:update(Id, Operation, Actor, Variables),
     {reply, {ok, ReqId, {Partition, Node}, Result}, State};
 
 handle_command({thread, {ReqId, _}, Module, Function, Args}, _From,
                #state{variables=Variables}=State) ->
-    ok = ?BACKEND:thread(Module, Function, Args, Variables),
+    ok = ?BACKEND_COMMON:thread(Module, Function, Args, Variables),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({wait_needed, {ReqId, _}, Id, Threshold}, From,
@@ -322,12 +322,7 @@ handle_command({wait_needed, {ReqId, _}, Id, Threshold}, From,
     BlockingFun = fun() ->
                         {noreply, State}
                   end,
-    ?BACKEND:wait_needed(Id,
-                         Threshold,
-                         Variables,
-                         From,
-                         ReplyFun,
-                         BlockingFun);
+    ?BACKEND_COMMON:wait_needed(Id, Threshold, Variables, From, ReplyFun, BlockingFun);
 
 handle_command({read, {ReqId, _}, Id, Threshold}, From,
                State=#state{variables=Variables}) ->
@@ -337,12 +332,7 @@ handle_command({read, {ReqId, _}, Id, Threshold}, From,
     BlockingFun = fun() ->
                     {noreply, State}
                   end,
-    ?BACKEND:read(Id,
-                  Threshold,
-                  Variables,
-                  From,
-                  ReplyFun,
-                  BlockingFun);
+    ?BACKEND_COMMON:read(Id, Threshold, Variables, From, ReplyFun, BlockingFun);
 
 handle_command({filter, {ReqId, _}, Id, Function, AccId}, _From,
                State=#state{variables=Variables,
@@ -359,13 +349,13 @@ handle_command({filter, {ReqId, _}, Id, Function, AccId}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?BACKEND:read(_Id, _Threshold, _Variables);
+                    ?BACKEND_COMMON:read(_Id, _Threshold, _Variables);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(_Id, _Threshold)
             end
     end,
-    ok = ?BACKEND:filter(Id, Function, AccId, Variables, BindFun, ReadFun),
+    ok = ?BACKEND_COMMON:filter(Id, Function, AccId, Variables, BindFun, ReadFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({product, {ReqId, _}, Left, Right, Product}, _From,
@@ -383,7 +373,7 @@ handle_command({product, {ReqId, _}, Left, Right, Product}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?BACKEND:read(Left, _Threshold, _Variables);
+                    ?BACKEND_COMMON:read(Left, _Threshold, _Variables);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(Left, _Threshold)
@@ -397,13 +387,13 @@ handle_command({product, {ReqId, _}, Left, Right, Product}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?BACKEND:read(Right, _Threshold, _Variables);
+                    ?BACKEND_COMMON:read(Right, _Threshold, _Variables);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(Right, _Threshold)
             end
     end,
-    ok = ?BACKEND:product(Left, Right, Product, Variables, BindFun, ReadLeftFun, ReadRightFun),
+    ok = ?BACKEND_COMMON:product(Left, Right, Product, Variables, BindFun, ReadLeftFun, ReadRightFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({intersection, {ReqId, _}, Left, Right, Intersection}, _From,
@@ -421,7 +411,7 @@ handle_command({intersection, {ReqId, _}, Left, Right, Intersection}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?BACKEND:read(Left, _Threshold, _Variables);
+                    ?BACKEND_COMMON:read(Left, _Threshold, _Variables);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(Left, _Threshold)
@@ -435,13 +425,13 @@ handle_command({intersection, {ReqId, _}, Left, Right, Intersection}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?BACKEND:read(Right, _Threshold, _Variables);
+                    ?BACKEND_COMMON:read(Right, _Threshold, _Variables);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(Right, _Threshold)
             end
     end,
-    ok = ?BACKEND:intersection(Left, Right, Intersection, Variables, BindFun, ReadLeftFun, ReadRightFun),
+    ok = ?BACKEND_COMMON:intersection(Left, Right, Intersection, Variables, BindFun, ReadLeftFun, ReadRightFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({union, {ReqId, _}, Left, Right, Union}, _From,
@@ -459,7 +449,7 @@ handle_command({union, {ReqId, _}, Left, Right, Union}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?BACKEND:read(Left, _Threshold, _Variables);
+                    ?BACKEND_COMMON:read(Left, _Threshold, _Variables);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(Left, _Threshold)
@@ -473,13 +463,13 @@ handle_command({union, {ReqId, _}, Left, Right, Union}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?BACKEND:read(Right, _Threshold, _Variables);
+                    ?BACKEND_COMMON:read(Right, _Threshold, _Variables);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(Right, _Threshold)
             end
     end,
-    ok = ?BACKEND:union(Left, Right, Union, Variables, BindFun, ReadLeftFun, ReadRightFun),
+    ok = ?BACKEND_COMMON:union(Left, Right, Union, Variables, BindFun, ReadLeftFun, ReadRightFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({map, {ReqId, _}, Id, Function, AccId}, _From,
@@ -497,13 +487,13 @@ handle_command({map, {ReqId, _}, Id, Function, AccId}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?BACKEND:read(_Id, _Threshold, _Variables);
+                    ?BACKEND_COMMON:read(_Id, _Threshold, _Variables);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(_Id, _Threshold)
             end
     end,
-    ok = ?BACKEND:map(Id, Function, AccId, Variables, BindFun, ReadFun),
+    ok = ?BACKEND_COMMON:map(Id, Function, AccId, Variables, BindFun, ReadFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({fold, {ReqId, _}, Id, Function, AccId}, _From,
@@ -521,13 +511,13 @@ handle_command({fold, {ReqId, _}, Id, Function, AccId}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?BACKEND:read(_Id, _Threshold, _Variables);
+                    ?BACKEND_COMMON:read(_Id, _Threshold, _Variables);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(_Id, _Threshold)
             end
     end,
-    ok = ?BACKEND:fold(Id, Function, AccId, Variables, BindFun, ReadFun),
+    ok = ?BACKEND_COMMON:fold(Id, Function, AccId, Variables, BindFun, ReadFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command(_Message, _Sender, State) ->

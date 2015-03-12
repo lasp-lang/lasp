@@ -4,7 +4,9 @@
 -define(VNODE, lasp).
 
 -define(BUCKET, <<"lasp">>).
+
 -define(BACKEND, lasp_ets_backend).
+-define(BACKEND_COMMON, lasp_backend_common).
 
 -define(N, 3).
 -define(W, 2).
@@ -27,6 +29,8 @@
              waiting_threads = [],
              lazy_threads = [],
              type}).
+
+-type variable() :: #dv{}.
 
 -type module() :: atom().
 -type file() :: iolist().

@@ -81,7 +81,7 @@ transform_statement({call, Line1,
                      Arguments}) ->
     {call, Line1,
      {remote, Line2,
-      {atom, Line3, ?BACKEND}, {atom, Line4, Func}},
+      {atom, Line3, ?BACKEND_COMMON}, {atom, Line4, Func}},
      Arguments ++ [{atom, Line4, get(store)}]};
 transform_statement(Stmt) when is_tuple(Stmt) ->
     list_to_tuple(transform_statement(tuple_to_list(Stmt)));

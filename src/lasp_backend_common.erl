@@ -34,7 +34,6 @@
          declare/2,
          declare/3,
          update/4,
-         value/2,
          thread/4,
          filter/4,
          map/4,
@@ -245,16 +244,6 @@ bind_to(Id, TheirId, Store) ->
             ?MODULE:bind(_AccId, _AccValue, _Variables)
     end,
     bind_to(Id, TheirId, Store, BindFun).
-
-%% @doc Get the current value of a CRDT.
-%%
-%%      Given an `Id' of a dataflow variable, return the actual value,
-%%      not the data structure, of the CRDT.
-%%
--spec value(id(), store()) -> {ok, value()}.
-value(Id, Store) ->
-    {ok, #dv{value=Value, type=Type}} = ?BACKEND:get(Store, Id),
-    {ok, Type:value(Value)}.
 
 %% @doc Spawn a function.
 %%

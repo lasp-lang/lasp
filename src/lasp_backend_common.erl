@@ -68,7 +68,7 @@
                read_fun :: function()}).
 
 %% @doc Initialize the backend.
--spec start(atom()) -> atom().
+-spec start(atom()) -> {ok, store()} | {error, atom()}.
 start(Identifier) ->
     ?BACKEND:start(Identifier).
 
@@ -232,7 +232,7 @@ declare(Type, Store) ->
 %% @doc Declare a dataflow variable in a provided by identifer.
 -spec declare(id(), type(), store()) -> {ok, id()}.
 declare(Id, Type, Store) ->
-    ?BACKEND:put(Store, Id, #dv{value=Type:new(), type=Type}),
+    ok = ?BACKEND:put(Store, Id, #dv{value=Type:new(), type=Type}),
     {ok, Id}.
 
 %% @doc Define a dataflow variable to be bound to another dataflow
@@ -380,9 +380,7 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
                                 Self,
                                 Type,
                                 Threshold}]),
-            ?BACKEND:put(Store, Id,
-                         V#dv{waiting_threads=WT,
-                              lazy_threads=StillLazy}),
+            ok = ?BACKEND:put(Store, Id, V#dv{waiting_threads=WT, lazy_threads=StillLazy}),
             BlockingFun()
     end.
 
@@ -428,9 +426,7 @@ read_any(Reads, Self, Store) ->
                                            Self,
                                            Type,
                                            Threshold}]),
-                       ?BACKEND:put(Store, Id,
-                                    V#dv{waiting_threads=WT,
-                                         lazy_threads=StillLazy}),
+                       ok = ?BACKEND:put(Store, Id, V#dv{waiting_threads=WT, lazy_threads=StillLazy}),
                        false
                end;
            Result ->
@@ -769,8 +765,7 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                                                       Type,
                                                       Threshold}])
                     end,
-                    ?BACKEND:put(Store, Id,
-                                 V#dv{lazy_threads=LazyThreads}),
+                    ok = ?BACKEND:put(Store, Id, V#dv{lazy_threads=LazyThreads}),
                     BlockingFun()
             end
     end.
@@ -882,5 +877,5 @@ write(Type, Value, Key, Store) ->
     {ok, #dv{waiting_threads=WT}} = ?BACKEND:get(Store, Key),
     {ok, StillWaiting} = reply_to_all(WT, [], {ok, {Key, Type, Value}}),
     V1 = #dv{type=Type, value=Value, waiting_threads=StillWaiting},
-    ?BACKEND:put(Store, Key, V1),
+    ok = ?BACKEND:put(Store, Key, V1),
     ok.

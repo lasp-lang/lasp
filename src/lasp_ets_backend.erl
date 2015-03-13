@@ -30,12 +30,19 @@
 -behaviour(lasp_backend).
 
 %% @doc Initialize the backend.
--spec start(atom()) -> atom().
+-spec start(atom()) -> {ok, atom()} | {error, atom()}.
 start(Store) ->
-    Store = ets:new(Store, [set,
-                            named_table,
-                            public,
-                            {write_concurrency, true}]).
+    try
+        Store = ets:new(Store, [set,
+                                named_table,
+                                public,
+                                {write_concurrency, true}]),
+        {ok, Store}
+    catch
+        _:Reason ->
+            lager:info("Backend initialization failed!"),
+            {error, Reason}
+    end.
 
 %% @doc Write a record to the backend.
 -spec put(store(), id(), variable()) -> ok.
@@ -44,7 +51,11 @@ put(Store, Id, Record) ->
     ok.
 
 %% @doc Retrieve a record from the backend.
--spec get(store(), id()) -> {ok, variable()}.
+-spec get(store(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
 get(Store, Id) ->
-    [{_Key, Record}] = ets:lookup(Store, Id),
-    {ok, Record}.
+    case ets:lookup(Store, Id) of
+        [{_Key, Record}] ->
+            {ok, Record};
+        [] ->
+            {error, not_found}
+    end.

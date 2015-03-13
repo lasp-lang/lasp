@@ -23,6 +23,6 @@
 
 -include("lasp.hrl").
 
--callback start(atom()) -> atom().
--callback put(store(), id(), variable()) -> ok.
--callback get(store(), id()) -> {ok, variable()}.
+-callback start(atom()) -> {ok, store()} | {error, atom()}.
+-callback put(store(), id(), variable()) -> ok | {error, atom()}.
+-callback get(store(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.

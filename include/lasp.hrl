@@ -5,7 +5,14 @@
 
 -define(BUCKET, <<"lasp">>).
 
+%% Erlang term storage based backend; no persistence.
 -define(BACKEND, lasp_ets_backend).
+
+%% LevelDB backend; persistence.
+% -define(BACKEND, lasp_eleveldb_backend).
+
+%% Code which connects the backends to the actual backend
+%% implementation.
 -define(BACKEND_COMMON, lasp_backend_common).
 
 -define(N, 3).
@@ -45,7 +52,7 @@
 -type bound() :: true | false.
 -type supervisor() :: pid().
 -type stream() :: list(#dv{}).
--type store() :: ets:tid().
+-type store() :: ets:tid() | eleveldb:db_ref() | atom().
 -type threshold() :: value() | {strict, value()}.
 -type pending_threshold() :: {threshold, read | wait, pid(), type(), threshold()}.
 -type operation() :: {atom(), value()}.

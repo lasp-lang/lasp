@@ -186,8 +186,8 @@ start_vnode(I) ->
 
 init([Partition]) ->
     Node = node(),
-    Variables = generate_unique_partition_identifier(Partition, Node),
-    Variables = ?BACKEND_COMMON:start(Variables),
+    Identifier = generate_unique_partition_identifier(Partition, Node),
+    {ok, Variables} = ?BACKEND_COMMON:start(Identifier),
     {ok, #state{partition=Partition,
                 programs=dict:new(),
                 node=Node,

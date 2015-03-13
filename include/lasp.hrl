@@ -13,7 +13,7 @@
 
 %% Code which connects the backends to the actual backend
 %% implementation.
--define(BACKEND_COMMON, lasp_backend_common).
+-define(CORE, lasp_core).
 
 -define(N, 3).
 -define(W, 2).

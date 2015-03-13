@@ -24,7 +24,7 @@
 
 %% @doc Initialize the program.  Perform whatever initial configuration
 %%      is required.
--callback init() -> {ok, state()}.
+-callback init(store()) -> {ok, state()}.
 
 %% @doc Given a notification from the underlying system about an object
 %%      having been put, handed off, or deleted, notify all programs that

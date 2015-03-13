@@ -23,29 +23,30 @@
 
 -behavior(lasp_program).
 
--export([init/0,
+-export([init/1,
          process/4,
          execute/1,
          merge/1,
          sum/1]).
 
--record(state, {type, id, previous}).
+-record(state, {store, type, id, previous}).
 
+-define(CORE, lasp_core).
 -define(TYPE, riak_dt_gset).
 
 %% @doc Initialize an or-set as an accumulator.
-init() ->
-    {ok, Id} = lasp:declare(?TYPE),
-    {ok, #state{id=Id}}.
+init(Store) ->
+    {ok, Id} = ?CORE:declare(?TYPE, Store),
+    {ok, #state{store=Store, id=Id}}.
 
 %% @doc Notification from the system of an event.
-process(Object, _Reason, Idx, #state{id=Id}=State) ->
-    {ok, _} = lasp:update(Id, {add, Object}, Idx),
+process(Object, _Reason, Idx, #state{store=Store, id=Id}=State) ->
+    {ok, _} = ?CORE:update(Id, {add, Object}, Idx, Store),
     {ok, State}.
 
 %% @doc Return the result.
-execute(#state{id=Id, previous=Previous}) ->
-    {ok, {_, _, Value}} = lasp:read(Id, Previous),
+execute(#state{store=Store, id=Id, previous=Previous}) ->
+    {ok, {_, _, Value}} = ?CORE:read(Id, Previous, Store),
     {ok, Value}.
 
 %% @doc Given a series of outputs, take each one and merge it.

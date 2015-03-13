@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_backend_common).
+-module(lasp_core).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -include("lasp.hrl").

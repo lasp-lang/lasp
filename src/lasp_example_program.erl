@@ -26,6 +26,7 @@
 -export([init/1,
          process/4,
          execute/1,
+         value/1,
          merge/1,
          sum/1]).
 
@@ -45,6 +46,9 @@ process(Object, _Reason, Actor, #state{store=Store, id=Id}=State) ->
 execute(#state{store=Store, id=Id}) ->
     {ok, {_, _, Value}} = ?CORE:read(Id, undefined, Store),
     {ok, Value}.
+
+value(Merged) ->
+    {ok, ?TYPE:value(Merged)}.
 
 merge(Outputs) ->
     Value = ?TYPE:new(),

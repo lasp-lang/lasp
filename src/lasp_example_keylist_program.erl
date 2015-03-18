@@ -26,6 +26,7 @@
 -export([init/1,
          process/4,
          execute/1,
+         value/1,
          merge/1,
          sum/1]).
 
@@ -48,6 +49,10 @@ process(Object, _Reason, Idx, #state{store=Store, id=Id}=State) ->
 execute(#state{store=Store, id=Id, previous=Previous}) ->
     {ok, {_, _, Value}} = ?CORE:read(Id, Previous, Store),
     {ok, Value}.
+
+%% @doc Return the result from a merged response
+value(Merged) ->
+    {ok, ?TYPE:value(Merged)}.
 
 %% @doc Given a series of outputs, take each one and merge it.
 merge(Outputs) ->

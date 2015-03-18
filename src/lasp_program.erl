@@ -34,6 +34,9 @@
 %% @doc Return the current result of a given program.
 -callback execute(state()) -> {ok, output()}.
 
+%% @doc Return the actual observable value of a result.
+-callback value(output()) -> {ok, output()}.
+
 %% @doc Merge the results of a replicated program, which should compute
 %%      the results least-upper-bound for the given output type.
 -callback merge(list(output())) -> {ok, output()}.

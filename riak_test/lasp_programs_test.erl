@@ -23,7 +23,7 @@
 -module(lasp_programs_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--export([test/1]).
+-export([test/0]).
 
 -ifdef(TEST).
 
@@ -44,24 +44,14 @@ confirm() ->
 
     ok = lasp_test_helpers:wait_for_cluster(Nodes),
 
-    TestPaths = rt_config:get(test_paths, undefined),
-    Program = hd(TestPaths) ++ "/../lasp_example_program.erl",
-    lager:info("Program is: ~p", [Program]),
-
     lager:info("Remotely executing the test."),
-    ?assertEqual([], rpc:call(Node, ?MODULE, test, [Program])),
+    ?assertEqual([], rpc:call(Node, ?MODULE, test, [])),
 
     pass.
 
 -endif.
 
-test(Program) ->
-    lager:info("Registering program from the test."),
-
-    ok = lasp:register(lasp_example_program, Program, preflist),
-
+test() ->
     lager:info("Executing program from the test."),
-
     {ok, Result} = lasp:execute(lasp_example_program, preflist),
-
     Result.

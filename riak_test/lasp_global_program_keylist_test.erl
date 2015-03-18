@@ -23,7 +23,7 @@
 -module(lasp_global_program_keylist_test).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--export([test/1]).
+-export([test/0]).
 
 -ifdef(TEST).
 
@@ -46,21 +46,14 @@ confirm() ->
 
     ok = lasp_test_helpers:wait_for_cluster(Nodes),
 
-    TestPaths = rt_config:get(test_paths, undefined),
-    Program = hd(TestPaths) ++ "/../lasp_example_keylist_program.erl",
-    lager:info("Program is: ~p", [Program]),
-
     lager:info("Remotely executing the test."),
-    ?assertEqual([1,2], rpc:call(Node, ?MODULE, test, [Program])),
+    ?assertEqual([1,2], rpc:call(Node, ?MODULE, test, [])),
 
     pass.
 
 -endif.
 
-test(Program) ->
-    lager:info("Registering program from the test."),
-    ok = lasp:register(lasp_example_keylist_program, Program, global),
-
+test() ->
     %% Put one value.
     lager:info("Processing one value."),
     ok = lasp:process(lasp_example_keylist_program, global, 1, put, 0, node()),

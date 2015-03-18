@@ -48,9 +48,10 @@ start(_StartType, _StartArgs) ->
             ok = riak_core_node_watcher_events:add_guarded_handler(lasp_node_event_handler, []),
 
             %% Register Lasp applications.
-            [ok = lasp:register(Program,
-                                code:lib_dir(?APP, src) ++ "/" ++ atom_to_list(Program) ++ ".erl",
-                                global) || Program <- ?PROGRAMS],
+            lists:foreach(fun(Program) ->
+                        File = code:lib_dir(?APP, src) ++ "/" ++ atom_to_list(Program) ++ ".erl",
+                        ok = lasp:register(Program, File, global)
+                end, ?PROGRAMS),
 
             {ok, Pid};
         {error, Reason} ->

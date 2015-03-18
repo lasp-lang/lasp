@@ -136,7 +136,6 @@ waiting({ok, _ReqId, Reply},
 
     case NumResponses =:= ?PROCESS_R of
         true ->
-            lager:info("responding with ok"),
             From ! {ReqId, ok},
             {next_state, finalize, State, 0};
         false ->

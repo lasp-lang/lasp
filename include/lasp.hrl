@@ -6,10 +6,10 @@
 -define(BUCKET, <<"lasp">>).
 
 %% Erlang term storage based backend; no persistence.
--define(BACKEND, lasp_ets_backend).
+% -define(BACKEND, lasp_ets_backend).
 
 %% LevelDB backend; persistence.
-% -define(BACKEND, lasp_eleveldb_backend).
+-define(BACKEND, lasp_eleveldb_backend).
 
 %% Code which connects the backends to the actual backend
 %% implementation.

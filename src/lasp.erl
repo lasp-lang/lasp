@@ -46,7 +46,13 @@
          execute/2,
          process/6,
          mk_reqid/0,
+         register/0,
+         process/4,
          wait_for_reqid/2]).
+
+-define(PROGRAMS, [{global, lasp_example_keylist_program},
+                   {global, lasp_example_program},
+                   {global, lasp_riak_keylist_program}]).
 
 %% Public API
 
@@ -105,6 +111,26 @@ execute(Module, global) ->
     wait_for_reqid(ReqId, ?TIMEOUT);
 execute(_Module, _Registration) ->
     error.
+
+%% @doc Register all known programs; used by Lasp during initialization.
+-spec register() -> ok.
+register() ->
+    lists:foreach(fun({Type, Program}) ->
+                File = code:lib_dir(?APP, src) ++ "/" ++ atom_to_list(Program) ++ ".erl",
+                ok = lasp:register(Program, File, Type)
+        end, ?PROGRAMS),
+    ok.
+
+%% @doc Process notifications for all registered programs.
+%%
+%%      Notify a given partition at a given node that an object has
+%%      changed for a particular reason.
+%%
+-spec process(object(), reason(), idx(), node()) -> ok.
+process(Object, Reason, Idx, Node) ->
+    _ = [process(Program, Type, Object, Reason, Idx, Node)
+     || {Type, Program} <- ?PROGRAMS],
+    ok.
 
 %% @doc Notification of value change.
 %%

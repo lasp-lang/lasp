@@ -57,8 +57,8 @@ merge(Outputs) ->
 
 %% @doc Computing a sum accorss nodes is the same as as performing the
 %%      merge of outputs between a replica, when dealing with the
-%%      set.
+%%      set.  For a set, it's safe to just perform the merge.
 sum(Outputs) ->
     Value = ?TYPE:new(),
-    Sum = lists:foldl(fun(X, Acc) -> X ++ Acc end, Value, Outputs),
+    Sum = lists:foldl(fun(X, Acc) -> ?TYPE:merge(X, Acc) end, Value, Outputs),
     {ok, Sum}.

@@ -41,7 +41,6 @@ start_link() ->
 
 %% @doc Start a child.
 start_child(Args) ->
-    lager:info("Starting coverage FSM from supervisor!"),
     supervisor:start_child(?MODULE, Args).
 
 %% @doc Stop a child immediately.

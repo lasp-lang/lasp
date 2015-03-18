@@ -232,8 +232,15 @@ declare(Type, Store) ->
 %% @doc Declare a dataflow variable in a provided by identifer.
 -spec declare(id(), type(), store()) -> {ok, id()}.
 declare(Id, Type, Store) ->
-    ok = ?BACKEND:put(Store, Id, #dv{value=Type:new(), type=Type}),
-    {ok, Id}.
+    case ?BACKEND:get(Store, Id) of
+        {ok, _} ->
+            %% Do nothing; make declare idempotent at each replica.
+            {ok, Id};
+        _ ->
+            Value = Type:new(),
+            ok = ?BACKEND:put(Store, Id, #dv{value=Value, type=Type}),
+            {ok, Id}
+    end.
 
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.

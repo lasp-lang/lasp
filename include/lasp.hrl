@@ -42,7 +42,7 @@
 -type module() :: atom().
 -type file() :: iolist().
 -type registration() :: preflist | global.
--type id() :: atom().
+-type id() :: binary().
 -type idx() :: term().
 -type result() :: term().
 -type type() :: lasp_ivar | riak_dt_gset | riak_dt_orset | riak_dt_orswot | riak_dt_gcounter.

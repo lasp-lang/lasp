@@ -70,7 +70,8 @@ finish(clean,
                         module=Module,
                         results=Results}) ->
     {ok, Sum} = Module:sum(Results),
-    ClientPid ! {ReqId, ok, Sum},
+    {ok, Value} = Module:value(Sum),
+    ClientPid ! {ReqId, ok, Value},
     {stop, normal, StateData};
 finish(Message, StateData) ->
     lager:info("Unhandled finish: ~p", [Message]),

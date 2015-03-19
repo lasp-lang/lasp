@@ -57,8 +57,6 @@ start(Identifier) ->
 put(Store, Id, Record) ->
     StorageKey = encode(Id),
     StorageValue = encode(Record),
-    % lager:info("Writing id: ~p from store: ~p; storagekey: ~p",
-    %            [Id, Store, StorageKey]),
     Updates = [{put, StorageKey, StorageValue}],
     case eleveldb:write(Store, Updates, ?WRITE_OPTS) of
         ok ->
@@ -72,21 +70,20 @@ put(Store, Id, Record) ->
 -spec get(store(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
 get(Store, Id) ->
     StorageKey = encode(Id),
-    % lager:info("Retrieving id: ~p from store: ~p; storagekey: ~p",
-    %            [Id, Store, StorageKey]),
     case eleveldb:get(Store, StorageKey, ?READ_OPTS) of
         {ok, Value} ->
             {ok, decode(Value)};
         not_found ->
-            lager:info("Object not found!"),
             {error, not_found};
         {error, Reason} ->
             lager:info("Error reading object: ~p", [Reason]),
             {error, Reason}
     end.
 
+%% @doc Encoding of object to binary before LevelDB write.
 encode(X) ->
     term_to_binary(X).
 
+%% @doc Decoding of object to binary after LevelDB read.
 decode(X) ->
     binary_to_term(X).

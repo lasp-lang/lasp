@@ -26,28 +26,45 @@
 -export([init/1,
          process/4,
          execute/1,
+         value/1,
          merge/1,
          sum/1]).
 
 -record(state, {store, type, id, previous}).
 
+-define(ID, <<"lasp_riak_keylist_program">>).
 -define(CORE, lasp_core).
--define(TYPE, riak_dt_gset).
+-define(TYPE, riak_dt_orset).
 
 %% @doc Initialize an or-set as an accumulator.
 init(Store) ->
-    {ok, Id} = ?CORE:declare(?TYPE, Store),
+    {ok, Id} = ?CORE:declare(?ID, ?TYPE, Store),
     {ok, #state{store=Store, id=Id}}.
 
 %% @doc Notification from the system of an event.
-process(Object, _Reason, Idx, #state{store=Store, id=Id}=State) ->
-    {ok, _} = ?CORE:update(Id, {add, Object}, Idx, Store),
+process(Object, Reason, Idx, #state{store=Store, id=Id}=State) ->
+    Key = riak_object:key(Object),
+    case Reason of
+        put ->
+            {ok, _} = ?CORE:update(Id, {add, Key}, Idx, Store),
+            ok;
+        delete ->
+            {ok, _} = ?CORE:update(Id, {remove, Key}, Idx, Store),
+            ok;
+        handoff ->
+            %% Do nothing, right now.
+            ok
+    end,
     {ok, State}.
 
 %% @doc Return the result.
 execute(#state{store=Store, id=Id, previous=Previous}) ->
     {ok, {_, _, Value}} = ?CORE:read(Id, Previous, Store),
     {ok, Value}.
+
+%% @doc Return the result from a merged response
+value(Merged) ->
+    {ok, ?TYPE:value(Merged)}.
 
 %% @doc Given a series of outputs, take each one and merge it.
 merge(Outputs) ->
@@ -62,3 +79,4 @@ sum(Outputs) ->
     Value = ?TYPE:new(),
     Sum = lists:foldl(fun(X, Acc) -> ?TYPE:merge(X, Acc) end, Value, Outputs),
     {ok, Sum}.
+

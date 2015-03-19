@@ -254,18 +254,10 @@ handle_command({register, {ReqId, _}, Module0, File}, _From,
                                  {module, Module},
                                  {node, Node}]) of
             {ok, _, Bin} ->
-                lager:info("Compilation succeeded; partition: ~p",
-                           [Partition]),
                 case code:load_binary(Module, File, Bin) of
                     {module, Module} ->
-                        lager:info("Binary loaded, module: ~p, partition: ~p",
-                                   [Module, Partition]),
                         {ok, Value} = Module:init(Variables),
-                        lager:info("Module initialized: value: ~p",
-                                   [Value]),
                         Programs = dict:store(Module, Value, Programs0),
-                        lager:info("Initialized module at partition: ~p",
-                                   [Partition]),
                         {reply, {ok, ReqId}, State#state{programs=Programs}};
                     Reason ->
                         lager:info("Binary not loaded, reason: ~p, partition: ~p",

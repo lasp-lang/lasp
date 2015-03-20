@@ -32,27 +32,28 @@
 
 -record(state, {store, type, id, previous}).
 
--define(ID, <<"lasp_riak_keylist_program">>).
 -define(CORE, lasp_core).
 -define(TYPE, riak_dt_orset).
 
 %% @doc Initialize an or-set as an accumulator.
 init(Store) ->
-    {ok, Id} = ?CORE:declare(?ID, ?TYPE, Store),
+    Id = list_to_binary(atom_to_list(?MODULE)),
+    {ok, Id} = ?CORE:declare(Id, ?TYPE, Store),
     {ok, #state{store=Store, id=Id}}.
 
 %% @doc Notification from the system of an event.
-process(Object, Reason, Idx, #state{store=Store, id=Id}=State) ->
+process(Object, Reason, Idx, State) ->
     Key = riak_object:key(Object),
+    Metadata = riak_object:get_metadata(Object),
     case Reason of
         put ->
-            {ok, _} = ?CORE:update(Id, {add, Key}, Idx, Store),
+            ok = remove_entries_for_key(Key, Idx, State),
+            ok = add_entry(Key, Metadata, Idx, State),
             ok;
         delete ->
-            {ok, _} = ?CORE:update(Id, {remove, Key}, Idx, Store),
+            ok = remove_entries_for_key(Key, Idx, State),
             ok;
         handoff ->
-            %% Do nothing, right now.
             ok
     end,
     {ok, State}.
@@ -64,7 +65,7 @@ execute(#state{store=Store, id=Id, previous=Previous}) ->
 
 %% @doc Return the result from a merged response
 value(Merged) ->
-    {ok, ?TYPE:value(Merged)}.
+    {ok, [K || {K, _} <- ?TYPE:value(Merged)]}.
 
 %% @doc Given a series of outputs, take each one and merge it.
 merge(Outputs) ->
@@ -80,3 +81,22 @@ sum(Outputs) ->
     Sum = lists:foldl(fun(X, Acc) -> ?TYPE:merge(X, Acc) end, Value, Outputs),
     {ok, Sum}.
 
+%% Internal Functions
+
+%% @doc For a given key, remove all metadata entries for that key.
+remove_entries_for_key(Key, Idx, #state{store=Store, id=Id, previous=Previous}) ->
+    {ok, {_, Type, Value}} = ?CORE:read(Id, Previous, Store),
+    lists:foreach(fun(V) ->
+                case V of
+                    {Key, _} ->
+                        {ok, _} = ?CORE:update(Id, {remove, V}, Idx, Store);
+                    _ ->
+                        ok
+                end
+        end, Type:value(Value)),
+    ok.
+
+%% @doc Add an entry to the index.
+add_entry(Key, Metadata, Idx, #state{store=Store, id=Id}) ->
+    {ok, _} = ?CORE:update(Id, {add, {Key, Metadata}}, Idx, Store),
+    ok.

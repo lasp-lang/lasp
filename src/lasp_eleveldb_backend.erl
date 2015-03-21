@@ -38,7 +38,7 @@
 start(Identifier) ->
     %% Get the data root directory
     Config = app_helper:get_env(?APP),
-    DataDir = filename:join(app_helper:get_prop_or_env(variable_data_dir, Config, lasp),
+    DataDir = filename:join(app_helper:get_prop_or_env(store_data_dir, Config, ?APP),
                             atom_to_list(Identifier)),
 
     %% Ensure directory.

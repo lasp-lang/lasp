@@ -72,7 +72,7 @@
 
 -record(state, {node,
                 partition,
-                variables,
+                store,
                 programs}).
 
 %% Extrenal API
@@ -187,17 +187,17 @@ start_vnode(I) ->
 init([Partition]) ->
     Node = node(),
     Identifier = generate_unique_partition_identifier(Partition, Node),
-    {ok, Variables} = ?CORE:start(Identifier),
+    {ok, Store} = ?CORE:start(Identifier),
     {ok, #state{partition=Partition,
                 programs=dict:new(),
                 node=Node,
-                variables=Variables}}.
+                store=Store}}.
 
 %% Program execution handling.
 
 handle_command({repair, undefined, Id, Type, Value}, _From,
-               #state{variables=Variables}=State) ->
-    ?CORE:write(Type, Value, Id, Variables),
+               #state{store=Store}=State) ->
+    ?CORE:write(Type, Value, Id, Store),
     {noreply, State};
 
 handle_command({execute, {ReqId, _}, Module0}, _From,
@@ -231,7 +231,7 @@ handle_command({process, {ReqId, _}, Module0, Object, Reason, Idx}, _From,
 handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
                #state{partition=Partition,
                       node=Node,
-                      variables=Variables,
+                      store=Store,
                       programs=Programs0}=State) ->
     try
         %% Compile under original name, for the pure functions like
@@ -264,7 +264,7 @@ handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
         Options = [binary,
                    {parse_transform, lager_transform},
                    {parse_transform, lasp_transform},
-                   {store, Variables},
+                   {store, Store},
                    {partition, Partition},
                    {module, Module},
                    {node, Node}] ++ Options0,
@@ -278,7 +278,7 @@ handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
                     {ok, _, Bin} ->
                         case code:load_binary(Module, File, Bin) of
                             {module, Module} ->
-                                {ok, Value} = Module:init(Variables),
+                                {ok, Value} = Module:init(Store),
                                 Programs = dict:store(Module, Value, Programs0),
                                 ok = update_broadcast({add, Module1}, Partition),
                                 {reply, {ok, ReqId}, State#state{programs=Programs}};
@@ -303,61 +303,61 @@ handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
 %% Language handling.
 
 handle_command({declare, {ReqId, _}, Id, Type}, _From,
-               #state{variables=Variables, partition=_Partition}=State) ->
-    {ok, Id} = ?CORE:declare(Id, Type, Variables),
+               #state{store=Store, partition=_Partition}=State) ->
+    {ok, Id} = ?CORE:declare(Id, Type, Store),
     {reply, {ok, ReqId, Id}, State};
 
 handle_command({bind_to, {ReqId, _}, Id, DVId}, _From,
-               State=#state{variables=Variables}) ->
-    BindFun = fun(_AccId, _AccValue, _Variables) ->
+               State=#state{store=Store}) ->
+    BindFun = fun(_AccId, _AccValue, _Store) ->
             lasp:bind(_AccId, _AccValue)
     end,
-    ok = ?CORE:bind_to(Id, DVId, Variables, BindFun),
+    ok = ?CORE:bind_to(Id, DVId, Store, BindFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({bind, {ReqId, _}, Id, Value}, _From,
-               State=#state{partition=Partition, node=Node, variables=Variables}) ->
-    {ok, Result} = ?CORE:bind(Id, Value, Variables),
+               State=#state{partition=Partition, node=Node, store=Store}) ->
+    {ok, Result} = ?CORE:bind(Id, Value, Store),
     {reply, {ok, ReqId, {Partition, Node}, Result}, State};
 
 handle_command({update, {ReqId, _}, Id, Operation, Actor}, _From,
-               State=#state{partition=Partition, node=Node, variables=Variables}) ->
-    {ok, Result} = ?CORE:update(Id, Operation, Actor, Variables),
+               State=#state{partition=Partition, node=Node, store=Store}) ->
+    {ok, Result} = ?CORE:update(Id, Operation, Actor, Store),
     {reply, {ok, ReqId, {Partition, Node}, Result}, State};
 
 handle_command({thread, {ReqId, _}, Module, Function, Args}, _From,
-               #state{variables=Variables}=State) ->
-    ok = ?CORE:thread(Module, Function, Args, Variables),
+               #state{store=Store}=State) ->
+    ok = ?CORE:thread(Module, Function, Args, Store),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({wait_needed, {ReqId, _}, Id, Threshold}, From,
-               State=#state{variables=Variables}) ->
+               State=#state{store=Store}) ->
     ReplyFun = fun(ReadThreshold) ->
                         {reply, {ok, ReqId, ReadThreshold}, State}
                end,
     BlockingFun = fun() ->
                         {noreply, State}
                   end,
-    ?CORE:wait_needed(Id, Threshold, Variables, From, ReplyFun, BlockingFun);
+    ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, BlockingFun);
 
 handle_command({read, {ReqId, _}, Id, Threshold}, From,
-               State=#state{variables=Variables}) ->
+               State=#state{store=Store}) ->
     ReplyFun = fun(_Id, Type, Value) ->
                     {reply, {ok, ReqId, {_Id, Type, Value}}, State}
                end,
     BlockingFun = fun() ->
                     {noreply, State}
                   end,
-    ?CORE:read(Id, Threshold, Variables, From, ReplyFun, BlockingFun);
+    ?CORE:read(Id, Threshold, Store, From, ReplyFun, BlockingFun);
 
 handle_command({filter, {ReqId, _}, Id, Function, AccId}, _From,
-               State=#state{variables=Variables,
+               State=#state{store=Store,
                             partition=Partition,
                             node=Node}) ->
-    BindFun = fun(_AccId, AccValue, _Variables) ->
+    BindFun = fun(_AccId, AccValue, _Store) ->
             lasp:bind(_AccId, AccValue)
     end,
-    ReadFun = fun(_Id, _Threshold, _Variables) ->
+    ReadFun = fun(_Id, _Threshold, _Store) ->
             %% Beware of cycles in the gen_server calls!
             [{IndexNode, _Type}] = lasp:preflist(?N, _Id, lasp),
 
@@ -365,23 +365,23 @@ handle_command({filter, {ReqId, _}, Id, Function, AccId}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?CORE:read(_Id, _Threshold, _Variables);
+                    ?CORE:read(_Id, _Threshold, _Store);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(_Id, _Threshold)
             end
     end,
-    ok = ?CORE:filter(Id, Function, AccId, Variables, BindFun, ReadFun),
+    ok = ?CORE:filter(Id, Function, AccId, Store, BindFun, ReadFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({product, {ReqId, _}, Left, Right, Product}, _From,
-               State=#state{variables=Variables,
+               State=#state{store=Store,
                             partition=Partition,
                             node=Node}) ->
-    BindFun = fun(_Product, _AccValue, _Variables) ->
+    BindFun = fun(_Product, _AccValue, _Store) ->
             lasp:bind(_Product, _AccValue)
     end,
-    ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
+    ReadLeftFun = fun(_Left, _Threshold, _Store) ->
             %% Beware of cycles in the gen_server calls!
             [{IndexNode, _Type}] = lasp:preflist(?N, Left, lasp),
 
@@ -389,13 +389,13 @@ handle_command({product, {ReqId, _}, Left, Right, Product}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?CORE:read(Left, _Threshold, _Variables);
+                    ?CORE:read(Left, _Threshold, _Store);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(Left, _Threshold)
             end
     end,
-    ReadRightFun = fun(_Right, _Threshold, _Variables) ->
+    ReadRightFun = fun(_Right, _Threshold, _Store) ->
             %% Beware of cycles in the gen_server calls!
             [{IndexNode, _Type}] = lasp:preflist(?N, Right, lasp),
 
@@ -403,23 +403,23 @@ handle_command({product, {ReqId, _}, Left, Right, Product}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?CORE:read(Right, _Threshold, _Variables);
+                    ?CORE:read(Right, _Threshold, _Store);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(Right, _Threshold)
             end
     end,
-    ok = ?CORE:product(Left, Right, Product, Variables, BindFun, ReadLeftFun, ReadRightFun),
+    ok = ?CORE:product(Left, Right, Product, Store, BindFun, ReadLeftFun, ReadRightFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({intersection, {ReqId, _}, Left, Right, Intersection}, _From,
-               State=#state{variables=Variables,
+               State=#state{store=Store,
                             partition=Partition,
                             node=Node}) ->
-    BindFun = fun(_Intersection, _AccValue, _Variables) ->
+    BindFun = fun(_Intersection, _AccValue, _Store) ->
             lasp:bind(_Intersection, _AccValue)
     end,
-    ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
+    ReadLeftFun = fun(_Left, _Threshold, _Store) ->
             %% Beware of cycles in the gen_server calls!
             [{IndexNode, _Type}] = lasp:preflist(?N, Left, lasp),
 
@@ -427,13 +427,13 @@ handle_command({intersection, {ReqId, _}, Left, Right, Intersection}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?CORE:read(Left, _Threshold, _Variables);
+                    ?CORE:read(Left, _Threshold, _Store);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(Left, _Threshold)
             end
     end,
-    ReadRightFun = fun(_Right, _Threshold, _Variables) ->
+    ReadRightFun = fun(_Right, _Threshold, _Store) ->
             %% Beware of cycles in the gen_server calls!
             [{IndexNode, _Type}] = lasp:preflist(?N, Right, lasp),
 
@@ -441,23 +441,23 @@ handle_command({intersection, {ReqId, _}, Left, Right, Intersection}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?CORE:read(Right, _Threshold, _Variables);
+                    ?CORE:read(Right, _Threshold, _Store);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(Right, _Threshold)
             end
     end,
-    ok = ?CORE:intersection(Left, Right, Intersection, Variables, BindFun, ReadLeftFun, ReadRightFun),
+    ok = ?CORE:intersection(Left, Right, Intersection, Store, BindFun, ReadLeftFun, ReadRightFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({union, {ReqId, _}, Left, Right, Union}, _From,
-               State=#state{variables=Variables,
+               State=#state{store=Store,
                             partition=Partition,
                             node=Node}) ->
-    BindFun = fun(_Union, _AccValue, _Variables) ->
+    BindFun = fun(_Union, _AccValue, _Store) ->
             lasp:bind(_Union, _AccValue)
     end,
-    ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
+    ReadLeftFun = fun(_Left, _Threshold, _Store) ->
             %% Beware of cycles in the gen_server calls!
             [{IndexNode, _Type}] = lasp:preflist(?N, Left, lasp),
 
@@ -465,13 +465,13 @@ handle_command({union, {ReqId, _}, Left, Right, Union}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?CORE:read(Left, _Threshold, _Variables);
+                    ?CORE:read(Left, _Threshold, _Store);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(Left, _Threshold)
             end
     end,
-    ReadRightFun = fun(_Right, _Threshold, _Variables) ->
+    ReadRightFun = fun(_Right, _Threshold, _Store) ->
             %% Beware of cycles in the gen_server calls!
             [{IndexNode, _Type}] = lasp:preflist(?N, Right, lasp),
 
@@ -479,23 +479,23 @@ handle_command({union, {ReqId, _}, Left, Right, Union}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?CORE:read(Right, _Threshold, _Variables);
+                    ?CORE:read(Right, _Threshold, _Store);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(Right, _Threshold)
             end
     end,
-    ok = ?CORE:union(Left, Right, Union, Variables, BindFun, ReadLeftFun, ReadRightFun),
+    ok = ?CORE:union(Left, Right, Union, Store, BindFun, ReadLeftFun, ReadRightFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({map, {ReqId, _}, Id, Function, AccId}, _From,
-               State=#state{variables=Variables,
+               State=#state{store=Store,
                             partition=Partition,
                             node=Node}) ->
-    BindFun = fun(_AccId, AccValue, _Variables) ->
+    BindFun = fun(_AccId, AccValue, _Store) ->
             lasp:bind(_AccId, AccValue)
     end,
-    ReadFun = fun(_Id, _Threshold, _Variables) ->
+    ReadFun = fun(_Id, _Threshold, _Store) ->
             %% Beware of cycles in the gen_server calls!
             [{IndexNode, _Type}] = lasp:preflist(?N, _Id, lasp),
 
@@ -503,23 +503,23 @@ handle_command({map, {ReqId, _}, Id, Function, AccId}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?CORE:read(_Id, _Threshold, _Variables);
+                    ?CORE:read(_Id, _Threshold, _Store);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(_Id, _Threshold)
             end
     end,
-    ok = ?CORE:map(Id, Function, AccId, Variables, BindFun, ReadFun),
+    ok = ?CORE:map(Id, Function, AccId, Store, BindFun, ReadFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({fold, {ReqId, _}, Id, Function, AccId}, _From,
-               State=#state{variables=Variables,
+               State=#state{store=Store,
                             partition=Partition,
                             node=Node}) ->
-    BindFun = fun(_AccId, _AccValue, _Variables) ->
+    BindFun = fun(_AccId, _AccValue, _Store) ->
             lasp:bind(_AccId, _AccValue)
     end,
-    ReadFun = fun(_Id, _Threshold, _Variables) ->
+    ReadFun = fun(_Id, _Threshold, _Store) ->
             %% Beware of cycles in the gen_server calls!
             [{IndexNode, _Type}] = lasp:preflist(?N, _Id, lasp),
 
@@ -527,13 +527,13 @@ handle_command({fold, {ReqId, _}, Id, Function, AccId}, _From,
                 {Partition, Node} ->
                     %% We're local, which means that we can interact
                     %% directly with the data store.
-                    ?CORE:read(_Id, _Threshold, _Variables);
+                    ?CORE:read(_Id, _Threshold, _Store);
                 _ ->
                     %% We're remote, go through all of the routing logic.
                     lasp:read(_Id, _Threshold)
             end
     end,
-    ok = ?CORE:fold(Id, Function, AccId, Variables, BindFun, ReadFun),
+    ok = ?CORE:fold(Id, Function, AccId, Store, BindFun, ReadFun),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command(_Message, _Sender, State) ->

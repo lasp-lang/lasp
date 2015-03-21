@@ -70,10 +70,12 @@
 
 -ignore_xref([start_vnode/1]).
 
+-record(program, {state}).
+
 -record(state, {node,
                 partition,
                 store,
-                programs}).
+                reference}).
 
 %% Extrenal API
 
@@ -188,10 +190,11 @@ init([Partition]) ->
     Node = node(),
     Identifier = generate_unique_partition_identifier(Partition, Node),
     {ok, Store} = ?CORE:start(Identifier),
+    {ok, Reference} = dets:open_file(Identifier, []),
     {ok, #state{partition=Partition,
-                programs=dict:new(),
                 node=Node,
-                store=Store}}.
+                store=Store,
+                reference=Reference}}.
 
 %% Program execution handling.
 
@@ -201,13 +204,13 @@ handle_command({repair, undefined, Id, Type, Value}, _From,
     {noreply, State};
 
 handle_command({execute, {ReqId, _}, Module0}, _From,
-               #state{programs=Programs,
+               #state{reference=Reference,
                       node=Node,
                       partition=Partition}=State) ->
     Module = generate_unique_module_identifier(Partition,
                                                Node,
                                                Module0),
-    case execute(Module, Programs) of
+    case execute(Module, Reference) of
         {ok, Result} ->
             {reply, {ok, ReqId, Result}, State};
         {error, undefined} ->
@@ -215,15 +218,15 @@ handle_command({execute, {ReqId, _}, Module0}, _From,
     end;
 
 handle_command({process, {ReqId, _}, Module0, Object, Reason, Idx}, _From,
-               #state{programs=Programs0,
+               #state{reference=Reference,
                       node=Node,
                       partition=Partition}=State) ->
     Module = generate_unique_module_identifier(Partition,
                                                Node,
                                                Module0),
-    case process(Module, Object, Reason, Idx, Programs0) of
-        {ok, Result, Programs} ->
-            {reply, {ok, ReqId, Result}, State#state{programs=Programs}};
+    case process(Module, Object, Reason, Idx, Reference) of
+        ok ->
+            {reply, {ok, ReqId}, State};
         {error, undefined} ->
             {reply, {error, ReqId}, State}
     end;
@@ -232,7 +235,7 @@ handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
                #state{partition=Partition,
                       node=Node,
                       store=Store,
-                      programs=Programs0}=State) ->
+                      reference=Reference}=State) ->
     try
         %% Compile under original name, for the pure functions like
         %% `sum' and `merge', but only if not already compiled.
@@ -279,9 +282,9 @@ handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
                         case code:load_binary(Module, File, Bin) of
                             {module, Module} ->
                                 {ok, Value} = Module:init(Store),
-                                Programs = dict:store(Module, Value, Programs0),
+                                ok = dets:insert(Reference, [{Module, #program{state=Value}}]),
                                 ok = update_broadcast({add, Module1}, Partition),
-                                {reply, {ok, ReqId}, State#state{programs=Programs}};
+                                {reply, {ok, ReqId}, State};
                             Reason ->
                                 lager:info("Binary not loaded, reason: ~p, partition: ~p",
                                            [Reason, Partition]),
@@ -566,13 +569,13 @@ delete(State) ->
     {ok, State}.
 
 handle_coverage(?EXECUTE_REQUEST{module=Module0}, _KeySpaces, _Sender,
-                #state{programs=Programs,
+                #state{reference=Reference,
                        node=Node,
                        partition=Partition}=State) ->
     Module = generate_unique_module_identifier(Partition,
                                                Node,
                                                Module0),
-    case execute(Module, Programs) of
+    case execute(Module, Reference) of
         {ok, Result} ->
             {reply, {done, Result}, State};
         {error, undefined} ->
@@ -590,10 +593,10 @@ terminate(_Reason, _State) ->
 %% Internal program execution functions.
 
 %% @doc Execute a given program.
-execute(Module, Programs) ->
-    case dict:is_key(Module, Programs) of
+execute(Module, Reference) ->
+    case dets:member(Reference, Module) of
         true ->
-            State = dict:fetch(Module, Programs),
+            {Module, #program{state=State}} = hd(dets:lookup(Reference, Module)),
             Self = self(),
             ReqId = lasp:mk_reqid(),
             spawn_link(fun() ->
@@ -608,19 +611,19 @@ execute(Module, Programs) ->
     end.
 
 %% @doc Process a given program.
-process(Module, Object, Reason, Idx, Programs0) ->
-    case dict:is_key(Module, Programs0) of
+process(Module, Object, Reason, Idx, Reference) ->
+    case dets:member(Reference, Module) of
         true ->
-            State0 = dict:fetch(Module, Programs0),
+            {Module, #program{state=State0}=Program} = hd(dets:lookup(Reference, Module)),
             Self = self(),
             ReqId = lasp:mk_reqid(),
             spawn_link(fun() ->
                         {ok, State} = Module:process(Object, Reason, Idx, State0),
-                        Programs = dict:store(Module, State, Programs0),
-                        Self ! {ReqId, ok, {ok, Programs}}
+                        ok = dets:insert(Reference, [{Module, Program#program{state=State}}]),
+                        Self ! {ReqId, ok}
                         end),
-            {ok, {Result, Programs}} = lasp:wait_for_reqid(ReqId, infinity),
-            {ok, Result, Programs};
+            ok = lasp:wait_for_reqid(ReqId, infinity),
+            ok;
         false ->
             lager:info("Failed to execute module: ~p", [Module]),
             {error, undefined}

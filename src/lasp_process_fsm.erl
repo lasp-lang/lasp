@@ -125,14 +125,12 @@ execute(timeout, #state{preflist=Preflist,
     lasp_vnode:process(Preflist, {ReqId, Coordinator}, Module, Object, Reason, Idx),
     {next_state, waiting, State}.
 
-waiting({ok, _ReqId, Reply},
+waiting({ok, _ReqId},
         #state{from=From,
                req_id=ReqId,
-               num_responses=NumResponses0,
-               replies=Replies0}=State0) ->
+               num_responses=NumResponses0}=State0) ->
     NumResponses = NumResponses0 + 1,
-    Replies = [Reply|Replies0],
-    State = State0#state{num_responses=NumResponses, replies=Replies},
+    State = State0#state{num_responses=NumResponses},
 
     case NumResponses =:= ?PROCESS_R of
         true ->
@@ -142,12 +140,10 @@ waiting({ok, _ReqId, Reply},
             {next_state, waiting, State}
     end.
 
-waiting_n({ok, _ReqId, Reply},
-        #state{num_responses=NumResponses0,
-               replies=Replies0}=State0) ->
+waiting_n({ok, _ReqId},
+        #state{num_responses=NumResponses0}=State0) ->
     NumResponses = NumResponses0 + 1,
-    Replies = [Reply|Replies0],
-    State = State0#state{num_responses=NumResponses, replies=Replies},
+    State = State0#state{num_responses=NumResponses},
 
     case NumResponses =:= ?PROGRAM_N of
         true ->

@@ -1,6 +1,8 @@
 Distributed deterministic dataflow programming (with CRDTs!)
 =======================================================
 
+[![Join the chat at https://gitter.im/cmeiklejohn/lasp](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/cmeiklejohn/lasp?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 Curious about what we're building?  Try out these posts:
 
 * [Programming Models, Part 1: Try Derflow!](http://christophermeiklejohn.com/derflow/erlang/2014/09/28/try-derflow.html)

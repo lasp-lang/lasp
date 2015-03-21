@@ -1,0 +1,8 @@
+%%-*- mode: erlang -*-
+
+%% @doc Configure where the variable store should put data files.
+{mapping, "store_data_dir", "lasp.store_data_dir", [
+  {default, "$(platform_data_dir)/lasp/store"},
+  hidden,
+  {datatype, directory}
+]}.

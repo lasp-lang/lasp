@@ -26,8 +26,8 @@
 -include("lasp.hrl").
 
 %% API
--export([start_link/4,
-         register/2]).
+-export([start_link/5,
+         register/3]).
 
 %% Callbacks
 -export([init/1,
@@ -48,19 +48,20 @@
                 from,
                 module,
                 file,
+                options,
                 responses}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
-start_link(ReqId, From, Group, Pid) ->
-    gen_fsm:start_link(?MODULE, [ReqId, From, Group, Pid], []).
+start_link(ReqId, From, Module, File, Options) ->
+    gen_fsm:start_link(?MODULE, [ReqId, From, Module, File, Options], []).
 
 %% @doc Register a program.
-register(Module, File) ->
+register(Module, File, Options) ->
     ReqId = lasp:mk_reqid(),
-    _ = lasp_register_global_fsm_sup:start_child([ReqId, self(), Module, File]),
+    _ = lasp_register_global_fsm_sup:start_child([ReqId, self(), Module, File, Options]),
     {ok, ReqId}.
 
 %%%===================================================================
@@ -87,13 +88,14 @@ terminate(_Reason, _SN, _SD) ->
 %%%===================================================================
 
 %% @doc Initialize the request.
-init([ReqId, From, Module, File]) ->
+init([ReqId, From, Module, File, Options]) ->
     State = #state{preflist=undefined,
                    req_id=ReqId,
                    coordinator=node(),
                    from=From,
                    module=Module,
                    file=File,
+                   options=Options,
                    responses=0},
     {ok, prepare, State, 0}.
 
@@ -108,8 +110,9 @@ execute(timeout, #state{preflist=Preflist,
                         req_id=ReqId,
                         coordinator=Coordinator,
                         module=Module,
-                        file=File}=State) ->
-    lasp_vnode:register(Preflist, {ReqId, Coordinator}, Module, File),
+                        file=File,
+                        options=Options}=State) ->
+    lasp_vnode:register(Preflist, {ReqId, Coordinator}, Module, File, Options),
     {next_state, waiting, State}.
 
 %% @doc Attempt to write to every single node responsible for this

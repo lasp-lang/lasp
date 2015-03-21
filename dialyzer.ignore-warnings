@@ -1,1 +1,2 @@
 Callback info about the riak_core_coverage_fsm behaviour is not available
+The variable _ can never match since previous clauses completely covered the type 'lasp_riak_index_program'

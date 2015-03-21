@@ -49,7 +49,7 @@
          thread/5]).
 
 %% Program execution functions.
--export([register/4,
+-export([register/5,
          execute/3,
          process/6]).
 
@@ -83,9 +83,9 @@ repair(IdxNode, Id, Type, Value) ->
                                    ignore,
                                    ?VNODE_MASTER).
 
-register(Preflist, Identity, Module, File) ->
+register(Preflist, Identity, Module, File, Options) ->
     riak_core_vnode_master:command(Preflist,
-                                   {register, Identity, Module, File},
+                                   {register, Identity, Module, File, Options},
                                    {fsm, undefined, self()},
                                    ?VNODE_MASTER).
 
@@ -228,46 +228,70 @@ handle_command({process, {ReqId, _}, Module0, Object, Reason, Idx}, _From,
             {reply, {error, ReqId}, State}
     end;
 
-handle_command({register, {ReqId, _}, Module0, File}, _From,
+handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
                #state{partition=Partition,
                       node=Node,
                       variables=Variables,
                       programs=Programs0}=State) ->
     try
         %% Compile under original name, for the pure functions like
-        %% `sum' and `merge'.
-        %%
-        {ok, _, Bin0} = compile:file(File, [binary,
-                                            {parse_transform, lager_transform}]),
-        {module, Module0} = code:load_binary(Module0, File, Bin0),
+        %% `sum' and `merge', but only if not already compiled.
+        try
+            _ = Module0:module_info()
+        catch
+            _:_ ->
+                lager:info("Module ~p not loaded; loading!", [Module0]),
+                {ok, _, Bin0} = compile:file(File, [binary, {parse_transform, lager_transform}]),
+                {module, Module0} = code:load_binary(Module0, File, Bin0)
+        end,
+
+        %% Allow override module name from users trying to register
+        %% programs.
+        Module1 = case lists:keyfind(module, 1, Options0) of
+            {module, M} ->
+                M;
+            _ ->
+                Module0
+        end,
 
         %% Compile under unique name for vnode.
         %%
         Module = generate_unique_module_identifier(Partition,
                                                    Node,
-                                                   Module0),
-        case compile:file(File, [binary,
-                                 {parse_transform, lager_transform},
-                                 {parse_transform, lasp_transform},
-                                 {store, Variables},
-                                 {partition, Partition},
-                                 {module, Module},
-                                 {node, Node}]) of
-            {ok, _, Bin} ->
-                case code:load_binary(Module, File, Bin) of
-                    {module, Module} ->
-                        {ok, Value} = Module:init(Variables),
-                        Programs = dict:store(Module, Value, Programs0),
-                        {reply, {ok, ReqId}, State#state{programs=Programs}};
-                    Reason ->
-                        lager:info("Binary not loaded, reason: ~p, partition: ~p",
-                                   [Reason, Partition]),
-                        {reply, {error, Reason}, State}
-                end;
-            Error ->
-                lager:info("Compilation failed; error: ~p, partition: ~p",
-                           [Error, Partition]),
-                {reply, {error, Error}, State}
+                                                   Module1),
+
+        %% Generate options for compilation.
+        Options = [binary,
+                   {parse_transform, lager_transform},
+                   {parse_transform, lasp_transform},
+                   {store, Variables},
+                   {partition, Partition},
+                   {module, Module},
+                   {node, Node}] ++ Options0,
+        try
+            _ = Module:module_info(),
+            {reply, {ok, ReqId}, State}
+        catch
+            _:_ ->
+                lager:info("Module ~p not loaded; loading!", [Module]),
+                case compile:file(File, Options) of
+                    {ok, _, Bin} ->
+                        case code:load_binary(Module, File, Bin) of
+                            {module, Module} ->
+                                {ok, Value} = Module:init(Variables),
+                                Programs = dict:store(Module, Value, Programs0),
+                                ok = update_broadcast({add, Module1}, Partition),
+                                {reply, {ok, ReqId}, State#state{programs=Programs}};
+                            Reason ->
+                                lager:info("Binary not loaded, reason: ~p, partition: ~p",
+                                           [Reason, Partition]),
+                                {reply, {error, Reason}, State}
+                        end;
+                    Error ->
+                        lager:info("Compilation failed; error: ~p, partition: ~p",
+                                   [Error, Partition]),
+                        {reply, {error, Error}, State}
+                end
         end
     catch
         _:Exception ->
@@ -612,3 +636,13 @@ generate_unique_module_identifier(Partition, Node, Module) ->
     list_to_atom(
         integer_to_list(Partition) ++ "-" ++
             atom_to_list(Node) ++ "-" ++ atom_to_list(Module)).
+
+update_broadcast({add, Module}, Partition) ->
+    Set0 = case riak_core_metadata:get(?PROGRAM_PREFIX, ?PROGRAM_KEY, []) of
+        undefined ->
+            riak_dt_orset:new();
+        X ->
+            X
+    end,
+    {ok, Set} = riak_dt_orset:update({add, Module}, Partition, Set0),
+    riak_core_metadata:put(?PROGRAM_PREFIX, ?PROGRAM_KEY, Set, []).

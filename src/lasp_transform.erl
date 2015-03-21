@@ -42,6 +42,20 @@ parse_transform(AST, Options) ->
     {module, Module} = lists:keyfind(module, 1, Options),
     put(module, Module),
 
+    case lists:keyfind(index_name, 1, Options) of
+        {index_name, IndexName} ->
+            put(index_name, IndexName);
+        _ ->
+            ok
+    end,
+
+    case lists:keyfind(index_value, 1, Options) of
+        {index_value, IndexValue} ->
+            put(index_value, IndexValue);
+        _ ->
+            ok
+    end,
+
     walk_ast([], AST).
 
 %% @private
@@ -75,14 +89,14 @@ walk_body(Acc, [H|T]) ->
     walk_body([transform_statement(H)|Acc], T).
 
 %% @private
-transform_statement({call, Line1,
-                     {remote, Line2,
-                      {atom, Line3, lasp}, {atom, Line4, Func}},
-                     Arguments}) ->
-    {call, Line1,
-     {remote, Line2,
-      {atom, Line3, ?CORE}, {atom, Line4, Func}},
-     Arguments ++ [{atom, Line4, get(store)}]};
+% transform_statement({call, Line1,
+%                      {remote, Line2,
+%                       {atom, Line3, lasp}, {atom, Line4, Func}},
+%                      Arguments}) ->
+%     {call, Line1,
+%      {remote, Line2,
+%       {atom, Line3, ?CORE}, {atom, Line4, Func}},
+%      Arguments ++ [{atom, Line4, get(store)}]};
 transform_statement(Stmt) when is_tuple(Stmt) ->
     list_to_tuple(transform_statement(tuple_to_list(Stmt)));
 transform_statement(Stmt) when is_list(Stmt) ->

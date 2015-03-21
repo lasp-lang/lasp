@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_riak_keylist_program).
+-module(lasp_riak_index_program).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -behavior(lasp_program).
@@ -32,8 +32,10 @@
 
 -record(state, {store, type, id, previous}).
 
+-define(APP,  lasp).
 -define(CORE, lasp_core).
 -define(TYPE, riak_dt_orset).
+-define(VIEW, lasp_riak_index_program).
 
 %% @doc Initialize an or-set as an accumulator.
 init(Store) ->
@@ -43,12 +45,22 @@ init(Store) ->
 
 %% @doc Notification from the system of an event.
 process(Object, Reason, Idx, State) ->
+    lager:info("Processing value for ~p", [?MODULE]),
     Key = riak_object:key(Object),
     Metadata = riak_object:get_metadata(Object),
+    IndexSpecs = extract_valid_specs(Object),
     case Reason of
         put ->
             ok = remove_entries_for_key(Key, Idx, State),
             ok = add_entry(Key, Metadata, Idx, State),
+            %% If this is the top-level index, create any required views
+            %% off of this index.
+            case ?MODULE of
+                lasp_riak_index_program ->
+                    ok = create_views(IndexSpecs);
+                _ ->
+                    ok
+            end,
             ok;
         delete ->
             ok = remove_entries_for_key(Key, Idx, State),
@@ -65,7 +77,7 @@ execute(#state{store=Store, id=Id, previous=Previous}) ->
 
 %% @doc Return the result from a merged response
 value(Merged) ->
-    {ok, [K || {K, _} <- ?TYPE:value(Merged)]}.
+    {ok, lists:usort([K || {K, _} <- ?TYPE:value(Merged)])}.
 
 %% @doc Given a series of outputs, take each one and merge it.
 merge(Outputs) ->
@@ -100,3 +112,30 @@ remove_entries_for_key(Key, Idx, #state{store=Store, id=Id, previous=Previous}) 
 add_entry(Key, Metadata, Idx, #state{store=Store, id=Id}) ->
     {ok, _} = ?CORE:update(Id, {add, {Key, Metadata}}, Idx, Store),
     ok.
+
+%% @doc Extract index specifications from indexes; only select views
+%%      which add information, given we don't want to destroy a
+%%      pre-computed view, for now.
+extract_valid_specs(Object) ->
+    IndexSpecs0 = riak_object:index_specs(Object),
+    lists:filter(fun({Type, _, _}) -> Type =:= add end, IndexSpecs0).
+
+%% @doc Register all applicable views.
+%%
+%%      Launch a process to asynchronously register the view; if this
+%%      fails, no big deal, it will be generated on the next write.
+create_views(Views) ->
+    lists:foreach(fun({_Type, Name, Value}) ->
+                Module = list_to_atom(atom_to_list(?VIEW) ++ "-" ++
+                                      binary_to_list(Name) ++ "-" ++
+                                      binary_to_list(Value)),
+                spawn_link(fun() ->
+                                ok = lasp:register(
+                                        ?VIEW,
+                                        code:lib_dir(?APP, src) ++ "/" ++ atom_to_list(?VIEW) ++ ".erl",
+                                        global,
+                                        [{module, Module},
+                                         {index_name, Name},
+                                         {index_value, Value}])
+                    end)
+        end, Views).

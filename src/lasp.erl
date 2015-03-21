@@ -42,7 +42,7 @@
          wait_needed/2,
          thread/3,
          preflist/3,
-         register/3,
+         register/4,
          execute/2,
          process/6,
          mk_reqid/0,
@@ -52,7 +52,7 @@
 
 -define(PROGRAMS, [{global, lasp_example_keylist_program},
                    {global, lasp_example_program},
-                   {global, lasp_riak_keylist_program}]).
+                   {global, lasp_riak_index_program}]).
 
 %% Public API
 
@@ -79,15 +79,15 @@
 %%      Programs must implement the `lasp_program' behavior to be
 %%      correct.
 %%
--spec register(module(), file(), registration()) ->
+-spec register(module(), file(), registration(), [{atom(), term()}]) ->
     ok | {error, timeout} | error.
-register(Module, File, preflist) ->
+register(Module, File, global, Options) ->
+    {ok, ReqId} = lasp_register_global_fsm:register(Module, File, Options),
+    wait_for_reqid(ReqId, ?TIMEOUT);
+register(Module, File, preflist, _Options) ->
     {ok, ReqId} = lasp_register_fsm:register(Module, File),
     wait_for_reqid(ReqId, ?TIMEOUT);
-register(Module, File, global) ->
-    {ok, ReqId} = lasp_register_global_fsm:register(Module, File),
-    wait_for_reqid(ReqId, ?TIMEOUT);
-register(_Module, _File, _Registration) ->
+register(_Module, _File, _Registration, _Options) ->
     error.
 
 %% @doc Execute an application.
@@ -117,7 +117,7 @@ execute(_Module, _Registration) ->
 register() ->
     lists:foreach(fun({Type, Program}) ->
                 File = code:lib_dir(?APP, src) ++ "/" ++ atom_to_list(Program) ++ ".erl",
-                ok = lasp:register(Program, File, Type)
+                ok = lasp:register(Program, File, Type, [])
         end, ?PROGRAMS),
     ok.
 
@@ -128,8 +128,15 @@ register() ->
 %%
 -spec process(object(), reason(), idx(), node()) -> ok.
 process(Object, Reason, Idx, Node) ->
-    _ = [process(Program, Type, Object, Reason, Idx, Node)
-     || {Type, Program} <- ?PROGRAMS],
+    case riak_core_metadata:get(?PROGRAM_PREFIX, ?PROGRAM_KEY, []) of
+        undefined ->
+            ok;
+        Programs0 ->
+            Programs = riak_dt_orset:value(Programs0),
+            lager:info("Executing for programs: ~p", [Programs]),
+            _ = [process(Program, global, Object, Reason, Idx, Node) || Program <- Programs],
+            ok
+    end,
     ok.
 
 %% @doc Notification of value change.

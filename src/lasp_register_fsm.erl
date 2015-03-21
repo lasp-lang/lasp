@@ -111,7 +111,7 @@ execute(timeout, #state{preflist=Preflist,
                         coordinator=Coordinator,
                         module=Module,
                         file=File}=State) ->
-    lasp_vnode:register(Preflist, {ReqId, Coordinator}, Module, File),
+    lasp_vnode:register(Preflist, {ReqId, Coordinator}, Module, File, []),
     {next_state, waiting, State}.
 
 %% @doc Attempt to write to every single node responsible for this

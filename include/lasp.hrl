@@ -25,6 +25,9 @@
 
 -define(PROCESS_R, 1).
 
+-define(PROGRAM_KEY,    registered).
+-define(PROGRAM_PREFIX, {lasp, programs}).
+
 -record(lasp_execute_request_v1, {
         module :: atom(),
         req_id :: non_neg_integer(),

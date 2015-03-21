@@ -1,2 +1,0 @@
-lasp_riak_keylist_program.erl:26: Undefined callback function process/5 (behaviour 'lasp_program')
-lasp_riak_keylist_program.erl:26: Undefined callback function execute/2 (behaviour 'lasp_program')

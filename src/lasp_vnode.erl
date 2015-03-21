@@ -70,7 +70,10 @@
 
 -ignore_xref([start_vnode/1]).
 
--record(program, {module, file, bin, state}).
+-record(program, {module,
+                  file,
+                  bin,
+                  state}).
 
 -record(state, {node,
                 partition,
@@ -187,10 +190,28 @@ start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
 init([Partition]) ->
+    %% Initialize the partition.
     Node = node(),
     Identifier = generate_unique_partition_identifier(Partition, Node),
     {ok, Store} = ?CORE:start(Identifier),
+
+    %% Load all applications from stored binaries.
     {ok, Reference} = dets:open_file(Identifier, []),
+    TraverseFun = fun({Module, #program{file=File, bin=Bin}}) ->
+            lager:info("Loading program: ~p", [Module]),
+            case code:load_binary(Module, File, Bin) of
+                {module, Module} ->
+                    lager:info("Module loaded!"),
+                    ok;
+                Error ->
+                    lager:info("Error loading module; error: ~p!",
+                               [Error]),
+                    ok
+            end,
+            continue
+    end,
+    dets:traverse(Reference, TraverseFun),
+
     {ok, #state{partition=Partition,
                 node=Node,
                 store=Store,

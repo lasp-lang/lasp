@@ -24,13 +24,13 @@
 -behavior(lasp_program).
 
 -export([init/1,
-         process/4,
-         execute/1,
+         process/5,
+         execute/2,
          value/1,
          merge/1,
          sum/1]).
 
--record(state, {store, type, id, previous}).
+-record(state, {type, id, previous}).
 
 -define(APP,  lasp).
 -define(CORE, lasp_core).
@@ -41,18 +41,18 @@
 init(Store) ->
     Id = list_to_binary(atom_to_list(?MODULE)),
     {ok, Id} = ?CORE:declare(Id, ?TYPE, Store),
-    {ok, #state{store=Store, id=Id}}.
+    {ok, #state{id=Id}}.
 
 %% @doc Notification from the system of an event.
-process(Object, Reason, Idx, State) ->
+process(Object, Reason, Idx, State, Store) ->
     lager:info("Processing value for ~p", [?MODULE]),
     Key = riak_object:key(Object),
     Metadata = riak_object:get_metadata(Object),
     IndexSpecs = extract_valid_specs(Object),
     case Reason of
         put ->
-            ok = remove_entries_for_key(Key, Idx, State),
-            ok = add_entry(Key, Metadata, Idx, State),
+            ok = remove_entries_for_key(Key, Idx, State, Store),
+            ok = add_entry(Key, Metadata, Idx, State, Store),
             %% If this is the top-level index, create any required views
             %% off of this index.
             case ?MODULE of
@@ -63,7 +63,7 @@ process(Object, Reason, Idx, State) ->
             end,
             ok;
         delete ->
-            ok = remove_entries_for_key(Key, Idx, State),
+            ok = remove_entries_for_key(Key, Idx, State, Store),
             ok;
         handoff ->
             ok
@@ -71,7 +71,7 @@ process(Object, Reason, Idx, State) ->
     {ok, State}.
 
 %% @doc Return the result.
-execute(#state{store=Store, id=Id, previous=Previous}) ->
+execute(#state{id=Id, previous=Previous}, Store) ->
     {ok, {_, _, Value}} = ?CORE:read(Id, Previous, Store),
     {ok, Value}.
 
@@ -96,7 +96,7 @@ sum(Outputs) ->
 %% Internal Functions
 
 %% @doc For a given key, remove all metadata entries for that key.
-remove_entries_for_key(Key, Idx, #state{store=Store, id=Id, previous=Previous}) ->
+remove_entries_for_key(Key, Idx, #state{id=Id, previous=Previous}, Store) ->
     {ok, {_, Type, Value}} = ?CORE:read(Id, Previous, Store),
     lists:foreach(fun(V) ->
                 case V of
@@ -109,7 +109,7 @@ remove_entries_for_key(Key, Idx, #state{store=Store, id=Id, previous=Previous}) 
     ok.
 
 %% @doc Add an entry to the index.
-add_entry(Key, Metadata, Idx, #state{store=Store, id=Id}) ->
+add_entry(Key, Metadata, Idx, #state{id=Id}, Store) ->
     {ok, _} = ?CORE:update(Id, {add, {Key, Metadata}}, Idx, Store),
     ok.
 

@@ -70,7 +70,7 @@
 
 -ignore_xref([start_vnode/1]).
 
--record(program, {state}).
+-record(program, {module, file, bin, state}).
 
 -record(state, {node,
                 partition,
@@ -206,11 +206,12 @@ handle_command({repair, undefined, Id, Type, Value}, _From,
 handle_command({execute, {ReqId, _}, Module0}, _From,
                #state{reference=Reference,
                       node=Node,
+                      store=Store,
                       partition=Partition}=State) ->
     Module = generate_unique_module_identifier(Partition,
                                                Node,
                                                Module0),
-    case execute(Module, Reference) of
+    case module_execute(Module, Reference, Store) of
         {ok, Result} ->
             {reply, {ok, ReqId, Result}, State};
         {error, undefined} ->
@@ -220,11 +221,12 @@ handle_command({execute, {ReqId, _}, Module0}, _From,
 handle_command({process, {ReqId, _}, Module0, Object, Reason, Idx}, _From,
                #state{reference=Reference,
                       node=Node,
+                      store=Store,
                       partition=Partition}=State) ->
     Module = generate_unique_module_identifier(Partition,
                                                Node,
                                                Module0),
-    case process(Module, Object, Reason, Idx, Reference) of
+    case module_process(Module, Object, Reason, Idx, Reference, Store) of
         ok ->
             {reply, {ok, ReqId}, State};
         {error, undefined} ->
@@ -282,7 +284,12 @@ handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
                         case code:load_binary(Module, File, Bin) of
                             {module, Module} ->
                                 {ok, Value} = Module:init(Store),
-                                ok = dets:insert(Reference, [{Module, #program{state=Value}}]),
+                                ok = dets:insert(Reference,
+                                                 [{Module,
+                                                   #program{module=Module,
+                                                            file=File,
+                                                            bin=Bin,
+                                                            state=Value}}]),
                                 ok = update_broadcast({add, Module1}, Partition),
                                 {reply, {ok, ReqId}, State};
                             Reason ->
@@ -571,11 +578,12 @@ delete(State) ->
 handle_coverage(?EXECUTE_REQUEST{module=Module0}, _KeySpaces, _Sender,
                 #state{reference=Reference,
                        node=Node,
+                       store=Store,
                        partition=Partition}=State) ->
     Module = generate_unique_module_identifier(Partition,
                                                Node,
                                                Module0),
-    case execute(Module, Reference) of
+    case module_execute(Module, Reference, Store) of
         {ok, Result} ->
             {reply, {done, Result}, State};
         {error, undefined} ->
@@ -593,14 +601,14 @@ terminate(_Reason, _State) ->
 %% Internal program execution functions.
 
 %% @doc Execute a given program.
-execute(Module, Reference) ->
+module_execute(Module, Reference, Store) ->
     case dets:member(Reference, Module) of
         true ->
             {Module, #program{state=State}} = hd(dets:lookup(Reference, Module)),
             Self = self(),
             ReqId = lasp:mk_reqid(),
             spawn_link(fun() ->
-                        Result = Module:execute(State),
+                        Result = Module:execute(State, Store),
                         Self ! {ReqId, ok, Result}
                         end),
             {ok, Result} = lasp:wait_for_reqid(ReqId, infinity),
@@ -611,14 +619,14 @@ execute(Module, Reference) ->
     end.
 
 %% @doc Process a given program.
-process(Module, Object, Reason, Idx, Reference) ->
+module_process(Module, Object, Reason, Idx, Reference, Store) ->
     case dets:member(Reference, Module) of
         true ->
             {Module, #program{state=State0}=Program} = hd(dets:lookup(Reference, Module)),
             Self = self(),
             ReqId = lasp:mk_reqid(),
             spawn_link(fun() ->
-                        {ok, State} = Module:process(Object, Reason, Idx, State0),
+                        {ok, State} = Module:process(Object, Reason, Idx, State0, Store),
                         ok = dets:insert(Reference, [{Module, Program#program{state=State}}]),
                         Self ! {ReqId, ok}
                         end),

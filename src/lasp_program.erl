@@ -22,6 +22,8 @@
 
 -include("lasp.hrl").
 
+%% Mutations
+
 %% @doc Initialize the program.  Perform whatever initial configuration
 %%      is required.
 -callback init(store()) -> {ok, state()}.
@@ -29,10 +31,12 @@
 %% @doc Given a notification from the underlying system about an object
 %%      having been put, handed off, or deleted, notify all programs that
 %%      need to be notified.
--callback process(object(), reason(), actor(), state()) -> {ok, state()}.
+-callback process(object(), reason(), actor(), state(), store()) -> {ok, state()}.
 
 %% @doc Return the current result of a given program.
--callback execute(state()) -> {ok, output()}.
+-callback execute(state(), store()) -> {ok, output()}.
+
+%% Pure Functions
 
 %% @doc Return the actual observable value of a result.
 -callback value(output()) -> {ok, output()}.

@@ -24,13 +24,13 @@
 -behavior(lasp_program).
 
 -export([init/1,
-         process/4,
-         execute/1,
+         process/5,
+         execute/2,
          value/1,
          merge/1,
          sum/1]).
 
--record(state, {store, type, id, previous}).
+-record(state, {type, id, previous}).
 
 -define(CORE, lasp_core).
 -define(TYPE, riak_dt_gset).
@@ -38,15 +38,15 @@
 %% @doc Initialize an or-set as an accumulator.
 init(Store) ->
     {ok, Id} = ?CORE:declare(?TYPE, Store),
-    {ok, #state{store=Store, id=Id}}.
+    {ok, #state{id=Id}}.
 
 %% @doc Notification from the system of an event.
-process(Object, _Reason, Idx, #state{store=Store, id=Id}=State) ->
+process(Object, _Reason, Idx, #state{id=Id}=State, Store) ->
     {ok, _} = ?CORE:update(Id, {add, Object}, Idx, Store),
     {ok, State}.
 
 %% @doc Return the result.
-execute(#state{store=Store, id=Id, previous=Previous}) ->
+execute(#state{id=Id, previous=Previous}, Store) ->
     {ok, {_, _, Value}} = ?CORE:read(Id, Previous, Store),
     {ok, Value}.
 

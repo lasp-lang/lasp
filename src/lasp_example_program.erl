@@ -24,26 +24,26 @@
 -behavior(lasp_program).
 
 -export([init/1,
-         process/4,
-         execute/1,
+         process/5,
+         execute/2,
          value/1,
          merge/1,
          sum/1]).
 
--record(state, {store, id}).
+-record(state, {id}).
 
 -define(CORE, lasp_core).
 -define(TYPE, riak_dt_gset).
 
 init(Store) ->
     {ok, Id} = ?CORE:declare(?TYPE, Store),
-    {ok, #state{store=Store, id=Id}}.
+    {ok, #state{id=Id}}.
 
-process(Object, _Reason, Actor, #state{store=Store, id=Id}=State) ->
+process(Object, _Reason, Actor, #state{id=Id}=State, Store) ->
     {ok, _} = ?CORE:update(Id, {add, Object}, Actor, Store),
     {ok, State}.
 
-execute(#state{store=Store, id=Id}) ->
+execute(#state{id=Id}, Store) ->
     {ok, {_, _, Value}} = ?CORE:read(Id, undefined, Store),
     {ok, Value}.
 

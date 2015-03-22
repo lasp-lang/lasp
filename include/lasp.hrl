@@ -11,6 +11,9 @@
 %% LevelDB backend; persistence.
 -define(BACKEND, lasp_eleveldb_backend).
 
+%% Bitcask backend.
+% -define(BACKEND, lasp_bitcask_backend).
+
 %% Code which connects the backends to the actual backend
 %% implementation.
 -define(CORE, lasp_core).
@@ -58,7 +61,7 @@
 -type bound() :: true | false.
 -type supervisor() :: pid().
 -type stream() :: list(#dv{}).
--type store() :: ets:tid() | eleveldb:db_ref() | atom().
+-type store() :: ets:tid() | eleveldb:db_ref() | atom() | reference().
 -type threshold() :: value() | {strict, value()}.
 -type pending_threshold() :: {threshold, read | wait, pid(), type(), threshold()}.
 -type operation() :: {atom(), value()} | {atom(), value(), value()}.

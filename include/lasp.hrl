@@ -61,7 +61,7 @@
 -type store() :: ets:tid() | eleveldb:db_ref() | atom().
 -type threshold() :: value() | {strict, value()}.
 -type pending_threshold() :: {threshold, read | wait, pid(), type(), threshold()}.
--type operation() :: {atom(), value()}.
+-type operation() :: {atom(), value()} | {atom(), value(), value()}.
 -type operations() :: list(operation()).
 -type ivar() :: term().
 -type actor() :: term().

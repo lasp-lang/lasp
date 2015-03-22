@@ -624,14 +624,7 @@ module_execute(Module, Reference, Store) ->
     case dets:member(Reference, Module) of
         true ->
             {Module, #program{state=State}} = hd(dets:lookup(Reference, Module)),
-            Self = self(),
-            ReqId = lasp:mk_reqid(),
-            spawn_link(fun() ->
-                        Result = Module:execute(State, Store),
-                        Self ! {ReqId, ok, Result}
-                        end),
-            {ok, Result} = lasp:wait_for_reqid(ReqId, infinity),
-            Result;
+            Module:execute(State, Store);
         false ->
             lager:info("Failed to execute module: ~p", [Module]),
             {error, undefined}
@@ -642,14 +635,8 @@ module_process(Module, Object, Reason, Idx, Reference, Store) ->
     case dets:member(Reference, Module) of
         true ->
             {Module, #program{state=State0}=Program} = hd(dets:lookup(Reference, Module)),
-            Self = self(),
-            ReqId = lasp:mk_reqid(),
-            spawn_link(fun() ->
-                        {ok, State} = Module:process(Object, Reason, Idx, State0, Store),
-                        ok = dets:insert(Reference, [{Module, Program#program{state=State}}]),
-                        Self ! {ReqId, ok}
-                        end),
-            ok = lasp:wait_for_reqid(ReqId, infinity),
+            {ok, State} = Module:process(Object, Reason, Idx, State0, Store),
+            ok = dets:insert(Reference, [{Module, Program#program{state=State}}]),
             ok;
         false ->
             lager:info("Failed to execute module: ~p", [Module]),

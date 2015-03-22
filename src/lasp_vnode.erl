@@ -266,7 +266,6 @@ handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
             _ = Module0:module_info()
         catch
             _:_ ->
-                lager:info("Module ~p not loaded; loading!", [Module0]),
                 {ok, _, Bin0} = compile:file(File, [binary, {parse_transform, lager_transform}]),
                 {module, Module0} = code:load_binary(Module0, File, Bin0)
         end,
@@ -299,7 +298,6 @@ handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
             {reply, {ok, ReqId}, State}
         catch
             _:_ ->
-                lager:info("Module ~p not loaded; loading!", [Module]),
                 case compile:file(File, Options) of
                     {ok, _, Bin} ->
                         case code:load_binary(Module, File, Bin) of

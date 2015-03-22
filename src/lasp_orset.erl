@@ -55,7 +55,7 @@
 
 -type orset_op() :: {add, member()} | {remove, member()} |
                     {add_all, [member()]} | {remove_all, [member()]} |
-                    {update, [orset_op()]}.
+                    {update, [orset_op()]} | {add_by_token, term(), member()}.
 
 -type actor() :: riak_dt:actor().
 -type member() :: term().
@@ -98,6 +98,8 @@ value(_,ORSet) ->
 
 -spec update(orset_op(), actor(), orset()) -> {ok, orset()} |
                                               {error, {precondition ,{not_present, member()}}}.
+update({add_by_token,Token,Elem}, _Actor, ORDict) ->
+    add_elem(Elem,Token,ORDict);
 update({add,Elem}, Actor, ORDict) ->
     Token = unique(Actor),
     add_elem(Elem,Token,ORDict);

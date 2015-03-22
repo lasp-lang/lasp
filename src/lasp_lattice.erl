@@ -64,6 +64,9 @@ threshold_met(riak_dt_gset, Value, {strict, Threshold}) ->
 threshold_met(riak_dt_gset, Value, Threshold) ->
     is_inflation(riak_dt_gset, Threshold, Value);
 
+threshold_met(lasp_orset, Value, Threshold) ->
+    threshold_met(riak_dt_orset, Value, Threshold);
+
 threshold_met(riak_dt_orset, Value, {strict, Threshold}) ->
     is_strict_inflation(riak_dt_orset, Threshold, Value);
 threshold_met(riak_dt_orset, Value, Threshold) ->
@@ -134,6 +137,9 @@ is_lattice_inflation(riak_dt_gset, Previous, Current) ->
         sets:from_list(riak_dt_gset:value(Previous)),
         sets:from_list(riak_dt_gset:value(Current)));
 
+is_lattice_inflation(lasp_orset, Previous, Current) ->
+    is_lattice_inflation(riak_dt_orset, Previous, Current);
+
 is_lattice_inflation(riak_dt_orset, Previous, Current) ->
     lists:foldl(fun({Element, Ids}, Acc) ->
                         case lists:keyfind(Element, 1, Current) of
@@ -197,6 +203,9 @@ is_lattice_strict_inflation(riak_dt_gset, Previous, Current) ->
     is_lattice_inflation(riak_dt_gset, Previous, Current) andalso
         lists:usort(riak_dt_gset:value(Previous)) =/=
         lists:usort(riak_dt_gset:value(Current));
+
+is_lattice_strict_inflation(lasp_orset, Previous, Current) ->
+    is_lattice_strict_inflation(riak_dt_orset, Previous, Current);
 
 is_lattice_strict_inflation(riak_dt_orset, [], Current)
   when Current =/= []->
@@ -525,5 +534,46 @@ riak_dt_map_strict_inflation_test() ->
     %% A3 after A2.
     ?assertEqual(true, is_lattice_strict_inflation(riak_dt_map, A2, A3)).
 
+%% lasp_orset tests.
+
+lasp_orset_inflation_test() ->
+    A1 = lasp_orset:new(),
+    B1 = lasp_orset:new(),
+
+    {ok, A2} = lasp_orset:update({add, 1}, a, A1),
+    {ok, B2} = lasp_orset:update({add, 2}, b, B1),
+    {ok, A3} = lasp_orset:update({remove, 1}, a, A2),
+
+    %% A1 and B1 are equivalent.
+    ?assertEqual(true, is_lattice_inflation(lasp_orset, A1, B1)),
+
+    %% A2 after A1.
+    ?assertEqual(true, is_lattice_inflation(lasp_orset, A1, A2)),
+
+    %% Concurrent
+    ?assertEqual(false, is_lattice_inflation(lasp_orset, A2, B2)),
+
+    %% A3 after A2.
+    ?assertEqual(true, is_lattice_inflation(lasp_orset, A2, A3)).
+
+lasp_orset_strict_inflation_test() ->
+    A1 = lasp_orset:new(),
+    B1 = lasp_orset:new(),
+
+    {ok, A2} = lasp_orset:update({add, 1}, a, A1),
+    {ok, B2} = lasp_orset:update({add, 2}, b, B1),
+    {ok, A3} = lasp_orset:update({remove, 1}, a, A2),
+
+    %% A1 and B1 are equivalent.
+    ?assertEqual(false, is_lattice_strict_inflation(lasp_orset, A1, B1)),
+
+    %% A2 after A1.
+    ?assertEqual(true, is_lattice_strict_inflation(lasp_orset, A1, A2)),
+
+    %% Concurrent
+    ?assertEqual(false, is_lattice_strict_inflation(lasp_orset, A2, B2)),
+
+    %% A3 after A2.
+    ?assertEqual(true, is_lattice_strict_inflation(lasp_orset, A2, A3)).
 
 -endif.

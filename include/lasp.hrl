@@ -15,6 +15,9 @@
 %% implementation.
 -define(CORE, lasp_core).
 
+%% Default set implementation for Lasp internal state tracking.
+-define(SET, lasp_orset).
+
 -define(N, 3).
 -define(W, 2).
 -define(R, 2).
@@ -48,7 +51,7 @@
 -type id() :: binary().
 -type idx() :: term().
 -type result() :: term().
--type type() :: lasp_ivar | riak_dt_gset | riak_dt_orset | riak_dt_orswot | riak_dt_gcounter.
+-type type() :: lasp_ivar | lasp_orset | riak_dt_gset | riak_dt_orset | riak_dt_orswot | riak_dt_gcounter.
 -type value() :: term().
 -type func() :: atom().
 -type args() :: list().

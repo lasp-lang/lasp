@@ -34,13 +34,13 @@
 
 -define(APP,  lasp).
 -define(CORE, lasp_core).
--define(TYPE, riak_dt_orset).
+-define(SET,  lasp_orset).
 -define(VIEW, lasp_riak_index_program).
 
 %% @doc Initialize an or-set as an accumulator.
 init(Store) ->
     Id = list_to_binary(atom_to_list(?MODULE)),
-    {ok, Id} = ?CORE:declare(Id, ?TYPE, Store),
+    {ok, Id} = ?CORE:declare(Id, ?SET, Store),
     {ok, #state{id=Id}}.
 
 %% @doc Notification from the system of an event.
@@ -77,20 +77,20 @@ execute(#state{id=Id, previous=Previous}, Store) ->
 
 %% @doc Return the result from a merged response
 value(Merged) ->
-    {ok, lists:usort([K || {K, _} <- ?TYPE:value(Merged)])}.
+    {ok, lists:usort([K || {K, _} <- ?SET:value(Merged)])}.
 
 %% @doc Given a series of outputs, take each one and merge it.
 merge(Outputs) ->
-    Value = ?TYPE:new(),
-    Merged = lists:foldl(fun(X, Acc) -> ?TYPE:merge(X, Acc) end, Value, Outputs),
+    Value = ?SET:new(),
+    Merged = lists:foldl(fun(X, Acc) -> ?SET:merge(X, Acc) end, Value, Outputs),
     {ok, Merged}.
 
 %% @doc Computing a sum accorss nodes is the same as as performing the
 %%      merge of outputs between a replica, when dealing with the
 %%      set.  For a set, it's safe to just perform the merge.
 sum(Outputs) ->
-    Value = ?TYPE:new(),
-    Sum = lists:foldl(fun(X, Acc) -> ?TYPE:merge(X, Acc) end, Value, Outputs),
+    Value = ?SET:new(),
+    Sum = lists:foldl(fun(X, Acc) -> ?SET:merge(X, Acc) end, Value, Outputs),
     {ok, Sum}.
 
 %% Internal Functions

@@ -672,9 +672,9 @@ generate_unique_module_identifier(Partition, Node, Module) ->
 update_broadcast({add, Module}, Partition) ->
     Set0 = case riak_core_metadata:get(?PROGRAM_PREFIX, ?PROGRAM_KEY, []) of
         undefined ->
-            riak_dt_orset:new();
+            ?SET:new();
         X ->
             X
     end,
-    {ok, Set} = riak_dt_orset:update({add, Module}, Partition, Set0),
+    {ok, Set} = ?SET:update({add, Module}, Partition, Set0),
     riak_core_metadata:put(?PROGRAM_PREFIX, ?PROGRAM_KEY, Set, []).

@@ -45,14 +45,15 @@ init(Store) ->
 
 %% @doc Notification from the system of an event.
 process(Object, Reason, Idx, State, Store) ->
-    lager:info("Processing value for ~p", [?MODULE]),
+    lager:info("Processing value for ~p ~p", [?MODULE, Reason]),
     Key = riak_object:key(Object),
+    VClock = riak_object:vclock(Object),
     Metadata = riak_object:get_metadata(Object),
     IndexSpecs = extract_valid_specs(Object),
     case Reason of
         put ->
             ok = remove_entries_for_key(Key, Idx, State, Store),
-            ok = add_entry(Key, Metadata, Idx, State, Store),
+            ok = add_entry(Key, VClock, Metadata, Idx, State, Store),
             %% If this is the top-level index, create any required views
             %% off of this index.
             case ?MODULE of
@@ -109,8 +110,14 @@ remove_entries_for_key(Key, Idx, #state{id=Id, previous=Previous}, Store) ->
     ok.
 
 %% @doc Add an entry to the index.
-add_entry(Key, Metadata, Idx, #state{id=Id}, Store) ->
-    {ok, _} = ?CORE:update(Id, {add, {Key, Metadata}}, Idx, Store),
+%%
+%%      To ensure we can map between data types across replicas, we use
+%%      the hashed vclock derived from the coordinator as the unique
+%%      identifier in the index for the OR-Set.
+add_entry(Key, VClock, Metadata, Idx, #state{id=Id}, Store) ->
+    Hashed = crypto:hash(md5, term_to_binary(VClock)),
+    lager:info("Computing unique token from vclock: ~p", [Hashed]),
+    {ok, _} = ?CORE:update(Id, {add_by_token, Hashed, {Key, Metadata}}, Idx, Store),
     ok.
 
 %% @doc Extract index specifications from indexes; only select views

@@ -198,10 +198,8 @@ init([Partition]) ->
     %% Load all applications from stored binaries.
     {ok, Reference} = dets:open_file(Identifier, []),
     TraverseFun = fun({Module, #program{file=File, bin=Bin}}) ->
-            lager:info("Loading program: ~p", [Module]),
             case code:load_binary(Module, File, Bin) of
                 {module, Module} ->
-                    lager:info("Module loaded!"),
                     ok;
                 Error ->
                     lager:info("Error loading module; error: ~p!",
@@ -260,16 +258,6 @@ handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
                       store=Store,
                       reference=Reference}=State) ->
     try
-        %% Compile under original name, for the pure functions like
-        %% `sum' and `merge', but only if not already compiled.
-        try
-            _ = Module0:module_info()
-        catch
-            _:_ ->
-                {ok, _, Bin0} = compile:file(File, [binary, {parse_transform, lager_transform}]),
-                {module, Module0} = code:load_binary(Module0, File, Bin0)
-        end,
-
         %% Allow override module name from users trying to register
         %% programs.
         Module1 = case lists:keyfind(module, 1, Options0) of
@@ -277,6 +265,33 @@ handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
                 M;
             _ ->
                 Module0
+        end,
+
+        %% Compile under original name, for the pure functions like
+        %% `sum' and `merge', but only if not already compiled.
+        try
+            _ = Module1:module_info()
+        catch
+            _:_ ->
+                Opts = [binary,
+                        {parse_transform, lager_transform},
+                        {parse_transform, lasp_transform}] ++ Options0,
+                try
+                    {ok, _, Bin0} = compile:file(File, Opts),
+                    try
+                        {module, Module1} = code:load_binary(Module1,
+                                                             File,
+                                                             Bin0)
+                    catch
+                        _:LoadError ->
+                            lager:info("Failed to load binary; module: ~p, error: ~p",
+                                       [Module1, LoadError])
+                    end
+                catch
+                    _:CompileError ->
+                        lager:info("Failed to compile; module: ~p, error: ~p",
+                                   [Module1, CompileError])
+                end
         end,
 
         %% Compile under unique name for vnode.

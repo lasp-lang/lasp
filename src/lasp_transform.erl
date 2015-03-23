@@ -30,17 +30,33 @@
 
 %% @private
 parse_transform(AST, Options) ->
-    {store, Store} = lists:keyfind(store, 1, Options),
-    put(store, Store),
+    case lists:keyfind(store, 1, Options) of
+        {store, Store} ->
+            put(store, Store);
+        _ ->
+            ok
+    end,
 
-    {node, Node} = lists:keyfind(node, 1, Options),
-    put(node, Node),
+    case lists:keyfind(node, 1, Options) of
+        {node, Node} ->
+            put(node, Node);
+        _ ->
+            ok
+    end,
 
-    {partition, Partition} = lists:keyfind(partition, 1, Options),
-    put(partition, Partition),
+    case lists:keyfind(partition, 1, Options) of
+        {partition, Partition} ->
+            put(partition, Partition);
+        _ ->
+            ok
+    end,
 
-    {module, Module} = lists:keyfind(module, 1, Options),
-    put(module, Module),
+    case lists:keyfind(module, 1, Options) of
+        {module, Module} ->
+            put(module, Module);
+        _ ->
+            ok
+    end,
 
     case lists:keyfind(index_name, 1, Options) of
         {index_name, IndexName} ->

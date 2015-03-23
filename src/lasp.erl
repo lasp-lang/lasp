@@ -133,7 +133,6 @@ process(Object, Reason, Idx, Node) ->
             ok;
         Programs0 ->
             Programs = ?SET:value(Programs0),
-            lager:info("Executing for programs: ~p", [Programs]),
             _ = [process(Program, global, Object, Reason, Idx, Node) || Program <- Programs],
             ok
     end,

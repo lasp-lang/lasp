@@ -89,14 +89,29 @@ walk_body(Acc, [H|T]) ->
     walk_body([transform_statement(H)|Acc], T).
 
 %% @private
-% transform_statement({call, Line1,
-%                      {remote, Line2,
-%                       {atom, Line3, lasp}, {atom, Line4, Func}},
-%                      Arguments}) ->
-%     {call, Line1,
-%      {remote, Line2,
-%       {atom, Line3, ?CORE}, {atom, Line4, Func}},
-%      Arguments ++ [{atom, Line4, get(store)}]};
+%% @doc Parse transformations for lasp_riak_index_program: these
+%%      parse_transforms automatically generate 2i/index
+%%      "materialized views."
+transform_statement({match, Line,
+                     {var, Line, 'Id'},
+                     _}) ->
+    {match, Line,
+     {var, Line, 'Id'},
+     {atom, Line, get(module)}};
+transform_statement({match, Line,
+                     {var, Line, 'DefaultIndexName'},
+                     {atom, Line, undefined}}) ->
+    {match, Line,
+     {var, Line, 'DefaultIndexName'},
+     {string, Line, get(index_name)}};
+transform_statement({match, Line,
+                     {var, Line, 'DefaultIndexValue'},
+                     {atom, Line, undefined}}) ->
+    {match, Line,
+     {var, Line, 'DefaultIndexValue'},
+     {string, Line, get(index_value)}};
+
+%% @private
 transform_statement(Stmt) when is_tuple(Stmt) ->
     list_to_tuple(transform_statement(tuple_to_list(Stmt)));
 transform_statement(Stmt) when is_list(Stmt) ->

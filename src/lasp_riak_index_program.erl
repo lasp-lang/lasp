@@ -30,7 +30,11 @@
          merge/1,
          sum/1]).
 
--record(state, {type, id, previous}).
+-record(state, {type,
+                id,
+                previous,
+                index_name,
+                index_value}).
 
 -define(APP,  lasp).
 -define(CORE, lasp_core).
@@ -39,21 +43,54 @@
 
 %% @doc Initialize an or-set as an accumulator.
 init(Store) ->
-    Id = list_to_binary(atom_to_list(?MODULE)),
-    {ok, Id} = ?CORE:declare(Id, ?SET, Store),
-    {ok, #state{id=Id}}.
+    %% These three terms are re-written by a parse_transform.
+    Id = ?MODULE,
+    DefaultIndexName = undefined,
+    DefaultIndexValue = undefined,
+
+    %% Here, we initialize the variables.
+    NormalizedId = normalize_to_binary(Id),
+    {ok, NormalizedId} = ?CORE:declare(NormalizedId, ?SET, Store),
+
+    {ok, #state{id=NormalizedId,
+                index_name=normalize_to_binary(DefaultIndexName),
+                index_value=normalize_to_binary(DefaultIndexValue)}}.
 
 %% @doc Notification from the system of an event.
-process(Object, Reason, Idx, State, Store) ->
-    lager:info("Processing value for ~p ~p", [?MODULE, Reason]),
+process(Object, Reason, Idx,
+        #state{index_name=IndexName, index_value=IndexValue}=State, Store) ->
     Key = riak_object:key(Object),
     VClock = riak_object:vclock(Object),
     Metadata = riak_object:get_metadata(Object),
     IndexSpecs = extract_valid_specs(Object),
     case Reason of
         put ->
+            %% Remove any existing entries for a given key.
             ok = remove_entries_for_key(Key, Idx, State, Store),
-            ok = add_entry(Key, VClock, Metadata, Idx, State, Store),
+
+            %% Different behavior for total index vs. subset index.
+            case IndexName of
+                undefined ->
+                    %% Indexes all values; add.
+                    ok = add_entry(Key, VClock, Metadata, Idx, State, Store);
+                IndexName ->
+                    %% If the index appears in the objects index
+                    %% specifications, then we add to index if it
+                    %% matches by value.
+                    case lists:keyfind(IndexName, 2, IndexSpecs) of
+                        {add, IndexName, IndexValue} ->
+                            %% Object has index with correct value.
+                            ok = add_entry(Key, VClock, Metadata, Idx, State, Store),
+                            ok;
+                        {add, IndexName, _} ->
+                            %% Object has index, but non matching value.
+                            ok;
+                        false ->
+                            %% Object doesn't require indexing.
+                            ok
+                    end
+            end,
+
             %% If this is the top-level index, create any required views
             %% off of this index.
             case ?MODULE of
@@ -62,6 +99,7 @@ process(Object, Reason, Idx, State, Store) ->
                 _ ->
                     ok
             end,
+
             ok;
         delete ->
             ok = remove_entries_for_key(Key, Idx, State, Store),
@@ -116,7 +154,6 @@ remove_entries_for_key(Key, Idx, #state{id=Id, previous=Previous}, Store) ->
 %%      identifier in the index for the OR-Set.
 add_entry(Key, VClock, Metadata, Idx, #state{id=Id}, Store) ->
     Hashed = crypto:hash(md5, term_to_binary(VClock)),
-    lager:info("Computing unique token from vclock: ~p", [Hashed]),
     {ok, _} = ?CORE:update(Id, {add_by_token, Hashed, {Key, Metadata}}, Idx, Store),
     ok.
 
@@ -142,7 +179,15 @@ create_views(Views) ->
                                         code:lib_dir(?APP, src) ++ "/" ++ atom_to_list(?VIEW) ++ ".erl",
                                         global,
                                         [{module, Module},
-                                         {index_name, Name},
-                                         {index_value, Value}])
+                                         {index_name, binary_to_list(Name)},
+                                         {index_value, binary_to_list(Value)}])
                     end)
         end, Views).
+
+%% @doc Normalize a parse_transform'd value into a binary.
+normalize_to_binary(undefined) ->
+    undefined;
+normalize_to_binary(X) when is_atom(X) ->
+    list_to_binary(atom_to_list(X));
+normalize_to_binary(X) when is_list(X) ->
+    list_to_binary(X).

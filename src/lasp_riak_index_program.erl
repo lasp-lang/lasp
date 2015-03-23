@@ -188,6 +188,6 @@ create_views(Views) ->
 normalize_to_binary(undefined) ->
     undefined;
 normalize_to_binary(X) when is_atom(X) ->
-    list_to_binary(atom_to_list(X));
+    atom_to_binary(X, latin1);
 normalize_to_binary(X) when is_list(X) ->
     list_to_binary(X).

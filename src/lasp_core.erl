@@ -64,7 +64,7 @@
 -type lasp_dict() :: dict:dict().
 -else.
 -type lasp_dict() :: dict().
--endif
+-endif.
 
 %% Exported helper functions.
 -export([notify/3]).

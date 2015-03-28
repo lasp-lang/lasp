@@ -48,7 +48,10 @@
 
 -type variable() :: #dv{}.
 
+-ifndef(namespaced_types).
 -type module() :: atom().
+-endif.
+
 -type file() :: iolist().
 -type registration() :: preflist | global.
 -type id() :: binary().

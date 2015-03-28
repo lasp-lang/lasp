@@ -59,6 +59,13 @@
          intersection/7,
          fold/6]).
 
+%% Erlang 17.
+-ifdef(namespaced_types).
+-type lasp_dict() :: dict:dict().
+-else.
+-type lasp_dict() :: dict().
+-endif
+
 %% Exported helper functions.
 -export([notify/3]).
 
@@ -848,7 +855,7 @@ reply_to_all([], StillWaiting, _Result) ->
 
 %% Internal functions.
 
--spec notify(store(), [{id(), function()}] | dict(), function()) -> ok.
+-spec notify(store(), [{id(), function()}] | lasp_dict(), function()) -> ok.
 notify(Variables, Reads, Function) when is_list(Reads) ->
     Scope = dict:from_list([{Id, #read{id=Id, read_fun=Fun}}
                             || {Id, Fun} <- Reads]),

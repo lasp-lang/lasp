@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% riak_dt_orset: A convergent, replicated, state based observe remove set
+%% lasp_orset: A convergent, replicated, state based observe remove set
 %%
 %% Copyright (c) 2007-2012 Basho Technologies, Inc.  All Rights Reserved.
 %%

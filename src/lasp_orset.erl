@@ -67,7 +67,7 @@ new() ->
 -spec value(orset()) -> [member()].
 value(ORDict0) ->
     ORDict1 = orddict:filter(fun(_Elem, Tokens) ->
-            ValidTokens = [Token || {Token, false} <- orddict:to_list(Tokens)],
+            ValidTokens = [Token || {Token, false} <- gb_trees:to_list(Tokens)],
             length(ValidTokens) > 0
         end, ORDict0),
     orddict:fetch_keys(ORDict1).
@@ -83,13 +83,13 @@ value({fragment, Elem}, ORSet) ->
 value({tokens, Elem}, ORSet) ->
     case orddict:find(Elem, ORSet) of
         error ->
-            orddict:new();
+            gb_trees:empty();
         {ok, Tokens} ->
             Tokens
     end;
 value(removed, ORDict0) ->
     ORDict1 = orddict:filter(fun(_Elem, Tokens) ->
-                                     ValidTokens = [Token || {Token, true} <- orddict:to_list(Tokens)],
+                                     ValidTokens = [Token || {Token, true} <- gb_trees:to_list(Tokens)],
                                      length(ValidTokens) > 0
                              end, ORDict0),
     orddict:fetch_keys(ORDict1);
@@ -128,9 +128,8 @@ parent_clock(_Clock, ORSet) ->
 -spec merge(orset(), orset()) -> orset().
 merge(ORDictA, ORDictB) ->
     orddict:merge(fun(_Elem,TokensA,TokensB) ->
-            orddict:merge(fun(_Token,BoolA,BoolB) ->
-                    BoolA or BoolB
-                end, TokensA, TokensB)
+                MergeFun = fun(A, B) -> A or B end,
+                gb_trees_ext:merge(TokensA, TokensB, MergeFun)
         end, ORDictA, ORDictB).
 
 -spec equal(orset(), orset()) -> boolean().
@@ -222,19 +221,29 @@ to_version(_Version, Set) ->
 add_elem(Elem,Token,ORDict) ->
     case orddict:find(Elem, ORDict) of
         {ok, Tokens} ->
-            Tokens1 = orddict:store(Token, false, Tokens),
+            Tokens1 = gb_trees:insert(Token, false, Tokens),
+            io:format("after add_elem: gb_tree is now: ~p~n", [Tokens1]),
             {ok, orddict:store(Elem, Tokens1, ORDict)};
         error ->
-            Tokens = orddict:store(Token, false, orddict:new()),
+            Tokens = gb_trees:insert(Token, false, gb_trees:empty()),
+            io:format("after add_elem: gb_tree is now: ~p~n", [Tokens]),
             {ok, orddict:store(Elem, Tokens, ORDict)}
     end.
+
+remove_observed({Key, _Value, Iter}, Tree0) ->
+    Tree = gb_trees:enter(Key, true, Tree0),
+    Next = gb_trees:next(Iter),
+    io:format("after remove_observed: gb_tree is now: ~p~n", [Tree]),
+    remove_observed(Next, Tree);
+remove_observed(none, Tree) ->
+    Tree.
 
 remove_elem(Elem, ORDict) ->
     case orddict:find(Elem, ORDict) of
         {ok, Tokens} ->
-            Tokens1 = orddict:fold(fun(Token, _, Tokens0) ->
-                                           orddict:store(Token, true, Tokens0)
-                                   end, orddict:new(), Tokens),
+            Iter = gb_trees:iterator(Tokens),
+            First = gb_trees:next(Iter),
+            Tokens1 = remove_observed(First, gb_trees:empty()),
             {ok, orddict:store(Elem, Tokens1, ORDict)};
         error ->
             {error, {precondition, {not_present, Elem}}}

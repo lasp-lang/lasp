@@ -1,13 +1,12 @@
-Distributed deterministic dataflow programming (with CRDTs!)
+Lasp: A Language for Distributed, Eventually Consistent Computations with CRDTs
 =======================================================
-
-[![Join the chat at https://gitter.im/cmeiklejohn/lasp](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/cmeiklejohn/lasp?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 Curious about what we're building?  Try out these posts:
 
 * [Programming Models, Part 1: Try Derflow!](http://christophermeiklejohn.com/derflow/erlang/2014/09/28/try-derflow.html)
 * [Programming Models, Part 2: QuickChecking Derflow](http://christophermeiklejohn.com/derflow/erlang/2014/10/01/quickchecking-derflow.html)
 * [Programming Models, Part 3: Ad Counter, Part 1](http://christophermeiklejohn.com/derflow/erlang/2014/11/16/ad-counter-derflow.html)
+* [Programming Models, Part 4: One Week in Louvain-la-Neuve](http://christophermeiklejohn.com/erlang/lasp/2014/12/21/lasp.html)
 
 To build:
 

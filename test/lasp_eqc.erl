@@ -18,10 +18,10 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @doc EQC test for the Lasp ETS backend.
+%% @doc EQC test for the Lasp backend.
 %%
 
--module(lasp_ets_eqc).
+-module(lasp_eqc).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -include("lasp.hrl").

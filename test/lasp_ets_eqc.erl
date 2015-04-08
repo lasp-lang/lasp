@@ -57,7 +57,7 @@ initial_state() ->
 %% Declaring new variables.
 
 declare(Type) ->
-    {ok, Id} = lasp_ets:declare(Type, ?ETS),
+    {ok, Id} = ?CORE:declare(Type, ?ETS),
     Id.
 
 declare_args(_S) ->
@@ -73,7 +73,7 @@ declare_next(#state{store=Store0}=S, Res, [Type]) ->
 %% Bind variables.
 
 bind(Id, Value) ->
-    lasp_ets:bind(Id, Value, ?ETS).
+    ?CORE:bind(Id, Value, ?ETS).
 
 bind_pre(S) ->
     has_variables(S).
@@ -140,7 +140,7 @@ bind_ok(#state{store=Store0}, [Id, NewValue]) ->
 %% Read variables.
 
 read(Id, Threshold) ->
-    lasp_ets:read(Id, Threshold, ?ETS).
+    ?CORE:read(Id, Threshold, ?ETS).
 
 read_pre(S) ->
     has_variables(S).

@@ -5,6 +5,8 @@
 
 -define(BUCKET, <<"lasp">>).
 
+-ifndef(EQC).
+
 %% Erlang term storage based backend; no persistence.
 % -define(BACKEND, lasp_ets_backend).
 
@@ -13,6 +15,12 @@
 
 %% Bitcask backend.
 % -define(BACKEND, lasp_bitcask_backend).
+
+-else.
+
+-define(BACKEND, lasp_ets_backend).
+
+-endif.
 
 %% Code which connects the backends to the actual backend
 %% implementation.

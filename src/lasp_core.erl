@@ -59,6 +59,15 @@
          intersection/7,
          fold/6]).
 
+%% Definitions for the bind/read fun abstraction.
+-define(BIND, fun(_AccId, AccValue, _Variables) ->
+                ?MODULE:bind(_AccId, AccValue, _Variables)
+              end).
+
+-define(READ, fun(_Id, _Threshold, _Variables) ->
+                ?MODULE:read(_Id, _Threshold, _Variables)
+              end).
+
 %% Erlang 17.
 -ifdef(namespaced_types).
 -type lasp_dict() :: dict:dict().
@@ -87,13 +96,7 @@ start(Identifier) ->
 %%
 -spec filter(id(), function(), id(), store()) -> ok.
 filter(Id, Function, AccId, Store) ->
-    BindFun = fun(_AccId, AccValue, _Variables) ->
-            ?MODULE:bind(_AccId, AccValue, _Variables)
-    end,
-    ReadFun = fun(_Id, _Threshold, _Variables) ->
-            ?MODULE:read(_Id, _Threshold, _Variables)
-    end,
-    filter(Id, Function, AccId, Store, BindFun, ReadFun).
+    filter(Id, Function, AccId, Store, ?BIND, ?READ).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -103,13 +106,7 @@ filter(Id, Function, AccId, Store) ->
 %%
 -spec fold(id(), function(), id(), store()) -> ok.
 fold(Id, Function, AccId, Store) ->
-    BindFun = fun(_AccId, AccValue, _Variables) ->
-            ?MODULE:bind(_AccId, AccValue, _Variables)
-    end,
-    ReadFun = fun(_Id, _Threshold, _Variables) ->
-            ?MODULE:read(_Id, _Threshold, _Variables)
-    end,
-    fold(Id, Function, AccId, Store, BindFun, ReadFun).
+    fold(Id, Function, AccId, Store, ?BIND, ?READ).
 
 %% @doc Map values from one lattice into another.
 %%
@@ -119,13 +116,7 @@ fold(Id, Function, AccId, Store) ->
 %%
 -spec map(id(), function(), id(), store()) -> ok.
 map(Id, Function, AccId, Store) ->
-    BindFun = fun(_AccId, AccValue, _Variables) ->
-            ?MODULE:bind(_AccId, AccValue, _Variables)
-    end,
-    ReadFun = fun(_Id, _Threshold, _Variables) ->
-            ?MODULE:read(_Id, _Threshold, _Variables)
-    end,
-    map(Id, Function, AccId, Store, BindFun, ReadFun).
+    map(Id, Function, AccId, Store, ?BIND, ?READ).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -134,16 +125,13 @@ map(Id, Function, AccId, Store) ->
 %%
 -spec intersection(id(), id(), id(), store()) -> ok.
 intersection(Left, Right, Intersection, Store) ->
-    BindFun = fun(_AccId, AccValue, _Variables) ->
-            ?MODULE:bind(_AccId, AccValue, _Variables)
-    end,
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
             ?MODULE:read(_Left, _Threshold, _Variables)
     end,
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read(_Right, _Threshold, _Variables)
     end,
-    intersection(Left, Right, Intersection, Store, BindFun, ReadLeftFun, ReadRightFun).
+    intersection(Left, Right, Intersection, Store, ?BIND, ReadLeftFun, ReadRightFun).
 
 %% @doc Compute the union of two sets.
 %%
@@ -152,16 +140,13 @@ intersection(Left, Right, Intersection, Store) ->
 %%
 -spec union(id(), id(), id(), store()) -> ok.
 union(Left, Right, Union, Store) ->
-    BindFun = fun(_AccId, AccValue, _Variables) ->
-            ?MODULE:bind(_AccId, AccValue, _Variables)
-    end,
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
             ?MODULE:read(_Left, _Threshold, _Variables)
     end,
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read(_Right, _Threshold, _Variables)
     end,
-    union(Left, Right, Union, Store, BindFun, ReadLeftFun, ReadRightFun).
+    union(Left, Right, Union, Store, ?BIND, ReadLeftFun, ReadRightFun).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -170,16 +155,13 @@ union(Left, Right, Union, Store) ->
 %%
 -spec product(id(), id(), id(), store()) -> ok.
 product(Left, Right, Product, Store) ->
-    BindFun = fun(_AccId, AccValue, _Variables) ->
-            ?MODULE:bind(_AccId, AccValue, _Variables)
-    end,
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
             ?MODULE:read(_Left, _Threshold, _Variables)
     end,
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read(_Right, _Threshold, _Variables)
     end,
-    product(Left, Right, Product, Store, BindFun, ReadLeftFun,
+    product(Left, Right, Product, Store, ?BIND, ReadLeftFun,
             ReadRightFun).
 
 %% @doc Perform a read for a particular identifier.
@@ -254,10 +236,7 @@ declare(Id, Type, Store) ->
 %%
 -spec bind_to(id(), id(), store()) -> ok.
 bind_to(Id, TheirId, Store) ->
-    BindFun = fun(_AccId, _AccValue, _Variables) ->
-            ?MODULE:bind(_AccId, _AccValue, _Variables)
-    end,
-    bind_to(Id, TheirId, Store, BindFun).
+    bind_to(Id, TheirId, Store, ?BIND).
 
 %% @doc Spawn a function.
 %%

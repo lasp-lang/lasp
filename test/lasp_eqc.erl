@@ -62,6 +62,7 @@ declare(Type) ->
 
 declare_args(_S) ->
     [elements([lasp_ivar,
+               lasp_orset,
                riak_dt_gset,
                riak_dt_orset])].
 
@@ -204,6 +205,18 @@ threshold(Variable, Store) ->
                         _ ->
                             {strict, undefined}
                     end;
+                lasp_orset ->
+                    %% @TODO: should toggle the boolean flag on some
+                    %% elements, if possible.
+                    %%
+                    Length = length(Value0),
+                    case Length of
+                        0 ->
+                            [];
+                        _ ->
+                            Random = random:uniform(Length),
+                            lists:sublist(Value0, Random, Length)
+                    end;
                 riak_dt_gset ->
                     Value = Type:value(Value0),
                     Length = length(Value),
@@ -231,9 +244,36 @@ threshold(Variable, Store) ->
 
 %% Predicates.
 
-has_variables(#state{store=Store}) ->
+num_variables(#state{store=Store}) ->
     Variables = dict:fetch_keys(Store),
-    length(Variables) > 0.
+    length(Variables).
+
+has_variables(S) ->
+    num_variables(S) > 0.
+
+is_set(#variable{type=Type}) ->
+    case Type of
+        lasp_orset ->
+            true;
+        riak_dt_orset ->
+            true;
+        _ ->
+            false
+    end.
+
+set_variables(#state{store=Store}) ->
+    dict:fold(fun(Key, Variable, Acc) ->
+                case is_set(Variable) of
+                    true ->
+                        Acc ++ [Key];
+                    _ ->
+                        Acc
+                end
+        end, [], Store).
+
+has_two_set_variables(S) ->
+    Sets = set_variables(S),
+    length(Sets) > 1.
 
 ok({ok, _}) ->
     true;

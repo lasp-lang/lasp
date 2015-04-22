@@ -66,9 +66,14 @@ new() ->
 
 -spec value(orset()) -> [member()].
 value(ORSet) ->
-    Iter = gb_trees:iterator(ORSet),
-    Next = gb_trees:next(Iter),
-    value(Next, [], ORSet).
+    gb_trees_ext:fold(fun(Elem, Tokens, Acc0) ->
+                case length(valid_tokens(Tokens)) > 0 of
+                    true ->
+                        Acc0 ++ [Elem];
+                    false ->
+                        Acc0
+                end
+        end, [], ORSet).
 
 -spec value(any(), orset()) -> [member()] | orddict:orddict().
 value({fragment, Elem}, ORSet) ->
@@ -85,26 +90,17 @@ value({tokens, Elem}, ORSet) ->
         false ->
             orddict:new()
     end;
-% value(removed, ORDict0) ->
-%     ORDict1 = orddict:filter(fun(_Elem, Tokens) ->
-%                                      ValidTokens = [Token || {Token, true} <- orddict:to_list(Tokens)],
-%                                      length(ValidTokens) > 0
-%                              end, ORDict0),
-%     orddict:fetch_keys(ORDict1);
+value(removed, ORSet) ->
+    gb_trees_ext:fold(fun(Elem, Tokens, Acc0) ->
+                case length(removed_tokens(Tokens)) > 0 of
+                    true ->
+                        Acc0 ++ [Elem];
+                    false ->
+                        Acc0
+                end
+        end, [], ORSet);
 value(_,ORSet) ->
     value(ORSet).
-
-value(none, Acc0, _ORSet) ->
-    Acc0;
-value({Key, Value, Iter}, Acc0, ORSet) ->
-    Acc = case length(valid_tokens(Value)) > 0 of
-        true ->
-            Acc0 ++ [Key];
-        false ->
-            Acc0
-    end,
-    Next = gb_trees:next(Iter),
-    value(Next, Acc, ORSet).
 
 -spec update(orset_op(), actor(), orset()) ->
     {ok, orset()} | {error, {precondition, {not_present, member()}}}.
@@ -136,16 +132,17 @@ parent_clock(_Clock, ORSet) ->
     ORSet.
 
 % -spec merge(orset(), orset()) -> orset().
-% merge(ORDictA, ORDictB) ->
-%     orddict:merge(fun(_Elem,TokensA,TokensB) ->
-%             orddict:merge(fun(_Token,BoolA,BoolB) ->
-%                     BoolA or BoolB
-%                 end, TokensA, TokensB)
-%         end, ORDictA, ORDictB).
+merge(ORSet1, ORSet2) ->
+    MergeFun = fun(TokensA, TokensB) ->
+            orddict:merge(fun(_Token, BoolA, BoolB) ->
+                BoolA or BoolB
+            end, TokensA, TokensB)
+    end,
+    gb_trees_ext:merge(ORSet1, ORSet2, MergeFun).
 
-% -spec equal(orset(), orset()) -> boolean().
-% equal(ORDictA, ORDictB) ->
-%     ORDictA == ORDictB. % Everything inside is ordered, so this should work
+-spec equal(orset(), orset()) -> boolean().
+equal(ORDictA, ORDictB) ->
+    gb_trees_ext:equal(ORDictA, ORDictB).
 
 %% @doc the precondition context is a fragment of the CRDT that
 %% operations with pre-conditions can be applied too.  In the case of
@@ -154,78 +151,82 @@ parent_clock(_Clock, ORSet) ->
 %% Especially useful for hybrid op/state systems where the context of
 %% an operation is needed at a replica without sending the entire
 %% state to the client.
-% -spec precondition_context(orset()) -> orset().
-% precondition_context(ORDict) ->
-%     orddict:fold(fun(Elem, Tokens, ORDict1) ->
-%             case minimum_tokens(Tokens) of
-%                 []      -> ORDict1;
-%                 Tokens1 -> orddict:store(Elem, Tokens1, ORDict1)
-%             end
-%         end, orddict:new(), ORDict).
+-spec precondition_context(orset()) -> orset().
+precondition_context(ORSet) ->
+    gb_trees_ext:fold(fun(Elem, Tokens, ORSet1) ->
+            case minimum_tokens(Tokens) of
+                [] ->
+                        ORSet1;
+                Tokens1 ->
+                        gb_trees:enter(Elem, Tokens1, ORSet1)
+            end
+        end, gb_trees:empty(), ORSet).
 
-% -spec stats(orset()) -> [{atom(), number()}].
-% stats(ORSet) ->
-%     [ {S, stat(S, ORSet)} || S <- [element_count,
-%                                    adds_count,
-%                                    removes_count,
-%                                    waste_pct] ].
+-spec stats(orset()) -> [{atom(), number()}].
+stats(ORSet) ->
+    [ {S, stat(S, ORSet)} || S <- [element_count,
+                                   adds_count,
+                                   removes_count,
+                                   waste_pct] ].
 
-% -spec stat(atom(), orset()) -> number() | undefined.
-% stat(element_count, ORSet) ->
-%     orddict:size(ORSet);
-% stat(adds_count, ORSet) ->
-%     orddict:fold(fun(_K, Tags, Acc0) ->
-%                          lists:foldl(fun({_Tag, false}, Acc) -> Acc + 1;
-%                                         (_, Acc) -> Acc end,
-%                                      Acc0, Tags)
-%                  end, 0, ORSet);
-% stat(removes_count, ORSet) ->
-%     orddict:fold(fun(_K, Tags, Acc0) ->
-%                          lists:foldl(fun({_Tag, true}, Acc) -> Acc + 1;
-%                                         (_, Acc) -> Acc end,
-%                                      Acc0, Tags)
-%                  end, 0, ORSet);
-% stat(waste_pct, ORSet) ->
-%     {Tags, Tombs} = orddict:fold(
-%                       fun(_K, Tags, Acc0) ->
-%                               lists:foldl(fun({_Tag, false}, {As, Rs}) ->
-%                                                   {As + 1, Rs};
-%                                              ({_Tag, true}, {As, Rs}) ->
-%                                                   {As, Rs + 1}
-%                                           end, Acc0, Tags)
-%                       end, {0,0}, ORSet),
-%     AllTags = Tags + Tombs,
-%     case Tags of
-%         0 -> 0;
-%         _ ->  round(Tombs / AllTags * 100)
-%     end;
-% stat(_, _) -> undefined.
+-spec stat(atom(), orset()) -> number() | undefined.
+stat(element_count, ORSet) ->
+    gb_trees:size(ORSet);
+stat(adds_count, ORSet) ->
+    gb_trees_ext:fold(fun(_, Tags, Acc0) ->
+                         lists:foldl(fun({_Tag, false}, Acc) -> Acc + 1;
+                                        (_, Acc) -> Acc end,
+                                     Acc0, Tags)
+                 end, 0, ORSet);
+stat(removes_count, ORSet) ->
+    gb_trees_ext:fold(fun(_, Tags, Acc0) ->
+                         lists:foldl(fun({_Tag, true}, Acc) -> Acc + 1;
+                                        (_, Acc) -> Acc end,
+                                     Acc0, Tags)
+                 end, 0, ORSet);
+stat(waste_pct, ORSet) ->
+    {Tags, Tombs} = gb_trees_ext:fold(
+                      fun(_K, Tags, Acc0) ->
+                              lists:foldl(fun({_Tag, false}, {As, Rs}) ->
+                                                  {As + 1, Rs};
+                                             ({_Tag, true}, {As, Rs}) ->
+                                                  {As, Rs + 1}
+                                          end, Acc0, Tags)
+                      end, {0,0}, ORSet),
+    AllTags = Tags + Tombs,
+    case Tags of
+        0 -> 0;
+        _ ->  round(Tombs / AllTags * 100)
+    end;
+stat(_, _) -> undefined.
 
-% -include_lib("riak_dt/include/riak_dt_tags.hrl").
-% -define(TAG, ?DT_ORSET_TAG).
-% -define(V1_VERS, 1).
+-include_lib("riak_dt/include/riak_dt_tags.hrl").
+-define(TAG, ?DT_ORSET_TAG).
+-define(V1_VERS, 1).
 
-% -spec to_binary(orset()) -> binary_orset().
-% to_binary(ORSet) ->
-%     <<?TAG:8/integer, ?V1_VERS:8/integer, (riak_dt:to_binary(ORSet))/binary>>.
+-spec to_binary(orset()) -> binary_orset().
+to_binary(ORSet) ->
+    <<?TAG:8/integer, ?V1_VERS:8/integer, (riak_dt:to_binary(ORSet))/binary>>.
 
-% -spec to_binary(Vers :: pos_integer(), orset()) -> {ok, binary_orset()} | ?UNSUPPORTED_VERSION.
-% to_binary(1, Set) ->
-%     {ok, to_binary(Set)};
-% to_binary(Vers, _Set) ->
-%     ?UNSUPPORTED_VERSION(Vers).
+-spec to_binary(Vers :: pos_integer(), orset()) ->
+    {ok, binary_orset()} | ?UNSUPPORTED_VERSION.
+to_binary(1, Set) ->
+    {ok, to_binary(Set)};
+to_binary(Vers, _Set) ->
+    ?UNSUPPORTED_VERSION(Vers).
 
-% -spec from_binary(binary_orset()) -> {ok, orset()} | ?UNSUPPORTED_VERSION | ?INVALID_BINARY.
-% from_binary(<<?TAG:8/integer, ?V1_VERS:8/integer, Bin/binary>>) ->
-%     riak_dt:from_binary(Bin);
-% from_binary(<<?TAG:8/integer, Vers:8/integer, _Bin/binary>>) ->
-%     ?UNSUPPORTED_VERSION(Vers);
-% from_binary(_B) ->
-%     ?INVALID_BINARY.
+-spec from_binary(binary_orset()) ->
+    {ok, orset()} | ?UNSUPPORTED_VERSION | ?INVALID_BINARY.
+from_binary(<<?TAG:8/integer, ?V1_VERS:8/integer, Bin/binary>>) ->
+    riak_dt:from_binary(Bin);
+from_binary(<<?TAG:8/integer, Vers:8/integer, _Bin/binary>>) ->
+    ?UNSUPPORTED_VERSION(Vers);
+from_binary(_B) ->
+    ?INVALID_BINARY.
 
-% -spec to_version(pos_integer(), orset()) -> orset().
-% to_version(_Version, Set) ->
-%     Set.
+-spec to_version(pos_integer(), orset()) -> orset().
+to_version(_Version, Set) ->
+    Set.
 
 
 %% Private
@@ -234,7 +235,7 @@ add_elem(Elem, Token, ORSet) ->
         true ->
             Tokens = gb_trees:get(Elem, ORSet),
             Tokens1 = orddict:store(Token, false, Tokens),
-            {ok, orddict:store(Elem, Tokens1, ORSet)};
+            {ok, gb_trees:enter(Elem, Tokens1, ORSet)};
         false ->
             Tokens = orddict:store(Token, false, orddict:new()),
             {ok, gb_trees:enter(Elem, Tokens, ORSet)}
@@ -247,7 +248,7 @@ remove_elem(Elem, ORSet) ->
             Tokens1 = orddict:fold(fun(Token, _, Tokens0) ->
                                            orddict:store(Token, true, Tokens0)
                                    end, orddict:new(), Tokens),
-            {ok, orddict:store(Elem, Tokens1, ORSet)};
+            {ok, gb_trees:enter(Elem, Tokens1, ORSet)};
         false ->
             {error, {precondition, {not_present, Elem}}}
     end.
@@ -284,6 +285,9 @@ minimum_tokens(Tokens) ->
 
 valid_tokens(Tokens) ->
     [Token || {Token, false} <- orddict:to_list(Tokens)].
+
+removed_tokens(Tokens) ->
+    [Token || {Token, true} <- orddict:to_list(Tokens)].
 
 %% ===================================================================
 %% EUnit tests

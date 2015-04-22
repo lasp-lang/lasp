@@ -49,7 +49,7 @@
 -endif.
 
 -export_type([orset/0, binary_orset/0, orset_op/0]).
--opaque orset() :: gb_trees:tree().
+-opaque orset() :: gb_tree().
 
 -type binary_orset() :: binary(). %% A binary that from_binary/1 will operate on.
 

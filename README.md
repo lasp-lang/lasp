@@ -8,6 +8,10 @@ Curious about what we're building?  Try out these posts:
 * [Programming Models, Part 3: Ad Counter, Part 1](http://christophermeiklejohn.com/derflow/erlang/2014/11/16/ad-counter-derflow.html)
 * [Programming Models, Part 4: One Week in Louvain-la-Neuve](http://christophermeiklejohn.com/erlang/lasp/2014/12/21/lasp.html)
 
+We also have a workshop paper:
+
+* [Lasp: a language for distributed, eventually consistent computations with CRDTs](http://dl.acm.org/citation.cfm?id=2745954)
+
 To build:
 
 * `make devrel`: Build six development releases.

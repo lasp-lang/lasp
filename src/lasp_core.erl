@@ -49,6 +49,7 @@
 %% Exported functions for vnode integration, where callback behavior is
 %% dynamic.
 -export([bind_to/4,
+         bind_to/5,
          wait_needed/6,
          read/6,
          write/4,
@@ -236,7 +237,7 @@ declare(Id, Type, Store) ->
 %%
 -spec bind_to(id(), id(), store()) -> ok.
 bind_to(Id, TheirId, Store) ->
-    bind_to(Id, TheirId, Store, ?BIND).
+    bind_to(Id, TheirId, Store, ?BIND, ?READ).
 
 %% @doc Spawn a function.
 %%
@@ -447,6 +448,9 @@ read_any(Reads, Self, Store) ->
 %%
 -spec bind_to(id(), id(), store(), function()) -> ok.
 bind_to(AccId, Id, Store, BindFun) ->
+    bind_to(AccId, Id, Store, BindFun, ?READ).
+
+bind_to(AccId, Id, Store, BindFun, ReadFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
         #read{value=Value} = dict:fetch(Id, Scope),
@@ -454,7 +458,7 @@ bind_to(AccId, Id, Store, BindFun) ->
         %% Bind new value back.
         {ok, _} = BindFun(AccId, Value, Store)
     end,
-    notify(Store, [{Id, fun() -> 1 end}], Fun).
+    notify(Store, [{Id, ReadFun}], Fun).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -842,21 +846,42 @@ notify(Variables, Reads, Function) when is_list(Reads) ->
     ok;
 
 notify(Variables, Scope0, Function) ->
-    %% Perform a read against all variables in the dict.
-    Reads = [{Id, {strict, Value}} ||
-             {Id, #read{value=Value}} <- dict:to_list(Scope0)],
+    Self = self(),
 
-    %% Wait for one of the variables to be modified.
-    {ok, {Id, Type, Value}} = lasp:read_any(Reads),
+    %% For every variable that has to be read, spawn a process to
+    %% perform the read and have it forward the response back to the
+    %% notifier, which is waiting for the first change to trigger
+    %% re-evaluation.
+    %%
+    lists:foreach(fun({Id, #read{read_fun=ReadFun, value=Value}}) ->
+        spawn_link(fun() ->
+                    {ok, Result} = ReadFun(Id, {strict, Value}, Variables),
+                    Self ! {ok, Result}
+                   end)
+        end, dict:to_list(Scope0)),
 
-    %% Store updated value in the dict.
-    ReadRecord = dict:fetch(Id, Scope0),
-    Scope = dict:store(Id, ReadRecord#read{value=Value, type=Type}, Scope0),
+    %% Wait for the first variable to change; once it changes, update
+    %% the dict and trigger the process which was waiting for
+    %% notification which causes re-evaluation.
+    %%
+    receive
+        {ok, {Id, Type, Value}} = Message ->
+            lager:info("Received message: ~p~n", [Message]),
 
-    %% Apply function with updated scope.
-    Function(Scope),
+            %% Store updated value in the dict.
+            ReadRecord = dict:fetch(Id, Scope0),
+            Scope = dict:store(Id,
+                               ReadRecord#read{value=Value, type=Type}, 
+                               Scope0),
 
-    notify(Variables, Scope, Function).
+            %% Apply function with updated scope.
+            Function(Scope),
+
+            notify(Variables, Scope, Function);
+        Error ->
+            lager:info("Received error: ~p~n", [Error]),
+            notify(Variables, Scope0, Function)
+    end.
 
 %% @doc Send responses to waiting threads, via messages.
 %%

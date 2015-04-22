@@ -82,7 +82,7 @@
 
 -define(READ, fun(_Id, _Threshold, _Store) ->
                   %% Beware of cycles in the gen_server calls!
-                  [{IndexNode, _Type}] = ?APP:preflist(?N, _Id, lasp),
+                  [{IndexNode, _Type}|_] = ?APP:preflist(?N, _Id, lasp),
 
                   case IndexNode of
                       {Partition, Node} ->
@@ -373,8 +373,8 @@ handle_command({declare, {ReqId, _}, Id, Type}, _From,
     {reply, {ok, ReqId, Id}, State};
 
 handle_command({bind_to, {ReqId, _}, Id, DVId}, _From,
-               State=#state{store=Store}) ->
-    ok = ?CORE:bind_to(Id, DVId, Store, ?BIND),
+               State=#state{partition=Partition, node=Node, store=Store}) ->
+    ok = ?CORE:bind_to(Id, DVId, Store, ?BIND, ?READ),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({bind, {ReqId, _}, Id, Value}, _From,

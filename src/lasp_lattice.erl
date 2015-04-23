@@ -151,7 +151,7 @@ is_lattice_inflation(lasp_orset_gbtree, Previous, Current) ->
                             none ->
                                 Acc andalso false;
                             {value, Ids1} ->
-                                Acc andalso ids_inflated(Ids, Ids1)
+                                Acc andalso ids_inflated(lasp_orset_gbtree, Ids, Ids1)
                         end
                 end, true, Previous);
 
@@ -162,7 +162,7 @@ is_lattice_inflation(riak_dt_orset, Previous, Current) ->
                             false ->
                                 Acc andalso false;
                             {_, Ids1} ->
-                                Acc andalso ids_inflated(Ids, Ids1)
+                                Acc andalso ids_inflated(riak_dt_orset, Ids, Ids1)
                         end
                 end, true, Previous);
 
@@ -283,12 +283,25 @@ is_lattice_strict_inflation(riak_dt_gcounter, Previous, Current) ->
     %% Massive shortcut here -- get the value and see if it's different.
     riak_dt_gcounter:value(Previous) < riak_dt_gcounter:value(Current).
 
-ids_inflated(Previous, Current) ->
+ids_inflated(riak_dt_orset, Previous, Current) ->
+    ids_inflated(lasp_orset, Previous, Current);
+
+ids_inflated(lasp_orset, Previous, Current) ->
     lists:foldl(fun({Id, _}, Acc) ->
                         case lists:keyfind(Id, 1, Current) of
                             false ->
                                 Acc andalso false;
                             _ ->
+                                Acc andalso true
+                        end
+                end, true, Previous);
+
+ids_inflated(lasp_orset_gbtree, Previous, Current) ->
+    gb_trees_ext:fold(fun(Id, _, Acc) ->
+                        case gb_trees:lookup(Id, Current) of
+                            none ->
+                                Acc andalso false;
+                            {value, _} ->
                                 Acc andalso true
                         end
                 end, true, Previous).

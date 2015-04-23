@@ -75,20 +75,20 @@ value(ORSet) ->
                 end
         end, [], ORSet).
 
--spec value(any(), orset()) -> [member()] | orddict:orddict().
+-spec value(any(), orset()) -> [member()] | gb_tree().
 value({fragment, Elem}, ORSet) ->
     case value({tokens, Elem}, ORSet) of
         [] ->
-            orddict:new();
+            gb_trees:empty();
         Tokens ->
-            orddict:store(Elem, Tokens, orddict:new())
+            gb_trees:enter(Elem, Tokens, gb_trees:empty())
     end;
 value({tokens, Elem}, ORSet) ->
     case gb_trees:is_defined(Elem, ORSet) of
         true ->
             gb_trees:get(Elem, ORSet);
         false ->
-            orddict:new()
+            gb_trees:empty()
     end;
 value(removed, ORSet) ->
     gb_trees_ext:fold(fun(Elem, Tokens, Acc0) ->
@@ -131,12 +131,11 @@ update(Op, Actor, ORSet, _Ctx) ->
 parent_clock(_Clock, ORSet) ->
     ORSet.
 
-% -spec merge(orset(), orset()) -> orset().
+-spec merge(orset(), orset()) -> orset().
 merge(ORSet1, ORSet2) ->
     MergeFun = fun(TokensA, TokensB) ->
-            orddict:merge(fun(_Token, BoolA, BoolB) ->
-                BoolA or BoolB
-            end, TokensA, TokensB)
+            TokenMergeFun = fun(A, B) -> A or B end,
+            gb_trees_ext:merge(TokensA, TokensB, TokenMergeFun)
     end,
     gb_trees_ext:merge(ORSet1, ORSet2, MergeFun).
 
@@ -174,23 +173,23 @@ stat(element_count, ORSet) ->
     gb_trees:size(ORSet);
 stat(adds_count, ORSet) ->
     gb_trees_ext:fold(fun(_, Tags, Acc0) ->
-                         lists:foldl(fun({_Tag, false}, Acc) -> Acc + 1;
-                                        (_, Acc) -> Acc end,
+                         gb_trees_ext:fold(fun(_Tag, false, Acc) -> Acc + 1;
+                                              (_, _, Acc) -> Acc end,
                                      Acc0, Tags)
                  end, 0, ORSet);
 stat(removes_count, ORSet) ->
     gb_trees_ext:fold(fun(_, Tags, Acc0) ->
-                         lists:foldl(fun({_Tag, true}, Acc) -> Acc + 1;
-                                        (_, Acc) -> Acc end,
+                         gb_trees_ext:fold(fun(_Tag, true, Acc) -> Acc + 1;
+                                              (_, _, Acc) -> Acc end,
                                      Acc0, Tags)
                  end, 0, ORSet);
 stat(waste_pct, ORSet) ->
     {Tags, Tombs} = gb_trees_ext:fold(
                       fun(_K, Tags, Acc0) ->
-                              lists:foldl(fun({_Tag, false}, {As, Rs}) ->
-                                                  {As + 1, Rs};
-                                             ({_Tag, true}, {As, Rs}) ->
-                                                  {As, Rs + 1}
+                              gb_trees_ext:fold(fun(_Tag, false, {As, Rs}) ->
+                                                        {As + 1, Rs};
+                                                   (_Tag, true, {As, Rs}) ->
+                                                        {As, Rs + 1}
                                           end, Acc0, Tags)
                       end, {0,0}, ORSet),
     AllTags = Tags + Tombs,
@@ -234,10 +233,10 @@ add_elem(Elem, Token, ORSet) ->
     case gb_trees:is_defined(Elem, ORSet) of
         true ->
             Tokens = gb_trees:get(Elem, ORSet),
-            Tokens1 = orddict:store(Token, false, Tokens),
+            Tokens1 = gb_trees:insert(Token, false, Tokens),
             {ok, gb_trees:enter(Elem, Tokens1, ORSet)};
         false ->
-            Tokens = orddict:store(Token, false, orddict:new()),
+            Tokens = gb_trees:insert(Token, false, gb_trees:empty()),
             {ok, gb_trees:enter(Elem, Tokens, ORSet)}
     end.
 
@@ -245,9 +244,9 @@ remove_elem(Elem, ORSet) ->
     case gb_trees:is_defined(Elem, ORSet) of
         true ->
             Tokens = gb_trees:get(Elem, ORSet),
-            Tokens1 = orddict:fold(fun(Token, _, Tokens0) ->
-                                           orddict:store(Token, true, Tokens0)
-                                   end, orddict:new(), Tokens),
+            Tokens1 = gb_trees_ext:fold(fun(Key, _Value, Acc0) ->
+                        gb_trees:enter(Key, true, Acc0)
+                end, gb_trees:empty(), Tokens),
             {ok, gb_trees:enter(Elem, Tokens1, ORSet)};
         false ->
             {error, {precondition, {not_present, Elem}}}
@@ -279,15 +278,20 @@ unique(_Actor) ->
     crypto:strong_rand_bytes(20).
 
 minimum_tokens(Tokens) ->
-    orddict:filter(fun(_Token, Removed) ->
-            not Removed
-        end, Tokens).
+    gb_trees_ext:fold(fun(Key, Removed, Acc) ->
+                case Removed of
+                    true ->
+                        Acc;
+                    false ->
+                        Acc ++ [{Key, Removed}]
+                end
+        end, [], Tokens).
 
 valid_tokens(Tokens) ->
-    [Token || {Token, false} <- orddict:to_list(Tokens)].
+    [Token || {Token, false} <- gb_trees:to_list(Tokens)].
 
 removed_tokens(Tokens) ->
-    [Token || {Token, true} <- orddict:to_list(Tokens)].
+    [Token || {Token, true} <- gb_trees:to_list(Tokens)].
 
 %% ===================================================================
 %% EUnit tests

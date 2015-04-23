@@ -38,7 +38,7 @@
 
 -define(APP,  lasp).
 -define(CORE, lasp_core).
--define(SET,  lasp_orset).
+-define(SET,  lasp_orset_gbtree).
 -define(VIEW, lasp_riak_index_program).
 
 %% @doc Initialize an or-set as an accumulator.

@@ -105,6 +105,7 @@ process(Object, Reason, Idx,
             ok = remove_entries_for_key(Key, Idx, State, Store),
             ok;
         handoff ->
+            %% TODO
             ok
     end,
     {ok, State}.

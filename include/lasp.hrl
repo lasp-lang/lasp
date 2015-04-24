@@ -65,7 +65,7 @@
 -type id() :: binary().
 -type idx() :: term().
 -type result() :: term().
--type type() :: lasp_ivar | lasp_orset | riak_dt_gset | riak_dt_orset | riak_dt_orswot | riak_dt_gcounter.
+-type type() :: lasp_ivar | lasp_orset | lasp_orset_gbtree | riak_dt_gset | riak_dt_orset | riak_dt_orswot | riak_dt_gcounter.
 -type value() :: term().
 -type func() :: atom().
 -type args() :: list().

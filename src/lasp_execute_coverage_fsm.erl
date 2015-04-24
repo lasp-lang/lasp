@@ -55,12 +55,10 @@ init(From={_, _, _}, [Timeout, NVal, Module]) ->
 
 process_results({error, Reason}, _State) ->
     {error, Reason};
-process_results({From, {Key, Value}=Element}, #state{result=Result0}=State) ->
-    lager:info("Received from: ~p element: ~p", [From, Element]),
+process_results({_From, {Key, Value}}, #state{result=Result0}=State) ->
     Result = gb_trees:enter(Key, Value, Result0),
     {ok, State#state{result=Result}};
 process_results(done, State) ->
-    lager:info("Received done", []),
     {done, State};
 process_results(Message, State) ->
     lager:info("Unhandled result: ~p", [Message]),

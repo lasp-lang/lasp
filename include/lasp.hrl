@@ -27,7 +27,7 @@
 -define(CORE, lasp_core).
 
 %% Default set implementation for Lasp internal state tracking.
--define(SET, lasp_orset).
+-define(SET, lasp_orset_gbtree).
 
 -define(N, 3).
 -define(W, 2).

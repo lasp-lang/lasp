@@ -252,7 +252,7 @@ handle_command({execute, {ReqId, _}, Module0}, _From,
                                                Node,
                                                Module0),
     case module_execute(Module, Reference, Store) of
-        {ok, Result} ->
+        {value, Result} ->
             {reply, {ok, ReqId, Result}, State};
         {error, undefined} ->
             {reply, {error, ReqId}, State}
@@ -486,7 +486,9 @@ handle_coverage(?EXECUTE_REQUEST{module=Module0}, _KeySpaces, Sender,
                                                Node,
                                                Module0),
     case module_execute(Module, Reference, Store) of
-        {ok, Result} ->
+        {value, Result} ->
+            {reply, {done, Result}, State};
+        {stream, Result} ->
             VisitFun = fun(Key, Value) ->
                     riak_core_vnode:reply(Sender,
                                           {self(), {Key, Value}})

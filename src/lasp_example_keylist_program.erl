@@ -26,9 +26,7 @@
 -export([init/1,
          process/5,
          execute/2,
-         value/1,
-         merge/1,
-         sum/1]).
+         type/0]).
 
 -record(state, {type, id, previous}).
 
@@ -48,22 +46,9 @@ process(Object, _Reason, Idx, #state{id=Id}=State, Store) ->
 %% @doc Return the result.
 execute(#state{id=Id, previous=Previous}, Store) ->
     {ok, {_, _, Value}} = ?CORE:read(Id, Previous, Store),
-    {ok, Value}.
+    {value, Value}.
 
-%% @doc Return the result from a merged response
-value(Merged) ->
-    {ok, ?TYPE:value(Merged)}.
-
-%% @doc Given a series of outputs, take each one and merge it.
-merge(Outputs) ->
-    Value = ?TYPE:new(),
-    Merged = lists:foldl(fun(X, Acc) -> ?TYPE:merge(X, Acc) end, Value, Outputs),
-    {ok, Merged}.
-
-%% @doc Computing a sum accorss nodes is the same as as performing the
-%%      merge of outputs between a replica, when dealing with the
-%%      set.
-sum(Outputs) ->
-    Value = ?TYPE:new(),
-    Sum = lists:foldl(fun(X, Acc) -> X ++ Acc end, Value, Outputs),
-    {ok, Sum}.
+%% @doc Return type information about what type of CRDT this program
+%%      returns.
+type() ->
+    ?TYPE.

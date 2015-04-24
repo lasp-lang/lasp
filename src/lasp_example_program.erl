@@ -26,36 +26,31 @@
 -export([init/1,
          process/5,
          execute/2,
-         value/1,
-         merge/1,
-         sum/1]).
+         type/0]).
 
 -record(state, {id}).
 
 -define(CORE, lasp_core).
--define(TYPE, riak_dt_gset).
+-define(TYPE, lasp_orset_gbtree).
 
+%% @doc Initialize an or-set as an accumulator.
 init(Store) ->
     {ok, Id} = ?CORE:declare(?TYPE, Store),
     {ok, #state{id=Id}}.
 
+%% @doc Notification from the system of an event.
 process(Object, _Reason, Actor, #state{id=Id}=State, Store) ->
     {ok, _} = ?CORE:update(Id, {add, Object}, Actor, Store),
     {ok, State}.
 
+%% @doc Return the result.
 execute(#state{id=Id}, Store) ->
+    lager:info("Execute called."),
     {ok, {_, _, Value}} = ?CORE:read(Id, undefined, Store),
-    {ok, Value}.
+    lager:info("Execute finished."),
+    {value, Value}.
 
-value(Merged) ->
-    {ok, ?TYPE:value(Merged)}.
-
-merge(Outputs) ->
-    Value = ?TYPE:new(),
-    Merged = lists:foldl(fun(X, Acc) -> ?TYPE:merge(X, Acc) end, Value, Outputs),
-    {ok, Merged}.
-
-sum(Outputs) ->
-    Value = ?TYPE:new(),
-    Sum = lists:foldl(fun(X, Acc) -> X ++ Acc end, Value, Outputs),
-    {ok, Sum}.
+%% @doc Return type information about what type of CRDT this program
+%%      returns.
+type() ->
+    ?TYPE.

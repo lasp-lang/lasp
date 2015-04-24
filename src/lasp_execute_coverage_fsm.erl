@@ -32,7 +32,7 @@
          process_results/2,
          finish/2]).
 
--record(state, {from, module, result}).
+-record(state, {from, type, module, result}).
 
 %% ===================================================================
 %% API functions
@@ -49,12 +49,17 @@ execute(Module, NVal) ->
 
 init(From={_, _, _}, [Timeout, NVal, Module]) ->
     Req = ?EXECUTE_REQUEST{module=Module},
-    Result = gb_trees:empty(),
+    Type = Module:type(),
+    Result = Type:new(),
     {Req, all, NVal, 1, lasp, lasp_vnode_master, Timeout,
-     #state{from=From, module=Module, result=Result}}.
+     #state{from=From, type=Type, module=Module, result=Result}}.
 
 process_results({error, Reason}, _State) ->
     {error, Reason};
+process_results({done, Response},
+                #state{type=Type, result=Result0}=State) ->
+    Result = Type:merge(Response, Result0),
+    {done, State#state{result=Result}};
 process_results({_From, {Key, Value}}, #state{result=Result0}=State) ->
     Result = gb_trees:enter(Key, Value, Result0),
     {ok, State#state{result=Result}};
@@ -71,9 +76,9 @@ finish({error, Reason}=Error,
     {stop, normal, StateData};
 finish(clean,
        StateData=#state{from={raw, ReqId, ClientPid},
-                        module=Module,
+                        type=Type,
                         result=Result}) ->
-    {ok, Value} = Module:value(Result),
+    Value = Type:value(Result),
     ClientPid ! {ReqId, ok, Value},
     {stop, normal, StateData};
 finish(Message, StateData) ->

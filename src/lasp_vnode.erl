@@ -477,7 +477,7 @@ is_empty(State) ->
 delete(State) ->
     {ok, State}.
 
-handle_coverage(?EXECUTE_REQUEST{module=Module0}, _KeySpaces, _Sender,
+handle_coverage(?EXECUTE_REQUEST{module=Module0}, _KeySpaces, Sender,
                 #state{reference=Reference,
                        node=Node,
                        store=Store,
@@ -487,7 +487,15 @@ handle_coverage(?EXECUTE_REQUEST{module=Module0}, _KeySpaces, _Sender,
                                                Module0),
     case module_execute(Module, Reference, Store) of
         {ok, Result} ->
-            {reply, {done, Result}, State};
+            VisitFun = fun(Key, Value) ->
+                    riak_core_vnode:reply(Sender,
+                                          {self(), {Key, Value}})
+            end,
+            FinishFun = fun() ->
+                    riak_core_vnode:reply(Sender, done)
+            end,
+            gb_trees_ext:iterate(VisitFun, FinishFun, Result),
+            {noreply, State};
         {error, undefined} ->
             {reply, {error, undefined}, State}
     end;

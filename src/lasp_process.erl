@@ -78,9 +78,7 @@ process(Variables, Scope0, Function) ->
     %% notification which causes re-evaluation.
     %%
     receive
-        {ok, {Id, Type, Value}} = Message ->
-            lager:info("Received message: ~p~n", [Message]),
-
+        {ok, {Id, Type, Value}} ->
             %% Store updated value in the dict.
             ReadRecord = dict:fetch(Id, Scope0),
             Scope = dict:store(Id,

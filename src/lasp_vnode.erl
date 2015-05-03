@@ -491,7 +491,7 @@ handle_coverage(?EXECUTE_REQUEST{module=Module0}, _KeySpaces, Sender,
         {stream, Result} ->
             VisitFun = fun(Key, Value) ->
                     riak_core_vnode:reply(Sender,
-                                          {self(), {Key, Value}})
+                                          {stream, self(), {Key, Value}})
             end,
             FinishFun = fun() ->
                     riak_core_vnode:reply(Sender, done)

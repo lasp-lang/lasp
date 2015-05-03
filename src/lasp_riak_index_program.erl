@@ -26,6 +26,7 @@
 -export([init/1,
          process/5,
          execute/2,
+         value/1,
          type/0]).
 
 -record(state, {type,
@@ -112,6 +113,10 @@ process(Object, Reason, Idx,
 execute(#state{id=Id, previous=Previous}, Store) ->
     {ok, {_, _, Value}} = ?CORE:read(Id, Previous, Store),
     {stream, Value}.
+
+%% @doc Don't return the metadata for values, just the key.
+value(Values) ->
+    [Key || {Key, _Metadata} <- Values].
 
 %% @doc Return type information about what type of CRDT this program
 %%      returns.

@@ -40,3 +40,7 @@
 
 %% @doc Return the type of the CRDT returned by the application.
 -callback type() -> type().
+
+%% @doc Given a value to be returned to the user when executing,
+%%      possibly filter some component of it.
+-callback value(output()) -> output().

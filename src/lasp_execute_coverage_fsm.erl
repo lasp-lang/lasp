@@ -60,7 +60,8 @@ process_results({done, Response},
                 #state{type=Type, result=Result0}=State) ->
     Result = Type:merge(Response, Result0),
     {done, State#state{result=Result}};
-process_results({_From, {Key, Value}}, #state{result=Result0}=State) ->
+process_results({stream, _From, {Key, Value}},
+                #state{result=Result0}=State) ->
     Result = gb_trees:enter(Key, Value, Result0),
     {ok, State#state{result=Result}};
 process_results(done, State) ->
@@ -77,9 +78,19 @@ finish({error, Reason}=Error,
 finish(clean,
        StateData=#state{from={raw, ReqId, ClientPid},
                         type=Type,
+                        module=Module,
                         result=Result}) ->
-    Value = Type:value(Result),
+    %% First, compute the value from the CRDT.
+    Value0 = Type:value(Result),
+    lager:info("Computed value is: ~p", [Value0]),
+
+    %% Then, call the applications value function that will filter the
+    %% response.
+    Value = Module:value(Value0),
+
+    %% Finally, send the response to the client.
     ClientPid ! {ReqId, ok, Value},
+
     {stop, normal, StateData};
 finish(Message, StateData) ->
     lager:info("Unhandled finish: ~p", [Message]),

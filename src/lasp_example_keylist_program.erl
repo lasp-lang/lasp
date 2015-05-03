@@ -26,6 +26,7 @@
 -export([init/1,
          process/5,
          execute/2,
+         value/1,
          type/0]).
 
 -record(state, {type, id, previous}).
@@ -47,6 +48,10 @@ process(Object, _Reason, Idx, #state{id=Id}=State, Store) ->
 execute(#state{id=Id, previous=Previous}, Store) ->
     {ok, {_, _, Value}} = ?CORE:read(Id, Previous, Store),
     {value, Value}.
+
+%% @doc Pass the value through without filtering.
+value(X) ->
+    X.
 
 %% @doc Return type information about what type of CRDT this program
 %%      returns.

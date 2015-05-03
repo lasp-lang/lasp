@@ -26,6 +26,7 @@
 -export([init/1,
          process/5,
          execute/2,
+         value/1,
          type/0]).
 
 -record(state, {id}).
@@ -49,6 +50,10 @@ execute(#state{id=Id}, Store) ->
     {ok, {_, _, Value}} = ?CORE:read(Id, undefined, Store),
     lager:info("Execute finished."),
     {value, Value}.
+
+%% @doc Pass the value through directly.
+value(X) ->
+    X.
 
 %% @doc Return type information about what type of CRDT this program
 %%      returns.

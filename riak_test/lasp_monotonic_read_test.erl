@@ -53,7 +53,7 @@ confirm() ->
 
 test() ->
     %% Create new set-based CRDT.
-    {ok, GSetId} = lasp:declare(riak_dt_gset),
+    {ok, GSetId} = lasp:declare(lasp_gset),
 
     %% Determine my pid.
     Me = self(),

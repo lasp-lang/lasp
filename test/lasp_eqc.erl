@@ -62,9 +62,7 @@ declare(Type) ->
 
 declare_args(_S) ->
     [elements([lasp_ivar,
-               lasp_orset,
-               riak_dt_gset,
-               riak_dt_orset])].
+               lasp_orset])].
 
 declare_next(#state{store=Store0}=S, Res, [Type]) ->
     Store = dict:store(Res,
@@ -216,28 +214,6 @@ threshold(Variable, Store) ->
                         _ ->
                             Random = random:uniform(Length),
                             lists:sublist(Value0, Random, Length)
-                    end;
-                riak_dt_gset ->
-                    Value = Type:value(Value0),
-                    Length = length(Value),
-                    case Length of
-                        0 ->
-                            [];
-                        _ ->
-                            Random = random:uniform(Length),
-                            lists:sublist(Value, Random, Length)
-                    end;
-                riak_dt_orset ->
-                    %% @TODO: should toggle the boolean flag on some
-                    %% elements, if possible.
-                    %%
-                    Length = length(Value0),
-                    case Length of
-                        0 ->
-                            [];
-                        _ ->
-                            Random = random:uniform(Length),
-                            lists:sublist(Value0, Random, Length)
                     end
             end
     end.
@@ -254,8 +230,6 @@ has_variables(S) ->
 is_set(#variable{type=Type}) ->
     case Type of
         lasp_orset ->
-            true;
-        riak_dt_orset ->
             true;
         _ ->
             false

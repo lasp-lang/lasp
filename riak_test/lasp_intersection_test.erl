@@ -48,7 +48,7 @@ confirm() ->
                  rpc:call(Node, ?MODULE, test, [lasp_gset])),
 
     ?assertEqual({ok, [3,a]},
-                 rpc:call(Node, ?MODULE, test, [riak_dt_orset])),
+                 rpc:call(Node, ?MODULE, test, [lasp_orset])),
 
     lager:info("Done!"),
 

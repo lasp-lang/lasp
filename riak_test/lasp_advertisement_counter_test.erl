@@ -54,7 +54,7 @@ confirm() ->
 
 -endif.
 
--define(SET, riak_dt_orset).
+-define(SET, lasp_orset).
 
 -define(COUNTER, riak_dt_gcounter).
 
@@ -172,7 +172,7 @@ test() ->
 
     %% Get the current advertisement list.
     {ok, {_, _, AdList0}} = lasp:read(AdsWithContracts),
-    AdList = riak_dt_orset:value(AdList0),
+    AdList = lasp_orset:value(AdList0),
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
@@ -213,7 +213,7 @@ client(Id, AdsWithContracts, PreviousValue) ->
         view_ad ->
             %% Get current ad list.
             {ok, {_, _, AdList0}} = lasp:read(AdsWithContracts, PreviousValue),
-            AdList = riak_dt_orset:value(AdList0),
+            AdList = lasp_orset:value(AdList0),
 
             case length(AdList) of
                 0 ->

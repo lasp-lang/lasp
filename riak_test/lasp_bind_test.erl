@@ -56,7 +56,7 @@ confirm() ->
 test() ->
     test_ivars(),
     test_lattice(lasp_gset),
-    test_lattice(riak_dt_orset),
+    test_lattice(lasp_orset),
     ok.
 
 %% @doc Test single-assignment variables.

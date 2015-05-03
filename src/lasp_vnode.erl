@@ -374,7 +374,7 @@ handle_command({declare, {ReqId, _}, Id, Type}, _From,
 
 handle_command({bind_to, {ReqId, _}, Id, DVId}, _From,
                State=#state{partition=Partition, node=Node, store=Store}) ->
-    ok = ?CORE:bind_to(Id, DVId, Store, ?BIND, ?READ),
+    {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?BIND, ?READ),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({bind, {ReqId, _}, Id, Value}, _From,
@@ -410,42 +410,42 @@ handle_command({filter, {ReqId, _}, Id, Function, AccId}, _From,
                State=#state{store=Store,
                             partition=Partition,
                             node=Node}) ->
-    ok = ?CORE:filter(Id, Function, AccId, Store, ?BIND, ?READ),
+    {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({product, {ReqId, _}, Left, Right, Product}, _From,
                State=#state{store=Store,
                             partition=Partition,
                             node=Node}) ->
-    ok = ?CORE:product(Left, Right, Product, Store, ?BIND, ?READ, ?READ),
+    {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?BIND, ?READ, ?READ),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({intersection, {ReqId, _}, Left, Right, Intersection}, _From,
                State=#state{store=Store,
                             partition=Partition,
                             node=Node}) ->
-    ok = ?CORE:intersection(Left, Right, Intersection, Store, ?BIND, ?READ, ?READ),
+    {ok, _Pid} = ?CORE:intersection(Left, Right, Intersection, Store, ?BIND, ?READ, ?READ),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({union, {ReqId, _}, Left, Right, Union}, _From,
                State=#state{store=Store,
                             partition=Partition,
                             node=Node}) ->
-    ok = ?CORE:union(Left, Right, Union, Store, ?BIND, ?READ, ?READ),
+    {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?BIND, ?READ, ?READ),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({map, {ReqId, _}, Id, Function, AccId}, _From,
                State=#state{store=Store,
                             partition=Partition,
                             node=Node}) ->
-    ok = ?CORE:map(Id, Function, AccId, Store, ?BIND, ?READ),
+    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command({fold, {ReqId, _}, Id, Function, AccId}, _From,
                State=#state{store=Store,
                             partition=Partition,
                             node=Node}) ->
-    ok = ?CORE:fold(Id, Function, AccId, Store, ?BIND, ?READ),
+    {ok, _Pid} = ?CORE:fold(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, {ok, ReqId, ok}, State};
 
 handle_command(_Message, _Sender, State) ->

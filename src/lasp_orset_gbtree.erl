@@ -230,25 +230,24 @@ to_version(_Version, Set) ->
 
 %% Private
 add_elem(Elem, Token, ORSet) ->
-    case gb_trees:is_defined(Elem, ORSet) of
-        true ->
-            Tokens = gb_trees:get(Elem, ORSet),
+    case gb_trees:lookup(Elem, ORSet) of
+        {value, Tokens} ->
             Tokens1 = gb_trees:insert(Token, false, Tokens),
             {ok, gb_trees:enter(Elem, Tokens1, ORSet)};
-        false ->
+        none ->
             Tokens = gb_trees:insert(Token, false, gb_trees:empty()),
             {ok, gb_trees:enter(Elem, Tokens, ORSet)}
     end.
 
 remove_elem(Elem, ORSet) ->
-    case gb_trees:is_defined(Elem, ORSet) of
-        true ->
+    case gb_trees:lookup(Elem, ORSet) of
+        {value, Tokens} ->
             Tokens = gb_trees:get(Elem, ORSet),
             Tokens1 = gb_trees_ext:fold(fun(Key, _Value, Acc0) ->
                         gb_trees:enter(Key, true, Acc0)
                 end, gb_trees:empty(), Tokens),
             {ok, gb_trees:enter(Elem, Tokens1, ORSet)};
-        false ->
+        none ->
             {error, {precondition, {not_present, Elem}}}
     end.
 

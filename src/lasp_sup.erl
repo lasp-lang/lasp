@@ -112,6 +112,10 @@ init(_Args) ->
                   {lasp_process_fsm_sup, start_link, []},
                    permanent, infinity, supervisor, [lasp_process_fsm_sup]},
 
+    Process = {lasp_process_sup,
+               {lasp_process_sup, start_link, []},
+                permanent, infinity, supervisor, [lasp_process_sup]},
+
     ExecuteCoverageFSM = {lasp_execute_coverage_fsm_sup,
                           {lasp_execute_coverage_fsm_sup, start_link, []},
                            permanent, infinity, supervisor, [lasp_execute_coverage_fsm_sup]},
@@ -133,5 +137,6 @@ init(_Args) ->
                                  RegisterFSM,
                                  RegisterGlobalFSM,
                                  ProcessFSM,
+                                 Process,
                                  ExecuteFSM,
                                  ExecuteCoverageFSM]}}.

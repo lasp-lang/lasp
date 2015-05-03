@@ -42,6 +42,11 @@
 -define(PROGRAM_KEY,    registered).
 -define(PROGRAM_PREFIX, {lasp, programs}).
 
+-record(read, {id :: id(),
+               type :: type(),
+               value :: value(),
+               read_fun :: function()}).
+
 -record(lasp_execute_request_v1, {
         module :: atom(),
         req_id :: non_neg_integer(),

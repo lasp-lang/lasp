@@ -69,21 +69,6 @@
                 ?MODULE:read(_Id, _Threshold, _Variables)
               end).
 
-%% Erlang 17.
--ifdef(namespaced_types).
--type lasp_dict() :: dict:dict().
--else.
--type lasp_dict() :: dict().
--endif.
-
-%% Exported helper functions.
--export([notify/3]).
-
--record(read, {id :: id(),
-               type :: type(),
-               value :: value(),
-               read_fun :: function()}).
-
 %% @doc Initialize the backend.
 -spec start(atom()) -> {ok, store()} | {error, atom()}.
 start(Identifier) ->
@@ -95,7 +80,7 @@ start(Identifier) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec filter(id(), function(), id(), store()) -> ok.
+-spec filter(id(), function(), id(), store()) -> {ok, pid()}.
 filter(Id, Function, AccId, Store) ->
     filter(Id, Function, AccId, Store, ?BIND, ?READ).
 
@@ -105,7 +90,7 @@ filter(Id, Function, AccId, Store) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec fold(id(), function(), id(), store()) -> ok.
+-spec fold(id(), function(), id(), store()) -> {ok, pid()}.
 fold(Id, Function, AccId, Store) ->
     fold(Id, Function, AccId, Store, ?BIND, ?READ).
 
@@ -115,7 +100,7 @@ fold(Id, Function, AccId, Store) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec map(id(), function(), id(), store()) -> ok.
+-spec map(id(), function(), id(), store()) -> {ok, pid()}.
 map(Id, Function, AccId, Store) ->
     map(Id, Function, AccId, Store, ?BIND, ?READ).
 
@@ -124,7 +109,7 @@ map(Id, Function, AccId, Store) ->
 %%      Computes the intersection of two sets and bind the result
 %%      to a third.
 %%
--spec intersection(id(), id(), id(), store()) -> ok.
+-spec intersection(id(), id(), id(), store()) -> {ok, pid()}.
 intersection(Left, Right, Intersection, Store) ->
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
             ?MODULE:read(_Left, _Threshold, _Variables)
@@ -139,7 +124,7 @@ intersection(Left, Right, Intersection, Store) ->
 %%      Computes the union of two sets and bind the result
 %%      to a third.
 %%
--spec union(id(), id(), id(), store()) -> ok.
+-spec union(id(), id(), id(), store()) -> {ok, pid()}.
 union(Left, Right, Union, Store) ->
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
             ?MODULE:read(_Left, _Threshold, _Variables)
@@ -154,7 +139,7 @@ union(Left, Right, Union, Store) ->
 %%      Computes the cartestian product of two sets and bind the result
 %%      to a third.
 %%
--spec product(id(), id(), id(), store()) -> ok.
+-spec product(id(), id(), id(), store()) -> {ok, pid()}.
 product(Left, Right, Product, Store) ->
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
             ?MODULE:read(_Left, _Threshold, _Variables)
@@ -235,7 +220,7 @@ declare(Id, Type, Store) ->
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.
 %%
--spec bind_to(id(), id(), store()) -> ok.
+-spec bind_to(id(), id(), store()) -> {ok, pid()}.
 bind_to(Id, TheirId, Store) ->
     bind_to(Id, TheirId, Store, ?BIND, ?READ).
 
@@ -446,7 +431,7 @@ read_any(Reads, Self, Store) ->
 %%      `FromPid' is sent a message with the target identifiers value,
 %%      if the target identifier is already bound.
 %%
--spec bind_to(id(), id(), store(), function()) -> ok.
+-spec bind_to(id(), id(), store(), function()) -> {ok, pid()}.
 bind_to(AccId, Id, Store, BindFun) ->
     bind_to(AccId, Id, Store, BindFun, ?READ).
 
@@ -458,7 +443,7 @@ bind_to(AccId, Id, Store, BindFun, ReadFun) ->
         %% Bind new value back.
         {ok, _} = BindFun(AccId, Value, Store)
     end,
-    notify(Store, [{Id, ReadFun}], Fun).
+    lasp_process:start(Store, [{Id, ReadFun}], Fun).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -470,7 +455,8 @@ bind_to(AccId, Id, Store, BindFun, ReadFun) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec fold(id(), function(), id(), store(), function(), function()) -> ok.
+-spec fold(id(), function(), id(), store(), function(), function()) ->
+    {ok, pid()}.
 fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
@@ -497,7 +483,7 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
         {ok, _} = BindFun(AccId, AccValue, Store)
 
     end,
-    notify(Store, [{Id, ReadFun}], Fun).
+    lasp_process:start(Store, [{Id, ReadFun}], Fun).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -509,7 +495,7 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
 %%      result, for instance, when it's located in another table.
 %%
 -spec product(id(), id(), id(), store(), function(), function(),
-              function()) -> ok.
+              function()) -> {ok, pid()}.
 product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
@@ -544,7 +530,7 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                 {ok, _} = BindFun(AccId, AccValue, Store)
         end
     end,
-    notify(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
+    lasp_process:start(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -555,7 +541,8 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec intersection(id(), id(), id(), store(), function(), function(), function()) -> ok.
+-spec intersection(id(), id(), id(), store(), function(), function(),
+                   function()) -> {ok, pid()}.
 intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
@@ -599,7 +586,7 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                 {ok, _} = BindFun(AccId, AccValue, Store)
         end
     end,
-    notify(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
+    lasp_process:start(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
 
 %% @doc Compute the union of two sets.
 %%
@@ -610,7 +597,8 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec union(id(), id(), id(), store(), function(), function(), function()) -> ok.
+-spec union(id(), id(), id(), store(), function(), function(),
+            function()) -> {ok, pid()}.
 union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
@@ -636,7 +624,7 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                 {ok, _} = BindFun(AccId, AccValue, Store)
         end
     end,
-    notify(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
+    lasp_process:start(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
 
 %% @doc Lap values from one lattice into another.
 %%
@@ -648,7 +636,8 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec map(id(), function(), id(), store(), function(), function()) -> ok.
+-spec map(id(), function(), id(), store(), function(), function()) ->
+    {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
@@ -675,7 +664,7 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
         {ok, _} = BindFun(AccId, AccValue, Store)
 
     end,
-    notify(Store, [{Id, ReadFun}], Fun).
+    lasp_process:start(Store, [{Id, ReadFun}], Fun).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -687,7 +676,8 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
--spec filter(id(), function(), id(), store(), function(), function()) -> ok.
+-spec filter(id(), function(), id(), store(), function(), function()) ->
+    {ok, pid()}.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
@@ -719,7 +709,7 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
         {ok, _} = BindFun(AccId, AccValue, Store)
 
     end,
-    notify(Store, [{Id, ReadFun}], Fun).
+    lasp_process:start(Store, [{Id, ReadFun}], Fun).
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
 %%      change the reply and blocking replies.
@@ -835,51 +825,6 @@ reply_to_all([], StillWaiting, _Result) ->
     {ok, StillWaiting}.
 
 %% Internal functions.
-
--spec notify(store(), [{id(), function()}] | lasp_dict(), function()) -> ok.
-notify(Variables, Reads, Function) when is_list(Reads) ->
-    Scope = dict:from_list([{Id, #read{id=Id, read_fun=Fun}}
-                            || {Id, Fun} <- Reads]),
-    spawn_link(?MODULE, notify, [Variables, Scope, Function]),
-    ok;
-
-notify(Variables, Scope0, Function) ->
-    Self = self(),
-
-    %% For every variable that has to be read, spawn a process to
-    %% perform the read and have it forward the response back to the
-    %% notifier, which is waiting for the first change to trigger
-    %% re-evaluation.
-    %%
-    lists:foreach(fun({Id, #read{read_fun=ReadFun, value=Value}}) ->
-        spawn_link(fun() ->
-                    {ok, Result} = ReadFun(Id, {strict, Value}, Variables),
-                    Self ! {ok, Result}
-                   end)
-        end, dict:to_list(Scope0)),
-
-    %% Wait for the first variable to change; once it changes, update
-    %% the dict and trigger the process which was waiting for
-    %% notification which causes re-evaluation.
-    %%
-    receive
-        {ok, {Id, Type, Value}} = Message ->
-            lager:info("Received message: ~p~n", [Message]),
-
-            %% Store updated value in the dict.
-            ReadRecord = dict:fetch(Id, Scope0),
-            Scope = dict:store(Id,
-                               ReadRecord#read{value=Value, type=Type}, 
-                               Scope0),
-
-            %% Apply function with updated scope.
-            Function(Scope),
-
-            notify(Variables, Scope, Function);
-        Error ->
-            lager:info("Received error: ~p~n", [Error]),
-            notify(Variables, Scope0, Function)
-    end.
 
 %% @doc Send responses to waiting threads, via messages.
 %%

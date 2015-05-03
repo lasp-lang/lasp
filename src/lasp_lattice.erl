@@ -59,18 +59,20 @@ threshold_met(lasp_ivar, Value, Threshold) when Value =:= Threshold ->
 threshold_met(lasp_ivar, Value, Threshold) when Value =/= Threshold ->
     false;
 
-threshold_met(riak_dt_gset, Value, {strict, Threshold}) ->
-    is_strict_inflation(riak_dt_gset, Threshold, Value);
-threshold_met(riak_dt_gset, Value, Threshold) ->
-    is_inflation(riak_dt_gset, Threshold, Value);
+threshold_met(lasp_gset, Value, {strict, Threshold}) ->
+    is_strict_inflation(lasp_gset, Threshold, Value);
+threshold_met(lasp_gset, Value, Threshold) ->
+    is_inflation(lasp_gset, Threshold, Value);
 
+threshold_met(lasp_orset_gbtree, Value, {strict, Threshold}) ->
+    is_strict_inflation(lasp_orset_gbtree, Threshold, Value);
+threshold_met(lasp_orset_gbtree, Value, Threshold) ->
+    is_inflation(lasp_orset_gbtree, Threshold, Value);
+
+threshold_met(lasp_orset, Value, {strict, Threshold}) ->
+    is_strict_inflation(lasp_orset, Threshold, Value);
 threshold_met(lasp_orset, Value, Threshold) ->
-    threshold_met(riak_dt_orset, Value, Threshold);
-
-threshold_met(riak_dt_orset, Value, {strict, Threshold}) ->
-    is_strict_inflation(riak_dt_orset, Threshold, Value);
-threshold_met(riak_dt_orset, Value, Threshold) ->
-    is_inflation(riak_dt_orset, Threshold, Value);
+    is_inflation(lasp_orset, Threshold, Value);
 
 threshold_met(riak_dt_orswot, Value, {strict, Threshold}) ->
     is_strict_inflation(riak_dt_orswot, Threshold, Value);
@@ -132,21 +134,29 @@ is_lattice_inflation(lasp_ivar, Previous, Current)
         when Previous =:= Current ->
     true;
 
-is_lattice_inflation(riak_dt_gset, Previous, Current) ->
+is_lattice_inflation(lasp_gset, Previous, Current) ->
     sets:is_subset(
-        sets:from_list(riak_dt_gset:value(Previous)),
-        sets:from_list(riak_dt_gset:value(Current)));
+        sets:from_list(lasp_gset:value(Previous)),
+        sets:from_list(lasp_gset:value(Current)));
+
+is_lattice_inflation(lasp_orset_gbtree, Previous, Current) ->
+    gb_trees_ext:fold(fun(Element, Ids, Acc) ->
+                        case gb_trees:lookup(Element, Current) of
+                            none ->
+                                Acc andalso false;
+                            {value, Ids1} ->
+                                Acc andalso ids_inflated(lasp_orset_gbtree, Ids, Ids1)
+                        end
+                end, true, Previous);
+
 
 is_lattice_inflation(lasp_orset, Previous, Current) ->
-    is_lattice_inflation(riak_dt_orset, Previous, Current);
-
-is_lattice_inflation(riak_dt_orset, Previous, Current) ->
     lists:foldl(fun({Element, Ids}, Acc) ->
                         case lists:keyfind(Element, 1, Current) of
                             false ->
                                 Acc andalso false;
                             {_, Ids1} ->
-                                Acc andalso ids_inflated(Ids, Ids1)
+                                Acc andalso ids_inflated(lasp_orset, Ids, Ids1)
                         end
                 end, true, Previous);
 
@@ -199,22 +209,36 @@ is_lattice_strict_inflation(lasp_ivar, undefined, Current)
 is_lattice_strict_inflation(lasp_ivar, _Previous, _Current) ->
     false;
 
-is_lattice_strict_inflation(riak_dt_gset, Previous, Current) ->
-    is_lattice_inflation(riak_dt_gset, Previous, Current) andalso
-        lists:usort(riak_dt_gset:value(Previous)) =/=
-        lists:usort(riak_dt_gset:value(Current));
+is_lattice_strict_inflation(lasp_gset, Previous, Current) ->
+    is_lattice_inflation(lasp_gset, Previous, Current) andalso
+        lists:usort(lasp_gset:value(Previous)) =/=
+        lists:usort(lasp_gset:value(Current));
 
-is_lattice_strict_inflation(lasp_orset, Previous, Current) ->
-    is_lattice_strict_inflation(riak_dt_orset, Previous, Current);
-
-is_lattice_strict_inflation(riak_dt_orset, [], Current)
-  when Current =/= []->
-    true;
-is_lattice_strict_inflation(riak_dt_orset, Previous, Current) ->
+is_lattice_strict_inflation(lasp_orset_gbtree, Previous, Current) ->
     %% We already know that `Previous' is fully covered in `Current', so
     %% we just need to look for a change -- removal (false -> true), or
     %% addition of a new element.
-    IsLatticeInflation = is_lattice_inflation(riak_dt_orset,
+    IsLatticeInflation = is_lattice_inflation(lasp_orset_gbtree,
+                                              Previous,
+                                              Current),
+    DeletedElements = gb_trees_ext:fold(fun(Element, Ids, Acc) ->
+                    case gb_trees:lookup(Element, Current) of
+                        none ->
+                            Acc;
+                        {value, Ids1} ->
+                            Acc orelse Ids =/= Ids1
+                    end
+                    end, false, Previous),
+    NewElements = gb_trees:size(Previous) < gb_trees:size(Current),
+    IsLatticeInflation andalso (DeletedElements orelse NewElements);
+
+is_lattice_strict_inflation(lasp_orset, [], Current) when Current =/= [] ->
+    true;
+is_lattice_strict_inflation(lasp_orset, Previous, Current) ->
+    %% We already know that `Previous' is fully covered in `Current', so
+    %% we just need to look for a change -- removal (false -> true), or
+    %% addition of a new element.
+    IsLatticeInflation = is_lattice_inflation(lasp_orset,
                                               Previous,
                                               Current),
     DeletedElements = lists:foldl(fun({Element, Ids}, Acc) ->
@@ -250,12 +274,22 @@ is_lattice_strict_inflation(riak_dt_gcounter, Previous, Current) ->
     %% Massive shortcut here -- get the value and see if it's different.
     riak_dt_gcounter:value(Previous) < riak_dt_gcounter:value(Current).
 
-ids_inflated(Previous, Current) ->
+ids_inflated(lasp_orset, Previous, Current) ->
     lists:foldl(fun({Id, _}, Acc) ->
                         case lists:keyfind(Id, 1, Current) of
                             false ->
                                 Acc andalso false;
                             _ ->
+                                Acc andalso true
+                        end
+                end, true, Previous);
+
+ids_inflated(lasp_orset_gbtree, Previous, Current) ->
+    gb_trees_ext:fold(fun(Id, _, Acc) ->
+                        case gb_trees:lookup(Id, Current) of
+                            none ->
+                                Acc andalso false;
+                            {value, _} ->
                                 Acc andalso true
                         end
                 end, true, Previous).
@@ -313,81 +347,39 @@ lasp_ivar_strict_inflation_test() ->
     %% Concurrent
     ?assertEqual(false, is_lattice_strict_inflation(lasp_ivar, A2, B2)).
 
-%% riak_dt_gset tests.
+%% lasp_gset tests.
 
-riak_dt_gset_inflation_test() ->
-    A1 = riak_dt_gset:new(),
-    B1 = riak_dt_gset:new(),
+lasp_gset_inflation_test() ->
+    A1 = lasp_gset:new(),
+    B1 = lasp_gset:new(),
 
-    {ok, A2} = riak_dt_gset:update({add, 1}, a, A1),
-    {ok, B2} = riak_dt_gset:update({add, 2}, b, B1),
-
-    %% A1 and B1 are equivalent.
-    ?assertEqual(true, is_lattice_inflation(riak_dt_gset, A1, B1)),
-
-    %% A2 after A1.
-    ?assertEqual(true, is_lattice_inflation(riak_dt_gset, A1, A2)),
-
-    %% Concurrent
-    ?assertEqual(false, is_lattice_inflation(riak_dt_gset, A2, B2)).
-
-riak_dt_gset_strict_inflation_test() ->
-    A1 = riak_dt_gset:new(),
-    B1 = riak_dt_gset:new(),
-
-    {ok, A2} = riak_dt_gset:update({add, 1}, a, A1),
-    {ok, B2} = riak_dt_gset:update({add, 2}, b, B1),
+    {ok, A2} = lasp_gset:update({add, 1}, a, A1),
+    {ok, B2} = lasp_gset:update({add, 2}, b, B1),
 
     %% A1 and B1 are equivalent.
-    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_gset, A1, B1)),
+    ?assertEqual(true, is_lattice_inflation(lasp_gset, A1, B1)),
 
     %% A2 after A1.
-    ?assertEqual(true, is_lattice_strict_inflation(riak_dt_gset, A1, A2)),
+    ?assertEqual(true, is_lattice_inflation(lasp_gset, A1, A2)),
 
     %% Concurrent
-    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_gset, A2, B2)).
+    ?assertEqual(false, is_lattice_inflation(lasp_gset, A2, B2)).
 
-%% riak_dt_orset tests.
+lasp_gset_strict_inflation_test() ->
+    A1 = lasp_gset:new(),
+    B1 = lasp_gset:new(),
 
-riak_dt_orset_inflation_test() ->
-    A1 = riak_dt_orset:new(),
-    B1 = riak_dt_orset:new(),
-
-    {ok, A2} = riak_dt_orset:update({add, 1}, a, A1),
-    {ok, B2} = riak_dt_orset:update({add, 2}, b, B1),
-    {ok, A3} = riak_dt_orset:update({remove, 1}, a, A2),
+    {ok, A2} = lasp_gset:update({add, 1}, a, A1),
+    {ok, B2} = lasp_gset:update({add, 2}, b, B1),
 
     %% A1 and B1 are equivalent.
-    ?assertEqual(true, is_lattice_inflation(riak_dt_orset, A1, B1)),
+    ?assertEqual(false, is_lattice_strict_inflation(lasp_gset, A1, B1)),
 
     %% A2 after A1.
-    ?assertEqual(true, is_lattice_inflation(riak_dt_orset, A1, A2)),
+    ?assertEqual(true, is_lattice_strict_inflation(lasp_gset, A1, A2)),
 
     %% Concurrent
-    ?assertEqual(false, is_lattice_inflation(riak_dt_orset, A2, B2)),
-
-    %% A3 after A2.
-    ?assertEqual(true, is_lattice_inflation(riak_dt_orset, A2, A3)).
-
-riak_dt_orset_strict_inflation_test() ->
-    A1 = riak_dt_orset:new(),
-    B1 = riak_dt_orset:new(),
-
-    {ok, A2} = riak_dt_orset:update({add, 1}, a, A1),
-    {ok, B2} = riak_dt_orset:update({add, 2}, b, B1),
-    {ok, A3} = riak_dt_orset:update({remove, 1}, a, A2),
-
-    %% A1 and B1 are equivalent.
-    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_orset, A1, B1)),
-
-    %% A2 after A1.
-    ?assertEqual(true, is_lattice_strict_inflation(riak_dt_orset, A1, A2)),
-
-    %% Concurrent
-    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_orset, A2, B2)),
-
-    %% A3 after A2.
-    ?assertEqual(true, is_lattice_strict_inflation(riak_dt_orset, A2, A3)).
+    ?assertEqual(false, is_lattice_strict_inflation(lasp_gset, A2, B2)).
 
 %% riak_dt_gcounter tests.
 
@@ -575,5 +567,47 @@ lasp_orset_strict_inflation_test() ->
 
     %% A3 after A2.
     ?assertEqual(true, is_lattice_strict_inflation(lasp_orset, A2, A3)).
+
+%% lasp_orset_gbtree tests.
+
+lasp_orset_gbtree_inflation_test() ->
+    A1 = lasp_orset_gbtree:new(),
+    B1 = lasp_orset_gbtree:new(),
+
+    {ok, A2} = lasp_orset_gbtree:update({add, 1}, a, A1),
+    {ok, B2} = lasp_orset_gbtree:update({add, 2}, b, B1),
+    {ok, A3} = lasp_orset_gbtree:update({remove, 1}, a, A2),
+
+    %% A1 and B1 are equivalent.
+    ?assertEqual(true, is_lattice_inflation(lasp_orset_gbtree, A1, B1)),
+
+    %% A2 after A1.
+    ?assertEqual(true, is_lattice_inflation(lasp_orset_gbtree, A1, A2)),
+
+    %% Concurrent
+    ?assertEqual(false, is_lattice_inflation(lasp_orset_gbtree, A2, B2)),
+
+    %% A3 after A2.
+    ?assertEqual(true, is_lattice_inflation(lasp_orset_gbtree, A2, A3)).
+
+lasp_orset_gbtree_strict_inflation_test() ->
+    A1 = lasp_orset_gbtree:new(),
+    B1 = lasp_orset_gbtree:new(),
+
+    {ok, A2} = lasp_orset_gbtree:update({add, 1}, a, A1),
+    {ok, B2} = lasp_orset_gbtree:update({add, 2}, b, B1),
+    {ok, A3} = lasp_orset_gbtree:update({remove, 1}, a, A2),
+
+    %% A1 and B1 are equivalent.
+    ?assertEqual(false, is_lattice_strict_inflation(lasp_orset_gbtree, A1, B1)),
+
+    %% A2 after A1.
+    ?assertEqual(true, is_lattice_strict_inflation(lasp_orset_gbtree, A1, A2)),
+
+    %% Concurrent
+    ?assertEqual(false, is_lattice_strict_inflation(lasp_orset_gbtree, A2, B2)),
+
+    %% A3 after A2.
+    ?assertEqual(true, is_lattice_strict_inflation(lasp_orset_gbtree, A2, A3)).
 
 -endif.

@@ -49,7 +49,9 @@
                 coordinator,
                 from,
                 module,
+                type,
                 num_responses,
+                result,
                 replies,
                 pids}).
 
@@ -91,11 +93,15 @@ terminate(_Reason, _SN, _SD) ->
 
 %% @doc Initialize the request.
 init([ReqId, From, Module]) ->
+    Type = Module:type(),
+    Result = Type:new(),
     State = #state{preflist=undefined,
                    req_id=ReqId,
                    coordinator=node(),
                    from=From,
                    module=Module,
+                   type=Type,
+                   result=Result,
                    num_responses=0,
                    pids=[],
                    replies=[]},
@@ -118,7 +124,8 @@ execute(timeout, #state{preflist=Preflist,
 waiting({ok, _ReqId, Reply},
         #state{from=From,
                req_id=ReqId,
-               module=Module,
+               type=Type,
+               result=Result0,
                num_responses=NumResponses0,
                replies=Replies0}=State0) ->
     NumResponses = NumResponses0 + 1,
@@ -127,14 +134,14 @@ waiting({ok, _ReqId, Reply},
 
     case NumResponses =:= ?PROGRAM_R of
         true ->
-            {ok, Result} = Module:merge(Replies),
+            Result = Type:merge(Reply, Result0),
             From ! {ReqId, ok, Result},
 
             case NumResponses =:= ?PROGRAM_N of
                 true ->
-                    {next_state, finalize, State, 0};
+                    {next_state, finalize, State#state{result=Result}, 0};
                 false ->
-                    {next_state, waiting_n, State}
+                    {next_state, waiting_n, State#state{result=Result}}
             end;
         false ->
             {next_state, waiting, State}

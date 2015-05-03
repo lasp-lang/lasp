@@ -45,10 +45,10 @@ confirm() ->
     ok = lasp_test_helpers:wait_for_cluster(Nodes),
 
     ?assertEqual({ok, [1,2,3,4,5,6], [1,1,1,2,2,2,3,3,3,4,4,4,5,5,5,6,6,6]},
-                 rpc:call(Node, ?MODULE, test, [riak_dt_gset])),
+                 rpc:call(Node, ?MODULE, test, [lasp_gset])),
 
     ?assertEqual({ok, [1,2,3,4,5,6], [1,1,1,2,2,2,3,3,3,4,4,4,5,5,5,6,6,6]},
-                 rpc:call(Node, ?MODULE, test, [riak_dt_orset])),
+                 rpc:call(Node, ?MODULE, test, [lasp_orset])),
 
     lager:info("Done!"),
 

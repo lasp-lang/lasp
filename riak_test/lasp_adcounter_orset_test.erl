@@ -56,7 +56,7 @@ confirm() ->
 
 test() ->
     %% Generate an OR-set for tracking advertisement counters.
-    {ok, Ads} = lasp:declare(riak_dt_orset),
+    {ok, Ads} = lasp:declare(lasp_orset),
 
     %% Build an advertisement counter, and add it to the set.
     OriginalAdList = lists:foldl(fun(_, Acc) ->
@@ -66,7 +66,7 @@ test() ->
                 end, [], lists:seq(1,5)),
 
     %% Generate a OR-set for tracking clients.
-    {ok, Clients} = lasp:declare(riak_dt_orset),
+    {ok, Clients} = lasp:declare(lasp_orset),
 
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
@@ -82,11 +82,11 @@ test() ->
     %% until the advertisement should be disabled.
 
     %% Create a OR-set for the server list.
-    {ok, Servers} = lasp:declare(riak_dt_orset),
+    {ok, Servers} = lasp:declare(lasp_orset),
 
     %% Get the current advertisement list.
     {ok, {_, _, AdList0}} = lasp:read(Ads),
-    AdList = riak_dt_orset:value(AdList0),
+    AdList = lasp_orset:value(AdList0),
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
@@ -101,7 +101,7 @@ test() ->
 
     %% Get client list.
     {ok, {_, _, ClientList0}} = lasp:read(Clients),
-    ClientList = riak_dt_orset:value(ClientList0),
+    ClientList = lasp_orset:value(ClientList0),
 
     Viewer = fun(_) ->
             Pid = lists:nth(random:uniform(5), ClientList),
@@ -122,7 +122,7 @@ test() ->
 
     lager:info("Verifying all impressions were used."),
     {ok, {_, _, FinalAdList0}} = lasp:read(Ads),
-    riak_dt_orset:value(FinalAdList0).
+    lasp_orset:value(FinalAdList0).
 
 %% @doc Server functions for the advertisement counter.  After 5 views,
 %%      disable the advertisement.
@@ -142,7 +142,7 @@ client(Id, Ads, PreviousValue) ->
         view_ad ->
             %% Get current ad list.
             {ok, {_, _, AdList0}} = lasp:read(Ads, PreviousValue),
-            AdList = riak_dt_orset:value(AdList0),
+            AdList = lasp_orset:value(AdList0),
 
             case length(AdList) of
                 0 ->

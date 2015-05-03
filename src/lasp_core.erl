@@ -480,10 +480,10 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
         FolderFun = fun(Element, Acc) ->
                 Values = case Element of
                     {X, Causality} ->
-                        %% riak_dt_orset | lasp_orset
+                        %% lasp_orset
                         [{V, Causality} || V <- Function(X)];
                     X ->
-                        %% riak_dt_gset
+                        %% lasp_gset
                         Function(X)
                 end,
 
@@ -526,11 +526,11 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                 FolderFun = fun(Element, Acc) ->
                         Values = case Element of
                             {X, XCausality} ->
-                                %% riak_dt_orset | lasp_orset
+                                %% lasp_orset
                                 [{{X, Y}, lasp_lattice:orset_causal_product(XCausality, YCausality)}
                                  || {Y, YCausality} <- RValue];
                             X ->
-                                %% riak_dt_gset
+                                %% lasp_gset
                                 [{X, Y} || Y  <- RValue]
                         end,
 
@@ -572,7 +572,7 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                 FolderFun = fun(Element, Acc) ->
                         Values = case Element of
                             {X, XCausality} ->
-                                %% riak_dt_orset | lasp_orset
+                                %% lasp_orset
                                 case lists:keyfind(X, 1, RValue) of
                                     {_Y, YCausality} ->
                                         [{X, lasp_lattice:orset_causal_union(XCausality, YCausality)}];
@@ -580,7 +580,7 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                                         []
                                 end;
                             X ->
-                                %% riak_dt_gset
+                                %% lasp_gset
                                 case lists:member(X, RValue) of
                                     true ->
                                         [X];
@@ -628,9 +628,7 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                 AccValue = case Type of
                     lasp_orset ->
                         orddict:merge(fun(_Key, L, _R) -> L end, LValue, RValue);
-                    riak_dt_orset ->
-                        orddict:merge(fun(_Key, L, _R) -> L end, LValue, RValue);
-                    riak_dt_gset ->
+                    lasp_gset ->
                         LValue ++ RValue
                 end,
 
@@ -660,10 +658,10 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
         FolderFun = fun(Element, Acc) ->
                 V = case Element of
                     {X, Causality} ->
-                        %% riak_dt_orset | lasp_orset
+                        %% lasp_orset
                         {Function(X), Causality};
                     X ->
-                        %% riak_dt_gset
+                        %% lasp_gset
                         Function(X)
                 end,
 
@@ -699,10 +697,10 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
         FolderFun = fun(Element, Acc) ->
                 V = case Element of
                     {X, _} ->
-                        %% riak_dt_orset | lasp_orset
+                        %% lasp_orset
                         X;
                     X ->
-                        %% riak_dt_gset
+                        %% lasp_gset
                         X
                 end,
 

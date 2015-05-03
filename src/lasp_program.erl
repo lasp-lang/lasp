@@ -34,19 +34,9 @@
 -callback process(object(), reason(), actor(), state(), store()) -> {ok, state()}.
 
 %% @doc Return the current result of a given program.
--callback execute(state(), store()) -> {ok, output()}.
+-callback execute(state(), store()) -> {value | stream, output()}.
 
 %% Pure Functions
 
-%% @doc Return the actual observable value of a result.
--callback value(output()) -> {ok, output()}.
-
-%% @doc Merge the results of a replicated program, which should compute
-%%      the results least-upper-bound for the given output type.
--callback merge(list(output())) -> {ok, output()}.
-
-%% @doc Sum the results of a sharded computation; this should compute an
-%%      associatative, commutative sum across all known executions of the
-%%      program; given a list of sharded CRDTs, sum the results.  This is
-%%      essentially a commutative monoid.
--callback sum(list(output())) -> {ok, output()}.
+%% @doc Return the type of the CRDT returned by the application.
+-callback type() -> type().

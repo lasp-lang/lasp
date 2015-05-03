@@ -55,7 +55,7 @@ confirm() ->
 -endif.
 
 -define(MAP, riak_dt_map).
--define(KEY, {'X', riak_dt_orset}).
+-define(KEY, {'X', lasp_orset}).
 -define(VALUE, <<"Chris">>).
 
 test() ->

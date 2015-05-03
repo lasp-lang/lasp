@@ -45,7 +45,7 @@ confirm() ->
     ok = lasp_test_helpers:wait_for_cluster(Nodes),
 
     lager:info("Remotely executing the test."),
-    ?assertEqual([], rpc:call(Node, ?MODULE, test, [])),
+    ?assertEqual({0, nil}, rpc:call(Node, ?MODULE, test, [])),
 
     pass.
 

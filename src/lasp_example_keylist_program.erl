@@ -31,7 +31,7 @@
 -record(state, {type, id, previous}).
 
 -define(CORE, lasp_core).
--define(TYPE, riak_dt_gset).
+-define(TYPE, lasp_gset).
 
 %% @doc Initialize an or-set as an accumulator.
 init(Store) ->

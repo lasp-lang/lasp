@@ -55,7 +55,7 @@ confirm() ->
 
 test() ->
     test_ivars(),
-    test_lattice(riak_dt_gset),
+    test_lattice(lasp_gset),
     test_lattice(riak_dt_orset),
     ok.
 

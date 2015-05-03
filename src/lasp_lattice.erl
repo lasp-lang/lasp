@@ -59,10 +59,10 @@ threshold_met(lasp_ivar, Value, Threshold) when Value =:= Threshold ->
 threshold_met(lasp_ivar, Value, Threshold) when Value =/= Threshold ->
     false;
 
-threshold_met(riak_dt_gset, Value, {strict, Threshold}) ->
-    is_strict_inflation(riak_dt_gset, Threshold, Value);
-threshold_met(riak_dt_gset, Value, Threshold) ->
-    is_inflation(riak_dt_gset, Threshold, Value);
+threshold_met(lasp_gset, Value, {strict, Threshold}) ->
+    is_strict_inflation(lasp_gset, Threshold, Value);
+threshold_met(lasp_gset, Value, Threshold) ->
+    is_inflation(lasp_gset, Threshold, Value);
 
 threshold_met(lasp_orset, Value, Threshold) ->
     threshold_met(riak_dt_orset, Value, Threshold);
@@ -137,10 +137,10 @@ is_lattice_inflation(lasp_ivar, Previous, Current)
         when Previous =:= Current ->
     true;
 
-is_lattice_inflation(riak_dt_gset, Previous, Current) ->
+is_lattice_inflation(lasp_gset, Previous, Current) ->
     sets:is_subset(
-        sets:from_list(riak_dt_gset:value(Previous)),
-        sets:from_list(riak_dt_gset:value(Current)));
+        sets:from_list(lasp_gset:value(Previous)),
+        sets:from_list(lasp_gset:value(Current)));
 
 is_lattice_inflation(lasp_orset, Previous, Current) ->
     is_lattice_inflation(riak_dt_orset, Previous, Current);
@@ -215,10 +215,10 @@ is_lattice_strict_inflation(lasp_ivar, undefined, Current)
 is_lattice_strict_inflation(lasp_ivar, _Previous, _Current) ->
     false;
 
-is_lattice_strict_inflation(riak_dt_gset, Previous, Current) ->
-    is_lattice_inflation(riak_dt_gset, Previous, Current) andalso
-        lists:usort(riak_dt_gset:value(Previous)) =/=
-        lists:usort(riak_dt_gset:value(Current));
+is_lattice_strict_inflation(lasp_gset, Previous, Current) ->
+    is_lattice_inflation(lasp_gset, Previous, Current) andalso
+        lists:usort(lasp_gset:value(Previous)) =/=
+        lists:usort(lasp_gset:value(Current));
 
 is_lattice_strict_inflation(lasp_orset, Previous, Current) ->
     is_lattice_strict_inflation(riak_dt_orset, Previous, Current);
@@ -359,39 +359,39 @@ lasp_ivar_strict_inflation_test() ->
     %% Concurrent
     ?assertEqual(false, is_lattice_strict_inflation(lasp_ivar, A2, B2)).
 
-%% riak_dt_gset tests.
+%% lasp_gset tests.
 
-riak_dt_gset_inflation_test() ->
-    A1 = riak_dt_gset:new(),
-    B1 = riak_dt_gset:new(),
+lasp_gset_inflation_test() ->
+    A1 = lasp_gset:new(),
+    B1 = lasp_gset:new(),
 
-    {ok, A2} = riak_dt_gset:update({add, 1}, a, A1),
-    {ok, B2} = riak_dt_gset:update({add, 2}, b, B1),
-
-    %% A1 and B1 are equivalent.
-    ?assertEqual(true, is_lattice_inflation(riak_dt_gset, A1, B1)),
-
-    %% A2 after A1.
-    ?assertEqual(true, is_lattice_inflation(riak_dt_gset, A1, A2)),
-
-    %% Concurrent
-    ?assertEqual(false, is_lattice_inflation(riak_dt_gset, A2, B2)).
-
-riak_dt_gset_strict_inflation_test() ->
-    A1 = riak_dt_gset:new(),
-    B1 = riak_dt_gset:new(),
-
-    {ok, A2} = riak_dt_gset:update({add, 1}, a, A1),
-    {ok, B2} = riak_dt_gset:update({add, 2}, b, B1),
+    {ok, A2} = lasp_gset:update({add, 1}, a, A1),
+    {ok, B2} = lasp_gset:update({add, 2}, b, B1),
 
     %% A1 and B1 are equivalent.
-    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_gset, A1, B1)),
+    ?assertEqual(true, is_lattice_inflation(lasp_gset, A1, B1)),
 
     %% A2 after A1.
-    ?assertEqual(true, is_lattice_strict_inflation(riak_dt_gset, A1, A2)),
+    ?assertEqual(true, is_lattice_inflation(lasp_gset, A1, A2)),
 
     %% Concurrent
-    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_gset, A2, B2)).
+    ?assertEqual(false, is_lattice_inflation(lasp_gset, A2, B2)).
+
+lasp_gset_strict_inflation_test() ->
+    A1 = lasp_gset:new(),
+    B1 = lasp_gset:new(),
+
+    {ok, A2} = lasp_gset:update({add, 1}, a, A1),
+    {ok, B2} = lasp_gset:update({add, 2}, b, B1),
+
+    %% A1 and B1 are equivalent.
+    ?assertEqual(false, is_lattice_strict_inflation(lasp_gset, A1, B1)),
+
+    %% A2 after A1.
+    ?assertEqual(true, is_lattice_strict_inflation(lasp_gset, A1, A2)),
+
+    %% Concurrent
+    ?assertEqual(false, is_lattice_strict_inflation(lasp_gset, A2, B2)).
 
 %% riak_dt_orset tests.
 

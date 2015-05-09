@@ -23,7 +23,8 @@
 -module(lasp_handoff_test).
 -author("Loïc Schils <loic.schils@student.uclouvain.be>").
 
--export([declare/0]).
+-export([declare/1,
+         read/1]).
 
 -ifdef(TEST).
 
@@ -37,56 +38,55 @@ confirm() ->
     % Configure a cluster with 2 nodes
     [Nodes] = rt:build_clusters([2]),
     lager:info("Nodes: ~p", [Nodes]),
-    Node = hd(Nodes),
+    [N1, N2] = Nodes,
 
-    lager:info("Remotely loading code on node ~p", [Node]),
+    lager:info("Remotely loading code on node ~p", [N1]),
     ok = lasp_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),
 
     ok = lasp_test_helpers:wait_for_cluster(Nodes),
 
-    ?assertEqual({ok, [4, 8, 8, 4]},
-                 rpc:call(Node, ?MODULE, declare, [])),
+    lager:info("Declaring variables."),
+    {ok, Ids} = rpc:call(N1, ?MODULE, declare, [1]),
 
-    %%% TEST %%%
-    % Not Working
-    %{{ok, _}, State} = riak_core_send_msg:send_event_unreliable(lasp_vnode, {get_dict, {0, 0},?MODULE}),
-
-    % Arguments are not correct but it's just for the test
-    riak_core_send_msg:send_event_unreliable(lasp_vnode, {get_dict, {0, 0},?MODULE}),
-    %lager:info("State : ~p", [State]),
+    lager:info("Ids: ~p", [Ids]),
 
     % Remove a node from the cluster (Handoff will be perform)
-    lager:info("Removing node ~p from cluster", [Node]),
-    rt:leave(Node),
-    ?assertEqual(ok, rt:wait_until_unpingable(Node)),
+    lager:info("Removing node ~p from cluster", [N1]),
+    rt:leave(N1),
+    ?assertEqual(ok, rt:wait_until_unpingable(N1)),
+
+    lager:info("Reading variables."),
+    {ok, [1,1,1]} = rpc:call(N2, ?MODULE, read, [Ids]),
+
+    lager:info("Done!"),
 
     pass.
 -endif.
 
-declare() ->
+declare(V1) ->
     % Declare variables
     {ok, I1} = lasp:declare(lasp_ivar),
     {ok, I2} = lasp:declare(lasp_ivar),
     {ok, I3} = lasp:declare(lasp_ivar),
-    {ok, I4} = lasp:declare(lasp_ivar),
 
-    % Bind variables
-    V1 = 4,
-    V2 = 8,
-
-    {ok, _} = lasp:bind_to(I4, I1),
+    {ok, _} = lasp:bind_to(I2, I1),
     {ok, _} = lasp:bind(I1, V1),
-    {ok, _} = lasp:bind(I2, V2),
-    {ok, _} = lasp:bind_to(I3, I2),
+    {ok, _} = lasp:bind_to(I3, I1),
 
     % Read variables
-    {ok, {_, _, R1, _}} = lasp:read(I1),
-    {ok, {_, _, R2, _}} = lasp:read(I2),
-    {ok, {_, _, R3, _}} = lasp:read(I3),
-    {ok, {_, _, R4, _}} = lasp:read(I4),
+    {ok, {_, _, V1, _}} = lasp:read(I3),
+    {ok, {_, _, V1, _}} = lasp:read(I2),
+    {ok, {_, _, V1, _}} = lasp:read(I1),
 
-    L1 = lists:append([[R1], [R2], [R3], [R4]]),
+    L1 = lists:append([[I1], [I2], [I3]]),
 
     % Return
     {ok, L1}.
+
+read(Ids) ->
+    Values = lists:map(fun(Id) ->
+                {ok, {_, _, V1, _}} = lasp:read(Id),
+                V1
+        end, Ids),
+    {ok, Values}.

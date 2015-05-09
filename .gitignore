@@ -16,3 +16,5 @@ doc/
 rel/lasp
 dialyzer_warnings
 .rebar/
+
+riak_test/lasp_handoff_chris_test.erl

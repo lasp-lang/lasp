@@ -24,28 +24,28 @@
 -include("lasp.hrl").
 
 %% API
--export([start_link/3,
-         start/3]).
+-export([start_link/2,
+         start/2]).
 
 %% Callbacks
--export([process/3]).
+-export([process/2]).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
-start_link(Variables, Reads, Function) when is_list(Reads) ->
+start_link(Reads, Function) when is_list(Reads) ->
     Scope = ?SCOPE:from_list([{Id, #read{id=Id, read_fun=Fun}}
                               || {Id, Fun} <- Reads]),
-    Pid = erlang:spawn_link(?MODULE, process, [Variables, Scope, Function]),
+    Pid = erlang:spawn_link(?MODULE, process, [Scope, Function]),
     {ok, Pid};
-start_link(Variables, Scope, Function) ->
-    Pid = erlang:spawn_link(?MODULE, process, [Variables, Scope, Function]),
+start_link(Scope, Function) ->
+    Pid = erlang:spawn_link(?MODULE, process, [Scope, Function]),
     {ok, Pid}.
 
 %% @doc Process a notification.
-start(Variables, Scope, Function) ->
-    lasp_process_sup:start_child([Variables, Scope, Function]).
+start(Scope, Function) ->
+    lasp_process_sup:start_child([Scope, Function]).
 
 %%%===================================================================
 %%% Callbacks
@@ -58,7 +58,7 @@ start(Variables, Scope, Function) ->
 %%      reading from one-or-many input CRDTs, transforming them in some
 %%      fashion, and binding a subsequent output CRDT.
 %%
-process(Variables, Scope0, Function) ->
+process(Scope0, Function) ->
     Self = self(),
 
     %% For every variable that has to be read, spawn a process to
@@ -88,8 +88,8 @@ process(Variables, Scope0, Function) ->
             %% Apply function with updated scope.
             Function(Scope),
 
-            process(Variables, Scope, Function);
+            process(Scope, Function);
         Error ->
             lager:info("Received error: ~p~n", [Error]),
-            process(Variables, Scope0, Function)
+            process(Scope0, Function)
     end.

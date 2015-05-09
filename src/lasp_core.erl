@@ -61,12 +61,12 @@
          fold/6]).
 
 %% Definitions for the bind/read fun abstraction.
--define(BIND, fun(_AccId, AccValue, _Variables) ->
-                ?MODULE:bind(_AccId, AccValue, _Variables)
+-define(BIND, fun(_AccId, AccValue, _Store) ->
+                ?MODULE:bind(_AccId, AccValue, _Store)
               end).
 
--define(READ, fun(_Id, _Threshold, _Variables) ->
-                ?MODULE:read(_Id, _Threshold, _Variables)
+-define(READ, fun(_Id, _Threshold) ->
+                ?MODULE:read(_Id, _Threshold, Store)
               end).
 
 %% @doc Initialize the backend.

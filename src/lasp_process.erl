@@ -68,7 +68,7 @@ process(Variables, Scope0, Function) ->
     %%
     lists:foreach(fun({Id, #read{read_fun=ReadFun, value=Value}}) ->
         spawn_link(fun() ->
-                    {ok, Result} = ReadFun(Id, {strict, Value}, Variables),
+                    {ok, Result} = ReadFun(Id, {strict, Value}),
                     Self ! {ok, Result}
                    end)
         end, ?SCOPE:to_list(Scope0)),

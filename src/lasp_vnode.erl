@@ -80,7 +80,7 @@
                 store,
                 reference}).
 
--define(READ, fun(_Id, _Threshold, _Store) ->
+-define(READ, fun(_Id, _Threshold) ->
                   %% Beware of cycles in the gen_server calls!
                   [{IndexNode, _Type}|_] = ?APP:preflist(?N, _Id, lasp),
 
@@ -88,7 +88,7 @@
                       {Partition, Node} ->
                           %% We're local, which means that we can interact
                           %% directly with the data store.
-                          ?CORE:read(_Id, _Threshold, _Store);
+                          ?CORE:read(_Id, _Threshold, Store);
                       _ ->
                           %% We're remote, go through all of the routing logic.
                           ?APP:read(_Id, _Threshold)

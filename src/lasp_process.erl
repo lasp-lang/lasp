@@ -84,7 +84,8 @@ process(Scope0, Function) ->
                                       {Id, Read#read{value=Value, type=Type}}),
 
             %% Apply function with updated scope.
-            Function(Scope),
+            Args = [{I, T, V} || {I, #read{type=T, value=V}} <- Scope],
+            erlang:apply(Function, Args),
 
             process(Scope, Function);
         Error ->

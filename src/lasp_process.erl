@@ -35,8 +35,7 @@
 %%%===================================================================
 
 start_link(Reads, Function) when is_list(Reads) ->
-    Scope = ?SCOPE:from_list([{Id, #read{id=Id, read_fun=Fun}}
-                              || {Id, Fun} <- Reads]),
+    Scope = [{Id, #read{id=Id, read_fun=Fun}} || {Id, Fun} <- Reads],
     Pid = erlang:spawn_link(?MODULE, process, [Scope, Function]),
     {ok, Pid};
 start_link(Scope, Function) ->
@@ -71,7 +70,7 @@ process(Scope0, Function) ->
                     {ok, Result} = ReadFun(Id, {strict, Value}),
                     Self ! {ok, Result}
                    end)
-        end, ?SCOPE:to_list(Scope0)),
+        end, Scope0),
 
     %% Wait for the first variable to change; once it changes, update
     %% the dict and trigger the process which was waiting for
@@ -80,10 +79,9 @@ process(Scope0, Function) ->
     receive
         {ok, {Id, Type, Value}} ->
             %% Store updated value in the dict.
-            ReadRecord = ?SCOPE:fetch(Id, Scope0),
-            Scope = ?SCOPE:store(Id,
-                                 ReadRecord#read{value=Value, type=Type},
-                                 Scope0),
+            {_, Read} = ?SCOPE:keyfind(Id, 1, Scope0),
+            Scope = ?SCOPE:keyreplace(Id, 1, Scope0,
+                                      {Id, Read#read{value=Value, type=Type}}),
 
             %% Apply function with updated scope.
             Function(Scope),

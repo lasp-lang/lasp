@@ -29,6 +29,9 @@
 %% Default set implementation for Lasp internal state tracking.
 -define(SET, lasp_orset_gbtree).
 
+%% What the process scope is in?
+-define(SCOPE, orddict).
+
 -define(N, 3).
 -define(W, 2).
 -define(R, 2).

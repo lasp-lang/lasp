@@ -438,7 +438,7 @@ bind_to(AccId, Id, Store, BindFun) ->
 bind_to(AccId, Id, Store, BindFun, ReadFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
-        #read{value=Value} = dict:fetch(Id, Scope),
+        #read{value=Value} = ?SCOPE:fetch(Id, Scope),
 
         %% Bind new value back.
         {ok, _} = BindFun(AccId, Value, Store)
@@ -460,7 +460,7 @@ bind_to(AccId, Id, Store, BindFun, ReadFun) ->
 fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
-        #read{type=Type, value=Value} = dict:fetch(Id, Scope),
+        #read{type=Type, value=Value} = ?SCOPE:fetch(Id, Scope),
 
         %% Iterator to map the data structure over.
         FolderFun = fun(Element, Acc) ->
@@ -499,8 +499,8 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
 product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
-        #read{type=Type, value=LValue} = dict:fetch(Left, Scope),
-        #read{type=_Type, value=RValue} = dict:fetch(Right, Scope),
+        #read{type=Type, value=LValue} = ?SCOPE:fetch(Left, Scope),
+        #read{type=_Type, value=RValue} = ?SCOPE:fetch(Right, Scope),
 
         case {LValue, RValue} of
             {undefined, _} ->
@@ -546,8 +546,8 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
-        #read{type=Type, value=LValue} = dict:fetch(Left, Scope),
-        #read{type=_Type, value=RValue} = dict:fetch(Right, Scope),
+        #read{type=Type, value=LValue} = ?SCOPE:fetch(Left, Scope),
+        #read{type=_Type, value=RValue} = ?SCOPE:fetch(Right, Scope),
 
         case {LValue, RValue} of
             {undefined, _} ->
@@ -604,8 +604,8 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
         %% Read current value from the scope.
         %% @TODO: assume for the time being source and destination are
         %% the same type.
-        #read{type=Type, value=LValue} = dict:fetch(Left, Scope),
-        #read{value=RValue} = dict:fetch(Right, Scope),
+        #read{type=Type, value=LValue} = ?SCOPE:fetch(Left, Scope),
+        #read{value=RValue} = ?SCOPE:fetch(Right, Scope),
 
         case {LValue, RValue} of
             {undefined, _} ->
@@ -641,7 +641,7 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
-        #read{type=Type, value=Value} = dict:fetch(Id, Scope),
+        #read{type=Type, value=Value} = ?SCOPE:fetch(Id, Scope),
 
         %% Iterator to map the data structure over.
         FolderFun = fun(Element, Acc) ->
@@ -681,7 +681,7 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun(Scope) ->
         %% Read current value from the scope.
-        #read{type=Type, value=Value} = dict:fetch(Id, Scope),
+        #read{type=Type, value=Value} = ?SCOPE:fetch(Id, Scope),
 
         %% Iterator to map the data structure over.
         FolderFun = fun(Element, Acc) ->

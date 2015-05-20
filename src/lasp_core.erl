@@ -61,12 +61,12 @@
          fold/6]).
 
 %% Definitions for the bind/read fun abstraction.
--define(BIND, fun(_AccId, AccValue, _Variables) ->
-                ?MODULE:bind(_AccId, AccValue, _Variables)
+-define(BIND, fun(_AccId, AccValue, _Store) ->
+                ?MODULE:bind(_AccId, AccValue, _Store)
               end).
 
--define(READ, fun(_Id, _Threshold, _Variables) ->
-                ?MODULE:read(_Id, _Threshold, _Variables)
+-define(READ, fun(_Id, _Threshold) ->
+                ?MODULE:read(_Id, _Threshold, Store)
               end).
 
 %% @doc Initialize the backend.
@@ -436,14 +436,11 @@ bind_to(AccId, Id, Store, BindFun) ->
     bind_to(AccId, Id, Store, BindFun, ?READ).
 
 bind_to(AccId, Id, Store, BindFun, ReadFun) ->
-    Fun = fun(Scope) ->
-        %% Read current value from the scope.
-        #read{value=Value} = ?SCOPE:fetch(Id, Scope),
-
+    Fun = fun({_, _, V}) ->
         %% Bind new value back.
-        {ok, _} = BindFun(AccId, Value, Store)
+        {ok, _} = BindFun(AccId, V, Store)
     end,
-    lasp_process:start(Store, [{Id, ReadFun}], Fun).
+    lasp_process:start([{Id, ReadFun}], Fun).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -458,16 +455,13 @@ bind_to(AccId, Id, Store, BindFun, ReadFun) ->
 -spec fold(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun(Scope) ->
-        %% Read current value from the scope.
-        #read{type=Type, value=Value} = ?SCOPE:fetch(Id, Scope),
-
+    Fun = fun({_, T, V}) ->
         %% Iterator to map the data structure over.
         FolderFun = fun(Element, Acc) ->
                 Values = case Element of
                     {X, Causality} ->
                         %% lasp_orset
-                        [{V, Causality} || V <- Function(X)];
+                        [{Z, Causality} || Z <- Function(X)];
                     X ->
                         %% lasp_gset
                         Function(X)
@@ -477,13 +471,13 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
         end,
 
         %% Apply change.
-        AccValue = lists:foldl(FolderFun, Type:new(), Value),
+        AccValue = lists:foldl(FolderFun, T:new(), V),
 
         %% Bind new value back.
         {ok, _} = BindFun(AccId, AccValue, Store)
 
     end,
-    lasp_process:start(Store, [{Id, ReadFun}], Fun).
+    lasp_process:start([{Id, ReadFun}], Fun).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -497,11 +491,7 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
 -spec product(id(), id(), id(), store(), function(), function(),
               function()) -> {ok, pid()}.
 product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun(Scope) ->
-        %% Read current value from the scope.
-        #read{type=Type, value=LValue} = ?SCOPE:fetch(Left, Scope),
-        #read{type=_Type, value=RValue} = ?SCOPE:fetch(Right, Scope),
-
+    Fun = fun({_, T, LValue}, {_, _, RValue}) ->
         case {LValue, RValue} of
             {undefined, _} ->
                 ok;
@@ -524,13 +514,13 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                 end,
 
                 %% Apply change.
-                AccValue = lists:foldl(FolderFun, Type:new(), LValue),
+                AccValue = lists:foldl(FolderFun, T:new(), LValue),
 
                 %% Bind new value back.
                 {ok, _} = BindFun(AccId, AccValue, Store)
         end
     end,
-    lasp_process:start(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
+    lasp_process:start([{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -544,11 +534,7 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec intersection(id(), id(), id(), store(), function(), function(),
                    function()) -> {ok, pid()}.
 intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun(Scope) ->
-        %% Read current value from the scope.
-        #read{type=Type, value=LValue} = ?SCOPE:fetch(Left, Scope),
-        #read{type=_Type, value=RValue} = ?SCOPE:fetch(Right, Scope),
-
+    Fun = fun({_, T, LValue}, {_, _, RValue}) ->
         case {LValue, RValue} of
             {undefined, _} ->
                 ok;
@@ -580,13 +566,13 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                 end,
 
                 %% Apply change.
-                AccValue = lists:foldl(FolderFun, Type:new(), LValue),
+                AccValue = lists:foldl(FolderFun, T:new(), LValue),
 
                 %% Bind new value back.
                 {ok, _} = BindFun(AccId, AccValue, Store)
         end
     end,
-    lasp_process:start(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
+    lasp_process:start([{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
 
 %% @doc Compute the union of two sets.
 %%
@@ -600,20 +586,14 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec union(id(), id(), id(), store(), function(), function(),
             function()) -> {ok, pid()}.
 union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun(Scope) ->
-        %% Read current value from the scope.
-        %% @TODO: assume for the time being source and destination are
-        %% the same type.
-        #read{type=Type, value=LValue} = ?SCOPE:fetch(Left, Scope),
-        #read{value=RValue} = ?SCOPE:fetch(Right, Scope),
-
+    Fun = fun({_, T, LValue}, {_, _, RValue}) ->
         case {LValue, RValue} of
             {undefined, _} ->
                 ok;
             {_, undefined} ->
                 ok;
             {_, _} ->
-                AccValue = case Type of
+                AccValue = case T of
                     lasp_orset ->
                         orddict:merge(fun(_Key, L, _R) -> L end, LValue, RValue);
                     lasp_gset ->
@@ -624,7 +604,7 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                 {ok, _} = BindFun(AccId, AccValue, Store)
         end
     end,
-    lasp_process:start(Store, [{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
+    lasp_process:start([{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
 
 %% @doc Lap values from one lattice into another.
 %%
@@ -639,13 +619,10 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec map(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun(Scope) ->
-        %% Read current value from the scope.
-        #read{type=Type, value=Value} = ?SCOPE:fetch(Id, Scope),
-
+    Fun = fun({_, T, V}) ->
         %% Iterator to map the data structure over.
         FolderFun = fun(Element, Acc) ->
-                V = case Element of
+                Z = case Element of
                     {X, Causality} ->
                         %% lasp_orset
                         {Function(X), Causality};
@@ -654,17 +631,17 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
                         Function(X)
                 end,
 
-                Acc ++ [V]
+                Acc ++ [Z]
         end,
 
         %% Apply change.
-        AccValue = lists:foldl(FolderFun, Type:new(), Value),
+        AccValue = lists:foldl(FolderFun, T:new(), V),
 
         %% Bind new value back.
         {ok, _} = BindFun(AccId, AccValue, Store)
 
     end,
-    lasp_process:start(Store, [{Id, ReadFun}], Fun).
+    lasp_process:start([{Id, ReadFun}], Fun).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -679,13 +656,10 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 -spec filter(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun(Scope) ->
-        %% Read current value from the scope.
-        #read{type=Type, value=Value} = ?SCOPE:fetch(Id, Scope),
-
+    Fun = fun({_, T, V}) ->
         %% Iterator to map the data structure over.
         FolderFun = fun(Element, Acc) ->
-                V = case Element of
+                Z = case Element of
                     {X, _} ->
                         %% lasp_orset
                         X;
@@ -694,7 +668,7 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
                         X
                 end,
 
-                case Function(V) of
+                case Function(Z) of
                     true ->
                         Acc ++ [Element];
                     _ ->
@@ -703,13 +677,13 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
         end,
 
         %% Apply change.
-        AccValue = lists:foldl(FolderFun, Type:new(), Value),
+        AccValue = lists:foldl(FolderFun, T:new(), V),
 
         %% Bind new value back.
         {ok, _} = BindFun(AccId, AccValue, Store)
 
     end,
-    lasp_process:start(Store, [{Id, ReadFun}], Fun).
+    lasp_process:start([{Id, ReadFun}], Fun).
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
 %%      change the reply and blocking replies.

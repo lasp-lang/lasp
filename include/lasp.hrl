@@ -30,7 +30,7 @@
 -define(SET, lasp_orset_gbtree).
 
 %% What the process scope is in?
--define(SCOPE, orddict).
+-define(SCOPE, lists).
 
 -define(N, 3).
 -define(W, 2).

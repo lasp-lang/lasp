@@ -296,7 +296,7 @@ handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
             _:_ ->
                 Opts = [binary,
                         {parse_transform, lager_transform},
-                        {parse_transform, lasp_transform}] ++ Options0,
+                        {parse_transform, lasp_distributed_transform}] ++ Options0,
                 try
                     {ok, _, Bin0} = compile:file(File, Opts),
                     try
@@ -324,7 +324,7 @@ handle_command({register, {ReqId, _}, Module0, File, Options0}, _From,
         %% Generate options for compilation.
         Options = [binary,
                    {parse_transform, lager_transform},
-                   {parse_transform, lasp_transform},
+                   {parse_transform, lasp_distributed_transform},
                    {store, Store},
                    {partition, Partition},
                    {module, Module},

@@ -20,7 +20,7 @@
 
 %% @doc Parse transform, for remote code loading.
 
--module(lasp_transform).
+-module(lasp_distributed_transform).
 -author('Christopher Meiklejohn <cmeiklejohn@basho.com>').
 
 -include("lasp.hrl").

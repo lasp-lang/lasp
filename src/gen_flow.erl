@@ -21,10 +21,6 @@
 -module(gen_flow).
 -author('Christopher Meiklejohn <christopher.meiklejohn@gmail.com>').
 
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
--endif.
-
 %% API
 -export([start_link/2]).
 
@@ -102,19 +98,3 @@ loop(Module, State0, Cache0) ->
             %% Wait.
             loop(Module, State, Cache)
     end.
-
--ifdef(TEST).
-
-gen_flow_test() ->
-    {ok, _Pid} = gen_flow:start_link(gen_flow_example, [self()]),
-
-    Response = receive
-        ok ->
-            ok;
-        {ok, X} ->
-            X
-    end,
-
-    ?assertEqual([1,2], Response).
-
--endif.

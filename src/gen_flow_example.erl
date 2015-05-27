@@ -23,6 +23,10 @@
 
 -behaviour(gen_flow).
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 %% API
 -export([start_link/0]).
 
@@ -50,7 +54,8 @@ init([Source]) ->
 
 %% @doc Return list of read functions.
 read(State) ->
-    ReadFuns = [fun() -> 1 end, fun() -> 2 end],
+    ReadFuns = [fun() -> sets:from_list([1,2,3]) end,
+                fun() -> sets:from_list([3,4,5]) end],
     {ok, ReadFuns, State}.
 
 %% @doc Computation to execute when inputs change.
@@ -60,8 +65,25 @@ process(Args, #state{source=Source}=State) ->
             ok;
         [_, undefined] ->
             ok;
-        [_, _] ->
-            Source ! {ok, Args},
+        [X, Y] ->
+            Set = sets:intersection(X, Y),
+            Source ! {ok, sets:to_list(Set)},
             ok
     end,
     {ok, State}.
+
+-ifdef(TEST).
+
+gen_flow_test() ->
+    {ok, _Pid} = gen_flow:start_link(gen_flow_example, [self()]),
+
+    Response = receive
+        ok ->
+            ok;
+        {ok, X} ->
+            X
+    end,
+
+    ?assertEqual([3], Response).
+
+-endif.

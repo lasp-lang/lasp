@@ -59,6 +59,8 @@ confirm() ->
     lager:info("Reading variables."),
     {ok, [1,1,1]} = rpc:call(N2, ?MODULE, read, [Ids]),
 
+    lager:info("Ids: ~p", [Ids]),
+
     lager:info("Done!"),
 
     pass.

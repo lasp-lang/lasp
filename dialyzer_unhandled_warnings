@@ -1,2 +1,0 @@
-gen_flow_example.erl:44: Call to missing or unexported function gen_flow:start_link/1
-lasp_map_flow.erl:44: Call to missing or unexported function gen_flow:start_link/1

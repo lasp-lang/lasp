@@ -440,7 +440,7 @@ bind_to(AccId, Id, Store, BindFun, ReadFun) ->
         %% Bind new value back.
         {ok, _} = BindFun(AccId, V, Store)
     end,
-    lasp_process:start([{Id, ReadFun}], Fun).
+    gen_flow:start_link(lasp_process, [[{Id, ReadFun}], Fun]).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -477,7 +477,7 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
         {ok, _} = BindFun(AccId, AccValue, Store)
 
     end,
-    lasp_process:start([{Id, ReadFun}], Fun).
+    gen_flow:start_link(lasp_process, [[{Id, ReadFun}], Fun]).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -520,7 +520,8 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                 {ok, _} = BindFun(AccId, AccValue, Store)
         end
     end,
-    lasp_process:start([{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
+    gen_flow:start_link(lasp_process, [[{Left, ReadLeftFun}, {Right, ReadRightFun}],
+                                       Fun]).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -572,7 +573,7 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                 {ok, _} = BindFun(AccId, AccValue, Store)
         end
     end,
-    lasp_process:start([{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
+    gen_flow:start_link(lasp_process, [[{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun]).
 
 %% @doc Compute the union of two sets.
 %%
@@ -604,7 +605,7 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                 {ok, _} = BindFun(AccId, AccValue, Store)
         end
     end,
-    lasp_process:start([{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun).
+    gen_flow:start_link(lasp_process, [[{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun]).
 
 %% @doc Lap values from one lattice into another.
 %%
@@ -641,7 +642,7 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
         {ok, _} = BindFun(AccId, AccValue, Store)
 
     end,
-    gen_flow:start_link(lasp_map_flow, [[{Id, ReadFun}], Fun]).
+    gen_flow:start_link(lasp_process, [[{Id, ReadFun}], Fun]).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -683,7 +684,7 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
         {ok, _} = BindFun(AccId, AccValue, Store)
 
     end,
-    lasp_process:start([{Id, ReadFun}], Fun).
+    gen_flow:start_link(lasp_process, [[{Id, ReadFun}], Fun]).
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
 %%      change the reply and blocking replies.

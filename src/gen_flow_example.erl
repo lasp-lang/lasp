@@ -28,7 +28,7 @@
 -endif.
 
 %% API
--export([start_link/0]).
+-export([start_link/1]).
 
 %% Callbacks
 -export([init/1, read/1, process/2]).
@@ -40,8 +40,8 @@
 %%% API
 %%%===================================================================
 
-start_link() ->
-    {ok, Pid} = gen_flow:start_link(?MODULE),
+start_link(Args) ->
+    {ok, Pid} = gen_flow:start_link(?MODULE, Args),
     {ok, Pid}.
 
 %%%===================================================================

@@ -34,7 +34,7 @@
 -type state() :: term().
 
 -callback init(list(term())) -> {ok, state()}.
--callback read(state()) -> {ok, state()}.
+-callback read(state()) -> {ok, [function()], state()}.
 -callback process(list(term()), state()) -> {ok, state()}.
 
 %%%===================================================================

@@ -1,4 +1,2 @@
 gen_flow_example.erl:44: Call to missing or unexported function gen_flow:start_link/1
-gen_flow_example.erl:56: The inferred return type of read/1 ({'ok',[fun(() -> any()),...],_}) has nothing in common with {'ok',_}, which is the expected return type for the callback of gen_flow behaviour
 lasp_map_flow.erl:44: Call to missing or unexported function gen_flow:start_link/1
-lasp_map_flow.erl:56: The inferred return type of read/1 ({'ok',[fun((_) -> any()),...],#state{read_funs::[any(),...]}}) has nothing in common with {'ok',_}, which is the expected return type for the callback of gen_flow behaviour

@@ -21,74 +21,61 @@
 -module(lasp_process).
 -author('Christopher Meiklejohn <christopher.meiklejohn@gmail.com>').
 
--include("lasp.hrl").
+-behaviour(gen_flow).
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
 
 %% API
--export([start_link/2,
-         start/2]).
+-export([start_link/1]).
 
 %% Callbacks
--export([process/2]).
+-export([init/1, read/1, process/2]).
+
+%% Records
+-record(state, {read_funs, function}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
-start_link(Reads, Function) when is_list(Reads) ->
-    Scope = [{Id, #read{id=Id, read_fun=Fun}} || {Id, Fun} <- Reads],
-    Pid = erlang:spawn_link(?MODULE, process, [Scope, Function]),
-    {ok, Pid};
-start_link(Scope, Function) ->
-    Pid = erlang:spawn_link(?MODULE, process, [Scope, Function]),
+start_link(Args) ->
+    {ok, Pid} = gen_flow:start_link(?MODULE, Args),
     {ok, Pid}.
-
-%% @doc Process a notification.
-start(Scope, Function) ->
-    lasp_process_sup:start_child([Scope, Function]).
 
 %%%===================================================================
 %%% Callbacks
 %%%===================================================================
 
-%% @doc Lasp process.
-%%
-%%      This function defines a supervised Lasp process; a Lasp process
-%%      is responsible for processing one stage in the dataflow graph:
-%%      reading from one-or-many input CRDTs, transforming them in some
-%%      fashion, and binding a subsequent output CRDT.
-%%
-process(Scope0, Function) ->
-    Self = self(),
+%% @doc Initialize state.
+init([ReadFuns, Function]) ->
+    {ok, #state{read_funs=ReadFuns, function=Function}}.
 
-    %% For every variable that has to be read, spawn a process to
-    %% perform the read and have it forward the response back to the
-    %% notifier, which is waiting for the first change to trigger
-    %% re-evaluation.
-    %%
-    lists:foreach(fun({Id, #read{read_fun=ReadFun, value=Value}}) ->
-        spawn_link(fun() ->
-                    {ok, Result} = ReadFun(Id, {strict, Value}),
-                    Self ! {ok, Result}
-                   end)
-        end, Scope0),
+%% @doc Return list of read functions.
+read(#state{read_funs=ReadFuns0}=State) ->
+    ReadFuns = [gen_read_fun(Id, ReadFun) || {Id, ReadFun} <- ReadFuns0],
+    {ok, ReadFuns, State}.
 
-    %% Wait for the first variable to change; once it changes, update
-    %% the dict and trigger the process which was waiting for
-    %% notification which causes re-evaluation.
-    %%
-    receive
-        {ok, {Id, Type, Value}} ->
-            %% Store updated value in the dict.
-            {_, Read} = ?SCOPE:keyfind(Id, 1, Scope0),
-            Scope = ?SCOPE:keyreplace(Id, 1, Scope0,
-                                      {Id, Read#read{value=Value, type=Type}}),
+%% @doc Computation to execute when inputs change.
+process(Args, #state{function=Function}=State) ->
+    case lists:any(fun(X) -> X =:= undefined end, Args) of
+        true ->
+            ok;
+        false ->
+            erlang:apply(Function, Args)
+    end,
+    {ok, State}.
 
-            %% Apply function with updated scope.
-            Args = [{I, T, V} || {I, #read{type=T, value=V}} <- Scope],
-            erlang:apply(Function, Args),
-
-            process(Scope, Function);
-        Error ->
-            lager:info("Received error: ~p~n", [Error]),
-            process(Scope0, Function)
-    end.
+%% @doc Generate ReadFun.
+gen_read_fun(Id, ReadFun) ->
+    fun(Value0) ->
+                Value = case Value0 of
+                    undefined ->
+                        undefined;
+                    {_, _, V} ->
+                        V
+                end,
+                {ok, NewValue} = ReadFun(Id, {strict, Value}),
+                NewValue
+        end.

@@ -76,8 +76,9 @@ loop(Module, State0, Cache0) ->
     %% For each readfun, spawn a linked process to request values.
     lists:foreach(fun(X) ->
             ReadFun = lists:nth(X, ReadFuns),
+            CachedValue = orddict:fetch(X, DefaultedCache),
             spawn_link(fun() ->
-                            Value = ReadFun(),
+                            Value = ReadFun(CachedValue),
                             Self ! {ok, X, Value}
                     end)
         end, lists:seq(1, length(ReadFuns))),

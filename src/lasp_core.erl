@@ -641,7 +641,7 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
         {ok, _} = BindFun(AccId, AccValue, Store)
 
     end,
-    lasp_process:start([{Id, ReadFun}], Fun).
+    gen_flow:start_link(lasp_map_flow, [[{Id, ReadFun}], Fun]).
 
 %% @doc Filter values from one lattice into another.
 %%

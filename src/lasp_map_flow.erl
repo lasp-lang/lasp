@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(gen_flow_example).
+-module(lasp_map_flow).
 -author('Christopher Meiklejohn <christopher.meiklejohn@gmail.com>').
 
 -behaviour(gen_flow).
@@ -34,7 +34,7 @@
 -export([init/1, read/1, process/2]).
 
 %% Records
--record(state, {source}).
+-record(state, {read_funs, function}).
 
 %%%===================================================================
 %%% API
@@ -49,41 +49,34 @@ start_link() ->
 %%%===================================================================
 
 %% @doc Initialize state.
-init([Source]) ->
-    {ok, #state{source=Source}}.
+init([ReadFuns, Function]) ->
+    {ok, #state{read_funs=ReadFuns, function=Function}}.
 
 %% @doc Return list of read functions.
-read(State) ->
-    ReadFuns = [fun(_) -> sets:from_list([1,2,3]) end,
-                fun(_) -> sets:from_list([3,4,5]) end],
+read(#state{read_funs=ReadFuns0}=State) ->
+    ReadFuns = case ReadFuns0 of
+        [{Id, ReadFun}] ->
+            [fun(Value0) ->
+                        Value = case Value0 of
+                            undefined ->
+                                undefined;
+                            {_, _, V} ->
+                                V
+                        end,
+                        lager:warning("***** VALUE: ~p", [Value]),
+                        {ok, NewValue} = ReadFun(Id, {strict, Value}),
+                        NewValue
+                end]
+    end,
     {ok, ReadFuns, State}.
 
 %% @doc Computation to execute when inputs change.
-process(Args, #state{source=Source}=State) ->
+process(Args, #state{function=Function}=State) ->
     case Args of
-        [undefined, _] ->
+        undefined ->
             ok;
-        [_, undefined] ->
-            ok;
-        [X, Y] ->
-            Set = sets:intersection(X, Y),
-            Source ! {ok, sets:to_list(Set)},
-            ok
+        _ ->
+            lager:info("Map flow executing; args: ~p", [Args]),
+            erlang:apply(Function, Args)
     end,
     {ok, State}.
-
--ifdef(TEST).
-
-gen_flow_test() ->
-    {ok, _Pid} = gen_flow:start_link(gen_flow_example, [self()]),
-
-    Response = receive
-        ok ->
-            ok;
-        {ok, X} ->
-            X
-    end,
-
-    ?assertEqual([3], Response).
-
--endif.

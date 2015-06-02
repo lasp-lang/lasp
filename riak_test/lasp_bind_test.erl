@@ -58,6 +58,7 @@ test() ->
     test_lattice(lasp_gset),
     test_lattice(lasp_orset),
     test_lattice(lasp_orset_gbtree),
+    test_lattice(lasp_orswot),
     ok.
 
 %% @doc Test single-assignment variables.

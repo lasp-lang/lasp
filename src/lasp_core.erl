@@ -624,7 +624,8 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
                 lasp_orset_gbtree ->
                     %% Iterator to map the data structure over.
                     FolderFun = fun(X, Value, Acc) ->
-                            gb_trees:enter(Function(X), Value, Acc)
+                            New = gb_trees:enter(Function(X), Value, gb_trees:empty()),
+                            lasp_orset_gbtree:merge(New, Acc)
                     end,
                     gb_trees_ext:foldl(FolderFun, T:new(), V);
                 _ ->

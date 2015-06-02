@@ -74,6 +74,11 @@ threshold_met(lasp_orset, Value, {strict, Threshold}) ->
 threshold_met(lasp_orset, Value, Threshold) ->
     is_inflation(lasp_orset, Threshold, Value);
 
+threshold_met(lasp_orswot, Value, {strict, Threshold}) ->
+    is_strict_inflation(lasp_orswot, Threshold, Value);
+threshold_met(lasp_orswot, Value, Threshold) ->
+    is_inflation(lasp_orswot, Threshold, Value);
+
 threshold_met(riak_dt_orswot, Value, {strict, Threshold}) ->
     is_strict_inflation(riak_dt_orswot, Threshold, Value);
 threshold_met(riak_dt_orswot, Value, Threshold) ->
@@ -138,6 +143,9 @@ is_lattice_inflation(lasp_gset, Previous, Current) ->
     sets:is_subset(
         sets:from_list(lasp_gset:value(Previous)),
         sets:from_list(lasp_gset:value(Current)));
+
+is_lattice_inflation(lasp_orswot, {Previous, _, _}, {Current, _, _}) ->
+    riak_dt_vclock:descends(Current, Previous);
 
 is_lattice_inflation(lasp_orset_gbtree, Previous, Current) ->
     gb_trees_ext:fold(fun(Element, Ids, Acc) ->
@@ -213,6 +221,9 @@ is_lattice_strict_inflation(lasp_gset, Previous, Current) ->
     is_lattice_inflation(lasp_gset, Previous, Current) andalso
         lists:usort(lasp_gset:value(Previous)) =/=
         lists:usort(lasp_gset:value(Current));
+
+is_lattice_strict_inflation(lasp_orswot, {Previous, _, _}, {Current, _, _}) ->
+    riak_dt_vclock:dominates(Current, Previous);
 
 is_lattice_strict_inflation(lasp_orset_gbtree, Previous, Current) ->
     %% We already know that `Previous' is fully covered in `Current', so

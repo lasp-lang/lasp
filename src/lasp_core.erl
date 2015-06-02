@@ -620,7 +620,6 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun({_, T, V}) ->
-            %% Apply change.
             AccValue = case T of
                 lasp_orset_gbtree ->
                     %% Iterator to map the data structure over.
@@ -664,31 +663,44 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
     {ok, pid()}.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun({_, T, V}) ->
-        %% Iterator to map the data structure over.
-        FolderFun = fun(Element, Acc) ->
-                Z = case Element of
-                    {X, _} ->
-                        %% lasp_orset
-                        X;
-                    X ->
-                        %% lasp_gset
-                        X
-                end,
+            AccValue = case T of
+                lasp_orset_gbtree ->
+                    %% Iterator to map the data structure over.
+                    FolderFun = fun(X, Value, Acc) ->
+                            case Function(X) of
+                                true ->
+                                    New = gb_trees:enter(X, Value, gb_trees:empty()),
+                                    lasp_orset_gbtree:merge(New, Acc);
+                                _ ->
+                                    Acc
+                            end
+                    end,
+                    gb_trees_ext:foldl(FolderFun, T:new(), V);
+                _ ->
+                    FolderFun = fun(Element, Acc) ->
+                            Z = case Element of
+                                {X, _} ->
+                                    %% lasp_orset
+                                    X;
+                                X ->
+                                    %% lasp_gset
+                                    X
+                            end,
 
-                case Function(Z) of
-                    true ->
-                        Acc ++ [Element];
-                    _ ->
-                        Acc
-                end
-        end,
+                            case Function(Z) of
+                                true ->
+                                    Acc ++ [Element];
+                                _ ->
+                                    Acc
+                            end
+                    end,
 
-        %% Apply change.
-        AccValue = lists:foldl(FolderFun, T:new(), V),
+                    %% Apply change.
+                    lists:foldl(FolderFun, T:new(), V)
+            end,
 
-        %% Bind new value back.
-        {ok, _} = BindFun(AccId, AccValue, Store)
-
+            %% Bind new value back.
+            {ok, _} = BindFun(AccId, AccValue, Store)
     end,
     gen_flow:start_link(lasp_process, [[{Id, ReadFun}], Fun]).
 

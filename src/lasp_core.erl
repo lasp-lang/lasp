@@ -620,26 +620,33 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun({_, T, V}) ->
-        %% Iterator to map the data structure over.
-        FolderFun = fun(Element, Acc) ->
-                Z = case Element of
-                    {X, Causality} ->
-                        %% lasp_orset
-                        {Function(X), Causality};
-                    X ->
-                        %% lasp_gset
-                        Function(X)
-                end,
+            %% Apply change.
+            AccValue = case T of
+                lasp_orset_gbtree ->
+                    %% Iterator to map the data structure over.
+                    FolderFun = fun(X, Value, Acc) ->
+                            gb_trees:enter(Function(X), Value, Acc)
+                    end,
+                    gb_trees_ext:foldl(FolderFun, T:new(), V);
+                _ ->
+                    %% Iterator to map the data structure over.
+                    FolderFun = fun(Element, Acc) ->
+                            Z = case Element of
+                                {X, Causality} ->
+                                    %% lasp_orset
+                                    {Function(X), Causality};
+                                X ->
+                                    %% lasp_gset
+                                    Function(X)
+                            end,
 
-                Acc ++ [Z]
-        end,
+                            Acc ++ [Z]
+                    end,
+                    lists:foldl(FolderFun, T:new(), V)
+            end,
 
-        %% Apply change.
-        AccValue = lists:foldl(FolderFun, T:new(), V),
-
-        %% Bind new value back.
-        {ok, _} = BindFun(AccId, AccValue, Store)
-
+            %% Bind new value back.
+            {ok, _} = BindFun(AccId, AccValue, Store)
     end,
     gen_flow:start_link(lasp_process, [[{Id, ReadFun}], Fun]).
 

@@ -50,6 +50,9 @@ confirm() ->
     ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6,8,10,12]},
                  rpc:call(Node, ?MODULE, test, [lasp_orset])),
 
+    ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6,8,10,12]},
+                 rpc:call(Node, ?MODULE, test, [lasp_orset_gbtree])),
+
     lager:info("Done!"),
 
     pass.

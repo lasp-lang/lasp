@@ -470,7 +470,6 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
                 Acc ++ Values
         end,
 
-        %% Apply change.
         AccValue = lists:foldl(FolderFun, T:new(), V),
 
         %% Bind new value back.

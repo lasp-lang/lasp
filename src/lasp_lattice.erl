@@ -148,7 +148,7 @@ is_lattice_inflation(lasp_orswot, {Previous, _, _}, {Current, _, _}) ->
     riak_dt_vclock:descends(Current, Previous);
 
 is_lattice_inflation(lasp_orset_gbtree, Previous, Current) ->
-    gb_trees_ext:fold(fun(Element, Ids, Acc) ->
+    gb_trees_ext:foldl(fun(Element, Ids, Acc) ->
                         case gb_trees:lookup(Element, Current) of
                             none ->
                                 Acc andalso false;
@@ -232,7 +232,7 @@ is_lattice_strict_inflation(lasp_orset_gbtree, Previous, Current) ->
     IsLatticeInflation = is_lattice_inflation(lasp_orset_gbtree,
                                               Previous,
                                               Current),
-    DeletedElements = gb_trees_ext:fold(fun(Element, Ids, Acc) ->
+    DeletedElements = gb_trees_ext:foldl(fun(Element, Ids, Acc) ->
                     case gb_trees:lookup(Element, Current) of
                         none ->
                             Acc;
@@ -296,7 +296,7 @@ ids_inflated(lasp_orset, Previous, Current) ->
                 end, true, Previous);
 
 ids_inflated(lasp_orset_gbtree, Previous, Current) ->
-    gb_trees_ext:fold(fun(Id, _, Acc) ->
+    gb_trees_ext:foldl(fun(Id, _, Acc) ->
                         case gb_trees:lookup(Id, Current) of
                             none ->
                                 Acc andalso false;

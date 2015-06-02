@@ -66,7 +66,7 @@ new() ->
 
 -spec value(orset()) -> [member()].
 value(ORSet) ->
-    gb_trees_ext:fold(fun(Elem, Tokens, Acc0) ->
+    gb_trees_ext:foldl(fun(Elem, Tokens, Acc0) ->
                 case length(valid_tokens(Tokens)) > 0 of
                     true ->
                         Acc0 ++ [Elem];
@@ -91,7 +91,7 @@ value({tokens, Elem}, ORSet) ->
             gb_trees:empty()
     end;
 value(removed, ORSet) ->
-    gb_trees_ext:fold(fun(Elem, Tokens, Acc0) ->
+    gb_trees_ext:foldl(fun(Elem, Tokens, Acc0) ->
                 case length(removed_tokens(Tokens)) > 0 of
                     true ->
                         Acc0 ++ [Elem];
@@ -152,7 +152,7 @@ equal(ORDictA, ORDictB) ->
 %% state to the client.
 -spec precondition_context(orset()) -> orset().
 precondition_context(ORSet) ->
-    gb_trees_ext:fold(fun(Elem, Tokens, ORSet1) ->
+    gb_trees_ext:foldl(fun(Elem, Tokens, ORSet1) ->
             case minimum_tokens(Tokens) of
                 [] ->
                         ORSet1;
@@ -172,21 +172,21 @@ stats(ORSet) ->
 stat(element_count, ORSet) ->
     gb_trees:size(ORSet);
 stat(adds_count, ORSet) ->
-    gb_trees_ext:fold(fun(_, Tags, Acc0) ->
-                         gb_trees_ext:fold(fun(_Tag, false, Acc) -> Acc + 1;
+    gb_trees_ext:foldl(fun(_, Tags, Acc0) ->
+                         gb_trees_ext:foldl(fun(_Tag, false, Acc) -> Acc + 1;
                                               (_, _, Acc) -> Acc end,
                                      Acc0, Tags)
                  end, 0, ORSet);
 stat(removes_count, ORSet) ->
-    gb_trees_ext:fold(fun(_, Tags, Acc0) ->
-                         gb_trees_ext:fold(fun(_Tag, true, Acc) -> Acc + 1;
+    gb_trees_ext:foldl(fun(_, Tags, Acc0) ->
+                         gb_trees_ext:foldl(fun(_Tag, true, Acc) -> Acc + 1;
                                               (_, _, Acc) -> Acc end,
                                      Acc0, Tags)
                  end, 0, ORSet);
 stat(waste_pct, ORSet) ->
-    {Tags, Tombs} = gb_trees_ext:fold(
+    {Tags, Tombs} = gb_trees_ext:foldl(
                       fun(_K, Tags, Acc0) ->
-                              gb_trees_ext:fold(fun(_Tag, false, {As, Rs}) ->
+                              gb_trees_ext:foldl(fun(_Tag, false, {As, Rs}) ->
                                                         {As + 1, Rs};
                                                    (_Tag, true, {As, Rs}) ->
                                                         {As, Rs + 1}
@@ -243,7 +243,7 @@ remove_elem(Elem, ORSet) ->
     case gb_trees:lookup(Elem, ORSet) of
         {value, Tokens} ->
             Tokens = gb_trees:get(Elem, ORSet),
-            Tokens1 = gb_trees_ext:fold(fun(Key, _Value, Acc0) ->
+            Tokens1 = gb_trees_ext:foldl(fun(Key, _Value, Acc0) ->
                         gb_trees:enter(Key, true, Acc0)
                 end, gb_trees:empty(), Tokens),
             {ok, gb_trees:enter(Elem, Tokens1, ORSet)};
@@ -277,7 +277,7 @@ unique(_Actor) ->
     crypto:strong_rand_bytes(20).
 
 minimum_tokens(Tokens) ->
-    gb_trees_ext:fold(fun(Key, Removed, Acc) ->
+    gb_trees_ext:foldl(fun(Key, Removed, Acc) ->
                 case Removed of
                     true ->
                         Acc;

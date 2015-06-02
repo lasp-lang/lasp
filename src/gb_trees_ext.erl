@@ -23,7 +23,7 @@
 -module(gb_trees_ext).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com").
 
--export([merge/3, equal/2, fold/3, iterate/3]).
+-export([merge/3, equal/2, foldl/3, iterate/3]).
 
 merge(Tree1, Tree2, Fun) ->
     Iter1 = gb_trees:iterator(Tree1),
@@ -70,17 +70,17 @@ do_equal(none, none) ->
 do_equal(_, _) ->
     false.
 
-fold(_Fun, Acc, []) ->
+foldl(_Fun, Acc, []) ->
     Acc;
-fold(Fun, Acc, Tree) ->
+foldl(Fun, Acc, Tree) ->
     Iter = gb_trees:iterator(Tree),
-    do_fold(gb_trees:next(Iter), Acc, Fun).
+    do_foldl(gb_trees:next(Iter), Acc, Fun).
 
-do_fold(none, Acc, _Fun) ->
+do_foldl(none, Acc, _Fun) ->
     Acc;
-do_fold({Key, Value, Iter}, Acc0, Fun) ->
+do_foldl({Key, Value, Iter}, Acc0, Fun) ->
     Acc = Fun(Key, Value, Acc0),
-    do_fold(gb_trees:next(Iter), Acc, Fun).
+    do_foldl(gb_trees:next(Iter), Acc, Fun).
 
 iterate(VisitFun, FinishFun, Tree) ->
     Iter = gb_trees:iterator(Tree),

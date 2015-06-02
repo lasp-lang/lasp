@@ -588,21 +588,23 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     Fun = fun({_, T, LValue}, {_, _, RValue}) ->
         case {LValue, RValue} of
-            {undefined, _} ->
-                ok;
-            {_, undefined} ->
-                ok;
-            {_, _} ->
-                AccValue = case T of
-                    lasp_orset ->
-                        orddict:merge(fun(_Key, L, _R) -> L end, LValue, RValue);
-                    lasp_gset ->
-                        LValue ++ RValue
-                end,
+                {undefined, _} ->
+                    ok;
+                {_, undefined} ->
+                    ok;
+                {_, _} ->
+                    AccValue = case T of
+                        lasp_orset_gbtree ->
+                            lasp_orset_gbtree:merge(LValue, RValue);
+                        lasp_orset ->
+                            lasp_orset:merge(LValue, RValue);
+                        lasp_gset ->
+                            lasp_gset:merge(LValue, RValue)
+                    end,
 
-                %% Bind new value back.
-                {ok, _} = BindFun(AccId, AccValue, Store)
-        end
+                    %% Bind new value back.
+                    {ok, _} = BindFun(AccId, AccValue, Store)
+            end
     end,
     gen_flow:start_link(lasp_process, [[{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun]).
 

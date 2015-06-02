@@ -131,7 +131,7 @@ update(Op, Actor, ORSet, _Ctx) ->
 parent_clock(_Clock, ORSet) ->
     ORSet.
 
--spec merge(orset(), orset()) -> orset().
+-spec merge(gb_tree(), gb_tree()) -> gb_tree().
 merge(ORSet1, ORSet2) ->
     MergeFun = fun(TokensA, TokensB) ->
             TokenMergeFun = fun(A, B) -> A or B end,

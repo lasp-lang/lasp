@@ -63,6 +63,7 @@ declare(Type) ->
 declare_args(_S) ->
     [elements([lasp_ivar,
                lasp_orset,
+               lasp_orswot,
                lasp_orset_gbtree])].
 
 declare_next(#state{store=Store0}=S, Res, [Type]) ->
@@ -216,6 +217,20 @@ threshold(Variable, Store) ->
                             Random = random:uniform(Length),
                             lists:sublist(Value0, Random, Length)
                     end;
+                lasp_orswot ->
+                    %% @TODO: make this way better.
+                    {VClock, Entries, Deferred} = Value0,
+                    Value = dict:to_list(Entries),
+                    Length = length(Value),
+                    Threshold = case Length of
+                        0 ->
+                            dict:new();
+                        _ ->
+                            Random = random:uniform(Length),
+                            T = lists:sublist(Value, Random, Length),
+                            dict:from_list(T)
+                    end,
+                    {VClock, Threshold, Deferred};
                 lasp_orset_gbtree ->
                     Value = gb_trees:to_list(Value0),
                     Length = length(Value),

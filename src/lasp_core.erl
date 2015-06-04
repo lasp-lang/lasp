@@ -502,7 +502,7 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                         Values = case Element of
                             {X, XCausality} ->
                                 %% lasp_orset
-                                [{{X, Y}, lasp_lattice:orset_causal_product(XCausality, YCausality)}
+                                [{{X, Y}, lasp_lattice:causal_product(T, XCausality, YCausality)}
                                  || {Y, YCausality} <- RValue];
                             X ->
                                 %% lasp_gset
@@ -535,44 +535,62 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                    function()) -> {ok, pid()}.
 intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     Fun = fun({_, T, LValue}, {_, _, RValue}) ->
-        case {LValue, RValue} of
-            {undefined, _} ->
-                ok;
-            {_, undefined} ->
-                ok;
-            {_, _} ->
-                %% Iterator to map the data structure over.
-                FolderFun = fun(Element, Acc) ->
-                        Values = case Element of
-                            {X, XCausality} ->
-                                %% lasp_orset
-                                case lists:keyfind(X, 1, RValue) of
-                                    {_Y, YCausality} ->
-                                        [{X, lasp_lattice:orset_causal_union(XCausality, YCausality)}];
-                                    false ->
-                                        []
-                                end;
-                            X ->
-                                %% lasp_gset
-                                case lists:member(X, RValue) of
-                                    true ->
-                                        [X];
-                                    false ->
-                                        []
-                                end
-                        end,
+            case {LValue, RValue} of
+                {undefined, _} ->
+                    ok;
+                {_, undefined} ->
+                    ok;
+                {_, _} ->
+                    AccValue = case T of
+                        lasp_orset_gbtree ->
+                            FolderFun = fun(X, XCausality, Acc) ->
+                                    Value = case gb_trees:lookup(X, RValue) of
+                                        {value, YCausality} ->
+                                            lasp_lattice:causal_union(T, XCausality, YCausality);
+                                        none ->
+                                            Acc
+                                    end,
+                                    New = gb_trees:enter(X,
+                                                         Value,
+                                                         gb_trees:empty()),
+                                    lasp_orset_gbtree:merge(New, Acc)
+                            end,
+                            gb_trees_ext:foldl(FolderFun,
+                                               T:new(),
+                                               LValue);
+                        _ ->
+                            FolderFun = fun(Element, Acc) ->
+                                    Values = case Element of
+                                        {X, XCausality} ->
+                                            %% lasp_orset
+                                            case lists:keyfind(X, 1, RValue) of
+                                                {_Y, YCausality} ->
+                                                    [{X, lasp_lattice:causal_union(T, XCausality, YCausality)}];
+                                                false ->
+                                                    []
+                                            end;
+                                        X ->
+                                            %% lasp_gset
+                                            case lists:member(X, RValue) of
+                                                true ->
+                                                    [X];
+                                                false ->
+                                                    []
+                                            end
+                                    end,
 
-                        Acc ++ Values
-                end,
+                                    Acc ++ Values
+                            end,
+                            lists:foldl(FolderFun, T:new(), LValue)
+                    end,
 
-                %% Apply change.
-                AccValue = lists:foldl(FolderFun, T:new(), LValue),
-
-                %% Bind new value back.
-                {ok, _} = BindFun(AccId, AccValue, Store)
-        end
+                    %% Bind new value back.
+                    {ok, _} = BindFun(AccId, AccValue, Store)
+            end
     end,
-    gen_flow:start_link(lasp_process, [[{Left, ReadLeftFun}, {Right, ReadRightFun}], Fun]).
+    gen_flow:start_link(lasp_process,
+                        [[{Left, ReadLeftFun}, {Right, ReadRightFun}],
+                        Fun]).
 
 %% @doc Compute the union of two sets.
 %%
@@ -624,14 +642,12 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun({_, T, V}) ->
             AccValue = case T of
                 lasp_orset_gbtree ->
-                    %% Iterator to map the data structure over.
                     FolderFun = fun(X, Value, Acc) ->
                             New = gb_trees:enter(Function(X), Value, gb_trees:empty()),
                             lasp_orset_gbtree:merge(New, Acc)
                     end,
                     gb_trees_ext:foldl(FolderFun, T:new(), V);
                 _ ->
-                    %% Iterator to map the data structure over.
                     FolderFun = fun(Element, Acc) ->
                             Z = case Element of
                                 {X, Causality} ->

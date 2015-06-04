@@ -33,8 +33,8 @@
          is_lattice_inflation/3,
          is_strict_inflation/3,
          is_lattice_strict_inflation/3,
-         orset_causal_product/2,
-         orset_causal_union/2]).
+         causal_product/3,
+         causal_union/3]).
 
 %% @doc Determine if a threshold is met.
 %%
@@ -311,7 +311,7 @@ ids_inflated(lasp_orset_gbtree, Previous, Current) ->
 %%      Computes product of `Xs' and `Ys' and map deleted through using
 %%      an or operation.
 %%
-orset_causal_product(Xs, Ys) ->
+causal_product(lasp_orset, Xs, Ys) ->
     lists:foldl(fun({X, XDeleted}, XAcc) ->
                 lists:foldl(fun({Y, YDeleted}, YAcc) ->
                             [{[X, Y], XDeleted orelse YDeleted}] ++ YAcc
@@ -319,8 +319,10 @@ orset_causal_product(Xs, Ys) ->
         end, [], Xs).
 
 %% @doc Compute the union of causal metadata.
-orset_causal_union(Xs, Ys) ->
-    Xs ++ Ys.
+causal_union(lasp_orset, Xs, Ys) ->
+    Xs ++ Ys;
+causal_union(lasp_orset_gbtree, Xs, Ys) ->
+    gb_trees_ext:merge(Xs, Ys, fun(X, _Y) -> X end).
 
 -ifdef(TEST).
 

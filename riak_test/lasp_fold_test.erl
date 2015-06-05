@@ -44,11 +44,14 @@ confirm() ->
 
     ok = lasp_test_helpers:wait_for_cluster(Nodes),
 
-    ?assertEqual({ok, [1,2,3,4,5,6], [1,1,1,2,2,2,3,3,3,4,4,4,5,5,5,6,6,6]},
+    ?assertEqual({ok, [1,2,3,4,5,6], [{1,2},{2,4},{3,6},{4,8},{5,10},{6,12}]},
                  rpc:call(Node, ?MODULE, test, [lasp_gset])),
 
-    ?assertEqual({ok, [1,2,3,4,5,6], [1,1,1,2,2,2,3,3,3,4,4,4,5,5,5,6,6,6]},
+    ?assertEqual({ok, [1,2,3,4,5,6], [{1,2},{2,4},{3,6},{4,8},{5,10},{6,12}]},
                  rpc:call(Node, ?MODULE, test, [lasp_orset])),
+
+    ?assertEqual({ok, [1,2,3,4,5,6], [{1,2},{2,4},{3,6},{4,8},{5,10},{6,12}]},
+                 rpc:call(Node, ?MODULE, test, [lasp_orset_gbtree])),
 
     lager:info("Done!"),
 
@@ -67,7 +70,7 @@ test(Type) ->
     {ok, S2} = lasp:declare(Type),
 
     %% Apply fold.
-    ok = lasp:fold(S1, fun(X) -> [X,X,X] end, S2),
+    ok = lasp:fold(S1, fun(X) -> [{X, X*2}] end, S2),
 
     %% Wait.
     timer:sleep(4000),

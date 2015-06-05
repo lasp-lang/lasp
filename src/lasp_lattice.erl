@@ -316,7 +316,13 @@ causal_product(lasp_orset, Xs, Ys) ->
                 lists:foldl(fun({Y, YDeleted}, YAcc) ->
                             [{[X, Y], XDeleted orelse YDeleted}] ++ YAcc
                     end, [], Ys) ++ XAcc
-        end, [], Xs).
+        end, [], Xs);
+causal_product(lasp_orset_gbtree, Xs, Ys) ->
+    gb_trees_ext:foldl(fun(X, XDeleted, XAcc) ->
+                gb_trees_ext:foldl(fun(Y, YDeleted, YAcc) ->
+                            gb_trees:enter([X, Y], XDeleted orelse YDeleted, YAcc)
+                    end, XAcc, Ys)
+        end, gb_trees:empty(), Xs).
 
 %% @doc Compute the union of causal metadata.
 causal_union(lasp_orset, Xs, Ys) ->

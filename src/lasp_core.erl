@@ -147,8 +147,7 @@ product(Left, Right, Product, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read(_Right, _Threshold, _Variables)
     end,
-    product(Left, Right, Product, Store, ?BIND, ReadLeftFun,
-            ReadRightFun).
+    product(Left, Right, Product, Store, ?BIND, ReadLeftFun, ReadRightFun).
 
 %% @doc Perform a read for a particular identifier.
 %%
@@ -491,36 +490,47 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
               function()) -> {ok, pid()}.
 product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     Fun = fun({_, T, LValue}, {_, _, RValue}) ->
-        case {LValue, RValue} of
-            {undefined, _} ->
-                ok;
-            {_, undefined} ->
-                ok;
-            {_, _} ->
-                %% Iterator to map the data structure over.
-                FolderFun = fun(Element, Acc) ->
-                        Values = case Element of
-                            {X, XCausality} ->
-                                %% lasp_orset
-                                [{{X, Y}, lasp_lattice:causal_product(T, XCausality, YCausality)}
-                                 || {Y, YCausality} <- RValue];
-                            X ->
-                                %% lasp_gset
-                                [{X, Y} || Y  <- RValue]
-                        end,
+            case {LValue, RValue} of
+                {undefined, _} ->
+                    ok;
+                {_, undefined} ->
+                    ok;
+                {_, _} ->
+                    AccValue = case T of
+                        lasp_orset_gbtree ->
+                            FolderFun = fun(X, XCausality, XAcc) ->
+                                    InnerFoldFun = fun(Y, YCausality, YAcc) ->
+                                            gb_trees:enter({X, Y},
+                                                           lasp_lattice:causal_product(T, XCausality, YCausality),
+                                                           YAcc)
+                                    end,
+                                    gb_trees_ext:foldl(InnerFoldFun, XAcc, RValue)
+                            end,
+                            gb_trees_ext:foldl(FolderFun, T:new(), LValue);
+                        _ ->
+                            FolderFun = fun(Element, Acc) ->
+                                    Values = case Element of
+                                        {X, XCausality} ->
+                                            %% lasp_orset
+                                            [{{X, Y}, lasp_lattice:causal_product(T, XCausality, YCausality)}
+                                             || {Y, YCausality} <- RValue];
+                                        X ->
+                                            %% lasp_gset
+                                            [{X, Y} || Y  <- RValue]
+                                    end,
 
-                        Acc ++ Values
-                end,
+                                    Acc ++ Values
+                            end,
+                            lists:foldl(FolderFun, T:new(), LValue)
+                    end,
 
-                %% Apply change.
-                AccValue = lists:foldl(FolderFun, T:new(), LValue),
-
-                %% Bind new value back.
-                {ok, _} = BindFun(AccId, AccValue, Store)
-        end
+                    %% Bind new value back.
+                    {ok, _} = BindFun(AccId, AccValue, Store)
+            end
     end,
-    gen_flow:start_link(lasp_process, [[{Left, ReadLeftFun}, {Right, ReadRightFun}],
-                                       Fun]).
+    gen_flow:start_link(lasp_process,
+                        [[{Left, ReadLeftFun}, {Right, ReadRightFun}],
+                        Fun]).
 
 %% @doc Compute the intersection of two sets.
 %%

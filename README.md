@@ -1,4 +1,4 @@
-Lasp: A Language for Distributed, Eventually Consistent Computations with CRDTs
+Lasp: A Language for Distributed, Eventually Consistent Computations
 =======================================================
 
 Curious about what we're building?  Try out these posts:

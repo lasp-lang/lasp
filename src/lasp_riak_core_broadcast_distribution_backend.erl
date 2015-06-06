@@ -97,7 +97,7 @@ start_link(Opts) ->
 %% @todo doc
 %% @todo spec
 broadcast_data(Msg) ->
-    Id = druiid:v4(),
+    Id = druuid:v4(),
     lager:warning("id: ~p, msg: ~p", [Id, Msg]),
     {Id, Msg}.
 

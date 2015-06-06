@@ -45,7 +45,6 @@
          register/4,
          execute/2,
          process/6,
-         mk_reqid/0,
          register/0,
          process/4]).
 
@@ -238,7 +237,7 @@ read(Id, Threshold) ->
 %%
 -spec read_any([{id(), threshold()}]) -> {ok, var()} | {error, timeout}.
 read_any(Reads) ->
-    ReqId = mk_reqid(),
+    ReqId = ?REQID(),
     _ = [lasp_read_fsm:read(Id, Threshold, ReqId) || {Id, Threshold} <- Reads],
     ?WAIT(ReqId, ?TIMEOUT).
 
@@ -367,10 +366,3 @@ preflist(NVal, Param, VNode) ->
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
-
-%% @doc Generate a request id.
-%%
-%%      Helper function; used to generate a unique request identifier.
-%%
-mk_reqid() ->
-    erlang:phash2(erlang:now()).

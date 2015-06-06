@@ -66,7 +66,7 @@ start_link(ReqId, From, Module, Object, Reason, Idx, Node) ->
 
 %% @doc Process a notification.
 process(Module, Object, Reason, Idx, Node) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_process_fsm_sup:start_child([ReqId, self(), Module, Object, Reason, Idx, Node]),
     {ok, ReqId}.
 

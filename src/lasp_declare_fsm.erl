@@ -63,13 +63,13 @@ start_link(ReqId, From, Preflist, Id, Type) ->
 
 %% @doc Declare a variable.
 declare(Id, Type) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_declare_fsm_sup:start_child([ReqId, self(), undefined, Id, Type]),
     {ok, ReqId}.
 
 %% @doc Declare a variable at a given preference list.
 declare(Preflist, Id, Type) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_declare_fsm_sup:start_child([ReqId, self(), Preflist, Id, Type]),
     {ok, ReqId}.
 

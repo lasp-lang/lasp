@@ -63,7 +63,7 @@ start_link(ReqId, From, Module, Function, Args) ->
 
 %% @doc Thread a function.
 thread(Module, Function, Args) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_thread_fsm_sup:start_child([ReqId, self(), Module, Function, Args]),
     {ok, ReqId}.
 

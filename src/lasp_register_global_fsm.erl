@@ -60,7 +60,7 @@ start_link(ReqId, From, Module, File, Options) ->
 
 %% @doc Register a program.
 register(Module, File, Options) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_register_global_fsm_sup:start_child([ReqId, self(), Module, File, Options]),
     {ok, ReqId}.
 

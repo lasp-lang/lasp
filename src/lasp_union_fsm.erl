@@ -63,7 +63,7 @@ start_link(ReqId, From, Left, Right, Union) ->
 
 %% @doc Compute the union of two sets.
 union(Left, Right, Union) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_union_fsm_sup:start_child([ReqId, self(), Left, Right, Union]),
     {ok, ReqId}.
 

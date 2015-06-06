@@ -63,7 +63,7 @@ start_link(ReqId, From, Left, Right, Product) ->
 
 %% @doc Compute the cartesian product of two sets.
 product(Left, Right, Product) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_product_fsm_sup:start_child([ReqId, self(), Left, Right, Product]),
     {ok, ReqId}.
 

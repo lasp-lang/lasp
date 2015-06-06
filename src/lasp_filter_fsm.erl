@@ -63,7 +63,7 @@ start_link(ReqId, From, Id, Function, AccId) ->
 
 %% @doc Filter one object into another.
 filter(Id, Function, AccId) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_filter_fsm_sup:start_child([ReqId, self(), Id, Function, AccId]),
     {ok, ReqId}.
 

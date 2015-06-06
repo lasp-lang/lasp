@@ -63,7 +63,7 @@ start_link(ReqId, From, Left, Right, Intersection) ->
 
 %% @doc Compute the intersection of two sets.
 intersection(Left, Right, Intersection) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_intersection_fsm_sup:start_child([ReqId, self(), Left, Right, Intersection]),
     {ok, ReqId}.
 

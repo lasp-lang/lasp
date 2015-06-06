@@ -68,6 +68,9 @@
 -type module() :: atom().
 -endif.
 
+%% @doc Generate a request id.
+-define(REQID(), erlang:phash2(erlang:now())).
+
 %% @doc Wait for a response.
 %%
 %%      Helper function; given a `ReqId', wait for a message within

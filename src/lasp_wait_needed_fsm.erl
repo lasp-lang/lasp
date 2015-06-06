@@ -62,7 +62,7 @@ start_link(ReqId, From, Id, Threshold) ->
 
 %% @doc Lazy education for an identifier.
 wait_needed(Id, Threshold) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_wait_needed_fsm_sup:start_child([ReqId, self(), Id, Threshold]),
     {ok, ReqId}.
 

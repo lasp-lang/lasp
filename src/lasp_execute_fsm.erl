@@ -64,7 +64,7 @@ start_link(ReqId, From, Module) ->
 
 %% @doc Execute a module.
 execute(Module) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_execute_fsm_sup:start_child([ReqId, self(), Module]),
     {ok, ReqId}.
 

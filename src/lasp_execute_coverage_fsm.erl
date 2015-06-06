@@ -42,7 +42,7 @@ execute(Module) ->
     execute(Module, 1).
 
 execute(Module, NVal) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_execute_coverage_fsm_sup:start_child([{raw, ReqId, self()},
                                                    [?TIMEOUT, NVal, Module]]),
     {ok, ReqId}.

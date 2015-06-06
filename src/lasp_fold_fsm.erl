@@ -63,7 +63,7 @@ start_link(ReqId, From, Id, Function, AccId) ->
 
 %% @doc Fold one object into another.
 fold(Id, Function, AccId) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_fold_fsm_sup:start_child([ReqId, self(), Id, Function, AccId]),
     {ok, ReqId}.
 

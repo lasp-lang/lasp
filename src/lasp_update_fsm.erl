@@ -65,7 +65,7 @@ start_link(ReqId, From, Id, Operation, Actor) ->
 
 %% @doc Update a variable.
 update(Id, Operation, Actor) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_update_fsm_sup:start_child([ReqId, self(), Id, Operation, Actor]),
     {ok, ReqId}.
 

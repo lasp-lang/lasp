@@ -64,7 +64,7 @@ start_link(ReqId, From, Id, Value) ->
 
 %% @doc Bind a variable.
 bind(Id, Value) ->
-    ReqId = lasp:mk_reqid(),
+    ReqId = ?REQID(),
     _ = lasp_bind_fsm_sup:start_child([ReqId, self(), Id, Value]),
     {ok, ReqId}.
 

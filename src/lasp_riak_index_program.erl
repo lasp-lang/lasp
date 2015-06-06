@@ -165,7 +165,7 @@ create_views(Views) ->
                                       binary_to_list(Name) ++ "-" ++
                                       binary_to_list(Value)),
                 spawn_link(fun() ->
-                                ok = lasp:register(
+                                ok = lasp_programs:register(
                                         ?VIEW,
                                         code:lib_dir(?APP, src) ++ "/" ++ atom_to_list(?VIEW) ++ ".erl",
                                         global,

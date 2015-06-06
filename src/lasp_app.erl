@@ -43,7 +43,7 @@ start(_StartType, _StartArgs) ->
 
             ok = riak_core_node_watcher_events:add_guarded_handler(lasp_node_event_handler, []),
 
-            ok = lasp:register(),
+            ok = lasp_programs:register(),
 
             {ok, Pid};
         {error, Reason} ->

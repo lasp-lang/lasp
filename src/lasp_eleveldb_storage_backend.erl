@@ -21,21 +21,60 @@
 -module(lasp_eleveldb_storage_backend).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
+-behaviour(gen_server).
+-behaviour(lasp_storage_backend).
+
 -include("lasp.hrl").
 
+%% lasp_storage_backend callbacks
 -export([start/1,
          put/3,
          get/2]).
 
--behaviour(lasp_storage_backend).
+%% gen_server callbacks
+-export([init/1,
+         handle_call/3,
+         handle_cast/2,
+         handle_info/2,
+         terminate/2,
+         code_change/3]).
 
+%% reference tpe
+-type ref() :: eleveldb:db_ref().
+
+%% State record
+-record(state, {ref :: ref()}).
+
+%% eleveldb configuration options.
 -define(OPEN_OPTS, [{create_if_missing, true}]).
 -define(READ_OPTS, []).
 -define(WRITE_OPTS, []).
 
-%% @doc Initialize the backend.
--spec start(atom()) -> {ok, eleveldb:db_ref()} | {error, atom()}.
+%%%===================================================================
+%%% lasp_storage_backend callbacks
+%%%===================================================================
+
+%% @doc Start and link to calling process.
+-spec start(atom())-> {ok, pid()} | ignore | {error, term()}.
 start(Identifier) ->
+    gen_server:start_link({local, Identifier}, ?MODULE, [Identifier], []).
+
+%% @doc Write a record to the backend.
+-spec put(ref(), id(), variable()) -> ok | {error, atom()}.
+put(Ref, Id, Record) ->
+    gen_server:call(Ref, {put, Id, Record}, infinity).
+
+%% @doc Retrieve a record from the backend.
+-spec get(ref(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
+get(Ref, Id) ->
+    gen_server:call(Ref, {get, Id}, infinity).
+
+%%%===================================================================
+%%% gen_server callbacks
+%%%===================================================================
+
+%% @private
+init([Identifier]) ->
     %% Get the data root directory
     Config = app_helper:get_env(?APP),
     DataDir = filename:join(app_helper:get_prop_or_env(store_data_dir, Config, ?APP),
@@ -46,44 +85,65 @@ start(Identifier) ->
 
     case eleveldb:open(DataDir, ?OPEN_OPTS) of
         {ok, Ref} ->
-            {ok, Ref};
+            {ok, #state{ref=Ref}};
         {error, Reason} ->
             lager:info("Failed to open backend: ~p", [Reason]),
-            {error, Reason}
+            {stop, Reason}
     end.
 
-%% @doc Write a record to the backend.
--spec put(store(), id(), variable()) -> ok | {error, atom()}.
-put(Store, Id, Record) ->
+%% @private
+handle_call({get, Id}, _From, #state{ref=Ref}=State) ->
     StorageKey = encode(Id),
-    StorageValue = encode(Record),
-    Updates = [{put, StorageKey, StorageValue}],
-    case eleveldb:write(Store, Updates, ?WRITE_OPTS) of
-        ok ->
-            lager:info("Wrote object; id: ~p", [Id]),
-            ok;
-        {error, Reason} ->
-            lager:info("Error writing object; id: ~p, reason: ~p",
-                       [Id, Reason]),
-            {error, Reason}
-    end.
-
-%% @doc Retrieve a record from the backend.
--spec get(store(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
-get(Store, Id) ->
-    StorageKey = encode(Id),
-    case eleveldb:get(Store, StorageKey, ?READ_OPTS) of
+    case eleveldb:get(Ref, StorageKey, ?READ_OPTS) of
         {ok, Value} ->
             lager:info("Retrieved object; id: ~p", [Id]),
-            {ok, decode(Value)};
+            {reply, {ok, decode(Value)}, State};
         not_found ->
             lager:info("Object not found; id: ~p", [Id]),
-            {error, not_found};
+            {reply, {error, not_found}, State};
         {error, Reason} ->
             lager:info("Error reading object; id: ~p, reason: ~p",
                        [Id, Reason]),
-            {error, Reason}
-    end.
+            {reply, {error, Reason}, State}
+    end;
+handle_call({put, Id, Record}, _From, #state{ref=Ref}=State) ->
+    StorageKey = encode(Id),
+    StorageValue = encode(Record),
+    Updates = [{put, StorageKey, StorageValue}],
+    case eleveldb:write(Ref, Updates, ?WRITE_OPTS) of
+        ok ->
+            lager:info("Wrote object; id: ~p", [Id]),
+            {reply, ok, State};
+        {error, Reason} ->
+            lager:info("Error writing object; id: ~p, reason: ~p",
+                       [Id, Reason]),
+            {reply, {error, Reason}, State}
+    end;
+handle_call(Msg, _From, State) ->
+    lager:warning("Unhandled messages: ~p", [Msg]),
+    {reply, ok, State}.
+
+%% @private
+handle_cast(Msg, State) ->
+    lager:warning("Unhandled messages: ~p", [Msg]),
+    {noreply, State}.
+
+%% @private
+handle_info(Msg, State) ->
+    lager:warning("Unhandled messages: ~p", [Msg]),
+    {noreply, State}.
+
+%% @private
+terminate(_Reason, _State) ->
+    ok.
+
+%% @private
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
 
 %% @doc Encoding of object to binary before LevelDB write.
 encode(X) ->

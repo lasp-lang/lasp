@@ -29,7 +29,6 @@
          bind/2,
          bind/4,
          bind_to/2,
-         read/1,
          read/2,
          read_any/1,
          filter/3,
@@ -108,15 +107,6 @@ bind_to(Id, TheirId) ->
 -spec bind(id(), module(), func(), args()) -> {ok, id()} | {error, timeout}.
 bind(Id, Module, Function, Args) ->
     bind(Id, Module:Function(Args)).
-
-%% @doc Blocking read operation for a given dataflow variable.
-%%
-%%      Block until the variable identified by `Id' has been bound and
-%%      then return the value.
-%%
--spec read(id()) -> {ok, var()} | {error, timeout}.
-read(Id) ->
-    read(Id, {strict, undefined}).
 
 %% @doc Blocking monotonic read operation for a given dataflow variable.
 %%

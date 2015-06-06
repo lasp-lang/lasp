@@ -80,9 +80,9 @@ test_ivars() ->
     {ok, _} = lasp:bind(I1, 2),
 
     %% Verify the same value is contained by all.
-    {ok, {_, _, V1}} = lasp:read(I3),
-    {ok, {_, _, V1}} = lasp:read(I2),
-    {ok, {_, _, V1}} = lasp:read(I1),
+    {ok, {_, _, V1}} = lasp:read(I3, {strict, undefined}),
+    {ok, {_, _, V1}} = lasp:read(I2, {strict, undefined}),
+    {ok, {_, _, V1}} = lasp:read(I1, {strict, undefined}),
 
     ok.
 
@@ -101,9 +101,9 @@ test_lattice(Type) ->
     timer:sleep(4000),
 
     %% Verify the same value is contained by all.
-    {ok, {_, _, S1}} = lasp:read(L3),
-    {ok, {_, _, S1}} = lasp:read(L2),
-    {ok, {_, _, S1}} = lasp:read(L1),
+    {ok, {_, _, S1}} = lasp:read(L3, {strict, undefined}),
+    {ok, {_, _, S1}} = lasp:read(L2, {strict, undefined}),
+    {ok, {_, _, S1}} = lasp:read(L1, {strict, undefined}),
 
     %% Test inflations.
     {ok, S2} = Type:update({add, 2}, a, S1),
@@ -121,9 +121,9 @@ test_lattice(Type) ->
     timer:sleep(4000),
 
     %% Verify the same value is contained by all.
-    {ok, {_, _, S2}} = lasp:read(L3),
-    {ok, {_, _, S2}} = lasp:read(L2),
-    {ok, {_, _, S2}} = lasp:read(L1),
+    {ok, {_, _, S2}} = lasp:read(L3, {strict, undefined}),
+    {ok, {_, _, S2}} = lasp:read(L2, {strict, undefined}),
+    {ok, {_, _, S2}} = lasp:read(L1, {strict, undefined}),
 
     %% Read at the S2 threshold level.
     {ok, {_, _, S2}} = lasp:read(L1, S2),

@@ -82,9 +82,9 @@ test(Type) ->
     timer:sleep(4000),
 
     %% Read resulting value.
-    {ok, {_, _, S1V4}} = lasp:read(S1),
+    {ok, {_, _, S1V4}} = lasp:read(S1, {strict, undefined}),
 
     %% Read resulting value.
-    {ok, {_, _, S2V1}} = lasp:read(S2),
+    {ok, {_, _, S2V1}} = lasp:read(S2, {strict, undefined}),
 
     {ok, Type:value(S1V4), Type:value(S2V1)}.

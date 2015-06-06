@@ -171,7 +171,7 @@ test() ->
     {ok, Servers} = lasp:declare(?SET),
 
     %% Get the current advertisement list.
-    {ok, {_, _, AdList0}} = lasp:read(AdsWithContracts),
+    {ok, {_, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
     AdList = lasp_orset:value(AdList0),
 
     %% For each advertisement, launch one server for tracking it's
@@ -184,7 +184,7 @@ test() ->
                 end, AdList),
 
     %% Get client list.
-    {ok, {_, _, ClientList0}} = lasp:read(Clients),
+    {ok, {_, _, ClientList0}} = lasp:read(Clients, {strict, undefined}),
     ClientList = ?SET:value(ClientList0),
 
     Viewer = fun(_) ->

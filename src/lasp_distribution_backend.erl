@@ -54,13 +54,6 @@
 %%
 -callback bind_to(id(), id()) -> {ok, id()} | error().
 
-%% @doc Bind a dataflow variable to the result of a function call.
-%%
-%%      Execute `Module:Function(Args)' and bind the result using {@link
-%%      bind/2}.
-%%
--callback bind(id(), module(), func(), args()) -> {ok, id()} | error().
-
 %% @doc Blocking monotonic read operation for a given dataflow variable.
 %%
 %%      Block until the variable identified by `Id' has been bound, and

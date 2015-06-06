@@ -203,5 +203,5 @@ wait_needed(Id, Threshold) ->
 do(Function, Args) ->
     Backend = application:get_env(?APP,
                                   distribution_backend,
-                                  lasp_riak_core_distribution_backend),
+                                  lasp_riak_core_broadcast_distribution_backend),
     erlang:apply(Backend, Function, Args).

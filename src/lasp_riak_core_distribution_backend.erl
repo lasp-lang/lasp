@@ -28,7 +28,6 @@
 -export([declare/2,
          update/3,
          bind/2,
-         bind/4,
          bind_to/2,
          read/2,
          read_any/1,
@@ -83,15 +82,6 @@ bind(Id, Value) ->
 bind_to(Id, TheirId) ->
     {ok, ReqId} = lasp_bind_to_fsm:bind_to(Id, TheirId),
     ?WAIT(ReqId, ?TIMEOUT).
-
-%% @doc Bind a dataflow variable to the result of a function call.
-%%
-%%      Execute `Module:Function(Args)' and bind the result using {@link
-%%      bind/2}.
-%%
--spec bind(id(), module(), func(), args()) -> {ok, id()} | error().
-bind(Id, Module, Function, Args) ->
-    bind(Id, Module:Function(Args)).
 
 %% @doc Blocking monotonic read operation for a given dataflow variable.
 %%

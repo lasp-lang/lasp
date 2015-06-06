@@ -79,7 +79,7 @@
 -type id() :: binary().
 -type idx() :: term().
 -type result() :: term().
--type type() :: lasp_ivar | lasp_orset | lasp_orset_gbtree | lasp_gset | riak_dt_orswot | riak_dt_gcounter.
+-type type() :: lasp_ivar | lasp_orset | lasp_orset_gbtree | lasp_gset.
 -type value() :: term().
 -type func() :: atom().
 -type args() :: list().
@@ -93,6 +93,7 @@
 -type operations() :: list(operation()).
 -type ivar() :: term().
 -type actor() :: term().
+-type error() :: {error, atom()}.
 
 %% @doc Result of a read operation.
 -type var() :: {id(), type(), value()}.

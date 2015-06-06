@@ -18,38 +18,17 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_riak_core_distribution_backend).
+-module(lasp_distribution_backend).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
--behaviour(lasp_distribution_backend).
-
 -include("lasp.hrl").
-
--export([declare/2,
-         update/3,
-         bind/2,
-         bind/4,
-         bind_to/2,
-         read/2,
-         read_any/1,
-         filter/3,
-         map/3,
-         product/3,
-         union/3,
-         intersection/3,
-         fold/3,
-         wait_needed/2,
-         thread/3]).
 
 %% @doc Declare a new dataflow variable of a given type.
 %%
 %%      Valid values for `Type' are any of lattices supporting the
 %%      `riak_dt' behavior.  Type is declared with the provided `Id'.
 %%
--spec declare(id(), type()) -> {ok, id()} | error().
-declare(Id, Type) ->
-    {ok, ReqId} = lasp_declare_fsm:declare(Id, Type),
-    ?WAIT(ReqId, ?TIMEOUT).
+-callback declare(id(), type()) -> {ok, id()} | error().
 
 %% @doc Update a dataflow variable.
 %%
@@ -57,10 +36,7 @@ declare(Id, Type) ->
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation(), actor()) -> {ok, {value(), id()}} | error().
-update(Id, Operation, Actor) ->
-    {ok, ReqId} = lasp_update_fsm:update(Id, Operation, Actor),
-    ?WAIT(ReqId, ?TIMEOUT).
+-callback update(id(), operation(), actor()) -> {ok, {value(), id()}} | error().
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -68,10 +44,7 @@ update(Id, Operation, Actor) ->
 %%      {@link declare/0}) dataflow variable.  The `Value' provided is
 %%      the value to bind.
 %%
--spec bind(id(), value()) -> {ok, id()} | error().
-bind(Id, Value) ->
-    {ok, ReqId} = lasp_bind_fsm:bind(Id, Value),
-    ?WAIT(ReqId, ?TIMEOUT).
+-callback bind(id(), value()) -> {ok, id()} | error().
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -79,19 +52,14 @@ bind(Id, Value) ->
 %%      {@link declare/0}) dataflow variable.  The `Value' provided is
 %%      the value to bind.
 %%
--spec bind_to(id(), id()) -> {ok, id()} | error().
-bind_to(Id, TheirId) ->
-    {ok, ReqId} = lasp_bind_to_fsm:bind_to(Id, TheirId),
-    ?WAIT(ReqId, ?TIMEOUT).
+-callback bind_to(id(), id()) -> {ok, id()} | error().
 
 %% @doc Bind a dataflow variable to the result of a function call.
 %%
 %%      Execute `Module:Function(Args)' and bind the result using {@link
 %%      bind/2}.
 %%
--spec bind(id(), module(), func(), args()) -> {ok, id()} | error().
-bind(Id, Module, Function, Args) ->
-    bind(Id, Module:Function(Args)).
+-callback bind(id(), module(), func(), args()) -> {ok, id()} | error().
 
 %% @doc Blocking monotonic read operation for a given dataflow variable.
 %%
@@ -99,49 +67,33 @@ bind(Id, Module, Function, Args) ->
 %%      is monotonically greater (as defined by the lattice) then the
 %%      provided `Threshold' value.
 %%
--spec read(id(), threshold()) -> {ok, var()} | error().
-read(Id, Threshold) ->
-    {ok, ReqId} = lasp_read_fsm:read(Id, Threshold),
-    ?WAIT(ReqId, ?TIMEOUT).
+-callback read(id(), threshold()) -> {ok, var()} | error().
 
 %% @doc Blocking monotonic read operation for a list of given dataflow
 %%      variables.
 %%
--spec read_any([{id(), threshold()}]) -> {ok, var()} | error().
-read_any(Reads) ->
-    ReqId = ?REQID(),
-    _ = [lasp_read_fsm:read(Id, Threshold, ReqId) || {Id, Threshold} <- Reads],
-    ?WAIT(ReqId, ?TIMEOUT).
+-callback read_any([{id(), threshold()}]) -> {ok, var()} | error().
 
 %% @doc Compute the cartesian product of two sets.
 %%
 %%      Computes the cartestian product of two sets and bind the result
 %%      to a third.
 %%
--spec product(id(), id(), id()) -> ok | error().
-product(Left, Right, Product) ->
-    {ok, ReqId} = lasp_product_fsm:product(Left, Right, Product),
-    ?WAIT(ReqId, ?TIMEOUT).
+-callback product(id(), id(), id()) -> ok | error().
 
 %% @doc Compute the union of two sets.
 %%
 %%      Computes the union of two sets and bind the result
 %%      to a third.
 %%
--spec union(id(), id(), id()) -> ok | error().
-union(Left, Right, Union) ->
-    {ok, ReqId} = lasp_union_fsm:union(Left, Right, Union),
-    ?WAIT(ReqId, ?TIMEOUT).
+-callback union(id(), id(), id()) -> ok | error().
 
 %% @doc Compute the intersection of two sets.
 %%
 %%      Computes the intersection of two sets and bind the result
 %%      to a third.
 %%
--spec intersection(id(), id(), id()) -> ok | error().
-intersection(Left, Right, Intersection) ->
-    {ok, ReqId} = lasp_intersection_fsm:intersection(Left, Right, Intersection),
-    ?WAIT(ReqId, ?TIMEOUT).
+-callback intersection(id(), id(), id()) -> ok | error().
 
 %% @doc Map values from one lattice into another.
 %%
@@ -149,10 +101,7 @@ intersection(Left, Right, Intersection) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec map(id(), function(), id()) -> ok | error().
-map(Id, Function, AccId) ->
-    {ok, ReqId} = lasp_map_fsm:map(Id, Function, AccId),
-    ?WAIT(ReqId, ?TIMEOUT).
+-callback map(id(), function(), id()) -> ok | error().
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -160,10 +109,7 @@ map(Id, Function, AccId) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec fold(id(), function(), id()) -> ok | error().
-fold(Id, Function, AccId) ->
-    {ok, ReqId} = lasp_fold_fsm:fold(Id, Function, AccId),
-    ?WAIT(ReqId, ?TIMEOUT).
+-callback fold(id(), function(), id()) -> ok | error().
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -171,19 +117,13 @@ fold(Id, Function, AccId) ->
 %%      placing the result in `AccId', both of which need to be declared
 %%      variables.
 %%
--spec filter(id(), function(), id()) -> ok | error().
-filter(Id, Function, AccId) ->
-    {ok, ReqId} = lasp_filter_fsm:filter(Id, Function, AccId),
-    ?WAIT(ReqId, ?TIMEOUT).
+-callback filter(id(), function(), id()) -> ok | error().
 
 %% @doc Spawn a function.
 %%
 %%      Spawn a process executing `Module:Function(Args)'.
 %%
--spec thread(module(), func(), args()) -> ok | error().
-thread(Module, Function, Args) ->
-    {ok, ReqId} = lasp_thread_fsm:thread(Module, Function, Args),
-    ?WAIT(ReqId, ?TIMEOUT).
+-callback thread(module(), func(), args()) -> ok | error().
 
 %% @doc Pause execution until value requested with given threshold.
 %%
@@ -191,11 +131,4 @@ thread(Module, Function, Args) ->
 %%      issued for the given `Id'.  Used to introduce laziness into a
 %%      computation.
 %%
--spec wait_needed(id(), threshold()) -> ok | error().
-wait_needed(Id, Threshold) ->
-    {ok, ReqId} = lasp_wait_needed_fsm:wait_needed(Id, Threshold),
-    ?WAIT(ReqId, ?TIMEOUT).
-
-%%%===================================================================
-%%% Internal Functions
-%%%===================================================================
+-callback wait_needed(id(), threshold()) -> ok | error().

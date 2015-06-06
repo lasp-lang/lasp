@@ -53,5 +53,5 @@ confirm() ->
 
 test() ->
     lager:info("Executing program from the test."),
-    {ok, Result} = lasp:execute(lasp_example_program, preflist),
+    {ok, Result} = lasp_programs:execute(lasp_example_program, preflist),
     Result.

@@ -56,13 +56,13 @@ confirm() ->
 test() ->
     %% Put one value.
     lager:info("Processing one value."),
-    ok = lasp:process(lasp_example_keylist_program, global, 1, put, 0, node()),
+    ok = lasp_programs:process(lasp_example_keylist_program, global, 1, put, 0, node()),
 
     %% Put one value.
     lager:info("Processing second value."),
-    ok = lasp:process(lasp_example_keylist_program, global, 2, put, 0, node()),
+    ok = lasp_programs:process(lasp_example_keylist_program, global, 2, put, 0, node()),
 
     lager:info("Executing program from the test."),
-    {ok, Result} = lasp:execute(lasp_example_keylist_program, global),
+    {ok, Result} = lasp_programs:execute(lasp_example_keylist_program, global),
 
     Result.

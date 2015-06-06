@@ -68,6 +68,22 @@
 -type module() :: atom().
 -endif.
 
+%% @doc Wait for a response.
+%%
+%%      Helper function; given a `ReqId', wait for a message within
+%%      `Timeout' seconds and return the result.
+%%
+-define(WAIT(ReqId, Timeout),
+        receive
+            {ReqId, ok} ->
+                ok;
+            {ReqId, ok, Val} ->
+                {ok, Val}
+        after Timeout ->
+            {error, timeout}
+        end).
+
+%% General types.
 -type file() :: iolist().
 -type registration() :: preflist | global.
 -type id() :: binary().

@@ -47,8 +47,7 @@
          process/6,
          mk_reqid/0,
          register/0,
-         process/4,
-         wait_for_reqid/2]).
+         process/4]).
 
 -define(PROGRAMS, [{global, lasp_example_keylist_program},
                    {global, lasp_example_program},
@@ -83,10 +82,10 @@
     ok | {error, timeout} | error.
 register(Module, File, global, Options) ->
     {ok, ReqId} = lasp_register_global_fsm:register(Module, File, Options),
-    wait_for_reqid(ReqId, ?TIMEOUT);
+    ?WAIT(ReqId, ?TIMEOUT);
 register(Module, File, preflist, _Options) ->
     {ok, ReqId} = lasp_register_fsm:register(Module, File),
-    wait_for_reqid(ReqId, ?TIMEOUT);
+    ?WAIT(ReqId, ?TIMEOUT);
 register(_Module, _File, _Registration, _Options) ->
     error.
 
@@ -105,10 +104,10 @@ register(_Module, _File, _Registration, _Options) ->
     {ok, result()} | {error, timeout} | error.
 execute(Module, preflist) ->
     {ok, ReqId} = lasp_execute_fsm:execute(Module),
-    wait_for_reqid(ReqId, ?TIMEOUT);
+    ?WAIT(ReqId, ?TIMEOUT);
 execute(Module, global) ->
     {ok, ReqId} = lasp_execute_coverage_fsm:execute(Module),
-    wait_for_reqid(ReqId, ?TIMEOUT);
+    ?WAIT(ReqId, ?TIMEOUT);
 execute(_Module, _Registration) ->
     error.
 
@@ -147,7 +146,7 @@ process(Object, Reason, Idx, Node) ->
               node()) -> {ok, result()} | {error, timeout}.
 process(Module, global, Object, Reason, Idx, Node) ->
     {ok, ReqId} = lasp_process_fsm:process(Module, Object, Reason, Idx, Node),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Declare a new dataflow variable of a given type.
 %%
@@ -169,7 +168,7 @@ declare(Type) ->
 -spec declare(id(), type()) -> {ok, id()} | {error, timeout}.
 declare(Id, Type) ->
     {ok, ReqId} = lasp_declare_fsm:declare(Id, Type),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Update a dataflow variable.
 %%
@@ -181,7 +180,7 @@ declare(Id, Type) ->
     {ok, {value(), id()}} | {error, timeout}.
 update(Id, Operation, Actor) ->
     {ok, ReqId} = lasp_update_fsm:update(Id, Operation, Actor),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -192,7 +191,7 @@ update(Id, Operation, Actor) ->
 -spec bind(id(), value()) -> {ok, id()} | {error, timeout}.
 bind(Id, Value) ->
     {ok, ReqId} = lasp_bind_fsm:bind(Id, Value),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -203,7 +202,7 @@ bind(Id, Value) ->
 -spec bind_to(id(), id()) -> {ok, id()} | {error, timeout}.
 bind_to(Id, TheirId) ->
     {ok, ReqId} = lasp_bind_to_fsm:bind_to(Id, TheirId),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Bind a dataflow variable to the result of a function call.
 %%
@@ -232,7 +231,7 @@ read(Id) ->
 -spec read(id(), threshold()) -> {ok, var()} | {error, timeout}.
 read(Id, Threshold) ->
     {ok, ReqId} = lasp_read_fsm:read(Id, Threshold),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Blocking monotonic read operation for a list of given dataflow
 %%      variables.
@@ -241,7 +240,7 @@ read(Id, Threshold) ->
 read_any(Reads) ->
     ReqId = mk_reqid(),
     _ = [lasp_read_fsm:read(Id, Threshold, ReqId) || {Id, Threshold} <- Reads],
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -251,7 +250,7 @@ read_any(Reads) ->
 -spec product(id(), id(), id()) -> ok | {error, timeout}.
 product(Left, Right, Product) ->
     {ok, ReqId} = lasp_product_fsm:product(Left, Right, Product),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Compute the union of two sets.
 %%
@@ -261,7 +260,7 @@ product(Left, Right, Product) ->
 -spec union(id(), id(), id()) -> ok | {error, timeout}.
 union(Left, Right, Union) ->
     {ok, ReqId} = lasp_union_fsm:union(Left, Right, Union),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -271,7 +270,7 @@ union(Left, Right, Union) ->
 -spec intersection(id(), id(), id()) -> ok | {error, timeout}.
 intersection(Left, Right, Intersection) ->
     {ok, ReqId} = lasp_intersection_fsm:intersection(Left, Right, Intersection),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Map values from one lattice into another.
 %%
@@ -282,7 +281,7 @@ intersection(Left, Right, Intersection) ->
 -spec map(id(), function(), id()) -> ok | {error, timeout}.
 map(Id, Function, AccId) ->
     {ok, ReqId} = lasp_map_fsm:map(Id, Function, AccId),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -293,7 +292,7 @@ map(Id, Function, AccId) ->
 -spec fold(id(), function(), id()) -> ok | {error, timeout}.
 fold(Id, Function, AccId) ->
     {ok, ReqId} = lasp_fold_fsm:fold(Id, Function, AccId),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -304,7 +303,7 @@ fold(Id, Function, AccId) ->
 -spec filter(id(), function(), id()) -> ok | {error, timeout}.
 filter(Id, Function, AccId) ->
     {ok, ReqId} = lasp_filter_fsm:filter(Id, Function, AccId),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Spawn a function.
 %%
@@ -313,7 +312,7 @@ filter(Id, Function, AccId) ->
 -spec thread(module(), func(), args()) -> ok | {error, timeout}.
 thread(Module, Function, Args) ->
     {ok, ReqId} = lasp_thread_fsm:thread(Module, Function, Args),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Pause execution until value requested.
 %%
@@ -334,7 +333,7 @@ wait_needed(Id) ->
 -spec wait_needed(id(), threshold()) -> ok | {error, timeout}.
 wait_needed(Id, Threshold) ->
     {ok, ReqId} = lasp_wait_needed_fsm:wait_needed(Id, Threshold),
-    wait_for_reqid(ReqId, ?TIMEOUT).
+    ?WAIT(ReqId, ?TIMEOUT).
 
 %% @doc Generate a preference list.
 %%
@@ -375,18 +374,3 @@ preflist(NVal, Param, VNode) ->
 %%
 mk_reqid() ->
     erlang:phash2(erlang:now()).
-
-%% @doc Wait for a response.
-%%
-%%      Helper function; given a `ReqId', wait for a message within
-%%      `Timeout' seconds and return the result.
-%%
-wait_for_reqid(ReqID, Timeout) ->
-    receive
-        {ReqID, ok} ->
-            ok;
-        {ReqID, ok, Val} ->
-            {ok, Val}
-    after Timeout ->
-        {error, timeout}
-    end.

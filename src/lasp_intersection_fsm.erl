@@ -105,7 +105,7 @@ init([ReqId, From, Left, Right, Intersection]) ->
 
 %% @doc Prepare request by retrieving the preflist.
 prepare(timeout, #state{intersection=Intersection}=State) ->
-    Preflist = lasp:preflist(?N, Intersection, lasp),
+    Preflist = lasp_vnode:preflist(?N, Intersection, ?VNODE),
     Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
     {next_state, execute, State#state{preflist=Preflist2}, 0}.
 

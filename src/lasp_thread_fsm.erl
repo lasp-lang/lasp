@@ -105,7 +105,7 @@ init([ReqId, From, Module, Function, Args]) ->
 
 %% @doc Prepare request by retrieving the preflist.
 prepare(timeout, #state{module=Module}=State) ->
-    Preflist = lasp:preflist(?N, Module, lasp),
+    Preflist = lasp_vnode:preflist(?N, Module, ?VNODE),
     Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
     {next_state, execute, State#state{preflist=Preflist2}, 0}.
 

@@ -112,7 +112,7 @@ init([ReqId, From, Preflist, Id, Type]) ->
 prepare(timeout, #state{id=Id, preflist=Preflist0}=State) ->
     Preflist2 = case Preflist0 of
         undefined ->
-            Preflist = lasp:preflist(?N, Id, lasp),
+            Preflist = lasp_vnode:preflist(?N, Id, ?VNODE),
             [{Index, Node} || {{Index, Node}, _Type} <- Preflist];
         _ ->
             Preflist0

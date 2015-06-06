@@ -5,6 +5,8 @@
 
 -define(BUCKET, <<"lasp">>).
 
+-define(DISTRIBUTION_BACKEND, lasp_riak_core_distribution_backend).
+
 -ifndef(EQC).
 
 %% Erlang term storage based backend; no persistence.

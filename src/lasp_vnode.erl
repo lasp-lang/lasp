@@ -53,6 +53,9 @@
          execute/3,
          process/6]).
 
+%% Helpers.
+-export([preflist/3]).
+
 -export([start_vnode/1,
          init/1,
          terminate/2,
@@ -82,7 +85,7 @@
 
 -define(READ, fun(_Id, _Threshold) ->
                   %% Beware of cycles in the gen_server calls!
-                  [{IndexNode, _Type}|_] = ?APP:preflist(?N, _Id, lasp),
+                  [{IndexNode, _Type}|_] = lasp_vnode:preflist(?N, _Id, lasp),
 
                   case IndexNode of
                       {Partition, Node} ->
@@ -556,3 +559,37 @@ update_broadcast({add, Module}, Partition) ->
     end,
     {ok, Set} = ?SET:update({add, Module}, Partition, Set0),
     riak_core_metadata:put(?PROGRAM_PREFIX, ?PROGRAM_KEY, Set, []).
+
+%%%===================================================================
+%%% Internal Functions
+%%%===================================================================
+
+%% @doc Generate a preference list.
+%%
+%%      Given a `NVal', or replication factor, generate a preference
+%%      list of primary replicas for a given `Param' and registered
+%%      `VNode'.
+%%
+-spec preflist(non_neg_integer(), term(), atom()) ->
+    riak_core_apl:preflist_ann().
+preflist(NVal, Param, VNode) ->
+    case application:get_env(lasp, single_partition_mode) of
+        {ok, true} ->
+            case riak_core_mochiglobal:get(primary_apl) of
+                undefined ->
+                    DocIdx = riak_core_util:chash_key({?BUCKET,
+                                                       term_to_binary(Param)}),
+                    Preflist = riak_core_apl:get_primary_apl(DocIdx,
+                                                             NVal,
+                                                             VNode),
+                    ok = riak_core_mochiglobal:put(primary_apl, Preflist),
+                    Preflist;
+                Preflist ->
+                    Preflist
+            end;
+        _ ->
+            DocIdx = riak_core_util:chash_key({?BUCKET,
+                                               term_to_binary(Param)}),
+            riak_core_apl:get_primary_apl(DocIdx, NVal, VNode)
+    end.
+

@@ -105,7 +105,7 @@ init([ReqId, From, Left, Right, Union]) ->
 
 %% @doc Prepare request by retrieving the preflist.
 prepare(timeout, #state{union=Union}=State) ->
-    Preflist = lasp:preflist(?N, Union, lasp),
+    Preflist = lasp_vnode:preflist(?N, Union, ?VNODE),
     Preflist2 = [{Index, Node} || {{Index, Node}, _Type} <- Preflist],
     {next_state, execute, State#state{preflist=Preflist2}, 0}.
 

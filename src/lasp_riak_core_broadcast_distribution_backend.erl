@@ -67,16 +67,14 @@
 
 %% Definitions for the bind/read fun abstraction.
 -define(BIND, fun(_AccId, _AccValue, _Store) ->
-            lager:warning("Writing id: ~p, value: ~p", [_AccId, _AccValue]),
                 ?CORE:bind(_AccId, _AccValue, _Store)
               end).
 
 -define(READ, fun(_Id, _Threshold) ->
-            lager:warning("Reading id: ~p", [_Id]),
                 ?CORE:read(_Id, _Threshold, Store)
               end).
 
--define(BLOCKING, fun() -> lager:warning("Returning noreply!"), {noreply, State} end).
+-define(BLOCKING, fun() -> {noreply, State} end).
 
 %%%===================================================================
 %%% API

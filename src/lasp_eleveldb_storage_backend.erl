@@ -18,8 +18,8 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_bitcask_backend).
--author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
+-module(lasp_eleveldb_storage_backend).
+-author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -include("lasp.hrl").
 
@@ -27,12 +27,14 @@
          put/3,
          get/2]).
 
--behaviour(lasp_backend).
+-behaviour(lasp_storage_backend).
 
--define(OPEN_OPTS, [{read_write, true}]).
+-define(OPEN_OPTS, [{create_if_missing, true}]).
+-define(READ_OPTS, []).
+-define(WRITE_OPTS, []).
 
 %% @doc Initialize the backend.
--spec start(atom()) -> {ok, reference()} | {error, timeout}.
+-spec start(atom()) -> {ok, eleveldb:db_ref()} | {error, atom()}.
 start(Identifier) ->
     %% Get the data root directory
     Config = app_helper:get_env(?APP),
@@ -40,14 +42,14 @@ start(Identifier) ->
                             atom_to_list(Identifier)),
 
     %% Ensure directory.
-    ok = filelib:ensure_dir(filename:join(DataDir, "bitcask")),
+    ok = filelib:ensure_dir(filename:join(DataDir, "leveldb")),
 
-    case bitcask:open(DataDir, ?OPEN_OPTS) of
+    case eleveldb:open(DataDir, ?OPEN_OPTS) of
+        {ok, Ref} ->
+            {ok, Ref};
         {error, Reason} ->
             lager:info("Failed to open backend: ~p", [Reason]),
-            {error, Reason};
-        Ref ->
-            {ok, Ref}
+            {error, Reason}
     end.
 
 %% @doc Write a record to the backend.
@@ -55,7 +57,8 @@ start(Identifier) ->
 put(Store, Id, Record) ->
     StorageKey = encode(Id),
     StorageValue = encode(Record),
-    case bitcask:put(Store, StorageKey, StorageValue) of
+    Updates = [{put, StorageKey, StorageValue}],
+    case eleveldb:write(Store, Updates, ?WRITE_OPTS) of
         ok ->
             ok;
         {error, Reason} ->
@@ -67,7 +70,7 @@ put(Store, Id, Record) ->
 -spec get(store(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
 get(Store, Id) ->
     StorageKey = encode(Id),
-    case bitcask:get(Store, StorageKey) of
+    case eleveldb:get(Store, StorageKey, ?READ_OPTS) of
         {ok, Value} ->
             {ok, decode(Value)};
         not_found ->

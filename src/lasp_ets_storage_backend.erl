@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_ets_backend).
+-module(lasp_ets_storage_backend).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -include("lasp.hrl").
@@ -27,7 +27,7 @@
          put/3,
          get/2]).
 
--behaviour(lasp_backend).
+-behaviour(lasp_storage_backend).
 
 %% @doc Initialize the backend.
 -spec start(atom()) -> {ok, atom()} | {error, atom()}.

@@ -127,7 +127,7 @@ waiting({ok, _ReqId, Reply},
 
     case NumResponses =:= ?R of
         true ->
-            From ! {ReqId, ok, Reply},
+            From ! {ReqId, ok},
 
             case NumResponses =:= ?N of
                 true ->

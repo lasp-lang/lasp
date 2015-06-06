@@ -38,7 +38,6 @@
          union/3,
          intersection/3,
          fold/3,
-         wait_needed/1,
          wait_needed/2,
          thread/3,
          preflist/3]).
@@ -210,16 +209,6 @@ filter(Id, Function, AccId) ->
 thread(Module, Function, Args) ->
     {ok, ReqId} = lasp_thread_fsm:thread(Module, Function, Args),
     ?WAIT(ReqId, ?TIMEOUT).
-
-%% @doc Pause execution until value requested.
-%%
-%%      Pause execution of calling thread until a read operation is
-%%      issued for the given `Id'.  Used to introduce laziness into a
-%%      computation.
-%%
--spec wait_needed(id()) -> ok | {error, timeout}.
-wait_needed(Id) ->
-    wait_needed(Id, {strict, undefined}).
 
 %% @doc Pause execution until value requested with given threshold.
 %%

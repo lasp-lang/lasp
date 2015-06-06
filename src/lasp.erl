@@ -71,7 +71,7 @@ bind(Id, Module, Function, Args) ->
 %%
 -spec declare(id(), type()) -> {ok, id()} | {error, timeout}.
 declare(Id, Type) ->
-    ?DISTRIBUTION_BACKEND:declare(Id, Type).
+    do(declare, [Id, Type]).
 
 %% @doc Update a dataflow variable.
 %%
@@ -81,7 +81,7 @@ declare(Id, Type) ->
 %%
 -spec update(id(), operation(), actor()) -> {ok, {value(), id()}} | {error, timeout}.
 update(Id, Operation, Actor) ->
-    ?DISTRIBUTION_BACKEND:update(Id, Operation, Actor).
+    do(update, [Id, Operation, Actor]).
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -91,7 +91,7 @@ update(Id, Operation, Actor) ->
 %%
 -spec bind(id(), value()) -> {ok, id()} | {error, timeout}.
 bind(Id, Value) ->
-    ?DISTRIBUTION_BACKEND:bind(Id, Value).
+    do(bind, [Id, Value]).
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -101,7 +101,7 @@ bind(Id, Value) ->
 %%
 -spec bind_to(id(), id()) -> {ok, id()} | {error, timeout}.
 bind_to(Id, TheirId) ->
-    ?DISTRIBUTION_BACKEND:bind_to(Id, TheirId).
+    do(bind_to, [Id, TheirId]).
 
 %% @doc Blocking monotonic read operation for a given dataflow variable.
 %%
@@ -111,14 +111,14 @@ bind_to(Id, TheirId) ->
 %%
 -spec read(id(), threshold()) -> {ok, var()} | {error, timeout}.
 read(Id, Threshold) ->
-    ?DISTRIBUTION_BACKEND:read(Id, Threshold).
+    do(read, [Id, Threshold]).
 
 %% @doc Blocking monotonic read operation for a list of given dataflow
 %%      variables.
 %%
 -spec read_any([{id(), threshold()}]) -> {ok, var()} | {error, timeout}.
 read_any(Reads) ->
-    ?DISTRIBUTION_BACKEND:read_any(Reads).
+    do(read_any, [Reads]).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -127,7 +127,7 @@ read_any(Reads) ->
 %%
 -spec product(id(), id(), id()) -> ok | {error, timeout}.
 product(Left, Right, Product) ->
-    ?DISTRIBUTION_BACKEND:product(Left, Right, Product).
+    do(product, [Left, Right, Product]).
 
 %% @doc Compute the union of two sets.
 %%
@@ -136,7 +136,7 @@ product(Left, Right, Product) ->
 %%
 -spec union(id(), id(), id()) -> ok | {error, timeout}.
 union(Left, Right, Union) ->
-    ?DISTRIBUTION_BACKEND:union(Left, Right, Union).
+    do(union, [Left, Right, Union]).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -145,7 +145,7 @@ union(Left, Right, Union) ->
 %%
 -spec intersection(id(), id(), id()) -> ok | {error, timeout}.
 intersection(Left, Right, Intersection) ->
-    ?DISTRIBUTION_BACKEND:intersection(Left, Right, Intersection).
+    do(intersection, [Left, Right, Intersection]).
 
 %% @doc Map values from one lattice into another.
 %%
@@ -155,7 +155,7 @@ intersection(Left, Right, Intersection) ->
 %%
 -spec map(id(), function(), id()) -> ok | {error, timeout}.
 map(Id, Function, AccId) ->
-    ?DISTRIBUTION_BACKEND:map(Id, Function, AccId).
+    do(map, [Id, Function, AccId]).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -165,7 +165,7 @@ map(Id, Function, AccId) ->
 %%
 -spec fold(id(), function(), id()) -> ok | {error, timeout}.
 fold(Id, Function, AccId) ->
-    ?DISTRIBUTION_BACKEND:fold(Id, Function, AccId).
+    do(fold, [Id, Function, AccId]).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -175,7 +175,7 @@ fold(Id, Function, AccId) ->
 %%
 -spec filter(id(), function(), id()) -> ok | {error, timeout}.
 filter(Id, Function, AccId) ->
-    ?DISTRIBUTION_BACKEND:filter(Id, Function, AccId).
+    do(filter, [Id, Function, AccId]).
 
 %% @doc Spawn a function.
 %%
@@ -183,7 +183,7 @@ filter(Id, Function, AccId) ->
 %%
 -spec thread(module(), func(), args()) -> ok | {error, timeout}.
 thread(Module, Function, Args) ->
-    ?DISTRIBUTION_BACKEND:thread(Module, Function, Args).
+    do(thread, [Module, Function, Args]).
 
 %% @doc Pause execution until value requested with given threshold.
 %%
@@ -193,8 +193,15 @@ thread(Module, Function, Args) ->
 %%
 -spec wait_needed(id(), threshold()) -> ok | {error, timeout}.
 wait_needed(Id, Threshold) ->
-    ?DISTRIBUTION_BACKEND:wait_needed(Id, Threshold).
+    do(wait_needed, [Id, Threshold]).
 
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
+
+%% @doc Execute call to the proper backend.
+do(Function, Args) ->
+    Backend = application:get_env(?APP,
+                                  distribution_backend,
+                                  lasp_riak_core_distribution_backend),
+    erlang:apply(Backend, Function, Args).

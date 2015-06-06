@@ -85,7 +85,7 @@
 
 -define(READ, fun(_Id, _Threshold) ->
                   %% Beware of cycles in the gen_server calls!
-                  [{IndexNode, _Type}|_] = lasp_vnode:preflist(?N, _Id, lasp),
+                  [{IndexNode, _Type}|_] = lasp_vnode:preflist(?N, _Id, ?VNODE),
 
                   case IndexNode of
                       {Partition, Node} ->

@@ -72,7 +72,7 @@
 %% @doc Initialize the storage backend.
 -spec start(atom()) -> {ok, store()} | {error, atom()}.
 start(Identifier) ->
-    ?STORAGE_BACKEND:start(Identifier).
+    do(start, [Identifier]).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -206,13 +206,13 @@ declare(Type, Store) ->
 %% @doc Declare a dataflow variable in a provided by identifer.
 -spec declare(id(), type(), store()) -> {ok, id()}.
 declare(Id, Type, Store) ->
-    case ?STORAGE_BACKEND:get(Store, Id) of
+    case do(get, [Store, Id]) of
         {ok, _} ->
             %% Do nothing; make declare idempotent at each replica.
             {ok, Id};
         _ ->
             Value = Type:new(),
-            ok = ?STORAGE_BACKEND:put(Store, Id, #dv{value=Value, type=Type}),
+            ok = do(put, [Store, Id, #dv{value=Value, type=Type}]),
             {ok, Id}
     end.
 
@@ -281,7 +281,7 @@ wait_needed(Id, Threshold, Store) ->
 %%
 -spec update(id(), operation(), actor(), store()) -> {ok, var()}.
 update(Id, Operation, Actor, Store) ->
-    {ok, #dv{value=Value0, type=Type}} = ?STORAGE_BACKEND:get(Store, Id),
+    {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
     {ok, Value} = Type:update(Operation, Actor, Value0),
     bind(Id, Value, Store).
 
@@ -289,7 +289,7 @@ update(Id, Operation, Actor, Store) ->
 %%
 -spec bind(id(), value(), store()) -> {ok, var()}.
 bind(Id, Value, Store) ->
-    {ok, #dv{value=Value0, type=Type}} = ?STORAGE_BACKEND:get(Store, Id),
+    {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
     case Value0 of
         Value ->
             {ok, {Id, Type, Value}};
@@ -330,7 +330,7 @@ bind(Id, Value, Store) ->
 read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
     {ok, V=#dv{value=Value,
                lazy_threads=LazyThreads,
-               type=Type}} = ?STORAGE_BACKEND:get(Store, Id),
+               type=Type}} = do(get, [Store, Id]),
 
     %% When no threshold is specified, use the bottom value for the
     %% given lattice.
@@ -358,7 +358,7 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
                                 Self,
                                 Type,
                                 Threshold}]),
-            ok = ?STORAGE_BACKEND:put(Store, Id, V#dv{waiting_threads=WT, lazy_threads=StillLazy}),
+            ok = do(put, [Store, Id, V#dv{waiting_threads=WT, lazy_threads=StillLazy}]),
             BlockingFun()
     end.
 
@@ -373,7 +373,7 @@ read_any(Reads, Self, Store) ->
            false ->
                {ok, V=#dv{value=Value,
                           lazy_threads=LazyThreads,
-                          type=Type}} = ?STORAGE_BACKEND:get(Store, Id),
+                          type=Type}} = do(get, [Store, Id]),
 
                %% When no threshold is specified, use the bottom
                %% value for the given lattice.
@@ -404,7 +404,7 @@ read_any(Reads, Self, Store) ->
                                            Self,
                                            Type,
                                            Threshold}]),
-                       ok = ?STORAGE_BACKEND:put(Store, Id, V#dv{waiting_threads=WT, lazy_threads=StillLazy}),
+                       ok = do(put, [Store, Id, V#dv{waiting_threads=WT, lazy_threads=StillLazy}]),
                        false
                end;
            Result ->
@@ -760,7 +760,7 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
     {ok, V=#dv{waiting_threads=WT,
                type=Type,
                value=Value,
-               lazy_threads=LazyThreads0}} = ?STORAGE_BACKEND:get(Store, Id),
+               lazy_threads=LazyThreads0}} = do(get, [Store, Id]),
     case lasp_lattice:threshold_met(Type, Value, Threshold) of
         true ->
             ReplyFun(Threshold);
@@ -781,7 +781,7 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                                                       Type,
                                                       Threshold}])
                     end,
-                    ok = ?STORAGE_BACKEND:put(Store, Id, V#dv{lazy_threads=LazyThreads}),
+                    ok = do(put, [Store, Id, V#dv{lazy_threads=LazyThreads}]),
                     BlockingFun()
             end
     end.
@@ -866,8 +866,26 @@ reply_to_all([], StillWaiting, _Result) ->
 %%
 -spec write(type(), value(), id(), store()) -> ok.
 write(Type, Value, Key, Store) ->
-    {ok, #dv{waiting_threads=WT}} = ?STORAGE_BACKEND:get(Store, Key),
+    {ok, #dv{waiting_threads=WT}} = do(get, [Store, Key]),
     {ok, StillWaiting} = reply_to_all(WT, [], {ok, {Key, Type, Value}}),
     V1 = #dv{type=Type, value=Value, waiting_threads=StillWaiting},
-    ok = ?STORAGE_BACKEND:put(Store, Key, V1),
+    ok = do(put, [Store, Key, V1]),
     ok.
+
+-ifndef(EQC).
+
+%% @doc Execute call to the proper backend.
+do(Function, Args) ->
+    Backend = application:get_env(?APP,
+                                  storage_backend,
+                                  lasp_eleveldb_storage_backend),
+    erlang:apply(Backend, Function, Args).
+
+-else.
+
+%% @doc Execute call to the proper backend.
+do(Function, Args) ->
+    Backend = lasp_ets_storage_backend,
+    erlang:apply(Backend, Function, Args).
+
+-endif.

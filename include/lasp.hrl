@@ -5,20 +5,6 @@
 
 -define(BUCKET, <<"lasp">>).
 
--ifndef(EQC).
-
-%% Erlang term storage based backend; no persistence.
-% -define(STORAGE_BACKEND, lasp_ets_storage_backend).
-
-%% LevelDB backend; persistence.
--define(STORAGE_BACKEND, lasp_eleveldb_storage_backend).
-
--else.
-
--define(STORAGE_BACKEND, lasp_ets_storage_backend).
-
--endif.
-
 %% Code which connects the storage backends to the implementation.
 -define(CORE, lasp_core).
 

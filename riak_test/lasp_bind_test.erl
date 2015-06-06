@@ -71,9 +71,9 @@ test_ivars() ->
     V1 = 1,
 
     %% Attempt pre, and post- dataflow variable bind operations.
-    {ok, _} = lasp:bind_to(I2, I1),
+    ok = lasp:bind_to(I2, I1),
     {ok, _} = lasp:bind(I1, V1),
-    {ok, _} = lasp:bind_to(I3, I1),
+    ok = lasp:bind_to(I3, I1),
 
     %% Perform invalid bind; won't return error, just will have no
     %% effect.
@@ -94,9 +94,9 @@ test_lattice(Type) ->
     {ok, L3} = lasp:declare(Type),
 
     %% Attempt pre, and post- dataflow variable bind operations.
-    {ok, _} = lasp:bind_to(L2, L1),
+    ok = lasp:bind_to(L2, L1),
     {ok, _} = lasp:update(L1, {add, 1}, a),
-    {ok, _} = lasp:bind_to(L3, L1),
+    ok = lasp:bind_to(L3, L1),
 
     timer:sleep(4000),
 

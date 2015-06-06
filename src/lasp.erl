@@ -48,10 +48,6 @@
          register/0,
          process/4]).
 
--define(PROGRAMS, [{global, lasp_example_keylist_program},
-                   {global, lasp_example_program},
-                   {global, lasp_riak_index_program}]).
-
 %% Public API
 
 %% @doc Register an application.

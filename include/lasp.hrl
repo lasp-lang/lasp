@@ -86,6 +86,11 @@
             {error, timeout}
         end).
 
+%% Define default list of applications to initialize.
+-define(PROGRAMS, [{global, lasp_example_keylist_program},
+                   {global, lasp_example_program},
+                   {global, lasp_riak_index_program}]).
+
 %% General types.
 -type file() :: iolist().
 -type registration() :: preflist | global.

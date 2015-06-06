@@ -62,7 +62,21 @@
 
 -include("lasp.hrl").
 
--record(state, {}).
+%% State record.
+-record(state, {store :: store()}).
+
+%% Definitions for the bind/read fun abstraction.
+-define(BIND, fun(_AccId, _AccValue, _Store) ->
+            lager:warning("Writing id: ~p, value: ~p", [_AccId, _AccValue]),
+                ?CORE:bind(_AccId, _AccValue, _Store)
+              end).
+
+-define(READ, fun(_Id, _Threshold) ->
+            lager:warning("Reading id: ~p", [_Id]),
+                ?CORE:read(_Id, _Threshold, Store)
+              end).
+
+-define(BLOCKING, fun() -> lager:warning("Returning noreply!"), {noreply, State} end).
 
 %%%===================================================================
 %%% API
@@ -93,13 +107,13 @@ broadcast_data(Msg) ->
 %% @todo spec
 merge(Id, Msg) ->
     lager:warning("id: ~p, msg: ~p", [Id, Msg]),
-    {error, not_implemented}.
+    false.
 
 %% @todo doc
 %% @todo spec
 is_stale(Id) ->
     lager:warning("id: ~p", [Id]),
-    {error, not_implemented}.
+    true.
 
 %% @todo doc
 %% @todo spec
@@ -123,8 +137,8 @@ exchange(Peer) ->
 %%      `riak_dt' behavior.  Type is declared with the provided `Id'.
 %%
 -spec declare(id(), type()) -> {ok, id()} | error().
-declare(_Id, _Type) ->
-    {error, not_implemented}.
+declare(Id, Type) ->
+    gen_server:call(?MODULE, {declare, Id, Type}, infinity).
 
 %% @doc Update a dataflow variable.
 %%
@@ -133,8 +147,8 @@ declare(_Id, _Type) ->
 %%      at the given `Id'.
 %%
 -spec update(id(), operation(), actor()) -> {ok, {value(), id()}} | error().
-update(_Id, _Operation, _Actor) ->
-    {error, not_implemented}.
+update(Id, Operation, Actor) ->
+    gen_server:call(?MODULE, {update, Id, Operation, Actor}, infinity).
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -143,8 +157,8 @@ update(_Id, _Operation, _Actor) ->
 %%      the value to bind.
 %%
 -spec bind(id(), value()) -> {ok, id()} | error().
-bind(_Id, _Value) ->
-    {error, not_implemented}.
+bind(Id, Value) ->
+    gen_server:call(?MODULE, {bind, Id, Value}, infinity).
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -153,8 +167,8 @@ bind(_Id, _Value) ->
 %%      the value to bind.
 %%
 -spec bind_to(id(), id()) -> {ok, id()} | error().
-bind_to(_Id, _TheirId) ->
-    {error, not_implemented}.
+bind_to(Id, TheirId) ->
+    gen_server:call(?MODULE, {bind_to, Id, TheirId}, infinity).
 
 %% @doc Blocking monotonic read operation for a given dataflow variable.
 %%
@@ -163,8 +177,8 @@ bind_to(_Id, _TheirId) ->
 %%      provided `Threshold' value.
 %%
 -spec read(id(), threshold()) -> {ok, var()} | error().
-read(_Id, _Threshold) ->
-    {error, not_implemented}.
+read(Id, Threshold) ->
+    gen_server:call(?MODULE, {read, Id, Threshold}, infinity).
 
 %% @doc Blocking monotonic read operation for a list of given dataflow
 %%      variables.
@@ -179,8 +193,8 @@ read_any(_Reads) ->
 %%      to a third.
 %%
 -spec product(id(), id(), id()) -> ok | error().
-product(_Left, _Right, _Product) ->
-    {error, not_implemented}.
+product(Left, Right, Product) ->
+    gen_server:call(?MODULE, {product, Left, Right, Product}, infinity).
 
 %% @doc Compute the union of two sets.
 %%
@@ -188,8 +202,8 @@ product(_Left, _Right, _Product) ->
 %%      to a third.
 %%
 -spec union(id(), id(), id()) -> ok | error().
-union(_Left, _Right, _Union) ->
-    {error, not_implemented}.
+union(Left, Right, Union) ->
+    gen_server:call(?MODULE, {union, Left, Right, Union}, infinity).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -197,8 +211,8 @@ union(_Left, _Right, _Union) ->
 %%      to a third.
 %%
 -spec intersection(id(), id(), id()) -> ok | error().
-intersection(_Left, _Right, _Intersection) ->
-    {error, not_implemented}.
+intersection(Left, Right, Intersection) ->
+    gen_server:call(?MODULE, {intersection, Left, Right, Intersection}, infinity).
 
 %% @doc Map values from one lattice into another.
 %%
@@ -207,8 +221,8 @@ intersection(_Left, _Right, _Intersection) ->
 %%      variables.
 %%
 -spec map(id(), function(), id()) -> ok | error().
-map(_Id, _Function, _AccId) ->
-    {error, not_implemented}.
+map(Id, Function, AccId) ->
+    gen_server:call(?MODULE, {map, Id, Function, AccId}, infinity).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -217,8 +231,8 @@ map(_Id, _Function, _AccId) ->
 %%      variables.
 %%
 -spec fold(id(), function(), id()) -> ok | error().
-fold(_Id, _Function, _AccId) ->
-    {error, not_implemented}.
+fold(Id, Function, AccId) ->
+    gen_server:call(?MODULE, {fold, Id, Function, AccId}, infinity).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -227,16 +241,16 @@ fold(_Id, _Function, _AccId) ->
 %%      variables.
 %%
 -spec filter(id(), function(), id()) -> ok | error().
-filter(_Id, _Function, _AccId) ->
-    {error, not_implemented}.
+filter(Id, Function, AccId) ->
+    gen_server:call(?MODULE, {filter, Id, Function, AccId}, infinity).
 
 %% @doc Spawn a function.
 %%
 %%      Spawn a process executing `Module:Function(Args)'.
 %%
 -spec thread(module(), func(), args()) -> ok | error().
-thread(_Module, _Function, _Args) ->
-    {error, not_implemented}.
+thread(Module, Function, Args) ->
+    gen_server:call(?MODULE, {thread, Module, Function, Args}, infinity).
 
 %% @doc Pause execution until value requested with given threshold.
 %%
@@ -245,45 +259,77 @@ thread(_Module, _Function, _Args) ->
 %%      computation.
 %%
 -spec wait_needed(id(), threshold()) -> ok | error().
-wait_needed(_Id, _Threshold) ->
-    {error, not_implemented}.
+wait_needed(Id, Threshold) ->
+    gen_server:call(?MODULE, {wait_needed, Id, Threshold}, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
 %% @private
--spec init([]) -> {ok, #state{}} |
-                  {ok, #state{}, non_neg_integer() | infinity} |
-                  ignore |
-                  {stop, term()}.
+-spec init([]) -> {ok, #state{}}.
 init([]) ->
-    {ok, #state{}}.
+    {ok, Store} = ?CORE:start(node()),
+    {ok, #state{store=Store}}.
 
 %% @private
--spec handle_call(term(), {pid(), term()}, #state{}) ->
-                         {reply, term(), #state{}} |
-                         {reply, term(), #state{}, non_neg_integer()} |
-                         {noreply, #state{}} |
-                         {noreply, #state{}, non_neg_integer()} |
-                         {stop, term(), term(), #state{}} |
-                         {stop, term(), #state{}}.
+-spec handle_call(term(), {pid(), term()}, #state{}) -> {reply, term(), #state{}}.
+handle_call({declare, Id, Type}, _From, #state{store=Store}=State) ->
+    {ok, Id} = ?CORE:declare(Id, Type, Store),
+    {reply, {ok, Id}, State};
+handle_call({bind, Id, Value}, _From, #state{store=Store}=State) ->
+    {ok, Result} = ?CORE:bind(Id, Value, Store),
+    {reply, {ok, Result}, State};
+handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?BIND, ?READ),
+    {reply, ok, State};
+handle_call({update, Id, Operation, Actor}, _From, #state{store=Store}=State) ->
+    {ok, Result} = ?CORE:update(Id, Operation, Actor, Store),
+    {reply, {ok, Result}, State};
+handle_call({thread, Module, Function, Args}, _From, #state{store=Store}=State) ->
+    ok = ?CORE:thread(Module, Function, Args, Store),
+    {reply, ok, State};
+handle_call({wait_needed, Id, Threshold}, From, #state{store=Store}=State) ->
+    ReplyFun = fun(ReadThreshold) ->
+                        {reply, {ok, ReadThreshold}, State}
+               end,
+    ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
+handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
+    %% @todo Normalize this ReplyFun in the future.
+    ReplyFun = fun(_Id, Type, Value) ->
+                    {reply, {ok, {_Id, Type, Value}}, State}
+               end,
+    ?CORE:read(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
+handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?BIND, ?READ),
+    {reply, ok, State};
+handle_call({product, Left, Right, Product}, _From, #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?BIND, ?READ, ?READ),
+    {reply, ok, State};
+handle_call({intersection, Left, Right, Intersection}, _From, #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:intersection(Left, Right, Intersection, Store, ?BIND, ?READ, ?READ),
+    {reply, ok, State};
+handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?BIND, ?READ, ?READ),
+    {reply, ok, State};
+handle_call({map, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?BIND, ?READ),
+    {reply, ok, State};
+handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:fold(Id, Function, AccId, Store, ?BIND, ?READ),
+    {reply, ok, State};
 handle_call(Msg, _From, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
 
 %% @private
--spec handle_cast(term(), #state{}) -> {noreply, #state{}} |
-                                       {noreply, #state{}, non_neg_integer()} |
-                                       {stop, term(), #state{}}.
+-spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 handle_cast(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
--spec handle_info(term(), #state{}) -> {noreply, #state{}} |
-                                       {noreply, #state{}, non_neg_integer()} |
-                                       {stop, term(), #state{}}.
+-spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.

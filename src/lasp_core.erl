@@ -1,4 +1,5 @@
-%% -------------------------------------------------------------------
+
+% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
 %%
@@ -289,26 +290,32 @@ update(Id, Operation, Actor, Store) ->
 %%
 -spec bind(id(), value(), store()) -> {ok, var()}.
 bind(Id, Value, Store) ->
-    {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
-    case Value0 of
-        Value ->
-            {ok, {Id, Type, Value}};
-        _ ->
-            %% Merge may throw for invalid types.
-            try
-                Merged = Type:merge(Value0, Value),
-                case lasp_lattice:is_inflation(Type, Value0, Merged) of
-                    true ->
-                        write(Type, Merged, Id, Store),
-                        {ok, {Id, Type, Value}};
-                    false ->
-                        {ok, {Id, Type, Value}}
-                end
-            catch
-                _:_Reason ->
-                    {ok, {Id, Type, Value}}
+    Mutator = fun(#dv{type=Type, value=Value0, waiting_threads=WT}=Object) ->
+            case Value0 of
+                Value ->
+                    %% Bind to current value.
+                    {Object, {ok, {Id, Type, Value}}};
+                _ ->
+                    %% Merge may throw for invalid types.
+                    try
+                        Merged = Type:merge(Value0, Value),
+                        case lasp_lattice:is_inflation(Type, Value0, Merged) of
+                            true ->
+                                {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Value}}),
+                                NewObject = #dv{type=Type, value=Value, waiting_threads=SW},
+                                {NewObject, {ok, {Id, Type, Value}}};
+                            false ->
+                                %% Value is old.
+                                {Object, {ok, {Id, Type, Value}}}
+                        end
+                    catch
+                        _:_Reason ->
+                            %% Merge threw.
+                            {Object, {ok, {Id, Type, Value}}}
+                    end
             end
-    end.
+    end,
+    do(update, [Store, Id, Mutator]).
 
 %% @doc Perform a read (or monotonic read) for a particular identifier.
 %%
@@ -328,40 +335,35 @@ bind(Id, Value, Store) ->
 -spec read(id(), value(), store(), pid(), function(), function()) ->
     {ok, var()}.
 read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
-    {ok, #dv{value=Value,
-             lazy_threads=LazyThreads,
-             type=Type}} = do(get, [Store, Id]),
-
-    %% When no threshold is specified, use the bottom value for the
-    %% given lattice.
-    %%
-    Threshold = case Threshold0 of
-        undefined ->
-            Type:new();
-        {strict, undefined} ->
-            {strict, Type:new()};
-        Threshold0 ->
-            Threshold0
-    end,
-
-    %% Notify all lazy processes of this read.
-    {ok, StillLazy} = reply_to_all(LazyThreads, {ok, Threshold}),
-
-    %% Satisfy read if threshold is met.
-    case lasp_lattice:threshold_met(Type, Value, Threshold) of
-        true ->
-            ReplyFun(Id, Type, Value);
-        false ->
-            Mutator = fun(Orig) ->
-                    WT = lists:append(Orig#dv.waiting_threads,
-                                      [{threshold,
-                                        read,
-                                        Self,
-                                        Type,
-                                        Threshold}]),
-                    Orig#dv{waiting_threads=WT, lazy_threads=StillLazy}
+    Mutator = fun(#dv{type=Type, value=Value, lazy_threads=LT}=Object) ->
+            %% When no threshold is specified, use the bottom value for the
+            %% given lattice.
+            %%
+            Threshold = case Threshold0 of
+                undefined ->
+                    Type:new();
+                {strict, undefined} ->
+                    {strict, Type:new()};
+                Threshold0 ->
+                    Threshold0
             end,
-            ok = do(update, [Store, Id, Mutator]),
+
+            %% Notify all lazy processes of this read.
+            {ok, SL} = reply_to_all(LT, {ok, Threshold}),
+
+            %% Satisfy read if threshold is met.
+            case lasp_lattice:threshold_met(Type, Value, Threshold) of
+                true ->
+                    {Object#dv{lazy_threads=SL}, {ok, {Id, Type, Value}}};
+                false ->
+                    WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
+                    {Object#dv{waiting_threads=WT, lazy_threads=SL}, error}
+            end
+    end,
+    case do(update, [Store, Id, Mutator]) of
+        {ok, {Id, Type, Value}} ->
+            ReplyFun(Id, Type, Value);
+        _ ->
             BlockingFun()
     end.
 
@@ -371,58 +373,50 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
 -spec read_any([{id(), value()}], pid(), store()) ->
     {ok, var()} | {ok, not_available_yet}.
 read_any(Reads, Self, Store) ->
-    Found = lists:foldl(fun({Id, Threshold0}, AlreadyFound) ->
-       case AlreadyFound of
-           false ->
-               {ok, V=#dv{value=Value,
-                          lazy_threads=LazyThreads,
-                          type=Type}} = do(get, [Store, Id]),
+    Found = lists:foldl(
+            fun({Id, Threshold0}, AlreadyFound) ->
+                    case AlreadyFound of
+                        false ->
+                            {ok, #dv{value=Value, lazy_threads=LazyThreads, type=Type}} = do(get, [Store, Id]),
 
-               %% When no threshold is specified, use the bottom
-               %% value for the given lattice.
-               %%
-               Threshold = case Threshold0 of
-                   undefined ->
-                       Type:new();
-                   {strict, undefined} ->
-                       {strict, Type:new()};
-                   Threshold0 ->
-                       Threshold0
-               end,
+                            %% When no threshold is specified, use the bottom
+                            %% value for the given lattice.
+                            %%
+                            Threshold = case Threshold0 of
+                                undefined ->
+                                    Type:new();
+                                {strict, undefined} ->
+                                    {strict, Type:new()};
+                                Threshold0 ->
+                                    Threshold0
+                            end,
 
-               %% Notify all lazy processes of this read.
-               {ok, StillLazy} = reply_to_all(LazyThreads,
-                                              {ok, Threshold}),
+                            %% Notify all lazy processes of this read.
+                            {ok, StillLazy} = reply_to_all(LazyThreads, {ok, Threshold}),
 
-               %% Satisfy read if threshold is met.
-               case lasp_lattice:threshold_met(Type,
-                                               Value,
-                                               Threshold) of
-                   true ->
-                       {Id, Type, Value};
-                   false ->
-                       Mutator = fun(Orig) ->
-                               WT = lists:append(V#dv.waiting_threads,
-                                                 [{threshold,
-                                                   read,
-                                                   Self,
-                                                   Type,
-                                                   Threshold}]),
-                               Orig#dv{waiting_threads=WT, lazy_threads=StillLazy}
-                       end,
-                       ok = do(update, [Store, Id, Mutator]),
-                       false
-               end;
-           Result ->
-               Result
-           end
-       end, false, Reads),
-       case Found of
-           false ->
-               {ok, not_available_yet};
-           Value ->
-               {ok, Value}
-       end.
+                            %% Satisfy read if threshold is met.
+                            case lasp_lattice:threshold_met(Type, Value, Threshold) of
+                                true ->
+                                    {Id, Type, Value};
+                                false ->
+                                    Mutator = fun(Object) ->
+                                            WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
+                                            {Object#dv{waiting_threads=WT, lazy_threads=StillLazy}, ok}
+                                    end,
+                                    ok = do(update, [Store, Id, Mutator]),
+                                    false
+                            end;
+                        Result ->
+                            Result
+                        end
+                    end, false, Reads),
+
+                    case Found of
+                        false ->
+                            {ok, not_available_yet};
+                        Value ->
+                            {ok, Value}
+                    end.
 
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.
@@ -775,20 +769,14 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                 [_H|_T] ->
                     ReplyFun(Threshold);
                 _ ->
-                    Mutator = fun(Orig) ->
+                    Mutator = fun(Object) ->
                             LazyThreads = case Threshold of
                                             undefined ->
-                                                lists:append(LazyThreads0,
-                                                             [Self]);
+                                                lists:append(LazyThreads0, [Self]);
                                             Threshold ->
-                                                lists:append(LazyThreads0,
-                                                            [{threshold,
-                                                              wait,
-                                                              Self,
-                                                              Type,
-                                                              Threshold}])
+                                                lists:append(LazyThreads0, [{threshold, wait, Self, Type, Threshold}])
                             end,
-                            Orig#dv{lazy_threads=LazyThreads}
+                            {Object#dv{lazy_threads=LazyThreads}, ok}
                     end,
                     ok = do(update, [Store, Id, Mutator]),
                     BlockingFun()

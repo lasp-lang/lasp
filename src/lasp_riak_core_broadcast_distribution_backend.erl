@@ -182,8 +182,17 @@ read(Id, Threshold) ->
 %%      variables.
 %%
 -spec read_any([{id(), threshold()}]) -> {ok, var()} | error().
-read_any(_Reads) ->
-    {error, not_implemented}.
+read_any(Reads) ->
+    Self = self(),
+    lists:foreach(fun({Id, Threshold}) ->
+                spawn_link(fun() ->
+                        Self ! read(Id, Threshold)
+                    end)
+        end, Reads),
+    receive
+        X ->
+            X
+    end.
 
 %% @doc Compute the cartesian product of two sets.
 %%

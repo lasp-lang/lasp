@@ -156,10 +156,8 @@ do_get(Ref, Id) ->
     StorageKey = encode(Id),
     case eleveldb:get(Ref, StorageKey, ?READ_OPTS) of
         {ok, Value} ->
-            lager:info("Retrieved object; id: ~p", [Id]),
             {ok, decode(Value)};
         not_found ->
-            lager:info("Object not found; id: ~p", [Id]),
             {error, not_found};
         {error, Reason} ->
             lager:info("Error reading object; id: ~p, reason: ~p",
@@ -173,7 +171,6 @@ do_put(Ref, Id, Record) ->
     Updates = [{put, StorageKey, StorageValue}],
     case eleveldb:write(Ref, Updates, ?WRITE_OPTS) of
         ok ->
-            lager:info("Wrote object; id: ~p, value: ~p", [Id, Record#dv.value]),
             ok;
         {error, Reason} ->
             lager:info("Error writing object; id: ~p, reason: ~p",

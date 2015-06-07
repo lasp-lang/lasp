@@ -285,8 +285,8 @@ handle_call({declare, Id, Type}, _From, #state{store=Store}=State) ->
     {ok, Id} = ?CORE:declare(Id, Type, Store),
     {reply, {ok, Id}, State};
 handle_call({bind, Id, Value}, _From, #state{store=Store}=State) ->
-    {ok, Result} = ?CORE:bind(Id, Value, Store),
-    {reply, {ok, Result}, State};
+    Result = ?CORE:bind(Id, Value, Store),
+    {reply, Result, State};
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?BIND, ?READ),
     {reply, ok, State};
@@ -303,8 +303,10 @@ handle_call({wait_needed, Id, Threshold}, From, #state{store=Store}=State) ->
     ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
 handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
     %% @todo Normalize this ReplyFun in the future.
-    ReplyFun = fun(_Id, Type, Value) ->
-                    {reply, {ok, {_Id, Type, Value}}, State}
+    ReplyFun = fun({_Id, Type, Value}) ->
+                    {reply, {ok, {_Id, Type, Value}}, State};
+                  ({error, Error}) ->
+                    {reply, {error, Error}, State}
                end,
     ?CORE:read(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->

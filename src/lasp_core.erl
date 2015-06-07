@@ -169,7 +169,7 @@ read(Id, Store) ->
 -spec read(id(), value(), store()) -> {ok, var()}.
 read(Id, Threshold, Store) ->
     Self = self(),
-    ReplyFun = fun(_Id, Type, Value) -> {ok, {_Id, Type, Value}} end,
+    ReplyFun = fun({_Id, Type, Value}) -> {ok, {_Id, Type, Value}} end,
     BlockingFun = fun() ->
                 receive
                     X ->
@@ -364,9 +364,13 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
     end,
     case do(update, [Store, Id, Mutator]) of
         {ok, {Id, Type, Value}} ->
-            ReplyFun(Id, Type, Value);
-        _ ->
-            BlockingFun()
+            ReplyFun({Id, Type, Value});
+        error ->
+            %% Not valid for threshold; wait.
+            BlockingFun();
+        {error, Error} ->
+            %% Error from the backend.
+            ReplyFun({error, Error})
     end.
 
 %% @doc Perform a read (or monotonic read) for a series of particular

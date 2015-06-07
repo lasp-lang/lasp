@@ -47,6 +47,24 @@
          <h4>Why Lasp?</h4>
           <p align="justify">Lasp is a new programming model designed to simplify large scale, fault-tolerant, distributed programming. Lasp is being developed as part of the <a href="http://syncfree.lip6.fr">SyncFree European research project</a>. It leverages ideas from distributed dataflow extended with <a href="http://en.wikipedia.org/wiki/Conflict-free_replicated_data_type">convergent replicated data types, or CRDTs</a>. This supports computations where not all participants are online together at a given moment. The initial design supports synchronization-free programming by combining CRDTs together with primitives for composing them inspired by functional programming. This lets us write long-lived fault-tolerant distributed applications, including ones with nonmonotonic behavior, in a functional paradigm. The initial prototype is implemented as an Erlang library built on top of the <a href="https://github.com/basho/riak_core">Riak Core</a> distributed systems infrastructure.</p>
         </div>
+        <div class="col-lg-12">
+          <h4>Erlang Code Sample</h4>
+          <p align="justify">Lasp's prototype implementation is provided
+          as an Erlang library.  Erlang is an excellent language for distribution and concurrency, and allows us to prototype new features for Lasp quickly.  Below is a code sample for creating a distributed set and applying a map function to the set.</p>
+          <pre>
+%% Create initial set.
+{ok, S1} = lasp:declare(Type),
+
+%% Add elements to initial set and update.
+{ok, _} = lasp:update(S1, {add_all, [1,2,3]}, a),
+
+%% Create second set.
+{ok, S2} = lasp:declare(Type),
+
+%% Apply map.
+ok = lasp:map(S1, fun(X) -> X * 2 end, S2).
+          </pre>
+        </div>
         <div class="col-lg-6">
           <h4>Talks</h4>
           <p align="justify">There have been several talks about Lasp,

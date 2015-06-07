@@ -301,17 +301,19 @@ bind(Id, Value, Store) ->
                         Merged = Type:merge(Value0, Value),
                         case lasp_lattice:is_inflation(Type, Value0, Merged) of
                             true ->
-                                {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Value}}),
-                                NewObject = #dv{type=Type, value=Value, waiting_threads=SW},
-                                {NewObject, {ok, {Id, Type, Value}}};
+                                {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Merged}}),
+                                NewObject = #dv{type=Type, value=Merged, waiting_threads=SW},
+                                {NewObject, {ok, {Id, Type, Merged}}};
                             false ->
                                 %% Value is old.
-                                {Object, {ok, {Id, Type, Value}}}
+                                {Object, {ok, {Id, Type, Value0}}}
                         end
                     catch
-                        _:_Reason ->
+                        _:Reason ->
                             %% Merge threw.
-                            {Object, {ok, {Id, Type, Value}}}
+                            lager:warning("Exception, reason: ~p ~p => ~p",
+                                          [Reason, Value0, Value]),
+                            {Object, {ok, {Id, Type, Value0}}}
                     end
             end
     end,
@@ -813,6 +815,9 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
                     gen_fsm:send_event(Address,
                                        {ok, undefined,
                                         {Id, Type, Value}});
+                {Address, Ref} ->
+                    gen_server:reply({Address, Ref},
+                                     {ok, {Id, Type, Value}});
                 _ ->
                     From ! Result
             end,
@@ -832,6 +837,8 @@ reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
                 {fsm, undefined, Address} ->
                     gen_fsm:send_event(Address,
                                        {ok, undefined, RThreshold});
+                {Address, Ref} ->
+                    gen_server:reply({Address, Ref}, {ok, RThreshold});
                 _ ->
                     From ! Result
             end,
@@ -846,6 +853,8 @@ reply_to_all([From|T], StillWaiting, Result) ->
             gen_server:reply({Address, Ref}, Result);
         {fsm, undefined, Address} ->
             gen_fsm:send_event(Address, Result);
+        {Address, Ref} ->
+            gen_server:reply({Address, Ref}, Result);
         _ ->
             From ! Result
     end,

@@ -62,7 +62,7 @@ put(Ref, Id, Record) ->
     gen_server:call(Ref, {put, Id, Record}, infinity).
 
 %% @doc In-place update given a mutation function.
--spec update(ref(), id(), function()) -> ok | {error, atom()}.
+-spec update(ref(), id(), function()) -> {ok, any()} | error | {error, atom()}.
 update(Ref, Id, Function) ->
     gen_server:call(Ref, {update, Id, Function}, infinity).
 
@@ -99,8 +99,11 @@ handle_call({put, Id, Record}, _From, #state{ref=Ref}=State) ->
 handle_call({update, Id, Function}, _From, #state{ref=Ref}=State) ->
     Result = case do_get(Ref, Id) of
         {ok, Value} ->
-            NewValue = Function(Value),
-            do_put(Ref, Id, NewValue);
+            {NewValue, InnerResult} = Function(Value),
+            case do_put(Ref, Id, NewValue) of
+                ok ->
+                    InnerResult
+            end;
         Error ->
             Error
     end,

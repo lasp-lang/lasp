@@ -66,7 +66,7 @@ put(Ref, Id, Record) ->
     gen_server:call(Ref, {put, Id, Record}, infinity).
 
 %% @doc In-place update given a mutation function.
--spec update(ref(), id(), function()) -> {ok, any()} | {error, atom()}.
+-spec update(ref(), id(), function()) -> {ok, any()} | error | {error, atom()}.
 update(Ref, Id, Function) ->
     gen_server:call(Ref, {update, Id, Function}, infinity).
 

@@ -52,6 +52,8 @@ threshold_met(lasp_ivar, undefined, {strict, undefined}) ->
     false;
 threshold_met(lasp_ivar, undefined, undefined) ->
     true;
+threshold_met(lasp_ivar, Value, undefined) when Value =/= undefined ->
+    true;
 threshold_met(lasp_ivar, _Value, {strict, undefined}) ->
     true;
 threshold_met(lasp_ivar, Value, Threshold) when Value =:= Threshold ->

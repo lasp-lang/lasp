@@ -44,7 +44,7 @@
 %%      {@link declare/0}) dataflow variable.  The `Value' provided is
 %%      the value to bind.
 %%
--callback bind(id(), value()) -> {ok, id()} | error().
+-callback bind(id(), value()) -> {ok, var()} | error().
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%

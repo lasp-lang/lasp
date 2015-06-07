@@ -315,9 +315,7 @@ prop_sequential() ->
                                  end))).
 
 setup() ->
-    ?ETS = ets:new(?ETS, [public, set, named_table,
-                          {write_concurrency, true},
-                          {read_concurrency, true}]),
+    {ok, ?ETS} = lasp_ets_storage_backend:start(?ETS),
     ok.
 
 teardown() ->

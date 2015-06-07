@@ -21,41 +21,128 @@
 -module(lasp_ets_storage_backend).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
--include("lasp.hrl").
-
--export([start/1,
-         put/3,
-         get/2]).
-
+-behaviour(gen_server).
 -behaviour(lasp_storage_backend).
 
-%% @doc Initialize the backend.
--spec start(atom()) -> {ok, atom()} | {error, atom()}.
-start(Store) ->
+-include("lasp.hrl").
+
+%% lasp_storage_backend callbacks
+-export([start/1,
+         put/3,
+         update/3,
+         get/2]).
+
+%% gen_server callbacks
+-export([init/1,
+         handle_call/3,
+         handle_cast/2,
+         handle_info/2,
+         terminate/2,
+         code_change/3]).
+
+%% reference tpe
+-type ref() :: atom().
+
+%% State record
+-record(state, {ref :: ref()}).
+
+%%%===================================================================
+%%% lasp_storage_backend callbacks
+%%%===================================================================
+
+%% @doc Start and link to calling process.
+-spec start(atom())-> {ok, atom()}.
+start(Identifier) ->
+    {ok, _Pid} = gen_server:start_link({local, Identifier}, ?MODULE, [Identifier], []),
+    {ok, Identifier}.
+
+%% @doc Write a record to the backend.
+-spec put(ref(), id(), variable()) -> ok | {error, atom()}.
+put(Ref, Id, Record) ->
+    gen_server:call(Ref, {put, Id, Record}, infinity).
+
+%% @doc In-place update given a mutation function.
+-spec update(ref(), id(), function()) -> ok | {error, atom()}.
+update(Ref, Id, Function) ->
+    gen_server:call(Ref, {update, Id, Function}, infinity).
+
+%% @doc Retrieve a record from the backend.
+-spec get(ref(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
+get(Ref, Id) ->
+    gen_server:call(Ref, {get, Id}, infinity).
+
+%%%===================================================================
+%%% gen_server callbacks
+%%%===================================================================
+
+%% @private
+init([Identifier]) ->
     try
-        Store = ets:new(Store, [set,
-                                named_table,
-                                public,
-                                {write_concurrency, true}]),
-        {ok, Store}
+        Identifier = ets:new(Identifier, [set,
+                                          named_table,
+                                          public,
+                                          {write_concurrency, true}]),
+        {ok, #state{ref=Identifier}}
     catch
         _:Reason ->
             lager:info("Backend initialization failed!"),
-            {error, Reason}
+            {stop, Reason}
     end.
 
-%% @doc Write a record to the backend.
--spec put(store(), id(), variable()) -> ok.
-put(Store, Id, Record) ->
-    true = ets:insert(Store, {Id, Record}),
+%% @private
+handle_call({get, Id}, _From, #state{ref=Ref}=State) ->
+    Result = do_get(Ref, Id),
+    {reply, Result, State};
+handle_call({put, Id, Record}, _From, #state{ref=Ref}=State) ->
+    Result = do_put(Ref, Id, Record),
+    {reply, Result, State};
+handle_call({update, Id, Function}, _From, #state{ref=Ref}=State) ->
+    Result = case do_get(Ref, Id) of
+        {ok, Value} ->
+            NewValue = Function(Value),
+            do_put(Ref, Id, NewValue);
+        Error ->
+            Error
+    end,
+    {reply, Result, State};
+handle_call(Msg, _From, State) ->
+    lager:warning("Unhandled messages: ~p", [Msg]),
+    {reply, ok, State}.
+
+%% @private
+handle_cast(Msg, State) ->
+    lager:warning("Unhandled messages: ~p", [Msg]),
+    {noreply, State}.
+
+%% @private
+handle_info(Msg, State) ->
+    lager:warning("Unhandled messages: ~p", [Msg]),
+    {noreply, State}.
+
+%% @private
+terminate(_Reason, _State) ->
     ok.
 
+%% @private
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
+
 %% @doc Retrieve a record from the backend.
--spec get(store(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
-get(Store, Id) ->
-    case ets:lookup(Store, Id) of
+-spec do_get(ref(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
+do_get(Ref, Id) ->
+    case ets:lookup(Ref, Id) of
         [{_Key, Record}] ->
             {ok, Record};
         [] ->
             {error, not_found}
     end.
+
+%% @doc Write a record to the backend.
+-spec do_put(ref(), id(), variable()) -> ok.
+do_put(Ref, Id, Record) ->
+    true = ets:insert(Ref, {Id, Record}),
+    ok.

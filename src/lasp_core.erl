@@ -328,9 +328,9 @@ bind(Id, Value, Store) ->
 -spec read(id(), value(), store(), pid(), function(), function()) ->
     {ok, var()}.
 read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
-    {ok, V=#dv{value=Value,
-               lazy_threads=LazyThreads,
-               type=Type}} = do(get, [Store, Id]),
+    {ok, #dv{value=Value,
+             lazy_threads=LazyThreads,
+             type=Type}} = do(get, [Store, Id]),
 
     %% When no threshold is specified, use the bottom value for the
     %% given lattice.
@@ -352,13 +352,16 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
         true ->
             ReplyFun(Id, Type, Value);
         false ->
-            WT = lists:append(V#dv.waiting_threads,
-                              [{threshold,
-                                read,
-                                Self,
-                                Type,
-                                Threshold}]),
-            ok = do(put, [Store, Id, V#dv{waiting_threads=WT, lazy_threads=StillLazy}]),
+            Mutator = fun(Orig) ->
+                    WT = lists:append(Orig#dv.waiting_threads,
+                                      [{threshold,
+                                        read,
+                                        Self,
+                                        Type,
+                                        Threshold}]),
+                    Orig#dv{waiting_threads=WT, lazy_threads=StillLazy}
+            end,
+            ok = do(update, [Store, Id, Mutator]),
             BlockingFun()
     end.
 
@@ -398,13 +401,16 @@ read_any(Reads, Self, Store) ->
                    true ->
                        {Id, Type, Value};
                    false ->
-                       WT = lists:append(V#dv.waiting_threads,
-                                         [{threshold,
-                                           read,
-                                           Self,
-                                           Type,
-                                           Threshold}]),
-                       ok = do(put, [Store, Id, V#dv{waiting_threads=WT, lazy_threads=StillLazy}]),
+                       Mutator = fun(Orig) ->
+                               WT = lists:append(V#dv.waiting_threads,
+                                                 [{threshold,
+                                                   read,
+                                                   Self,
+                                                   Type,
+                                                   Threshold}]),
+                               Orig#dv{waiting_threads=WT, lazy_threads=StillLazy}
+                       end,
+                       ok = do(update, [Store, Id, Mutator]),
                        false
                end;
            Result ->
@@ -757,10 +763,10 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
 -spec wait_needed(id(), threshold(), store(), pid(), function(),
                   function()) -> {ok, threshold()}.
 wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
-    {ok, V=#dv{waiting_threads=WT,
-               type=Type,
-               value=Value,
-               lazy_threads=LazyThreads0}} = do(get, [Store, Id]),
+    {ok, #dv{waiting_threads=WT,
+             type=Type,
+             value=Value,
+             lazy_threads=LazyThreads0}} = do(get, [Store, Id]),
     case lasp_lattice:threshold_met(Type, Value, Threshold) of
         true ->
             ReplyFun(Threshold);
@@ -769,19 +775,22 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                 [_H|_T] ->
                     ReplyFun(Threshold);
                 _ ->
-                    LazyThreads = case Threshold of
-                                    undefined ->
-                                        lists:append(LazyThreads0,
-                                                     [Self]);
-                                    Threshold ->
-                                        lists:append(LazyThreads0,
-                                                    [{threshold,
-                                                      wait,
-                                                      Self,
-                                                      Type,
-                                                      Threshold}])
+                    Mutator = fun(Orig) ->
+                            LazyThreads = case Threshold of
+                                            undefined ->
+                                                lists:append(LazyThreads0,
+                                                             [Self]);
+                                            Threshold ->
+                                                lists:append(LazyThreads0,
+                                                            [{threshold,
+                                                              wait,
+                                                              Self,
+                                                              Type,
+                                                              Threshold}])
+                            end,
+                            Orig#dv{lazy_threads=LazyThreads}
                     end,
-                    ok = do(put, [Store, Id, V#dv{lazy_threads=LazyThreads}]),
+                    ok = do(update, [Store, Id, Mutator]),
                     BlockingFun()
             end
     end.

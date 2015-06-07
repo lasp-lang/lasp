@@ -29,6 +29,7 @@
 %% lasp_storage_backend callbacks
 -export([start/1,
          put/3,
+         update/3,
          get/2]).
 
 %% gen_server callbacks
@@ -64,6 +65,11 @@ start(Identifier) ->
 put(Ref, Id, Record) ->
     gen_server:call(Ref, {put, Id, Record}, infinity).
 
+%% @doc In-place update given a mutation function.
+-spec update(ref(), id(), function()) -> ok | {error, atom()}.
+update(Ref, Id, Function) ->
+    gen_server:call(Ref, {update, Id, Function}, infinity).
+
 %% @doc Retrieve a record from the backend.
 -spec get(ref(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
 get(Ref, Id) ->
@@ -93,32 +99,20 @@ init([Identifier]) ->
 
 %% @private
 handle_call({get, Id}, _From, #state{ref=Ref}=State) ->
-    StorageKey = encode(Id),
-    case eleveldb:get(Ref, StorageKey, ?READ_OPTS) of
-        {ok, Value} ->
-            lager:info("Retrieved object; id: ~p", [Id]),
-            {reply, {ok, decode(Value)}, State};
-        not_found ->
-            lager:info("Object not found; id: ~p", [Id]),
-            {reply, {error, not_found}, State};
-        {error, Reason} ->
-            lager:info("Error reading object; id: ~p, reason: ~p",
-                       [Id, Reason]),
-            {reply, {error, Reason}, State}
-    end;
+    Result = do_get(Ref, Id),
+    {reply, Result, State};
 handle_call({put, Id, Record}, _From, #state{ref=Ref}=State) ->
-    StorageKey = encode(Id),
-    StorageValue = encode(Record),
-    Updates = [{put, StorageKey, StorageValue}],
-    case eleveldb:write(Ref, Updates, ?WRITE_OPTS) of
-        ok ->
-            lager:info("Wrote object; id: ~p", [Id]),
-            {reply, ok, State};
-        {error, Reason} ->
-            lager:info("Error writing object; id: ~p, reason: ~p",
-                       [Id, Reason]),
-            {reply, {error, Reason}, State}
-    end;
+    Result = do_put(Ref, Id, Record),
+    {reply, Result, State};
+handle_call({update, Id, Function}, _From, #state{ref=Ref}=State) ->
+    Result = case do_get(Ref, Id) of
+        {ok, Value} ->
+            NewValue = Function(Value),
+            do_put(Ref, Id, NewValue);
+        Error ->
+            Error
+    end,
+    {reply, Result, State};
 handle_call(Msg, _From, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
@@ -152,3 +146,32 @@ encode(X) ->
 %% @doc Decoding of object to binary after LevelDB read.
 decode(X) ->
     binary_to_term(X).
+
+do_get(Ref, Id) ->
+    StorageKey = encode(Id),
+    case eleveldb:get(Ref, StorageKey, ?READ_OPTS) of
+        {ok, Value} ->
+            lager:info("Retrieved object; id: ~p", [Id]),
+            {ok, decode(Value)};
+        not_found ->
+            lager:info("Object not found; id: ~p", [Id]),
+            {error, not_found};
+        {error, Reason} ->
+            lager:info("Error reading object; id: ~p, reason: ~p",
+                       [Id, Reason]),
+            {error, Reason}
+    end.
+
+do_put(Ref, Id, Record) ->
+    StorageKey = encode(Id),
+    StorageValue = encode(Record),
+    Updates = [{put, StorageKey, StorageValue}],
+    case eleveldb:write(Ref, Updates, ?WRITE_OPTS) of
+        ok ->
+            lager:info("Wrote object; id: ~p", [Id]),
+            ok;
+        {error, Reason} ->
+            lager:info("Error writing object; id: ~p, reason: ~p",
+                       [Id, Reason]),
+            {error, Reason}
+    end.

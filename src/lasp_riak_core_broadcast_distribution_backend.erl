@@ -65,6 +65,9 @@
 %% State record.
 -record(state, {store :: store()}).
 
+%% Broadcast record.
+-record(broadcast, {id :: id(), type :: type(), value :: value()}).
+
 %% Definitions for the bind/read fun abstraction.
 -define(BIND, fun(_AccId, _AccValue, _Store) ->
                 ?CORE:bind(_AccId, _AccValue, _Store)
@@ -96,22 +99,39 @@ start_link(Opts) ->
 
 %% @todo doc
 %% @todo spec
-broadcast_data(Msg) ->
-    Id = druuid:v4(),
+broadcast_data(#broadcast{id=Id, type=Type, value=Value}=Msg) ->
     lager:warning("id: ~p, msg: ~p", [Id, Msg]),
-    {Id, Msg}.
+    {{Id, Type, Value}, {Id, Type, Value}}.
 
 %% @todo doc
 %% @todo spec
-merge(Id, Msg) ->
-    lager:warning("id: ~p, msg: ~p", [Id, Msg]),
-    false.
+merge({Id, Type, Value}, {Id, Type, Value}) ->
+    lager:warning("id: ~p, type: ~p value: ~p", [Id, Type, Value]),
+
+    case is_stale({Id, Type, Value}) of
+        true ->
+            false;
+        false ->
+            {ok, _} = local_bind(Id, Type, Value),
+            true
+    end.
 
 %% @todo doc
 %% @todo spec
-is_stale(Id) ->
-    lager:warning("id: ~p", [Id]),
-    true.
+is_stale({Id, Type, Value}) ->
+    lager:warning("id: ~p, type: ~p value: ~p", [Id, Type, Value]),
+
+    Result = case read(Id, undefined) of
+        {ok, {_I, T, V}} ->
+            not lasp_lattice:is_lattice_strict_inflation(T, V, Value);
+        _ ->
+            %% We don't know about the value yet; not stale.
+            false
+    end,
+
+    lager:warning("returning: ~p", [Result]),
+
+    Result.
 
 %% @todo doc
 %% @todo spec
@@ -134,9 +154,11 @@ exchange(Peer) ->
 %%      Valid values for `Type' are any of lattices supporting the
 %%      `riak_dt' behavior.  Type is declared with the provided `Id'.
 %%
--spec declare(id(), type()) -> {ok, id()} | error().
+-spec declare(id(), type()) -> {ok, id()}.
 declare(Id, Type) ->
-    gen_server:call(?MODULE, {declare, Id, Type}, infinity).
+    {ok, Id} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
+    % broadcast({Id, Type, undefined}),
+    {ok, Id}.
 
 %% @doc Update a dataflow variable.
 %%
@@ -154,9 +176,11 @@ update(Id, Operation, Actor) ->
 %%      {@link declare/0}) dataflow variable.  The `Value' provided is
 %%      the value to bind.
 %%
--spec bind(id(), value()) -> {ok, id()} | error().
+-spec bind(id(), value()) -> {ok, var()}.
 bind(Id, Value) ->
-    gen_server:call(?MODULE, {bind, Id, Value}, infinity).
+    {ok, Result} = gen_server:call(?MODULE, {bind, Id, Value}, infinity),
+    broadcast(Result),
+    {ok, Result}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -356,3 +380,21 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+%% @private
+broadcast({Id, Type, Value}) ->
+    Broadcast = #broadcast{id=Id, type=Type, value=Value},
+    riak_core_broadcast:broadcast(Broadcast, ?MODULE).
+
+%% @private
+local_bind(Id, Type, Value) ->
+    lager:warning("id: ~p, type: ~p value: ~p", [Id, Type, Value]),
+
+    case gen_server:call(?MODULE, {bind, Id, Value}, infinity) of
+        {error, not_found} ->
+            lager:warning("not found; declaring!"),
+            {ok, Id} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
+            local_bind(Id, Type, Value);
+        {ok, X} ->
+           {ok, X}
+    end.

@@ -67,7 +67,7 @@ update(Id, Operation, Actor) ->
 %%      {@link declare/0}) dataflow variable.  The `Value' provided is
 %%      the value to bind.
 %%
--spec bind(id(), value()) -> {ok, id()} | error().
+-spec bind(id(), value()) -> {ok, var()} | error().
 bind(Id, Value) ->
     {ok, ReqId} = lasp_bind_fsm:bind(Id, Value),
     ?WAIT(ReqId, ?TIMEOUT).

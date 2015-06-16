@@ -34,6 +34,7 @@
          is_strict_inflation/3,
          is_lattice_strict_inflation/3,
          causal_product/3,
+         causal_remove/2,
          causal_union/3]).
 
 %% @doc Determine if a threshold is met.
@@ -316,6 +317,17 @@ causal_union(lasp_orset, Xs, Ys) ->
     Xs ++ Ys;
 causal_union(lasp_orset_gbtree, Xs, Ys) ->
     gb_trees_ext:merge(Xs, Ys, fun(X, _Y) -> X end).
+
+%% @doc Given the metadata for a given value, force that the object
+%%      appears removed by marking all of the metadata as removed.
+causal_remove(lasp_orset, Metadata) ->
+    orddict:fold(fun(Key, _Value, Acc) ->
+                orddict:store(Key, true, Acc)
+        end, orddict:new(), Metadata);
+causal_remove(lasp_orset_gbtree, Metadata) ->
+    gb_trees_ext:foldl(fun(Key, _Value, Acc) ->
+                gb_trees:enter(Key, true, Acc)
+        end, gb_trees:empty(), Metadata).
 
 -ifdef(TEST).
 

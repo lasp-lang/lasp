@@ -663,26 +663,27 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun({_, T, V}) ->
             AccValue = case T of
                 lasp_orset_gbtree ->
-                    FolderFun = fun(X, Value, Acc) ->
-                            case Function(X) of
+                    FolderFun = fun(X, Value0, Acc) ->
+                            Value = case Function(X) of
                                 true ->
-                                    New = gb_trees:enter(X,
-                                                         Value,
-                                                         gb_trees:empty()),
-                                    lasp_orset_gbtree:merge(New, Acc);
-                                _ ->
-                                    Acc
-                            end
+                                    Value0;
+                                false ->
+                                    lasp_lattice:causal_remove(T, Value0)
+                            end,
+                            New = gb_trees:enter(X, Value,
+                                                 gb_trees:empty()),
+                            lasp_orset_gbtree:merge(New, Acc)
                     end,
                     gb_trees_ext:foldl(FolderFun, T:new(), V);
                 lasp_orset ->
-                    FolderFun = fun({X, _} = Element, Acc) ->
-                            case Function(X) of
+                    FolderFun = fun({X, Causality0}, Acc) ->
+                            Causality = case Function(X) of
                                 true ->
-                                    Acc ++ [Element];
-                                _ ->
-                                    Acc
-                            end
+                                    Causality0;
+                                false ->
+                                    lasp_lattice:causal_remove(T, Causality0)
+                            end,
+                            Acc ++ [{X, Causality}]
                     end,
                     lists:foldl(FolderFun, T:new(), V)
             end,

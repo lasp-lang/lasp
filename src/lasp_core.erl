@@ -445,7 +445,6 @@ bind_to(AccId, Id, Store, BindFun) ->
 
 bind_to(AccId, Id, Store, BindFun, ReadFun) ->
     Fun = fun({_, _, V}) ->
-        %% Bind new value back.
         {ok, _} = BindFun(AccId, V, Store)
     end,
     gen_flow:start_link(lasp_process, [[{Id, ReadFun}], Fun]).
@@ -607,8 +606,6 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                         lasp_orset ->
                             lasp_orset:merge(LValue, RValue)
                     end,
-
-                    %% Bind new value back.
                     {ok, _} = BindFun(AccId, AccValue, Store)
             end
     end,

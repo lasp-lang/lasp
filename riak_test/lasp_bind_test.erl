@@ -55,7 +55,6 @@ confirm() ->
 
 test() ->
     test_ivars(),
-    test_lattice(lasp_gset),
     test_lattice(lasp_orset),
     test_lattice(lasp_orset_gbtree),
     test_lattice(lasp_orswot),

@@ -61,11 +61,6 @@ threshold_met(lasp_ivar, Value, Threshold) when Value =:= Threshold ->
 threshold_met(lasp_ivar, Value, Threshold) when Value =/= Threshold ->
     false;
 
-threshold_met(lasp_gset, Value, {strict, Threshold}) ->
-    is_strict_inflation(lasp_gset, Threshold, Value);
-threshold_met(lasp_gset, Value, Threshold) ->
-    is_inflation(lasp_gset, Threshold, Value);
-
 threshold_met(lasp_orset_gbtree, Value, {strict, Threshold}) ->
     is_strict_inflation(lasp_orset_gbtree, Threshold, Value);
 threshold_met(lasp_orset_gbtree, Value, Threshold) ->
@@ -141,11 +136,6 @@ is_lattice_inflation(lasp_ivar, Previous, Current)
         when Previous =:= Current ->
     true;
 
-is_lattice_inflation(lasp_gset, Previous, Current) ->
-    sets:is_subset(
-        sets:from_list(lasp_gset:value(Previous)),
-        sets:from_list(lasp_gset:value(Current)));
-
 is_lattice_inflation(lasp_orswot, {Previous, _, _}, {Current, _, _}) ->
     riak_dt_vclock:descends(Current, Previous);
 
@@ -218,11 +208,6 @@ is_lattice_strict_inflation(lasp_ivar, undefined, Current)
     true;
 is_lattice_strict_inflation(lasp_ivar, _Previous, _Current) ->
     false;
-
-is_lattice_strict_inflation(lasp_gset, Previous, Current) ->
-    is_lattice_inflation(lasp_gset, Previous, Current) andalso
-        lists:usort(lasp_gset:value(Previous)) =/=
-        lists:usort(lasp_gset:value(Current));
 
 is_lattice_strict_inflation(lasp_orswot, {Previous, _, _}, {Current, _, _}) ->
     riak_dt_vclock:dominates(Current, Previous);
@@ -367,40 +352,6 @@ lasp_ivar_strict_inflation_test() ->
 
     %% Concurrent
     ?assertEqual(false, is_lattice_strict_inflation(lasp_ivar, A2, B2)).
-
-%% lasp_gset tests.
-
-lasp_gset_inflation_test() ->
-    A1 = lasp_gset:new(),
-    B1 = lasp_gset:new(),
-
-    {ok, A2} = lasp_gset:update({add, 1}, a, A1),
-    {ok, B2} = lasp_gset:update({add, 2}, b, B1),
-
-    %% A1 and B1 are equivalent.
-    ?assertEqual(true, is_lattice_inflation(lasp_gset, A1, B1)),
-
-    %% A2 after A1.
-    ?assertEqual(true, is_lattice_inflation(lasp_gset, A1, A2)),
-
-    %% Concurrent
-    ?assertEqual(false, is_lattice_inflation(lasp_gset, A2, B2)).
-
-lasp_gset_strict_inflation_test() ->
-    A1 = lasp_gset:new(),
-    B1 = lasp_gset:new(),
-
-    {ok, A2} = lasp_gset:update({add, 1}, a, A1),
-    {ok, B2} = lasp_gset:update({add, 2}, b, B1),
-
-    %% A1 and B1 are equivalent.
-    ?assertEqual(false, is_lattice_strict_inflation(lasp_gset, A1, B1)),
-
-    %% A2 after A1.
-    ?assertEqual(true, is_lattice_strict_inflation(lasp_gset, A1, A2)),
-
-    %% Concurrent
-    ?assertEqual(false, is_lattice_strict_inflation(lasp_gset, A2, B2)).
 
 %% riak_dt_gcounter tests.
 

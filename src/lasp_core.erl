@@ -477,10 +477,7 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
                             Values = case Element of
                                 {X, Causality} ->
                                     %% lasp_orset
-                                    [{Z, Causality} || Z <- Function(X)];
-                                X ->
-                                    %% lasp_gset
-                                    Function(X)
+                                    [{Z, Causality} || Z <- Function(X)]
                             end,
 
                             Acc ++ Values
@@ -529,10 +526,7 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                                         {X, XCausality} ->
                                             %% lasp_orset
                                             [{{X, Y}, lasp_lattice:causal_product(T, XCausality, YCausality)}
-                                             || {Y, YCausality} <- RValue];
-                                        X ->
-                                            %% lasp_gset
-                                            [{X, Y} || Y  <- RValue]
+                                             || {Y, YCausality} <- RValue]
                                     end,
 
                                     Acc ++ Values
@@ -594,14 +588,6 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                                                     [{X, lasp_lattice:causal_union(T, XCausality, YCausality)}];
                                                 false ->
                                                     []
-                                            end;
-                                        X ->
-                                            %% lasp_gset
-                                            case lists:member(X, RValue) of
-                                                true ->
-                                                    [X];
-                                                false ->
-                                                    []
                                             end
                                     end,
 
@@ -641,9 +627,7 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                         lasp_orset_gbtree ->
                             lasp_orset_gbtree:merge(LValue, RValue);
                         lasp_orset ->
-                            lasp_orset:merge(LValue, RValue);
-                        lasp_gset ->
-                            lasp_gset:merge(LValue, RValue)
+                            lasp_orset:merge(LValue, RValue)
                     end,
 
                     %% Bind new value back.
@@ -678,10 +662,7 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
                             Z = case Element of
                                 {X, Causality} ->
                                     %% lasp_orset
-                                    {Function(X), Causality};
-                                X ->
-                                    %% lasp_gset
-                                    Function(X)
+                                    {Function(X), Causality}
                             end,
 
                             Acc ++ [Z]
@@ -710,7 +691,6 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun({_, T, V}) ->
             AccValue = case T of
                 lasp_orset_gbtree ->
-                    %% Iterator to map the data structure over.
                     FolderFun = fun(X, Value, Acc) ->
                             case Function(X) of
                                 true ->
@@ -726,9 +706,6 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
                             Z = case Element of
                                 {X, _} ->
                                     %% lasp_orset
-                                    X;
-                                X ->
-                                    %% lasp_gset
                                     X
                             end,
 

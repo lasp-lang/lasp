@@ -23,6 +23,8 @@
 
 -export([test/0]).
 
+-define(SET, lasp_orset).
+
 -ifdef(TEST).
 
 -export([confirm/0]).
@@ -43,9 +45,8 @@ confirm() ->
     ok = lasp_test_helpers:wait_for_cluster(Nodes),
 
     lager:info("Remotely executing the test."),
-    {GSet, GSet2} = rpc:call(Node, ?MODULE, test, []),
-    ?assertMatch({ok, {_, _, [1,2,3]}}, GSet),
-    ?assertMatch({ok, {_, _, [1,2,3,4]}}, GSet2),
+    ?assertMatch({[1,2,3], [1,2,3,4]},
+                 rpc:call(Node, ?MODULE, test, [])),
 
     pass.
 
@@ -53,38 +54,38 @@ confirm() ->
 
 test() ->
     %% Create new set-based CRDT.
-    {ok, GSetId} = lasp:declare(lasp_gset),
+    {ok, SetId} = lasp:declare(?SET),
 
     %% Determine my pid.
     Me = self(),
 
-    %% Spawn fun which should block until lattice reaches [1,2,3].
-    spawn(fun() -> Me ! lasp:read(GSetId, [1,2,3]) end),
-
     %% Perform 4 binds, each an inflation.
-    {ok, _} = lasp:bind(GSetId, [1]),
-    {ok, _} = lasp:bind(GSetId, [1, 2]),
-    {ok, _} = lasp:bind(GSetId, [1, 2, 3]),
+    {ok, _} = lasp:update(SetId, {add_all, [1]}, actor),
+    {ok, {_, _, V0}} = lasp:update(SetId, {add_all, [2]}, actor),
+    {ok, {_, _, V1}} = lasp:update(SetId, {add_all, [3]}, actor),
+
+    %% Spawn fun which should block until lattice is strict inflation of
+    %% U2.
+    spawn(fun() -> Me ! lasp:read(SetId, {strict, V0}) end),
 
     %% Ensure we receive [1, 2, 3].
-    GSet = receive
-        {ok, {_, _, [1, 2, 3]}} = V ->
-            V
+    Set1 = receive
+        {ok, {_, _, X}} ->
+            ?SET:value(X)
     end,
 
     %% Spawn fun which should block until lattice reaches [1,2,3,4,5].
-    spawn(fun() -> Me ! lasp:read(GSetId, [1,2,3,4]) end),
+    spawn(fun() -> Me ! lasp:read(SetId, {strict, V1}) end),
 
     %% Perform another inflation.
-    {ok, _} = lasp:bind(GSetId, [1, 2, 3, 4]),
-    {ok, _} = lasp:bind(GSetId, [1, 2, 3, 4, 5]),
+    {ok, _} = lasp:update(SetId, {add_all, [4]}, actor),
+    {ok, _} = lasp:update(SetId, {add_all, [5]}, actor),
 
     %% Ensure we receive [1, 2, 3, 4].
-    GSet2 = receive
-        {ok, {_, _, [1, 2, 3, 4]}} = V1 ->
-            V1
+    Set2 = receive
+        {ok, {_, _, Y}} ->
+            ?SET:value(Y)
     end,
 
-    lager:info("GSet: ~p GSet2: ~p", [GSet, GSet2]),
-
-    {GSet, GSet2}.
+    % {Set1, Set2}.
+    {Set1, Set2}.

@@ -53,13 +53,12 @@
           as an Erlang library.  Erlang is an excellent language for distribution and concurrency, and allows us to prototype new features for Lasp quickly.  Below is a code sample for creating a distributed set and applying a map function to the set.</p>
           <pre>
 %% Create initial set.
-{ok, S1} = lasp:declare(Type),
+{ok, S1} = lasp:declare(riak_dt_orset),
 
 %% Add elements to initial set and update.
 {ok, _} = lasp:update(S1, {add_all, [1,2,3]}, a),
 
-%% Create second set.
-{ok, S2} = lasp:declare(Type),
+{ok, S2} = lasp:declare(riak_dt_orset),
 
 %% Apply map.
 ok = lasp:map(S1, fun(X) -> X * 2 end, S2).
@@ -67,7 +66,14 @@ ok = lasp:map(S1, fun(X) -> X * 2 end, S2).
         </div>
         <div class="col-lg-6">
           <h4>Talks</h4>
-          <p align="justify">There have been several talks about Lasp, but for a good overview of how the language and runtime work, there's a <a href="https://www.youtube.com/watch?v=uwpakTIg9r8&index=3&list=PLWbHc_FXPo2h0sJW6X2RZDtT1ndw6KKpQ">video</a> from Erlang Factory 2015.</p>
+          <p align="justify">There have been several talks about Lasp,
+          but for a good overview of how the language and runtime work,
+          there's a <a
+            href="https://www.youtube.com/watch?v=uwpakTIg9r8&index=3&list=PLWbHc_FXPo2h0sJW6X2RZDtT1ndw6KKpQ">video</a>
+          from Erlang Factory 2015.  Slides are also available for our
+          recent talk at <a
+            href="https://speakerdeck.com/cmeiklejohn/coordination-free-computations">GOTO
+            Chicago 2015</a>.</p>
 
           <h4>Blogs and Articles</h4>
           <p align="justify">A blog series on Lasp is available:

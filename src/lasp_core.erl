@@ -311,8 +311,8 @@ bind(Id, Value, Store) ->
                     catch
                         _:Reason ->
                             %% Merge threw.
-                            lager:warning("Exception, reason: ~p ~p => ~p",
-                                          [Reason, Value0, Value]),
+                            lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
+                                          [Type, Reason, Value0, Value]),
                             {Object, {ok, {Id, Type, Value0}}}
                     end
             end

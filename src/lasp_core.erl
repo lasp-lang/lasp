@@ -548,16 +548,16 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                     AccValue = case T of
                         lasp_orset_gbtree ->
                             FolderFun = fun(X, XCausality, Acc) ->
-                                    Value = case gb_trees:lookup(X, RValue) of
+                                    case gb_trees:lookup(X, RValue) of
                                         {value, YCausality} ->
-                                            lasp_lattice:causal_union(T, XCausality, YCausality);
+                                            Value = lasp_lattice:causal_union(T, XCausality, YCausality),
+                                            New = gb_trees:enter(X,
+                                                                 Value,
+                                                                 gb_trees:empty()),
+                                            lasp_orset_gbtree:merge(New, Acc);
                                         none ->
                                             Acc
-                                    end,
-                                    New = gb_trees:enter(X,
-                                                         Value,
-                                                         gb_trees:empty()),
-                                    lasp_orset_gbtree:merge(New, Acc)
+                                    end
                             end,
                             gb_trees_ext:foldl(FolderFun,
                                                T:new(),

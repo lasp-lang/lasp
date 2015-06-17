@@ -109,7 +109,6 @@ test_lattice(Type) ->
 
     Self = self(),
 
-    lager:info("About to spawn wait_needed function..."),
     spawn_link(fun() ->
                   {ok, _} = lasp:wait_needed(L1, {strict, S1}),
                   Self ! threshold_met
@@ -136,7 +135,6 @@ test_lattice(Type) ->
     {ok, L5} = lasp:declare(Type),
     {ok, L6} = lasp:declare(Type),
 
-    lager:info("About to spawn read_any function..."),
     spawn_link(fun() ->
                 {ok, _} = lasp:read_any([{L5, {strict, undefined}}, {L6, {strict, undefined}}]),
                 Self ! read_any

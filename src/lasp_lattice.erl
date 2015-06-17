@@ -316,7 +316,10 @@ causal_product(lasp_orset_gbtree, Xs, Ys) ->
 causal_union(lasp_orset, Xs, Ys) ->
     Xs ++ Ys;
 causal_union(lasp_orset_gbtree, Xs, Ys) ->
-    gb_trees_ext:merge(Xs, Ys, fun(X, _Y) -> X end).
+    MergeFun = fun(X, Y) ->
+            X orelse Y
+    end,
+    gb_trees_ext:merge(Xs, Ys, MergeFun).
 
 %% @doc Given the metadata for a given value, force that the object
 %%      appears removed by marking all of the metadata as removed.

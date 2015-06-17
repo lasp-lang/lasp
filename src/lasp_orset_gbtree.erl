@@ -134,7 +134,9 @@ parent_clock(_Clock, ORSet) ->
 -spec merge(gb_tree(), gb_tree()) -> gb_tree().
 merge(ORSet1, ORSet2) ->
     MergeFun = fun(TokensA, TokensB) ->
-            TokenMergeFun = fun(A, B) -> A or B end,
+            TokenMergeFun = fun(A, B) ->
+                    A orelse B
+            end,
             gb_trees_ext:merge(TokensA, TokensB, TokenMergeFun)
     end,
     gb_trees_ext:merge(ORSet1, ORSet2, MergeFun).

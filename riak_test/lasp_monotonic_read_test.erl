@@ -45,7 +45,7 @@ confirm() ->
     ok = lasp_test_helpers:wait_for_cluster(Nodes),
 
     lager:info("Remotely executing the test."),
-    ?assertMatch({[1,2,3], [1,2,3,4]},
+    ?assertMatch({[1,2,3], [1,2,3,4,5]},
                  rpc:call(Node, ?MODULE, test, [])),
 
     pass.
@@ -65,27 +65,29 @@ test() ->
     {ok, {_, _, V1}} = lasp:update(SetId, {add_all, [3]}, actor),
 
     %% Spawn fun which should block until lattice is strict inflation of
-    %% U2.
-    spawn(fun() -> Me ! lasp:read(SetId, {strict, V0}) end),
+    %% V0.
+    I1 = first_read,
+    spawn(fun() -> Me ! {I1, lasp:read(SetId, {strict, V0})} end),
 
     %% Ensure we receive [1, 2, 3].
     Set1 = receive
-        {ok, {_, _, X}} ->
+        {I1, {ok, {_, _, X}}} ->
             ?SET:value(X)
     end,
 
-    %% Spawn fun which should block until lattice reaches [1,2,3,4,5].
-    spawn(fun() -> Me ! lasp:read(SetId, {strict, V1}) end),
-
-    %% Perform another inflation.
-    {ok, _} = lasp:update(SetId, {add_all, [4]}, actor),
+    %% Perform more inflations.
+    {ok, {_, _, V2}} = lasp:update(SetId, {add_all, [4]}, actor),
     {ok, _} = lasp:update(SetId, {add_all, [5]}, actor),
+
+    %% Spawn fun which should block until lattice is a strict inflation
+    %% of V1.
+    I2 = second_read,
+    spawn(fun() -> Me ! {I2, lasp:read(SetId, {strict, V2})} end),
 
     %% Ensure we receive [1, 2, 3, 4].
     Set2 = receive
-        {ok, {_, _, Y}} ->
+        {I2, {ok, {_, _, Y}}} ->
             ?SET:value(Y)
     end,
 
-    % {Set1, Set2}.
     {Set1, Set2}.

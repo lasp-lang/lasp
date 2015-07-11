@@ -58,6 +58,15 @@ confirm() ->
 
 -define(COUNTER, riak_dt_gcounter).
 
+%% The maximum number of impressions for each advertisement to display.
+-define(MAX_IMPRESSIONS, 5).
+
+%% The number of events to sent to clients.
+-define(NUM_EVENTS, 5000).
+
+%% The number of clients.
+-define(NUM_CLIENTS, 10).
+
 -record(ad, {id, image, counter}).
 
 -record(contract, {id}).
@@ -68,13 +77,8 @@ test() ->
 
     %% Generate a series of unique identifiers.
     RovioAdIds = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
-    lager:info("Rovio Ad Identifiers are: ~p", [RovioAdIds]),
-
     TriforkAdIds = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
-    lager:info("Trifork Ad Identifiers are: ~p", [TriforkAdIds]),
-
     Ids = RovioAdIds ++ TriforkAdIds,
-    lager:info("Ad Identifiers are: ~p", [Ids]),
 
     %% Generate Rovio's advertisements.
     {ok, RovioAds} = lasp:declare(?SET),
@@ -106,12 +110,6 @@ test() ->
     {ok, Ads} = lasp:declare(?SET),
     ok = lasp:union(RovioAds, TriforkAds, Ads),
 
-    %% Debug; print the list of advertisements to the log.
-    timer:sleep(500),
-    {ok, {_, _, Ads0}} = lasp:read(Ads, undefined),
-    lager:info("Current advertisements: ~p",
-               [?SET:value(Ads0)]),
-
     %% For each identifier, generate a contract.
     {ok, Contracts} = lasp:declare(?SET),
     lists:map(fun(Id) ->
@@ -120,20 +118,9 @@ test() ->
                                       undefined)
                 end, Ids),
 
-    %% Debug; print the list of advertisements to the log.
-    {ok, {_, _, Contracts0}} = lasp:read(Contracts, undefined),
-    lager:info("Current contracts: ~p",
-               [?SET:value(Contracts0)]),
-
     %% Compute the Cartesian product of both ads and contracts.
     {ok, AdsContracts} = lasp:declare(?SET),
     ok = lasp:product(Ads, Contracts, AdsContracts),
-
-    %% Debug; print the product.
-    timer:sleep(500),
-    {ok, {_, _, AdsContracts0}} = lasp:read(AdsContracts, undefined),
-    lager:info("Current ads-contracts: ~p",
-               [?SET:value(AdsContracts0)]),
 
     %% Filter items by join on item it.
     {ok, AdsWithContracts} = lasp:declare(?SET),
@@ -142,65 +129,25 @@ test() ->
     end,
     ok = lasp:filter(AdsContracts, FilterFun, AdsWithContracts),
 
-    %% Debug; print the filtered.
-    timer:sleep(500),
-    {ok, {_, _, AdsWithContracts0}} = lasp:read(AdsWithContracts, undefined),
-    lager:info("Current ads with contracts: ~p",
-               [?SET:value(AdsWithContracts0)]),
+    %% Launch client processes.
+    ClientList = clients(AdsWithContracts),
 
-    %% Launch a series of client processes, each of which is responsible
-    %% for displaying a particular advertisement.
+    %% Launch server processes.
+    servers(Ads, AdsWithContracts),
 
-    %% Generate a OR-set for tracking clients.
-    {ok, Clients} = lasp:declare(?SET),
+    %% Initialize simulation.
+    simulate(ClientList),
 
-    %% Each client takes the full list of ads when it starts, and reads
-    %% from the variable store.
-    lists:map(fun(Id) ->
-                ClientPid = spawn_link(?MODULE, client,
-                                       [Id, AdsWithContracts, undefined]),
-                {ok, _} = lasp:update(Clients,
-                                      {add, ClientPid},
-                                      undefined)
-                end, lists:seq(1,5)),
-
-    %% Launch a server process for each advertisement, which will block
-    %% until the advertisement should be disabled.
-
-    %% Create a OR-set for the server list.
-    {ok, Servers} = lasp:declare(?SET),
-
-    %% Get the current advertisement list.
-    {ok, {_, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
-    AdList = ?SET:value(AdList0),
-
-    %% For each advertisement, launch one server for tracking it's
-    %% impressions and wait to disable.
-    lists:map(fun(Ad) ->
-                ServerPid = spawn_link(?MODULE, server, [Ad, Ads]),
-                {ok, _} = lasp:update(Servers,
-                                      {add, ServerPid},
-                                      undefined)
-                end, AdList),
-
-    %% Get client list.
-    {ok, {_, _, ClientList0}} = lasp:read(Clients, {strict, undefined}),
-    ClientList = ?SET:value(ClientList0),
-
-    Viewer = fun(_) ->
-            Pid = lists:nth(random:uniform(5), ClientList),
-            Pid ! view_ad
-    end,
-    lists:map(Viewer, lists:seq(1,100)),
+    %% Finish and summarize.
+    summarize(AdsWithContracts),
 
     ok.
 
 %% @doc Server functions for the advertisement counter.  After 5 views,
 %%      disable the advertisement.
-%%
 server({#ad{counter=Counter}=Ad, _}, Ads) ->
     %% Blocking threshold read for 5 advertisement impressions.
-    {ok, _} = lasp:read(Counter, 5),
+    {ok, _} = lasp:read(Counter, ?MAX_IMPRESSIONS),
 
     %% Remove the advertisement.
     {ok, _} = lasp:update(Ads, {remove, Ad}, Ad),
@@ -228,8 +175,75 @@ client(Id, AdsWithContracts, PreviousValue) ->
 
                     %% Increment it.
                     {ok, _} = lasp:update(Ad, increment, Id),
-                    lager:info("Incremented ad counter: ~p", [Ad]),
 
                     client(Id, AdsWithContracts, AdList0)
             end
     end.
+
+%% @doc Simulate clients viewing advertisements.
+simulate(ClientList) ->
+    %% Start the simulation.
+    Viewer = fun(_) ->
+            Random = random:uniform(length(ClientList)),
+            Pid = lists:nth(Random, ClientList),
+            Pid ! view_ad
+    end,
+    lists:foreach(Viewer, lists:seq(1, ?NUM_EVENTS)).
+
+%% @doc Launch a server process for each advertisement, which will block
+%% until the advertisement should be disabled.
+servers(Ads, AdsWithContracts) ->
+    %% Create a OR-set for the server list.
+    {ok, Servers} = lasp:declare(?SET),
+
+    %% Get the current advertisement list.
+    {ok, {_, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
+    AdList = ?SET:value(AdList0),
+
+    %% For each advertisement, launch one server for tracking it's
+    %% impressions and wait to disable.
+    lists:map(fun(Ad) ->
+                ServerPid = spawn_link(?MODULE, server, [Ad, Ads]),
+                {ok, _} = lasp:update(Servers, {add, ServerPid}, undefined),
+                ServerPid
+                end, AdList).
+
+%% @doc Launch a series of client processes, each of which is responsible
+%% for displaying a particular advertisement.
+clients(AdsWithContracts) ->
+    %% Generate a OR-set for tracking clients.
+    {ok, Clients} = lasp:declare(?SET),
+
+    %% Each client takes the full list of ads when it starts, and reads
+    %% from the variable store.
+    lists:map(fun(Id) ->
+                ClientPid = spawn_link(?MODULE, client, [Id, AdsWithContracts, undefined]),
+                {ok, _} = lasp:update(Clients, {add, ClientPid}, undefined),
+                ClientPid
+                end, lists:seq(1, ?NUM_CLIENTS)).
+
+%% @doc Summarize results.
+summarize(AdsWithContracts) ->
+    %% Wait until all advertisements have been exhausted before stopping
+    %% execution of the test.
+    {ok, {_, _, AdsWithContracts0}} = lasp:read(AdsWithContracts, {strict, undefined}),
+    Overcounts = lists:map(fun({#ad{counter=CounterId}, _}) ->
+                lager:info("Waiting for advertisement ~p to reach ~p impressions...",
+                           [CounterId, ?MAX_IMPRESSIONS]),
+                {ok, {_, _, V0}} = lasp:read(CounterId, ?MAX_IMPRESSIONS),
+                V = ?COUNTER:value(V0),
+                lager:info("Advertisement ~p reached max impressions: ~p with ~p....",
+                           [CounterId, ?MAX_IMPRESSIONS, V]),
+                V - ?MAX_IMPRESSIONS
+        end, ?SET:value(AdsWithContracts0)),
+
+    Sum = fun(X, Acc) ->
+            X + Acc
+    end,
+    TotalOvercount = lists:foldl(Sum, 0, Overcounts),
+    io:format("----------------------------------------"),
+    io:format("Total overcount: ~p~n", [TotalOvercount]),
+    io:format("Mean overcount per client: ~p~n", [TotalOvercount / ?NUM_CLIENTS]),
+    io:format("----------------------------------------"),
+
+    ok.

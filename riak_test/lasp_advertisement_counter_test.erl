@@ -172,7 +172,7 @@ test() ->
 
     %% Get the current advertisement list.
     {ok, {_, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
-    AdList = lasp_orset:value(AdList0),
+    AdList = ?SET:value(AdList0),
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
@@ -213,7 +213,7 @@ client(Id, AdsWithContracts, PreviousValue) ->
         view_ad ->
             %% Get current ad list.
             {ok, {_, _, AdList0}} = lasp:read(AdsWithContracts, PreviousValue),
-            AdList = lasp_orset:value(AdList0),
+            AdList = ?SET:value(AdList0),
 
             case length(AdList) of
                 0 ->

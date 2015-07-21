@@ -157,7 +157,7 @@ exchange(Peer) ->
 -spec declare(id(), type()) -> {ok, id()}.
 declare(Id, Type) ->
     {ok, Id} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
-    % broadcast({Id, Type, undefined}),
+    broadcast({Id, Type, Type:new()}),
     {ok, Id}.
 
 %% @doc Update a dataflow variable.

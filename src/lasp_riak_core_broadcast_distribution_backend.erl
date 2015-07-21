@@ -321,9 +321,7 @@ handle_call({thread, Module, Function, Args}, _From, #state{store=Store}=State) 
     ok = ?CORE:thread(Module, Function, Args, Store),
     {reply, ok, State};
 handle_call({wait_needed, Id, Threshold}, From, #state{store=Store}=State) ->
-    ReplyFun = fun(ReadThreshold) ->
-                        {reply, {ok, ReadThreshold}, State}
-               end,
+    ReplyFun = fun(ReadThreshold) -> {reply, {ok, ReadThreshold}, State} end,
     ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
 handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
     %% @todo Normalize this ReplyFun in the future.

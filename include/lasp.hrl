@@ -39,10 +39,10 @@
 
 -define(EXECUTE_REQUEST, #lasp_execute_request_v1).
 
--record(dv, {value,
+-record(dv, {value :: value(),
              waiting_threads = [],
              lazy_threads = [],
-             type}).
+             type :: type()}).
 
 -type variable() :: #dv{}.
 

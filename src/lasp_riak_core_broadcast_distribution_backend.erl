@@ -142,8 +142,9 @@ merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
 %% stale or not.
 -spec is_stale({broadcast_id(), broadcast_clock()}) -> boolean().
 is_stale({Id, Clock}) ->
-    lager:info("id: ~p, clock: ~p", [Id, Clock]),
-    gen_server:call(?MODULE, {is_stale, Id, Clock}, infinity).
+    Result = gen_server:call(?MODULE, {is_stale, Id, Clock}, infinity),
+    lager:info("id: ~p, clock: ~p, result: ~p", [Id, Clock, Result]),
+    Result.
 
 %% @doc Given a message identifier and a clock, return a given message.
 -spec graft({broadcast_id(), broadcast_clock()}) ->

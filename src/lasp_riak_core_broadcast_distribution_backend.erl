@@ -70,6 +70,7 @@
 %% Broadcast record.
 -record(broadcast, {id :: id(),
                     type :: type(),
+                    clock :: vclock:vclock(),
                     metadata :: metadata(),
                     value :: value()}).
 
@@ -83,6 +84,16 @@
               end).
 
 -define(BLOCKING, fun() -> {noreply, State} end).
+
+%% Clock mutation macros.
+-define(CLOCK_INIT, fun(Metadata) ->
+            VClock = vclock:increment(Actor, vclock:fresh()),
+            orddict:store(clock, VClock, Metadata)
+    end).
+
+-define(CLOCK_MERG, fun(Metadata) ->
+            vclock:merge([orddict:fetch(clock, Metadata0), orddict:fetch(clock, Metadata)])
+    end).
 
 %%%===================================================================
 %%% API
@@ -102,47 +113,45 @@ start_link(Opts) ->
 %%% riak_core_broadcast_handler callbacks
 %%%===================================================================
 
-%% @todo doc
-%% @todo spec
-broadcast_data(#broadcast{id=Id, type=Type, value=Value}=Msg) ->
-    lager:warning("id: ~p, msg: ~p", [Id, Msg]),
-    {{Id, Type, Value}, {Id, Type, Value}}.
+-type clock() :: vclock:vclock().
+
+-type broadcast_message() :: #broadcast{}.
+-type broadcast_id() :: id().
+-type broadcast_clock() :: clock().
+-type broadcast_payload() :: {id(), type(), metadata(), value()}.
+
+%% @doc Returns from the broadcast message the identifier and the payload.
+-spec broadcast_data(broadcast_message()) -> {{broadcast_id(), broadcast_clock()}, broadcast_payload()}.
+broadcast_data(#broadcast{id=Id, type=Type, clock=Clock, metadata=Metadata, value=Value}) ->
+    {{Id, Clock}, {Id, Type, Metadata, Value}}.
 
 %% @todo doc
-%% @todo spec
-merge({Id, Type, Value}, {Id, Type, Value}) ->
-    lager:warning("id: ~p, type: ~p value: ~p", [Id, Type, Value]),
+-spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) -> boolean().
+merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
+    lager:info("id: ~p, clock: ~p", [Id, Clock]),
 
-    case is_stale({Id, Type, Value}) of
+    case is_stale({Id, Clock}) of
         true ->
             false;
         false ->
-            {ok, _} = local_bind(Id, Type, Value),
+            {ok, _} = local_bind(Id, Type, Metadata, Value),
             true
     end.
 
-%% @todo doc
-%% @todo spec
-is_stale({Id, Type, Value}) ->
-    lager:warning("id: ~p, type: ~p value: ~p", [Id, Type, Value]),
+%% @doc Use the clock on the object to determine if this message is
+%% stale or not.
+-spec is_stale({broadcast_id(), broadcast_clock()}) -> boolean().
+is_stale({Id, Clock}) ->
+    lager:info("id: ~p, clock: ~p", [Id, Clock]),
+    gen_server:call(?MODULE, {is_stale, Id, Clock}, infinity).
 
-    Result = case read(Id, undefined) of
-        {ok, {_I, T, _M, V}} ->
-            not lasp_lattice:is_lattice_strict_inflation(T, V, Value);
-        _ ->
-            %% We don't know about the value yet; not stale.
-            false
-    end,
-
-    lager:warning("returning: ~p", [Result]),
-
+%% @doc Given a message identifier and a clock, return a given message.
+-spec graft({broadcast_id(), broadcast_clock()}) ->
+    stale | {ok, broadcast_payload()} | {error, term()}.
+graft({Id, Clock}) ->
+    Result = gen_server:call(?MODULE, {graft, Id, Clock}, infinity),
+    lager:info("id: ~p, clock: ~p, result: ~p", [Id, Clock, Result]),
     Result.
-
-%% @todo doc
-%% @todo spec
-graft(Id) ->
-    lager:warning("id: ~p", [Id]),
-    {error, not_implemented}.
 
 %% @todo doc
 %% @todo spec
@@ -181,8 +190,8 @@ update(Id, Operation, Actor) ->
 %%      the value to bind.
 %%
 -spec bind(id(), value()) -> {ok, var()}.
-bind(Id, Value) ->
-    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE, {bind, Id, Value}, infinity),
+bind(Id, Value0) ->
+    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE, {bind, Id, Value0}, infinity),
     broadcast({Id, Type, Metadata, Value}),
     {ok, {Id, Type, Metadata, Value}}.
 
@@ -311,11 +320,14 @@ init([]) ->
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) -> {reply, term(), #state{}}.
-handle_call({declare, Id, Type}, _From, #state{store=Store, counter=Counter}=State) ->
-    {ok, Id} = ?CORE:declare(Id, Type, Store),
+handle_call({declare, Id, Type}, _From, #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    {ok, Id} = ?CORE:declare(Id, Type, ?CLOCK_INIT, Store),
     {reply, {ok, Id}, State#state{counter=increment_counter(Counter)}};
 handle_call({bind, Id, Value}, _From, #state{store=Store, counter=Counter}=State) ->
     Result = ?CORE:bind(Id, Value, Store),
+    {reply, Result, State#state{counter=increment_counter(Counter)}};
+handle_call({bind, Id, Metadata0, Value}, _From, #state{store=Store, counter=Counter}=State) ->
+    Result = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?BIND, ?READ),
@@ -331,8 +343,8 @@ handle_call({wait_needed, Id, Threshold}, From, #state{store=Store}=State) ->
     ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
 handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
     %% @todo Normalize this ReplyFun in the future.
-    ReplyFun = fun({_Id, Type, Value}) ->
-                    {reply, {ok, {_Id, Type, Value}}, State};
+    ReplyFun = fun({_Id, Type, Metadata, Value}) ->
+                    {reply, {ok, {_Id, Type, Metadata, Value}}, State};
                   ({error, Error}) ->
                     {reply, {error, Error}, State}
                end,
@@ -355,6 +367,29 @@ handle_call({map, Id, Function, AccId}, _From, #state{store=Store}=State) ->
 handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:fold(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, ok, State};
+handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
+    Result = case get(Id, Store) of
+        {ok, {Id, Type, Metadata, Value}} ->
+            OurClock = orddict:fetch(clock, Metadata),
+            case vclock:equal(TheirClock, OurClock) of
+                true ->
+                    {ok, {Id, Type, Metadata, Value}};
+                false ->
+                    stale
+            end;
+        {error, Error} ->
+            {error, Error}
+    end,
+    {reply, Result, State};
+handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
+    Result = case get(Id, Store) of
+        {ok, {_, _, Metadata, _}} ->
+            OurClock = orddict:fetch(clock, Metadata),
+            vclock:descends(TheirClock, OurClock);
+        {error, _Error} ->
+            false
+    end,
+    {reply, Result, State};
 handle_call(Msg, _From, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
@@ -387,21 +422,41 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 broadcast({Id, Type, Metadata, Value}) ->
-    Broadcast = #broadcast{id=Id, type=Type, metadata=Metadata, value=Value},
+    Clock = orddict:fetch(clock, Metadata),
+    Broadcast = #broadcast{id=Id, clock=Clock, type=Type, metadata=Metadata, value=Value},
     riak_core_broadcast:broadcast(Broadcast, ?MODULE).
 
 %% @private
-local_bind(Id, Type, Value) ->
+local_bind(Id, Type, Metadata, Value) ->
     lager:warning("id: ~p, type: ~p value: ~p", [Id, Type, Value]),
 
-    case gen_server:call(?MODULE, {bind, Id, Value}, infinity) of
+    case gen_server:call(?MODULE, {bind, Id, Metadata, Value}, infinity) of
         {error, not_found} ->
             lager:warning("not found; declaring!"),
             {ok, Id} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
-            local_bind(Id, Type, Value);
+            local_bind(Id, Type, Metadata, Value);
         {ok, X} ->
            {ok, X}
     end.
+
+%% @private
+-spec get(id(), store()) -> {ok, var()} | {error, term()}.
+get(Id, _Store) when is_list(Id) ->
+    %% This is only in here to satisfy dialyzer that the second clause
+    %% can return {error, term()} given it does not think it can because
+    %% of the use of higher-order functions.
+    {error, unsupported};
+get(Id, Store) ->
+    ReplyFun = fun({_Id, Type, Metadata, Value}) ->
+                    {ok, {_Id, Type, Metadata, Value}};
+                  ({error, Error}) ->
+                    {error, Error}
+               end,
+    BlockingFun = fun() ->
+            {error, blocking}
+    end,
+    Threshold = {strict, undefined},
+    ?CORE:read(Id, Threshold, Store, self(), ReplyFun, BlockingFun).
 
 %% @private
 increment_counter(Counter) ->

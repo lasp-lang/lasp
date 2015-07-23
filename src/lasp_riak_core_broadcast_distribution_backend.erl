@@ -92,7 +92,8 @@
     end).
 
 -define(CLOCK_MERG, fun(Metadata) ->
-            vclock:merge([orddict:fetch(clock, Metadata0), orddict:fetch(clock, Metadata)])
+            Merged = vclock:merge([orddict:fetch(clock, Metadata0), orddict:fetch(clock, Metadata)]),
+            orddict:store(clock, Merged, Metadata)
     end).
 
 %%%===================================================================

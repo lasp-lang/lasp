@@ -75,7 +75,7 @@ test(Type) ->
     timer:sleep(400),
 
     %% Read product.
-    {ok, {_, _, Product0}} = lasp:read(S3, undefined),
+    {ok, {_, _, _, Product0}} = lasp:read(S3, undefined),
 
     %% Read product value.
     Product = Type:value(Product0),

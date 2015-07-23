@@ -63,10 +63,15 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {store :: store()}).
+-record(state, {store :: store(),
+                actor :: non_neg_integer(),
+                counter :: non_neg_integer()}).
 
 %% Broadcast record.
--record(broadcast, {id :: id(), type :: type(), value :: value()}).
+-record(broadcast, {id :: id(),
+                    type :: type(),
+                    metadata :: metadata(),
+                    value :: value()}).
 
 %% Definitions for the bind/read fun abstraction.
 -define(BIND, fun(_AccId, _AccValue, _Store) ->
@@ -122,7 +127,7 @@ is_stale({Id, Type, Value}) ->
     lager:warning("id: ~p, type: ~p value: ~p", [Id, Type, Value]),
 
     Result = case read(Id, undefined) of
-        {ok, {_I, T, V}} ->
+        {ok, {_I, T, _M, V}} ->
             not lasp_lattice:is_lattice_strict_inflation(T, V, Value);
         _ ->
             %% We don't know about the value yet; not stale.
@@ -157,7 +162,6 @@ exchange(Peer) ->
 -spec declare(id(), type()) -> {ok, id()}.
 declare(Id, Type) ->
     {ok, Id} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
-    broadcast({Id, Type, Type:new()}),
     {ok, Id}.
 
 %% @doc Update a dataflow variable.
@@ -178,9 +182,9 @@ update(Id, Operation, Actor) ->
 %%
 -spec bind(id(), value()) -> {ok, var()}.
 bind(Id, Value) ->
-    {ok, Result} = gen_server:call(?MODULE, {bind, Id, Value}, infinity),
-    broadcast(Result),
-    {ok, Result}.
+    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE, {bind, Id, Value}, infinity),
+    broadcast({Id, Type, Metadata, Value}),
+    {ok, {Id, Type, Metadata, Value}}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -300,23 +304,25 @@ wait_needed(Id, Threshold) ->
 %% @private
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
+    Actor = erlang:phash2(erlang:now()),
+    Counter = 0,
     {ok, Store} = ?CORE:start(node()),
-    {ok, #state{store=Store}}.
+    {ok, #state{actor=Actor, counter=Counter, store=Store}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) -> {reply, term(), #state{}}.
-handle_call({declare, Id, Type}, _From, #state{store=Store}=State) ->
+handle_call({declare, Id, Type}, _From, #state{store=Store, counter=Counter}=State) ->
     {ok, Id} = ?CORE:declare(Id, Type, Store),
-    {reply, {ok, Id}, State};
-handle_call({bind, Id, Value}, _From, #state{store=Store}=State) ->
+    {reply, {ok, Id}, State#state{counter=increment_counter(Counter)}};
+handle_call({bind, Id, Value}, _From, #state{store=Store, counter=Counter}=State) ->
     Result = ?CORE:bind(Id, Value, Store),
-    {reply, Result, State};
+    {reply, Result, State#state{counter=increment_counter(Counter)}};
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?BIND, ?READ),
     {reply, ok, State};
-handle_call({update, Id, Operation, Actor}, _From, #state{store=Store}=State) ->
+handle_call({update, Id, Operation, Actor}, _From, #state{store=Store, counter=Counter}=State) ->
     {ok, Result} = ?CORE:update(Id, Operation, Actor, Store),
-    {reply, {ok, Result}, State};
+    {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};
 handle_call({thread, Module, Function, Args}, _From, #state{store=Store}=State) ->
     ok = ?CORE:thread(Module, Function, Args, Store),
     {reply, ok, State};
@@ -380,8 +386,8 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-broadcast({Id, Type, Value}) ->
-    Broadcast = #broadcast{id=Id, type=Type, value=Value},
+broadcast({Id, Type, Metadata, Value}) ->
+    Broadcast = #broadcast{id=Id, type=Type, metadata=Metadata, value=Value},
     riak_core_broadcast:broadcast(Broadcast, ?MODULE).
 
 %% @private
@@ -396,3 +402,7 @@ local_bind(Id, Type, Value) ->
         {ok, X} ->
            {ok, X}
     end.
+
+%% @private
+increment_counter(Counter) ->
+    Counter + 1.

@@ -42,7 +42,8 @@
 -record(dv, {value :: value(),
              waiting_threads = [],
              lazy_threads = [],
-             type :: type()}).
+             type :: type(),
+             metadata :: metadata()}).
 
 -type variable() :: #dv{}.
 
@@ -94,9 +95,10 @@
 -type ivar() :: term().
 -type actor() :: term().
 -type error() :: {error, atom()}.
+-type metadata() :: orddict:orddict().
 
 %% @doc Result of a read operation.
--type var() :: {id(), type(), value()}.
+-type var() :: {id(), type(), metadata(), value()}.
 
 %% @doc Only CRDTs are able to be processed.
 -type crdt() :: riak_dt:crdt().

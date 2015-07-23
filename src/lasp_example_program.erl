@@ -47,7 +47,7 @@ process(Object, _Reason, Actor, #state{id=Id}=State, Store) ->
 %% @doc Return the result.
 execute(#state{id=Id}, Store) ->
     lager:info("Execute called."),
-    {ok, {_, _, Value}} = ?CORE:read(Id, undefined, Store),
+    {ok, {_, _, _, Value}} = ?CORE:read(Id, undefined, Store),
     lager:info("Execute finished."),
     {value, Value}.
 

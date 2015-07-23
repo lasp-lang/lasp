@@ -75,7 +75,7 @@ test(Type) ->
     timer:sleep(400),
 
     %% Read union.
-    {ok, {_, _, Union0}} = lasp:read(S3, undefined),
+    {ok, {_, _, _, Union0}} = lasp:read(S3, undefined),
 
     %% Read union value.
     Union = Type:value(Union0),

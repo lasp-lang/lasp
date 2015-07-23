@@ -27,6 +27,7 @@
 %% Core API.
 -export([start/1,
          bind/3,
+         bind/4,
          bind_to/3,
          read/2,
          read/3,
@@ -34,7 +35,9 @@
          declare/1,
          declare/2,
          declare/3,
+         declare/4,
          update/4,
+         update/5,
          thread/4,
          filter/4,
          map/4,
@@ -169,7 +172,7 @@ read(Id, Store) ->
 -spec read(id(), value(), store()) -> {ok, var()}.
 read(Id, Threshold, Store) ->
     Self = self(),
-    ReplyFun = fun({_Id, Type, Value}) -> {ok, {_Id, Type, Value}} end,
+    ReplyFun = fun({_Id, Type, Metadata, Value}) -> {ok, {_Id, Type, Metadata, Value}} end,
     BlockingFun = fun() ->
                 receive
                     X ->
@@ -190,8 +193,8 @@ read_any(Reads, Store) ->
                 X ->
                     X
             end;
-        {ok, {Id, Type, Value}} ->
-            {ok, {Id, Type, Value}}
+        {ok, {Id, Type, Metadata, Value}} ->
+            {ok, {Id, Type, Metadata, Value}}
     end.
 
 %% @doc Declare a dataflow variable in a provided by identifer.
@@ -207,13 +210,22 @@ declare(Type, Store) ->
 %% @doc Declare a dataflow variable in a provided by identifer.
 -spec declare(id(), type(), store()) -> {ok, id()}.
 declare(Id, Type, Store) ->
+    MetadataFun = fun(X) -> X end,
+    declare(Id, Type, MetadataFun, Store).
+
+%% @doc Declare a dataflow variable in a provided by identifer.
+-spec declare(id(), type(), function(), store()) -> {ok, id()}.
+declare(Id, Type, MetadataFun, Store) ->
     case do(get, [Store, Id]) of
         {ok, _} ->
             %% Do nothing; make declare idempotent at each replica.
             {ok, Id};
         _ ->
             Value = Type:new(),
-            ok = do(put, [Store, Id, #dv{value=Value, type=Type}]),
+            Metadata = MetadataFun(orddict:new()),
+            ok = do(put, [Store, Id, #dv{value=Value,
+                                         type=Type,
+                                         metadata=Metadata}]),
             {ok, Id}
     end.
 
@@ -282,38 +294,49 @@ wait_needed(Id, Threshold, Store) ->
 %%
 -spec update(id(), operation(), actor(), store()) -> {ok, var()}.
 update(Id, Operation, Actor, Store) ->
+    MetadataFun = fun(X) -> X end,
+    update(Id, Operation, Actor, MetadataFun, Store).
+
+-spec update(id(), operation(), actor(), function(), store()) -> {ok, var()}.
+update(Id, Operation, Actor, MetadataFun, Store) ->
     {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
     {ok, Value} = Type:update(Operation, Actor, Value0),
-    bind(Id, Value, Store).
+    bind(Id, Value, MetadataFun, Store).
 
 %% @doc Define a dataflow variable to be bound a value.
-%%
 -spec bind(id(), value(), store()) -> {ok, var()}.
 bind(Id, Value, Store) ->
-    Mutator = fun(#dv{type=Type, value=Value0, waiting_threads=WT}=Object) ->
+    MetadataFun = fun(X) -> X end,
+    bind(Id, Value, MetadataFun, Store).
+
+%% @doc Define a dataflow variable to be bound a value.
+-spec bind(id(), value(), function(), store()) -> {ok, var()}.
+bind(Id, Value, MetadataFun, Store) ->
+    Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0, waiting_threads=WT}=Object) ->
+            Metadata = MetadataFun(Metadata0),
             case Value0 of
                 Value ->
                     %% Bind to current value.
-                    {Object, {ok, {Id, Type, Value}}};
+                    {Object, {ok, {Id, Type, Metadata, Value}}};
                 _ ->
                     %% Merge may throw for invalid types.
                     try
                         Merged = Type:merge(Value0, Value),
                         case lasp_lattice:is_inflation(Type, Value0, Merged) of
                             true ->
-                                {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Merged}}),
-                                NewObject = #dv{type=Type, value=Merged, waiting_threads=SW},
-                                {NewObject, {ok, {Id, Type, Merged}}};
+                                {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
+                                NewObject = #dv{type=Type, metadata=Metadata, value=Merged, waiting_threads=SW},
+                                {NewObject, {ok, {Id, Type, Metadata, Merged}}};
                             false ->
                                 %% Value is old.
-                                {Object, {ok, {Id, Type, Value0}}}
+                                {Object, {ok, {Id, Type, Metadata, Value0}}}
                         end
                     catch
                         _:Reason ->
                             %% Merge threw.
                             lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
                                           [Type, Reason, Value0, Value]),
-                            {Object, {ok, {Id, Type, Value0}}}
+                            {Object, {ok, {Id, Type, Metadata, Value0}}}
                     end
             end
     end,
@@ -337,7 +360,7 @@ bind(Id, Value, Store) ->
 -spec read(id(), value(), store(), pid(), function(), function()) ->
     {ok, var()}.
 read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
-    Mutator = fun(#dv{type=Type, value=Value, lazy_threads=LT}=Object) ->
+    Mutator = fun(#dv{type=Type, value=Value, metadata=Metadata, lazy_threads=LT}=Object) ->
             %% When no threshold is specified, use the bottom value for the
             %% given lattice.
             %%
@@ -356,15 +379,15 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
             %% Satisfy read if threshold is met.
             case lasp_lattice:threshold_met(Type, Value, Threshold) of
                 true ->
-                    {Object#dv{lazy_threads=SL}, {ok, {Id, Type, Value}}};
+                    {Object#dv{lazy_threads=SL}, {ok, {Id, Type, Metadata, Value}}};
                 false ->
                     WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
                     {Object#dv{waiting_threads=WT, lazy_threads=SL}, error}
             end
     end,
     case do(update, [Store, Id, Mutator]) of
-        {ok, {Id, Type, Value}} ->
-            ReplyFun({Id, Type, Value});
+        {ok, {Id, Type, Metadata, Value}} ->
+            ReplyFun({Id, Type, Metadata, Value});
         error ->
             %% Not valid for threshold; wait.
             BlockingFun();
@@ -383,7 +406,7 @@ read_any(Reads, Self, Store) ->
             fun({Id, Threshold0}, AlreadyFound) ->
                     case AlreadyFound of
                         false ->
-                            Mutator = fun(#dv{type=Type, value=Value, lazy_threads=LT}=Object) ->
+                            Mutator = fun(#dv{type=Type, value=Value, metadata=Metadata, lazy_threads=LT}=Object) ->
                                     %% When no threshold is specified, use the bottom
                                     %% value for the given lattice.
                                     %%
@@ -402,7 +425,7 @@ read_any(Reads, Self, Store) ->
                                     %% Satisfy read if threshold is met.
                                     case lasp_lattice:threshold_met(Type, Value, Threshold) of
                                         true ->
-                                            {Object, {ok, {Id, Type, Value}}};
+                                            {Object, {ok, {Id, Type, Metadata, Value}}};
                                         false ->
                                             WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
                                             {Object#dv{waiting_threads=WT, lazy_threads=SL}, error}
@@ -410,8 +433,8 @@ read_any(Reads, Self, Store) ->
                             end,
 
                             case do(update, [Store, Id, Mutator]) of
-                                {ok, {Id, Type, Value}} ->
-                                    {ok, {Id, Type, Value}};
+                                {ok, {Id, Type, Metadata, Value}} ->
+                                    {ok, {Id, Type, Metadata, Value}};
                                 error ->
                                     false
                             end;
@@ -444,7 +467,7 @@ bind_to(AccId, Id, Store, BindFun) ->
     bind_to(AccId, Id, Store, BindFun, ?READ).
 
 bind_to(AccId, Id, Store, BindFun, ReadFun) ->
-    Fun = fun({_, _, V}) ->
+    Fun = fun({_, _, _, V}) ->
         {ok, _} = BindFun(AccId, V, Store)
     end,
     gen_flow:start_link(lasp_process, [[{Id, ReadFun}], Fun]).
@@ -462,7 +485,7 @@ bind_to(AccId, Id, Store, BindFun, ReadFun) ->
 -spec fold(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun({_, T, V}) ->
+    Fun = fun({_, T, _, V}) ->
             AccValue = case T of
                 lasp_orset_gbtree ->
                     FolderFun = fun(X, Causality, Acc) ->
@@ -495,7 +518,7 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
 -spec product(id(), id(), id(), store(), function(), function(),
               function()) -> {ok, pid()}.
 product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, T, LValue}, {_, _, RValue}) ->
+    Fun = fun({_, T, _, LValue}, {_, _, _, RValue}) ->
             case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
@@ -538,7 +561,7 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec intersection(id(), id(), id(), store(), function(), function(),
                    function()) -> {ok, pid()}.
 intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, T, LValue}, {_, _, RValue}) ->
+    Fun = fun({_, T, _, LValue}, {_, _, _, RValue}) ->
             case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
@@ -593,7 +616,7 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec union(id(), id(), id(), store(), function(), function(),
             function()) -> {ok, pid()}.
 union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, T, LValue}, {_, _, RValue}) ->
+    Fun = fun({_, T, _, LValue}, {_, _, _, RValue}) ->
         case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
@@ -624,7 +647,7 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec map(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun({_, T, V}) ->
+    Fun = fun({_, T, _, V}) ->
             AccValue = case T of
                 lasp_orset_gbtree ->
                     FolderFun = fun(X, Value, Acc) ->
@@ -657,7 +680,7 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 -spec filter(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun({_, T, V}) ->
+    Fun = fun({_, T, _, V}) ->
             AccValue = case T of
                 lasp_orset_gbtree ->
                     FolderFun = fun(X, Value0, Acc) ->
@@ -747,20 +770,20 @@ reply_to_all(List, Result) ->
     {ok, list(pending_threshold())}.
 reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
-             {ok, {Id, Type, Value}}=Result) ->
+             {ok, {Id, Type, Metadata, Value}}=Result) ->
     SW = case lasp_lattice:threshold_met(Type, Value, Threshold) of
         true ->
             case From of
                 {server, undefined, {Address, Ref}} ->
                     gen_server:reply({Address, Ref},
-                                     {ok, {Id, Type, Value}});
+                                     {ok, {Id, Type, Metadata, Value}});
                 {fsm, undefined, Address} ->
                     gen_fsm:send_event(Address,
                                        {ok, undefined,
-                                        {Id, Type, Value}});
+                                        {Id, Type, Metadata, Value}});
                 {Address, Ref} ->
                     gen_server:reply({Address, Ref},
-                                     {ok, {Id, Type, Value}});
+                                     {ok, {Id, Type, Metadata, Value}});
                 _ ->
                     From ! Result
             end,
@@ -799,6 +822,7 @@ reply_to_all([From|T], StillWaiting, Result) ->
         {Address, Ref} ->
             gen_server:reply({Address, Ref}, Result);
         _ ->
+            lager:info("Result: ~p", [Result]),
             From ! Result
     end,
     reply_to_all(T, StillWaiting, Result);
@@ -818,8 +842,8 @@ reply_to_all([], StillWaiting, _Result) ->
 %%
 -spec write(type(), value(), id(), store()) -> ok.
 write(Type, Value, Key, Store) ->
-    {ok, #dv{waiting_threads=WT}} = do(get, [Store, Key]),
-    {ok, StillWaiting} = reply_to_all(WT, [], {ok, {Key, Type, Value}}),
+    {ok, #dv{metadata=Metadata, waiting_threads=WT}} = do(get, [Store, Key]),
+    {ok, StillWaiting} = reply_to_all(WT, [], {ok, {Key, Type, Metadata, Value}}),
     V1 = #dv{type=Type, value=Value, waiting_threads=StillWaiting},
     ok = do(put, [Store, Key, V1]),
     ok.

@@ -61,8 +61,8 @@ test() ->
 
     %% Perform 4 binds, each an inflation.
     {ok, _} = lasp:update(SetId, {add_all, [1]}, actor),
-    {ok, {_, _, V0}} = lasp:update(SetId, {add_all, [2]}, actor),
-    {ok, {_, _, _}} = lasp:update(SetId, {add_all, [3]}, actor),
+    {ok, {_, _, _, V0}} = lasp:update(SetId, {add_all, [2]}, actor),
+    {ok, {_, _, _, _}} = lasp:update(SetId, {add_all, [3]}, actor),
 
     %% Spawn fun which should block until lattice is strict inflation of
     %% V0.
@@ -71,12 +71,12 @@ test() ->
 
     %% Ensure we receive [1, 2, 3].
     Set1 = receive
-        {I1, {ok, {_, _, X}}} ->
+        {I1, {ok, {_, _, _, X}}} ->
             ?SET:value(X)
     end,
 
     %% Perform more inflations.
-    {ok, {_, _, V1}} = lasp:update(SetId, {add_all, [4]}, actor),
+    {ok, {_, _, _, V1}} = lasp:update(SetId, {add_all, [4]}, actor),
     {ok, _} = lasp:update(SetId, {add_all, [5]}, actor),
 
     %% Spawn fun which should block until lattice is a strict inflation
@@ -86,7 +86,7 @@ test() ->
 
     %% Ensure we receive [1, 2, 3, 4].
     Set2 = receive
-        {I2, {ok, {_, _, Y}}} ->
+        {I2, {ok, {_, _, _, Y}}} ->
             ?SET:value(Y)
     end,
 

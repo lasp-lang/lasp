@@ -404,8 +404,8 @@ handle_command({wait_needed, {ReqId, _}, Id, Threshold}, From,
 
 handle_command({read, {ReqId, _}, Id, Threshold}, From,
                State=#state{store=Store}) ->
-    ReplyFun = fun({_Id, Type, Value}) ->
-                    {reply, {ok, ReqId, {_Id, Type, Value}}, State}
+    ReplyFun = fun({_Id, Type, Metadata, Value}) ->
+                    {reply, {ok, ReqId, {_Id, Type, Metadata, Value}}, State}
                end,
     ?CORE:read(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
 

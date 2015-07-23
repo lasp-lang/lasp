@@ -111,7 +111,7 @@ process(Object, Reason, Idx,
 
 %% @doc Return the result.
 execute(#state{id=Id, previous=Previous}, Store) ->
-    {ok, {_, _, Value}} = ?CORE:read(Id, Previous, Store),
+    {ok, {_, _, _, Value}} = ?CORE:read(Id, Previous, Store),
     {stream, Value}.
 
 %% @doc Don't return the metadata for values, just the key.
@@ -127,7 +127,7 @@ type() ->
 
 %% @doc For a given key, remove all metadata entries for that key.
 remove_entries_for_key(Key, Idx, #state{id=Id, previous=Previous}, Store) ->
-    {ok, {_, Type, Value}} = ?CORE:read(Id, Previous, Store),
+    {ok, {_, Type, _, Value}} = ?CORE:read(Id, Previous, Store),
     lists:foreach(fun(V) ->
                 case V of
                     {Key, _} ->

@@ -46,7 +46,7 @@ process(Object, _Reason, Idx, #state{id=Id}=State, Store) ->
 
 %% @doc Return the result.
 execute(#state{id=Id, previous=Previous}, Store) ->
-    {ok, {_, _, Value}} = ?CORE:read(Id, Previous, Store),
+    {ok, {_, _, _, Value}} = ?CORE:read(Id, Previous, Store),
     {value, Value}.
 
 %% @doc Pass the value through without filtering.

@@ -106,7 +106,7 @@ receiver(Map, ReplicaId) ->
     %% Wait for messages from clients.
     receive
         {get, Key, Client} ->
-            {ok, {_, _, MapValue0}} = lasp:read(Map, {strict, undefined}),
+            {ok, {_, _, _, MapValue0}} = lasp:read(Map, {strict, undefined}),
             MapValue = ?MAP:value(MapValue0),
             case orddict:find(Key, MapValue) of
                 error ->

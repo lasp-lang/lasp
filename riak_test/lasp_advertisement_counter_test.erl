@@ -159,7 +159,7 @@ client(Id, AdsWithContracts, PreviousValue) ->
     receive
         view_ad ->
             %% Get current ad list.
-            {ok, {_, _, AdList0}} = lasp:read(AdsWithContracts, PreviousValue),
+            {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, PreviousValue),
             AdList = ?SET:value(AdList0),
 
             case length(AdList) of
@@ -197,7 +197,7 @@ servers(Ads, AdsWithContracts) ->
     {ok, Servers} = lasp:declare(?SET),
 
     %% Get the current advertisement list.
-    {ok, {_, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
+    {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
     AdList = ?SET:value(AdList0),
 
     %% For each advertisement, launch one server for tracking it's
@@ -226,11 +226,11 @@ clients(AdsWithContracts) ->
 summarize(AdsWithContracts) ->
     %% Wait until all advertisements have been exhausted before stopping
     %% execution of the test.
-    {ok, {_, _, AdsWithContracts0}} = lasp:read(AdsWithContracts, {strict, undefined}),
+    {ok, {_, _, _, AdsWithContracts0}} = lasp:read(AdsWithContracts, {strict, undefined}),
     Overcounts = lists:map(fun({#ad{counter=CounterId}, _}) ->
                 lager:info("Waiting for advertisement ~p to reach ~p impressions...",
                            [CounterId, ?MAX_IMPRESSIONS]),
-                {ok, {_, _, V0}} = lasp:read(CounterId, ?MAX_IMPRESSIONS),
+                {ok, {_, _, _, V0}} = lasp:read(CounterId, ?MAX_IMPRESSIONS),
                 V = ?COUNTER:value(V0),
                 lager:info("Advertisement ~p reached max impressions: ~p with ~p....",
                            [CounterId, ?MAX_IMPRESSIONS, V]),

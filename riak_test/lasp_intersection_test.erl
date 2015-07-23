@@ -75,7 +75,7 @@ test(Type) ->
     timer:sleep(400),
 
     %% Read intersection.
-    {ok, {_, _, Intersection0}} = lasp:read(S3, undefined),
+    {ok, {_, _, _, Intersection0}} = lasp:read(S3, undefined),
 
     %% Read intersection value.
     Intersection = Type:value(Intersection0),

@@ -122,7 +122,7 @@ execute(timeout, #state{preflist=Preflist,
                       Actor),
     {next_state, waiting, State}.
 
-waiting({ok, _ReqId, IndexNode, {Id, Type, Value} = Reply},
+waiting({ok, _ReqId, IndexNode, {Id, Type, _Metadata, Value} = Reply},
         #state{from=From,
                req_id=ReqId,
                values=Values0,
@@ -151,7 +151,7 @@ waiting({ok, _ReqId, IndexNode, {Id, Type, Value} = Reply},
             {next_state, waiting, State}
     end.
 
-waiting_n({ok, _ReqId, IndexNode, {Id, Type, Value} = Reply},
+waiting_n({ok, _ReqId, IndexNode, {Id, Type, _Metadata, Value} = Reply},
         #state{num_responses=NumResponses0,
                values=Values0,
                replies=Replies0}=State0) ->

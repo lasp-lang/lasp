@@ -49,7 +49,13 @@
 -endif.
 
 -export_type([orset/0, binary_orset/0, orset_op/0]).
+-ifdef(namespaced_types).
+-opaque orset() :: gb_trees:tree().
+-type value() :: gb_trees:tree().
+-else.
 -opaque orset() :: gb_tree().
+-type value() :: gb_tree().
+-endif.
 
 -type binary_orset() :: binary(). %% A binary that from_binary/1 will operate on.
 
@@ -75,7 +81,7 @@ value(ORSet) ->
                 end
         end, [], ORSet).
 
--spec value(any(), orset()) -> [member()] | gb_tree().
+-spec value(any(), orset()) -> [member()] | value().
 value({fragment, Elem}, ORSet) ->
     case value({tokens, Elem}, ORSet) of
         [] ->
@@ -131,7 +137,7 @@ update(Op, Actor, ORSet, _Ctx) ->
 parent_clock(_Clock, ORSet) ->
     ORSet.
 
--spec merge(gb_tree(), gb_tree()) -> gb_tree().
+-spec merge(orset(), orset()) -> orset().
 merge(ORSet1, ORSet2) ->
     MergeFun = fun(TokensA, TokensB) ->
             TokenMergeFun = fun(A, B) ->

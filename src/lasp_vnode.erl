@@ -217,7 +217,15 @@ init([Partition]) ->
     %% Initialize the partition.
     Node = node(),
     Identifier = generate_unique_partition_identifier(Partition, Node),
-    {ok, Store} = ?CORE:start(Identifier),
+    {ok, Store} = case ?CORE:start(Identifier) of
+        {ok, Pid} ->
+            {ok, Pid};
+        {error, {already_started, Pid}} ->
+            {ok, Pid};
+        {error, Reason} ->
+            lager:error("Failed to initialize backend: ~p", [Reason]),
+            {error, Reason}
+    end,
 
     %% Load all applications from stored binaries.
     {ok, Reference} = dets:open_file(Identifier, []),

@@ -1,5 +1,12 @@
 ## Building Riak with Lasp
 
+Ensure your version of Lasp has been compiled with the `riak_kv`
+dependency needed for `riak_object`.
+
+```
+{riak_kv, ".*", {git, "git://github.com/basho/riak_kv.git", {branch, "develop"}}}
+```
+
 Clone a fork of riak, which integrates cmeiklejohn/lasp and
 cmeiklejohn/riak_kv.
 

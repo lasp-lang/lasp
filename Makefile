@@ -61,8 +61,8 @@ dev% : all
 	(cd rel && $(REBAR) generate target_dir=../dev/$@ overlay_vars=vars/$@_vars.config)
 
 stagedev% : dev%
-	  $(foreach dep,$(wildcard deps/*), rm -rf dev/$^/lib/$(shell basename $(dep))* && ln -sf $(abspath $(dep)) dev/$^/lib;)
-	  $(foreach app,$(wildcard apps/*), rm -rf dev/$^/lib/$(shell basename $(app))* && ln -sf $(abspath $(app)) dev/$^/lib;)
+	  $(foreach dep,$(wildcard deps/*), rm -rf dev/$^/lib/$(shell basename $(dep))-* && ln -sf $(abspath $(dep)) dev/$^/lib;)
+	  $(foreach app,$(wildcard apps/*), rm -rf dev/$^/lib/$(shell basename $(app))-* && ln -sf $(abspath $(app)) dev/$^/lib;)
 
 devclean: clean
 	rm -rf dev

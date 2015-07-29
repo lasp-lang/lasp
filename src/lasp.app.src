@@ -2,7 +2,7 @@
 {application, lasp,
  [
   {description, "Distributed deterministic dataflow programming for Erlang"},
-  {vsn, "1"},
+  {vsn, "0.0.1"},
   {registered, []},
   {applications, [
                   kernel,

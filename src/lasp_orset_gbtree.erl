@@ -54,7 +54,7 @@
 -opaque orset() :: gb_trees:tree().
 -type value() :: gb_trees:tree().
 -else.
--opaque orset() :: gb_tree().
+-type orset() :: gb_tree().
 -type value() :: gb_tree().
 -endif.
 

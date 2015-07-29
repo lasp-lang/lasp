@@ -34,6 +34,7 @@
 -export([update/4, parent_clock/2]).
 -export([to_binary/2]).
 -export([to_version/2]).
+-export([intersect/2, map/2, filter/2]).
 
 -ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
@@ -216,6 +217,41 @@ from_binary(_B) ->
 -spec to_version(pos_integer(), orset()) -> orset().
 to_version(_Version, Set) ->
     Set.
+
+-spec intersect(orset(), orset()) -> orset().
+intersect(LValue, RValue) ->
+    lists:foldl(intersect_folder(RValue), ?MODULE:new(), LValue).
+
+intersect_folder(RValue) ->
+    fun({X, XCausality}, Acc) ->
+            Values = case lists:keyfind(X, 1, RValue) of
+                         {_Y, YCausality} ->
+                             [{X, lasp_lattice:causal_union(?MODULE, XCausality, YCausality)}];
+                         false ->
+                             []
+                     end,
+            Acc ++ Values
+    end.
+
+-spec map(fun(), orset()) -> orset().
+map(Function, V) ->
+    FolderFun = fun({X, Causality}, Acc) ->
+                        Acc ++ [{Function(X), Causality}]
+                end,
+    lists:foldl(FolderFun, new(), V).
+
+-spec filter(fun((_) -> boolean()), orset()) -> orset().
+filter(Function, V) ->
+    FolderFun = fun({X, Causality0}, Acc) ->
+                        Causality = case Function(X) of
+                                        true ->
+                                            Causality0;
+                                        false ->
+                                            lasp_lattice:causal_remove(?MODULE, Causality0)
+                                    end,
+                        Acc ++ [{X, Causality}]
+                end,
+    lists:foldl(FolderFun, new(), V).
 
 
 %% Private

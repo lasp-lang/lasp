@@ -34,6 +34,7 @@
 -export([update/4, parent_clock/2]).
 -export([to_binary/2]).
 -export([to_version/2]).
+-export([intersect/2, map/2, filter/2]).
 
 -ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
@@ -235,6 +236,46 @@ from_binary(_B) ->
 to_version(_Version, Set) ->
     Set.
 
+-spec intersect(orset(), orset()) -> orset().
+intersect(LValue, RValue) ->
+    gb_trees_ext:foldl(intersect_folder(RValue), ?MODULE:new(), LValue).
+
+intersect_folder(RValue) ->
+    fun(X, XCausality, Acc) ->
+            case gb_trees:lookup(X, RValue) of
+                {value, YCausality} ->
+                    Value = lasp_lattice:causal_union(?MODULE, XCausality, YCausality),
+                    New = gb_trees:enter(X, Value, gb_trees:empty()),
+                    merge(New, Acc);
+                none ->
+                    Acc
+            end
+    end.
+
+-spec map(fun(), orset()) -> orset().
+map(Function, V) ->
+    FolderFun = fun(X, Value, Acc) ->
+            New = gb_trees:enter(Function(X),
+                                 Value,
+                                 gb_trees:empty()),
+            lasp_orset_gbtree:merge(New, Acc)
+    end,
+    gb_trees_ext:foldl(FolderFun, new(), V).
+
+-spec filter(fun((_) -> boolean()), orset()) -> orset().
+filter(Function, V) ->
+    FolderFun = fun(X, Value0, Acc) ->
+                        Value = case Function(X) of
+                                    true ->
+                                        Value0;
+                                    false ->
+                                        lasp_lattice:causal_remove(?MODULE, Value0)
+                                end,
+                        New = gb_trees:enter(X, Value,
+                                             gb_trees:empty()),
+                        lasp_orset_gbtree:merge(New, Acc)
+                end,
+    gb_trees_ext:foldl(FolderFun, new(), V).
 
 %% Private
 add_elem(Elem, Token, ORSet) ->

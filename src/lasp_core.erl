@@ -569,34 +569,11 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                     ok;
                 {_, _} ->
                     AccValue = case T of
-                        lasp_orset_gbtree ->
-                            FolderFun = fun(X, XCausality, Acc) ->
-                                    case gb_trees:lookup(X, RValue) of
-                                        {value, YCausality} ->
-                                            Value = lasp_lattice:causal_union(T, XCausality, YCausality),
-                                            New = gb_trees:enter(X,
-                                                                 Value,
-                                                                 gb_trees:empty()),
-                                            lasp_orset_gbtree:merge(New, Acc);
-                                        none ->
-                                            Acc
-                                    end
-                            end,
-                            gb_trees_ext:foldl(FolderFun,
-                                               T:new(),
-                                               LValue);
-                        lasp_orset ->
-                            FolderFun = fun({X, XCausality}, Acc) ->
-                                    Values = case lists:keyfind(X, 1, RValue) of
-                                        {_Y, YCausality} ->
-                                            [{X, lasp_lattice:causal_union(T, XCausality, YCausality)}];
-                                        false ->
-                                            []
-                                    end,
-                                    Acc ++ Values
-                            end,
-                            lists:foldl(FolderFun, T:new(), LValue)
-                    end,
+                                   lasp_orset_gbtree ->
+                                       lasp_orset_gbtree:intersect(LValue, RValue);
+                                   lasp_orset ->
+                                       lasp_orset:intersect(LValue, RValue)
+                               end,
                     {ok, _} = BindFun(AccId, AccValue, Store)
             end
     end,
@@ -647,24 +624,15 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec map(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun({_, T, _, V}) ->
-            AccValue = case T of
-                lasp_orset_gbtree ->
-                    FolderFun = fun(X, Value, Acc) ->
-                            New = gb_trees:enter(Function(X),
-                                                 Value,
-                                                 gb_trees:empty()),
-                            lasp_orset_gbtree:merge(New, Acc)
-                    end,
-                    gb_trees_ext:foldl(FolderFun, T:new(), V);
-                lasp_orset ->
-                    FolderFun = fun({X, Causality}, Acc) ->
-                            Acc ++ [{Function(X), Causality}]
-                    end,
-                    lists:foldl(FolderFun, T:new(), V)
-            end,
-            {ok, _} = BindFun(AccId, AccValue, Store)
-    end,
+    Fun = fun({_, T, V}) ->
+                  AccValue = case T of
+                                 lasp_orset_gbtree ->
+                                     lasp_orset_gbtree:map(Function, V);
+                                 lasp_orset ->
+                                     lasp_orset:map(Function, V)
+                             end,
+                  {ok, _} = BindFun(AccId, AccValue, Store)
+          end,
     gen_flow:start_link(lasp_process, [[{Id, ReadFun}], Fun]).
 
 %% @doc Filter values from one lattice into another.
@@ -682,30 +650,8 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun({_, T, _, V}) ->
             AccValue = case T of
-                lasp_orset_gbtree ->
-                    FolderFun = fun(X, Value0, Acc) ->
-                            Value = case Function(X) of
-                                true ->
-                                    Value0;
-                                false ->
-                                    lasp_lattice:causal_remove(T, Value0)
-                            end,
-                            New = gb_trees:enter(X, Value,
-                                                 gb_trees:empty()),
-                            lasp_orset_gbtree:merge(New, Acc)
-                    end,
-                    gb_trees_ext:foldl(FolderFun, T:new(), V);
-                lasp_orset ->
-                    FolderFun = fun({X, Causality0}, Acc) ->
-                            Causality = case Function(X) of
-                                true ->
-                                    Causality0;
-                                false ->
-                                    lasp_lattice:causal_remove(T, Causality0)
-                            end,
-                            Acc ++ [{X, Causality}]
-                    end,
-                    lists:foldl(FolderFun, T:new(), V)
+                lasp_orset_gbtree -> lasp_orset_gbtree:filter(Function, V);
+                lasp_orset -> lasp_orset:filter(Function, V)
             end,
             {ok, _} = BindFun(AccId, AccValue, Store)
     end,

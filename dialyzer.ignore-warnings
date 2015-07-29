@@ -1,3 +1,8 @@
 Callback info about the riak_core_coverage_fsm behaviour is not available
 The variable _ can never match since previous clauses completely covered the type 'lasp_riak_index_program'
 The variable X can never match since previous clauses completely covered the type 'lasp_riak_index_program' | 'undefined'
+Unknown functions:
+  riak_object:get_metadata/1
+  riak_object:index_specs/1
+  riak_object:key/1
+  riak_object:vclock/1

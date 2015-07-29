@@ -70,8 +70,6 @@ do_equal(none, none) ->
 do_equal(_, _) ->
     false.
 
-foldl(_Fun, Acc, []) ->
-    Acc;
 foldl(Fun, Acc, Tree) ->
     Iter = gb_trees:iterator(Tree),
     do_foldl(gb_trees:next(Iter), Acc, Fun).

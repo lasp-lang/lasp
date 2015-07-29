@@ -624,7 +624,7 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec map(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun({_, T, V}) ->
+    Fun = fun({_, T, _, V}) ->
                   AccValue = case T of
                                  lasp_orset_gbtree ->
                                      lasp_orset_gbtree:map(Function, V);

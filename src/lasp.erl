@@ -201,7 +201,11 @@ wait_needed(Id, Threshold) ->
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
-    Backend = application:get_env(?APP,
-                                  distribution_backend,
-                                  lasp_riak_core_distribution_backend),
+    Backend = distribution_backend(),
     erlang:apply(Backend, Function, Args).
+
+%% @doc Return the currently active distribution backend.
+distribution_backend() ->
+    application:get_env(?APP,
+                        distribution_backend,
+                        lasp_riak_core_distribution_backend).

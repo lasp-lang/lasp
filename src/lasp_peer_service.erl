@@ -97,4 +97,4 @@ do(Function, Args) ->
 
 %% @doc Return the currently active peer service.
 peer_service() ->
-    application:get_env(?APP, peer_service, riak_core).
+    application:get_env(?APP, peer_service, lasp_riak_core_peer_service).

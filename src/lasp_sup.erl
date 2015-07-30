@@ -120,9 +120,13 @@ init(_Args) ->
                           {lasp_execute_coverage_fsm_sup, start_link, []},
                            permanent, infinity, supervisor, [lasp_execute_coverage_fsm_sup]},
 
-    BroadcastBackend = {lasp_riak_core_broadcast_distribution_backend,
-                        {lasp_riak_core_broadcast_distribution_backend, start_link, []},
-                         permanent, 5000, worker, [lasp_riak_core_broadcast_distribution_backend]},
+    RiakCoreBroadcastBackend = {lasp_riak_core_broadcast_distribution_backend,
+                                {lasp_riak_core_broadcast_distribution_backend, start_link, []},
+                                 permanent, 5000, worker, [lasp_riak_core_broadcast_distribution_backend]},
+
+    PlumtreeBroadcastBackend = {lasp_plumtree_broadcast_distribution_backend,
+                                {lasp_plumtree_broadcast_distribution_backend, start_link, []},
+                                 permanent, 5000, worker, [lasp_plumtree_broadcast_distribution_backend]},
 
     {ok, {{one_for_one, 5, 10}, [VMaster,
                                  DeclareFSM,
@@ -144,4 +148,5 @@ init(_Args) ->
                                  Process,
                                  ExecuteFSM,
                                  ExecuteCoverageFSM,
-                                 BroadcastBackend]}}.
+                                 RiakCoreBroadcastBackend,
+                                 PlumtreeBroadcastBackend]}}.

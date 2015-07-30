@@ -26,6 +26,8 @@
 -export([load/1,
          wait_for_cluster/1]).
 
+-export([build_clusters/1]).
+
 %% @doc Ensure cluster is properly configured.
 wait_for_cluster(Nodes) ->
     lager:info("Waiting for transfers to complete."),
@@ -38,23 +40,66 @@ load(Nodes) when is_list(Nodes) ->
     ok;
 load(Node) ->
     TestGlob = rt_config:get(tests_to_remote_load, undefined),
-    lager:info("Test glob is: ~p", [TestGlob]),
     case TestGlob of
         undefined ->
             ok;
         TestGlob ->
             Tests = filelib:wildcard(TestGlob),
-            lager:info("Found the following tests: ~p", [Tests]),
             [ok = remote_compile_and_load(Node, Test) || Test <- Tests],
             ok
     end.
 
 %% @doc Remotely compile and load a test on a given node.
 remote_compile_and_load(Node, F) ->
-    lager:info("Compiling and loading file ~s on node ~s", [F, Node]),
     {ok, _, Bin} = rpc:call(Node, compile, file,
                             [F, [binary,
                                  {parse_transform, lager_transform}]]),
     ModName = list_to_atom(filename:basename(F, ".erl")),
     {module, _} = rpc:call(Node, code, load_binary, [ModName, F, Bin]),
     ok.
+
+-include_lib("eunit/include/eunit.hrl").
+
+%% @doc Build a series of cluster.
+build_clusters(Settings) ->
+    Clusters = rt:deploy_clusters(Settings),
+    [begin
+         join_cluster(Nodes),
+         lager:info("Cluster built: ~p", [Nodes])
+     end || Nodes <- Clusters],
+    Clusters.
+
+%% @private
+join_cluster(Nodes) ->
+    PeerService = lasp_peer_service:peer_service(),
+
+    case PeerService of
+        lasp_riak_core_peer_service ->
+            %% Ensure each node owns 100% of it's own ring
+            [?assertEqual([Node], rt:owners_according_to(Node)) || Node <- Nodes],
+
+            %% Join nodes
+            [Node1|OtherNodes] = Nodes,
+            case OtherNodes of
+                [] ->
+                    %% no other nodes, nothing to join/plan/commit
+                    ok;
+                _ ->
+                    %% ok do a staged join and then commit it, this eliminates the
+                    %% large amount of redundant handoff done in a sequential join
+                    [rt:staged_join(Node, Node1) || Node <- OtherNodes],
+                     rt:plan_and_commit(Node1),
+                     rt:try_nodes_ready(Nodes, 3, 500)
+            end,
+
+            %% Wait until nodes are ready.
+            ?assertEqual(ok, rt:wait_until_nodes_ready(Nodes)),
+
+            %% Ensure each node owns a portion of the ring
+            rt:wait_until_nodes_agree_about_ownership(Nodes),
+            ?assertEqual(ok, rt:wait_until_no_pending_changes(Nodes)),
+            ok;
+        Unknown ->
+            lager:error("Unknown peer service: ~p", [Unknown]),
+            {error, unknown_peer_service}
+    end.

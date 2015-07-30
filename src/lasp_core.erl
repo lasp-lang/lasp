@@ -74,7 +74,7 @@
               end).
 
 %% @doc Initialize the storage backend.
--spec start(atom()) -> {ok, store()} | {error, atom()}.
+-spec start(atom()) -> {ok, store()} | {error, term()}.
 start(Identifier) ->
     do(start, [Identifier]).
 

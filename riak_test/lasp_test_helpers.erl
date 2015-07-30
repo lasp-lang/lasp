@@ -30,9 +30,16 @@
 
 %% @doc Ensure cluster is properly configured.
 wait_for_cluster(Nodes) ->
-    lager:info("Waiting for transfers to complete."),
-    ok = rt:wait_until_transfers_complete(Nodes),
-    lager:info("Transfers complete.").
+    PeerService = lasp_peer_service:peer_service(),
+    case PeerService of
+        lasp_riak_core_peer_service ->
+            lager:info("Waiting for transfers to complete."),
+            ok = rt:wait_until_transfers_complete(Nodes),
+            lager:info("Transfers complete."),
+            ok;
+        _ ->
+            ok
+    end.
 
 %% @doc Remotely load test code on a series of nodes.
 load(Nodes) when is_list(Nodes) ->

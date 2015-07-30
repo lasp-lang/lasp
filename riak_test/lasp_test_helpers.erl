@@ -99,7 +99,28 @@ join_cluster(Nodes) ->
             rt:wait_until_nodes_agree_about_ownership(Nodes),
             ?assertEqual(ok, rt:wait_until_no_pending_changes(Nodes)),
             ok;
+        lasp_plumtree_peer_service ->
+            %% Join nodes
+            [Node1|OtherNodes] = Nodes,
+            case OtherNodes of
+                [] ->
+                    %% no other nodes, nothing to join/plan/commit
+                    ok;
+                _ ->
+                    %% ok do a staged join and then commit it, this eliminates the
+                    %% large amount of redundant handoff done in a sequential join
+                    [peer_service_join(PeerService, Node, Node1) || Node <- OtherNodes]
+            end,
+            ok;
         Unknown ->
             lager:error("Unknown peer service: ~p", [Unknown]),
             {error, unknown_peer_service}
     end.
+
+%% @private
+peer_service_join(PeerService, Node, PNode) ->
+    R = rpc:call(Node, PeerService, join, [PNode]),
+    lager:info("[join] ~p to (~p): ~p", [Node, PNode, R]),
+    ?assertEqual(ok, R),
+    ok.
+

@@ -64,7 +64,7 @@ remote_compile_and_load(Node, F) ->
 build_clusters(Settings) ->
     Clusters = rt:deploy_clusters(Settings),
     [begin
-         join_cluster(Nodes),
+         ok = join_cluster(Nodes),
          lager:info("Cluster built: ~p", [Nodes])
      end || Nodes <- Clusters],
     Clusters.

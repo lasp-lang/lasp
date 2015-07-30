@@ -38,8 +38,6 @@ confirm() ->
     lager:info("Nodes: ~p", [Nodes]),
     Node = hd(Nodes),
 
-    ok = rt:wait_until_ring_converged(Nodes),
-
     lager:info("Remotely loading code on node ~p", [Node]),
     ok = lasp_test_helpers:load(Nodes),
     lager:info("Remote code loading complete."),

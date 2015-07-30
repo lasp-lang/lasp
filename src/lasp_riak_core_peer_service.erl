@@ -25,6 +25,8 @@
 
 -include("lasp.hrl").
 
+-define(PEER_SERVICE, riak_core).
+
 -export([join/1,
          join/2,
          join/3,
@@ -68,5 +70,4 @@ stop(Reason) ->
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
-    Backend = riak_core,
-    erlang:apply(Backend, Function, Args).
+    erlang:apply(?PEER_SERVICE, Function, Args).

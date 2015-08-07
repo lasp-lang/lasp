@@ -24,23 +24,23 @@
 
 %% Mutations
 
-%% @doc Initialize the program.  Perform whatever initial configuration
-%%      is required.
+%% Initialize the program.  Perform whatever initial configuration is
+%% required.
 -callback init(store()) -> {ok, state()}.
 
-%% @doc Given a notification from the underlying system about an object
-%%      having been put, handed off, or deleted, notify all programs that
-%%      need to be notified.
+%% Given a notification from the underlying system about an object
+%% having been put, handed off, or deleted, notify all programs that
+%% need to be notified.
 -callback process(object(), reason(), actor(), state(), store()) -> {ok, state()}.
 
-%% @doc Return the current result of a given program.
+%% Return the current result of a given program.
 -callback execute(state(), store()) -> {value | stream, output()}.
 
 %% Pure Functions
 
-%% @doc Return the type of the CRDT returned by the application.
+%% Return the type of the CRDT returned by the application.
 -callback type() -> type().
 
-%% @doc Given a value to be returned to the user when executing,
-%%      possibly filter some component of it.
+%% Given a value to be returned to the user when executing, possibly
+%% filter some component of it.
 -callback value(output()) -> output().

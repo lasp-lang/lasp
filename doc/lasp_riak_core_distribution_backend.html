@@ -1,0 +1,222 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Module lasp_riak_core_distribution_backend</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module lasp_riak_core_distribution_backend</h1>
+<ul class="index"><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
+
+<p><b>Behaviours:</b> <a href="lasp_distribution_backend.html"><tt>lasp_distribution_backend</tt></a>.</p>
+
+<h2><a name="types">Data Types</a></h2>
+
+<h3 class="typedecl"><a name="type-actor">actor()</a></h3>
+<p><tt>actor() = term()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-args">args()</a></h3>
+<p><tt>args() = list()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-error">error()</a></h3>
+<p><tt>error() = {error, atom()}</tt></p>
+
+
+<h3 class="typedecl"><a name="type-func">func()</a></h3>
+<p><tt>func() = atom()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-id">id()</a></h3>
+<p><tt>id() = binary()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-metadata">metadata()</a></h3>
+<p><tt>metadata() = <a href="orddict.html#type-orddict">orddict:orddict()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-module">module()</a></h3>
+<p><tt>module() = atom()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-operation">operation()</a></h3>
+<p><tt>operation() = {atom(), <a href="#type-value">value()</a>} | {atom(), <a href="#type-value">value()</a>, <a href="#type-value">value()</a>}</tt></p>
+
+
+<h3 class="typedecl"><a name="type-threshold">threshold()</a></h3>
+<p><tt>threshold() = <a href="#type-value">value()</a> | {strict, <a href="#type-value">value()</a>}</tt></p>
+
+
+<h3 class="typedecl"><a name="type-type">type()</a></h3>
+<p><tt>type() = lasp_ivar | lasp_orset | lasp_orset_gbtree</tt></p>
+
+
+<h3 class="typedecl"><a name="type-value">value()</a></h3>
+<p><tt>value() = term()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-var">var()</a></h3>
+<p><tt>var() = {<a href="#type-id">id()</a>, <a href="#type-type">type()</a>, <a href="#type-metadata">metadata()</a>, <a href="#type-value">value()</a>}</tt></p>
+
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#bind-2">bind/2</a></td><td>Bind a dataflow variable to a value.</td></tr>
+<tr><td valign="top"><a href="#bind_to-2">bind_to/2</a></td><td>Bind a dataflow variable to another dataflow variable.</td></tr>
+<tr><td valign="top"><a href="#declare-2">declare/2</a></td><td>Declare a new dataflow variable of a given type.</td></tr>
+<tr><td valign="top"><a href="#filter-3">filter/3</a></td><td>Filter values from one lattice into another.</td></tr>
+<tr><td valign="top"><a href="#fold-3">fold/3</a></td><td>Fold values from one lattice into another.</td></tr>
+<tr><td valign="top"><a href="#intersection-3">intersection/3</a></td><td>Compute the intersection of two sets.</td></tr>
+<tr><td valign="top"><a href="#map-3">map/3</a></td><td>Map values from one lattice into another.</td></tr>
+<tr><td valign="top"><a href="#product-3">product/3</a></td><td>Compute the cartesian product of two sets.</td></tr>
+<tr><td valign="top"><a href="#read-2">read/2</a></td><td>Blocking monotonic read operation for a given dataflow variable.</td></tr>
+<tr><td valign="top"><a href="#read_any-1">read_any/1</a></td><td>Blocking monotonic read operation for a list of given dataflow
+       variables.</td></tr>
+<tr><td valign="top"><a href="#thread-3">thread/3</a></td><td>Spawn a function.</td></tr>
+<tr><td valign="top"><a href="#union-3">union/3</a></td><td>Compute the union of two sets.</td></tr>
+<tr><td valign="top"><a href="#update-3">update/3</a></td><td>Update a dataflow variable.</td></tr>
+<tr><td valign="top"><a href="#wait_needed-2">wait_needed/2</a></td><td>Pause execution until value requested with given threshold.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="bind-2">bind/2</a></h3>
+<div class="spec">
+<p><tt>bind(Id::<a href="#type-id">id()</a>, Value::<a href="#type-value">value()</a>) -&gt; {ok, <a href="#type-var">var()</a>} | <a href="#type-error">error()</a></tt><br></p>
+</div><p><p>Bind a dataflow variable to a value.</p>
+ 
+       The provided <code>Id</code> is identifier of a previously declared (see:
+       <a href="#declare-0"><code>declare/0</code></a>) dataflow variable.  The <code>Value</code> provided is
+       the value to bind.
+ </p>
+
+<h3 class="function"><a name="bind_to-2">bind_to/2</a></h3>
+<div class="spec">
+<p><tt>bind_to(Id::<a href="#type-id">id()</a>, TheirId::<a href="#type-id">id()</a>) -&gt; {ok, <a href="#type-id">id()</a>} | <a href="#type-error">error()</a></tt><br></p>
+</div><p><p>Bind a dataflow variable to another dataflow variable.</p>
+ 
+       The provided <code>Id</code> is identifier of a previously declared (see:
+       <a href="#declare-0"><code>declare/0</code></a>) dataflow variable.  The <code>Value</code> provided is
+       the value to bind.
+ </p>
+
+<h3 class="function"><a name="declare-2">declare/2</a></h3>
+<div class="spec">
+<p><tt>declare(Id::<a href="#type-id">id()</a>, Type::<a href="#type-type">type()</a>) -&gt; {ok, <a href="#type-id">id()</a>} | <a href="#type-error">error()</a></tt><br></p>
+</div><p><p>Declare a new dataflow variable of a given type.</p>
+ 
+       Valid values for <code>Type</code> are any of lattices supporting the
+       <code>riak_dt</code> behavior.  Type is declared with the provided <code>Id</code>.
+ </p>
+
+<h3 class="function"><a name="filter-3">filter/3</a></h3>
+<div class="spec">
+<p><tt>filter(Id::<a href="#type-id">id()</a>, Function::function(), AccId::<a href="#type-id">id()</a>) -&gt; ok | <a href="#type-error">error()</a></tt><br></p>
+</div><p><p>Filter values from one lattice into another.</p>
+ 
+       Applies the given <code>Function</code> as a filter over the items in <code>Id</code>,
+       placing the result in <code>AccId</code>, both of which need to be declared
+       variables.
+ </p>
+
+<h3 class="function"><a name="fold-3">fold/3</a></h3>
+<div class="spec">
+<p><tt>fold(Id::<a href="#type-id">id()</a>, Function::function(), AccId::<a href="#type-id">id()</a>) -&gt; ok | <a href="#type-error">error()</a></tt><br></p>
+</div><p><p>Fold values from one lattice into another.</p>
+ 
+       Applies the given <code>Function</code> as a fold over the items in <code>Id</code>,
+       placing the result in <code>AccId</code>, both of which need to be declared
+       variables.
+ </p>
+
+<h3 class="function"><a name="intersection-3">intersection/3</a></h3>
+<div class="spec">
+<p><tt>intersection(Left::<a href="#type-id">id()</a>, Right::<a href="#type-id">id()</a>, Intersection::<a href="#type-id">id()</a>) -&gt; ok | <a href="#type-error">error()</a></tt><br></p>
+</div><p><p>Compute the intersection of two sets.</p>
+ 
+       Computes the intersection of two sets and bind the result
+       to a third.
+ </p>
+
+<h3 class="function"><a name="map-3">map/3</a></h3>
+<div class="spec">
+<p><tt>map(Id::<a href="#type-id">id()</a>, Function::function(), AccId::<a href="#type-id">id()</a>) -&gt; ok | <a href="#type-error">error()</a></tt><br></p>
+</div><p><p>Map values from one lattice into another.</p>
+ 
+       Applies the given <code>Function</code> as a map over the items in <code>Id</code>,
+       placing the result in <code>AccId</code>, both of which need to be declared
+       variables.
+ </p>
+
+<h3 class="function"><a name="product-3">product/3</a></h3>
+<div class="spec">
+<p><tt>product(Left::<a href="#type-id">id()</a>, Right::<a href="#type-id">id()</a>, Product::<a href="#type-id">id()</a>) -&gt; ok | <a href="#type-error">error()</a></tt><br></p>
+</div><p><p>Compute the cartesian product of two sets.</p>
+ 
+       Computes the cartestian product of two sets and bind the result
+       to a third.
+ </p>
+
+<h3 class="function"><a name="read-2">read/2</a></h3>
+<div class="spec">
+<p><tt>read(Id::<a href="#type-id">id()</a>, Threshold::<a href="#type-threshold">threshold()</a>) -&gt; {ok, <a href="#type-var">var()</a>} | <a href="#type-error">error()</a></tt><br></p>
+</div><p><p>Blocking monotonic read operation for a given dataflow variable.</p>
+ 
+       Block until the variable identified by <code>Id</code> has been bound, and
+       is monotonically greater (as defined by the lattice) then the
+       provided <code>Threshold</code> value.
+ </p>
+
+<h3 class="function"><a name="read_any-1">read_any/1</a></h3>
+<div class="spec">
+<p><tt>read_any(Reads::[{<a href="#type-id">id()</a>, <a href="#type-threshold">threshold()</a>}]) -&gt; {ok, <a href="#type-var">var()</a>} | <a href="#type-error">error()</a></tt><br></p>
+</div><p>Blocking monotonic read operation for a list of given dataflow
+       variables.
+ </p>
+
+<h3 class="function"><a name="thread-3">thread/3</a></h3>
+<div class="spec">
+<p><tt>thread(Module::module(), Function::<a href="#type-func">func()</a>, Args::<a href="#type-args">args()</a>) -&gt; ok | <a href="#type-error">error()</a></tt><br></p>
+</div><p><p>Spawn a function.</p>
+ 
+       Spawn a process executing <code>Module:Function(Args)</code>.
+ </p>
+
+<h3 class="function"><a name="union-3">union/3</a></h3>
+<div class="spec">
+<p><tt>union(Left::<a href="#type-id">id()</a>, Right::<a href="#type-id">id()</a>, Union::<a href="#type-id">id()</a>) -&gt; ok | <a href="#type-error">error()</a></tt><br></p>
+</div><p><p>Compute the union of two sets.</p>
+ 
+       Computes the union of two sets and bind the result
+       to a third.
+ </p>
+
+<h3 class="function"><a name="update-3">update/3</a></h3>
+<div class="spec">
+<p><tt>update(Id::<a href="#type-id">id()</a>, Operation::<a href="#type-operation">operation()</a>, Actor::<a href="#type-actor">actor()</a>) -&gt; {ok, {<a href="#type-value">value()</a>, <a href="#type-id">id()</a>}} | <a href="#type-error">error()</a></tt><br></p>
+</div><p><p>Update a dataflow variable.</p>
+ 
+       Read the given <code>Id</code> and update it given the provided
+       <code>Operation</code>, which should be valid for the type of CRDT stored
+       at the given <code>Id</code>.
+ </p>
+
+<h3 class="function"><a name="wait_needed-2">wait_needed/2</a></h3>
+<div class="spec">
+<p><tt>wait_needed(Id::<a href="#type-id">id()</a>, Threshold::<a href="#type-threshold">threshold()</a>) -&gt; ok | <a href="#type-error">error()</a></tt><br></p>
+</div><p><p>Pause execution until value requested with given threshold.</p>
+ 
+       Pause execution of calling thread until a read operation is
+       issued for the given <code>Id</code>.  Used to introduce laziness into a
+       computation.
+ </p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc, Aug 7 2015, 16:08:43.</i></p>
+</body>
+</html>

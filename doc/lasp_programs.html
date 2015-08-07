@@ -1,0 +1,129 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Module lasp_programs</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module lasp_programs</h1>
+<ul class="index"><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
+
+
+<h2><a name="types">Data Types</a></h2>
+
+<h3 class="typedecl"><a name="type-crdt">crdt()</a></h3>
+<p><tt>crdt() = <a href="riak_dt.html#type-crdt">riak_dt:crdt()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-file">file()</a></h3>
+<p><tt>file() = iolist()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-idx">idx()</a></h3>
+<p><tt>idx() = term()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-module">module()</a></h3>
+<p><tt>module() = atom()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-object">object()</a></h3>
+<p><tt>object() = <a href="#type-crdt">crdt()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-reason">reason()</a></h3>
+<p><tt>reason() = put | handoff | delete</tt></p>
+
+
+<h3 class="typedecl"><a name="type-registration">registration()</a></h3>
+<p><tt>registration() = preflist | global</tt></p>
+
+
+<h3 class="typedecl"><a name="type-result">result()</a></h3>
+<p><tt>result() = term()</tt></p>
+
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#execute-2">execute/2</a></td><td>Execute an application.</td></tr>
+<tr><td valign="top"><a href="#process-4">process/4</a></td><td>Process notifications for all registered programs.</td></tr>
+<tr><td valign="top"><a href="#process-6">process/6</a></td><td>Notification of value change.</td></tr>
+<tr><td valign="top"><a href="#register-0">register/0</a></td><td>Register all known programs; used by Lasp during initialization.</td></tr>
+<tr><td valign="top"><a href="#register-4">register/4</a></td><td>Register an application.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="execute-2">execute/2</a></h3>
+<div class="spec">
+<p><tt>execute(Module::module(), Registration::<a href="#type-registration">registration()</a>) -&gt; {ok, <a href="#type-result">result()</a>} | {error, timeout} | error</tt><br></p>
+</div><p><p>Execute an application.</p>
+ 
+       <p>Given a registered program using <a href="#register-3"><code>register/3</code></a>, execute the       
+program and receive it's result.</p>
+ 
+       When executing a <code>preflist</code> program, contact <code>?N</code> replicas, wait
+       for a majority and return the merge of the results.  When
+       executing a <code>global</code> program, use the coverage facility of
+       <code>riak_core</code> to compute a minimal covering set (or specify a <code>?R</code>
+       value, and contact all nodes, merging the results.
+ </p>
+
+<h3 class="function"><a name="process-4">process/4</a></h3>
+<div class="spec">
+<p><tt>process(Object::<a href="#type-object">object()</a>, Reason::<a href="#type-reason">reason()</a>, Idx::<a href="#type-idx">idx()</a>, Node::node()) -&gt; ok</tt><br></p>
+</div><p><p>Process notifications for all registered programs.</p>
+ 
+       Notify a given partition at a given node that an object has
+       changed for a particular reason.
+ </p>
+
+<h3 class="function"><a name="process-6">process/6</a></h3>
+<div class="spec">
+<p><tt>process(Module::module(), X2::<a href="#type-registration">registration()</a>, Object::<a href="#type-object">object()</a>, Reason::<a href="#type-reason">reason()</a>, Idx::<a href="#type-idx">idx()</a>, Node::node()) -&gt; {ok, <a href="#type-result">result()</a>} | {error, timeout}</tt><br></p>
+</div><p><p>Notification of value change.</p>
+ 
+       Notify a given partition at a given node that an object has
+       changed for a particular reason.
+ </p>
+
+<h3 class="function"><a name="register-0">register/0</a></h3>
+<div class="spec">
+<p><tt>register() -&gt; ok</tt><br></p>
+</div><p>Register all known programs; used by Lasp during initialization.</p>
+
+<h3 class="function"><a name="register-4">register/4</a></h3>
+<div class="spec">
+<p><tt>register(Module::module(), File::<a href="#type-file">file()</a>, Registration::<a href="#type-registration">registration()</a>, Options::[{atom(), term()}]) -&gt; ok | {error, timeout} | error</tt><br></p>
+</div><p><p>Register an application.</p>
+ 
+       <p>Register a program with a lasp cluster.</p>
+ 
+       <p>This function will, given the path to a local file on each node,       
+read, compile, parse_transform, and load the library into       
+memory, with a copy at each replica, customized with a unique       
+name, to ensure multiple replicas can run on the same physical       
+node.</p>
+ 
+       <p><code>Module</code> should be the name you want to refer to the program as
+       when executing it using <a href="#execute-2"><code>execute/2</code></a>.</p>
+ 
+       <p><code>File</code> is the path to the file on the node receiving the       
+register request.</p>
+ 
+       <p>When the last argument is <code>preflist</code>, the programs name will be
+       hashed and installed on <code>?N</code> replicas; when the last argument is
+       <code>global</code>, a copy will be installed on all replicas.</p>
+ 
+       Programs must implement the <code>lasp_program</code> behavior to be
+       correct.
+ </p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc, Aug 7 2015, 16:08:43.</i></p>
+</body>
+</html>

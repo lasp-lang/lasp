@@ -1,0 +1,172 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Module lasp_orset_gbtree</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module lasp_orset_gbtree</h1>
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>This module is a fork of the riak_dt_orset, which is modified to
+       support some additional update functions needed for correctly
+       composing objects in Riak.
+
+<p><b>Behaviours:</b> <a href="riak_dt.html"><tt>riak_dt</tt></a>.</p>
+
+<h2><a name="description">Description</a></h2>This module is a fork of the riak_dt_orset, which is modified to
+       support some additional update functions needed for correctly
+       composing objects in Riak.
+<h2><a name="types">Data Types</a></h2>
+
+<h3 class="typedecl"><a name="type-actor">actor()</a></h3>
+<p><tt>actor() = <a href="riak_dt.html#type-actor">riak_dt:actor()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-binary_orset">binary_orset()</a></h3>
+<p><tt>binary_orset() = binary()</tt></p>
+<p>  A binary that from_binary/1 will operate on.</p>
+
+<h3 class="typedecl"><a name="type-member">member()</a></h3>
+<p><tt>member() = term()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-orset">orset()</a></h3>
+<p><tt>orset() = gb_tree()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-orset_op">orset_op()</a></h3>
+<p><tt>orset_op() = {add, <a href="#type-member">member()</a>} | {remove, <a href="#type-member">member()</a>} | {add_all, [<a href="#type-member">member()</a>]} | {remove_all, [<a href="#type-member">member()</a>]} | {update, [<a href="#type-orset_op">orset_op()</a>]} | {add_by_token, term(), <a href="#type-member">member()</a>}</tt></p>
+
+
+<h3 class="typedecl"><a name="type-value">value()</a></h3>
+<p><tt>value() = gb_tree()</tt></p>
+
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#equal-2">equal/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#filter-2">filter/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#from_binary-1">from_binary/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#intersect-2">intersect/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#map-2">map/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#merge-2">merge/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#new-0">new/0</a></td><td></td></tr>
+<tr><td valign="top"><a href="#parent_clock-2">parent_clock/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#precondition_context-1">precondition_context/1</a></td><td>the precondition context is a fragment of the CRDT that
+  operations with pre-conditions can be applied too.</td></tr>
+<tr><td valign="top"><a href="#stat-2">stat/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#stats-1">stats/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#to_binary-1">to_binary/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#to_binary-2">to_binary/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#to_version-2">to_version/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#update-3">update/3</a></td><td></td></tr>
+<tr><td valign="top"><a href="#update-4">update/4</a></td><td></td></tr>
+<tr><td valign="top"><a href="#value-1">value/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#value-2">value/2</a></td><td></td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="equal-2">equal/2</a></h3>
+<div class="spec">
+<p><tt>equal(ORDictA::<a href="#type-orset">orset()</a>, ORDictB::<a href="#type-orset">orset()</a>) -&gt; boolean()</tt><br></p>
+</div>
+
+<h3 class="function"><a name="filter-2">filter/2</a></h3>
+<div class="spec">
+<p><tt>filter(Function::fun((term()) -&gt; boolean()), V::<a href="#type-orset">orset()</a>) -&gt; <a href="#type-orset">orset()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="from_binary-1">from_binary/1</a></h3>
+<div class="spec">
+<p><tt>from_binary(B::<a href="#type-binary_orset">binary_orset()</a>) -&gt; {ok, <a href="#type-orset">orset()</a>} | {error, unsupported_version, Vers::pos_integer()} | {error, invalid_binary}</tt><br></p>
+</div>
+
+<h3 class="function"><a name="intersect-2">intersect/2</a></h3>
+<div class="spec">
+<p><tt>intersect(LValue::<a href="#type-orset">orset()</a>, RValue::<a href="#type-orset">orset()</a>) -&gt; <a href="#type-orset">orset()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="map-2">map/2</a></h3>
+<div class="spec">
+<p><tt>map(Function::function(), V::<a href="#type-orset">orset()</a>) -&gt; <a href="#type-orset">orset()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="merge-2">merge/2</a></h3>
+<div class="spec">
+<p><tt>merge(ORSet1::<a href="#type-orset">orset()</a>, ORSet2::<a href="#type-orset">orset()</a>) -&gt; <a href="#type-orset">orset()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="new-0">new/0</a></h3>
+<div class="spec">
+<p><tt>new() -&gt; <a href="#type-orset">orset()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="parent_clock-2">parent_clock/2</a></h3>
+<div class="spec">
+<p><tt>parent_clock(Clock::<a href="riak_dt_vclock.html#type-vclock">riak_dt_vclock:vclock()</a>, ORSet::<a href="#type-orset">orset()</a>) -&gt; <a href="#type-orset">orset()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="precondition_context-1">precondition_context/1</a></h3>
+<div class="spec">
+<p><tt>precondition_context(ORSet::<a href="#type-orset">orset()</a>) -&gt; <a href="#type-orset">orset()</a></tt><br></p>
+</div><p>the precondition context is a fragment of the CRDT that
+  operations with pre-conditions can be applied too.  In the case of
+  OR-Sets this is the set of adds observed.  The system can then
+  apply a remove to this context and merge it with a replica.
+  Especially useful for hybrid op/state systems where the context of
+  an operation is needed at a replica without sending the entire
+  state to the client.</p>
+
+<h3 class="function"><a name="stat-2">stat/2</a></h3>
+<div class="spec">
+<p><tt>stat(X1::atom(), ORSet::<a href="#type-orset">orset()</a>) -&gt; number() | undefined</tt><br></p>
+</div>
+
+<h3 class="function"><a name="stats-1">stats/1</a></h3>
+<div class="spec">
+<p><tt>stats(ORSet::<a href="#type-orset">orset()</a>) -&gt; [{atom(), number()}]</tt><br></p>
+</div>
+
+<h3 class="function"><a name="to_binary-1">to_binary/1</a></h3>
+<div class="spec">
+<p><tt>to_binary(ORSet::<a href="#type-orset">orset()</a>) -&gt; <a href="#type-binary_orset">binary_orset()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="to_binary-2">to_binary/2</a></h3>
+<div class="spec">
+<p><tt>to_binary(Vers::pos_integer(), Set::<a href="#type-orset">orset()</a>) -&gt; {ok, <a href="#type-binary_orset">binary_orset()</a>} | {error, unsupported_version, Vers::pos_integer()}</tt><br></p>
+</div>
+
+<h3 class="function"><a name="to_version-2">to_version/2</a></h3>
+<div class="spec">
+<p><tt>to_version(Version::pos_integer(), Set::<a href="#type-orset">orset()</a>) -&gt; <a href="#type-orset">orset()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="update-3">update/3</a></h3>
+<div class="spec">
+<p><tt>update(X1::<a href="#type-orset_op">orset_op()</a>, Actor::<a href="#type-actor">actor()</a>, ORDict::<a href="#type-orset">orset()</a>) -&gt; {ok, <a href="#type-orset">orset()</a>} | {error, {precondition, {not_present, <a href="#type-member">member()</a>}}}</tt><br></p>
+</div>
+
+<h3 class="function"><a name="update-4">update/4</a></h3>
+<div class="spec">
+<p><tt>update(Op::<a href="#type-orset_op">orset_op()</a>, Actor::<a href="#type-actor">actor()</a>, ORSet::<a href="#type-orset">orset()</a>, Ctx::<a href="riak_dt.html#type-context">riak_dt:context()</a>) -&gt; {ok, <a href="#type-orset">orset()</a>} | {error, {precondition, {not_present, <a href="#type-member">member()</a>}}}</tt><br></p>
+</div>
+
+<h3 class="function"><a name="value-1">value/1</a></h3>
+<div class="spec">
+<p><tt>value(ORSet::<a href="#type-orset">orset()</a>) -&gt; [<a href="#type-member">member()</a>]</tt><br></p>
+</div>
+
+<h3 class="function"><a name="value-2">value/2</a></h3>
+<div class="spec">
+<p><tt>value(X1::any(), ORSet::<a href="#type-orset">orset()</a>) -&gt; [<a href="#type-member">member()</a>] | <a href="#type-value">value()</a></tt><br></p>
+</div>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc, Aug 7 2015, 16:08:43.</i></p>
+</body>
+</html>

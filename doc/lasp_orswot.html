@@ -1,0 +1,231 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Module lasp_orswot</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module lasp_orswot</h1>
+<ul class="index"><li><a href="#description">Description</a></li><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>An OR-Set CRDT.
+
+<p><b>Behaviours:</b> <a href="riak_dt.html"><tt>riak_dt</tt></a>.</p>
+<p><b>References</b><ul><li>Marc Shapiro, Nuno Preguiça, Carlos Baquero, Marek
+  Zawirski (2011) A comprehensive study of Convergent and Commutative
+  Replicated Data Types. <a href="http://hal.upmc.fr/inria-00555588/" target="_top"><tt>http://hal.upmc.fr/inria-00555588/</tt></a>
+ </li><li>Annette Bieniusa, Marek Zawirski, Nuno Preguiça, Marc
+  Shapiro, Carlos Baquero, Valter Balegas, Sérgio Duarte (2012) An
+  Optimized Conﬂict-free Replicated Set
+  <a href="http://arxiv.org/abs/1210.3368" target="_top"><tt>http://arxiv.org/abs/1210.3368</tt></a>
+ </li><li>Nuno Preguiça, Carlos Baquero, Paulo Sérgio Almeida,
+  Victor Fonte, Ricardo Gonçalves <a href="http://arxiv.org/abs/1011.5808" target="_top"><tt>http://arxiv.org/abs/1011.5808</tt></a>
+ </li></ul></p>
+<p><b>See also:</b> <a href="riak_dt_multi.html">riak_dt_multi</a>, <a href="riak_dt_vclock.html">riak_dt_vclock</a>.</p>
+
+<h2><a name="description">Description</a></h2><p>An OR-Set CRDT. An OR-Set allows the adding, and removal, of
+  elements. Should an add and remove be concurrent, the add wins. In
+  this implementation there is a version vector for the whole set.
+  When an element is added to the set, the version vector is
+  incremented and the <code>{actor(), count()}</code> pair for that increment is
+  stored against the element as its "birth dot". Every time the
+  element is re-added to the set, its "birth dot" is updated to that
+  of the <code>{actor(), count()}</code> version vector entry resulting from the  
+add. When an element is removed, we simply drop it, no tombstones.</p>
+ 
+  <p>When an element exists in replica A and not replica B, is it  
+because A added it and B has not yet seen that, or that B removed  
+it and A has not yet seen that? Usually the presence of a tombstone  
+arbitrates. In this implementation we compare the "birth dot" of  
+the present element to the clock in the Set it is absent from. If  
+the element dot is not "seen" by the Set clock, that means the  
+other set has yet to see this add, and the item is in the merged  
+Set. If the Set clock dominates the dot, that means the other Set  
+has removed this element already, and the item is not in the merged  
+Set.</p>
+ 
+  Essentially we've made a dotted version vector.
+ 
+<h2><a name="types">Data Types</a></h2>
+
+<h3 class="typedecl"><a name="type-actor">actor()</a></h3>
+<p><tt>actor() = <a href="riak_dt.html#type-actor">riak_dt:actor()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-any_orswot">any_orswot()</a></h3>
+<p><tt>any_orswot() = <a href="#type-v2_orswot">v2_orswot()</a> | <a href="#type-v2ord_orswot">v2ord_orswot()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-binary_orswot">binary_orswot()</a></h3>
+<p><tt>binary_orswot() = binary()</tt></p>
+<p>  A binary that from_binary/1 will operate on.</p>
+
+<h3 class="typedecl"><a name="type-deferred">deferred()</a></h3>
+<p><tt>deferred() = <a href="#type-dict">dict</a>(<a href="riak_dt_vclock.html#type-vclock">riak_dt_vclock:vclock()</a>, [<a href="#type-member">member()</a>])</tt></p>
+
+
+<h3 class="typedecl"><a name="type-dict">dict()</a></h3>
+<p><tt>dict(_A, _B) = dict()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-dot">dot()</a></h3>
+<p><tt>dot() = <a href="riak_dt.html#type-dot">riak_dt:dot()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-dots">dots()</a></h3>
+<p><tt>dots() = [<a href="#type-dot">dot()</a>]</tt></p>
+
+
+<h3 class="typedecl"><a name="type-entries">entries()</a></h3>
+<p><tt>entries() = <a href="#type-dict">dict</a>(<a href="#type-member">member()</a>, <a href="#type-dots">dots()</a>)</tt></p>
+
+
+<h3 class="typedecl"><a name="type-member">member()</a></h3>
+<p><tt>member() = term()</tt></p>
+
+
+<h3 class="typedecl"><a name="type-orswot">orswot()</a></h3>
+<p><tt>orswot() = <a href="#type-v1_orswot">v1_orswot()</a> | <a href="#type-v2_orswot">v2_orswot()</a></tt></p>
+
+
+<h3 class="typedecl"><a name="type-orswot_op">orswot_op()</a></h3>
+<p><tt>orswot_op() = {add, <a href="#type-member">member()</a>} | {remove, <a href="#type-member">member()</a>} | {add_all, [<a href="#type-member">member()</a>]} | {remove_all, [<a href="#type-member">member()</a>]} | {update, [<a href="#type-orswot_op">orswot_op()</a>]}</tt></p>
+
+
+<h3 class="typedecl"><a name="type-orswot_q">orswot_q()</a></h3>
+<p><tt>orswot_q() = size | {contains, term()}</tt></p>
+
+
+<h3 class="typedecl"><a name="type-precondition_error">precondition_error()</a></h3>
+<p><tt>precondition_error() = {error, {precondition, {not_present, <a href="#type-member">member()</a>}}}</tt></p>
+
+
+<h3 class="typedecl"><a name="type-v1_orswot">v1_orswot()</a></h3>
+<p><tt>v1_orswot() = {<a href="riak_dt_vclock.html#type-vclock">riak_dt_vclock:vclock()</a>, {<a href="#type-member">member()</a>, <a href="#type-dots">dots()</a>}, {<a href="riak_dt_vclock.html#type-vclock">riak_dt_vclock:vclock()</a>, [<a href="#type-member">member()</a>]}}</tt></p>
+
+
+<h3 class="typedecl"><a name="type-v2_orswot">v2_orswot()</a></h3>
+<p><tt>v2_orswot() = {<a href="riak_dt_vclock.html#type-vclock">riak_dt_vclock:vclock()</a>, <a href="#type-entries">entries()</a>, <a href="#type-deferred">deferred()</a>}</tt></p>
+
+
+<h3 class="typedecl"><a name="type-v2ord_orswot">v2ord_orswot()</a></h3>
+<p><tt>v2ord_orswot() = {<a href="riak_dt_vclock.html#type-vclock">riak_dt_vclock:vclock()</a>, <a href="orddict.html#type-orddict">orddict:orddict()</a>, <a href="orddict.html#type-orddict">orddict:orddict()</a>}</tt></p>
+
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#equal-2">equal/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#from_binary-1">from_binary/1</a></td><td>When the argument is a <code>binary_orswot()</code> produced by
+  <code>to_binary/1</code> will return the original <code>orswot()</code>.</td></tr>
+<tr><td valign="top"><a href="#merge-2">merge/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#new-0">new/0</a></td><td></td></tr>
+<tr><td valign="top"><a href="#parent_clock-2">parent_clock/2</a></td><td>sets the clock in the Set to that <code>Clock</code>.</td></tr>
+<tr><td valign="top"><a href="#precondition_context-1">precondition_context/1</a></td><td>the precondition context is a fragment of the CRDT that
+   operations requiring certain pre-conditions can be applied with.</td></tr>
+<tr><td valign="top"><a href="#stat-2">stat/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#stats-1">stats/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#to_binary-1">to_binary/1</a></td><td>returns a binary representation of the provided
+  <code>orswot()</code>.</td></tr>
+<tr><td valign="top"><a href="#to_version-2">to_version/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#update-3">update/3</a></td><td>take a list of Set operations and apply them to the set.</td></tr>
+<tr><td valign="top"><a href="#update-4">update/4</a></td><td></td></tr>
+<tr><td valign="top"><a href="#value-1">value/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#value-2">value/2</a></td><td></td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="equal-2">equal/2</a></h3>
+<div class="spec">
+<p><tt>equal(LHS::<a href="#type-orswot">orswot()</a>, RHS::<a href="#type-orswot">orswot()</a>) -&gt; boolean()</tt><br></p>
+</div>
+
+<h3 class="function"><a name="from_binary-1">from_binary/1</a></h3>
+<div class="spec">
+<p><tt>from_binary(B::<a href="#type-binary_orswot">binary_orswot()</a>) -&gt; {ok, <a href="#type-orswot">orswot()</a>} | {error, unsupported_version, Vers::pos_integer()} | {error, invalid_binary}</tt><br></p>
+</div><p>When the argument is a <code>binary_orswot()</code> produced by
+  <code>to_binary/1</code> will return the original <code>orswot()</code>.
+ </p>
+
+<h3 class="function"><a name="merge-2">merge/2</a></h3>
+<div class="spec">
+<p><tt>merge(LHS::<a href="#type-orswot">orswot()</a>, RHS::<a href="#type-orswot">orswot()</a>) -&gt; <a href="#type-orswot">orswot()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="new-0">new/0</a></h3>
+<div class="spec">
+<p><tt>new() -&gt; <a href="#type-orswot">orswot()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="parent_clock-2">parent_clock/2</a></h3>
+<div class="spec">
+<p><tt>parent_clock(Clock::<a href="riak_dt_vclock.html#type-vclock">riak_dt_vclock:vclock()</a>, Set::<a href="#type-orswot">orswot()</a>) -&gt; <a href="#type-orswot">orswot()</a></tt><br></p>
+</div><p>sets the clock in the Set to that <code>Clock</code>. Used by a
+  containing Map for sub-CRDTs</p>
+
+<h3 class="function"><a name="precondition_context-1">precondition_context/1</a></h3>
+<div class="spec">
+<p><tt>precondition_context(X1::<a href="#type-orswot">orswot()</a>) -&gt; <a href="#type-orswot">orswot()</a></tt><br></p>
+</div><p>the precondition context is a fragment of the CRDT that
+   operations requiring certain pre-conditions can be applied with.
+   Especially useful for hybrid op/state systems where the context of
+   an operation is needed at a replica without sending the entire
+   state to the client. In the case of the ORSWOT the context is a
+   version vector. When passed as an argument to <code>update/4</code> the
+   context ensures that only seen adds are removed, and that removes
+   of unseen adds can be deferred until they're seen.</p>
+
+<h3 class="function"><a name="stat-2">stat/2</a></h3>
+<div class="spec">
+<p><tt>stat(Stat::atom(), S::<a href="#type-orswot">orswot()</a>) -&gt; number() | undefined</tt><br></p>
+</div>
+
+<h3 class="function"><a name="stats-1">stats/1</a></h3>
+<div class="spec">
+<p><tt>stats(ORSWOT::<a href="#type-orswot">orswot()</a>) -&gt; [{atom(), number()}]</tt><br></p>
+</div>
+
+<h3 class="function"><a name="to_binary-1">to_binary/1</a></h3>
+<div class="spec">
+<p><tt>to_binary(S::<a href="#type-orswot">orswot()</a>) -&gt; <a href="#type-binary_orswot">binary_orswot()</a></tt><br></p>
+</div><p>returns a binary representation of the provided
+  <code>orswot()</code>. The resulting binary is tagged and versioned for ease
+  of future upgrade. Calling <code>from_binary/1</code> with the result of this
+  function will return the original set. Use the application env var
+  <code>binary_compression</code> to turn t2b compression on (<code>true</code>) and off
+  (<code>false</code>)
+ </p>
+<p><b>See also:</b> <a href="#from_binary-1">from_binary/1</a>.</p>
+
+<h3 class="function"><a name="to_version-2">to_version/2</a></h3>
+<div class="spec">
+<p><tt>to_version(X1::pos_integer(), Set::<a href="#type-any_orswot">any_orswot()</a>) -&gt; <a href="#type-any_orswot">any_orswot()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="update-3">update/3</a></h3>
+<div class="spec">
+<p><tt>update(Op::<a href="#type-orswot_op">orswot_op()</a>, Actor::<a href="#type-actor">actor()</a> | <a href="#type-dot">dot()</a>, V1Set::<a href="#type-orswot">orswot()</a>) -&gt; {ok, <a href="#type-orswot">orswot()</a>} | <a href="#type-precondition_error">precondition_error()</a></tt><br></p>
+</div><p>take a list of Set operations and apply them to the set.
+  NOTE: either _all_ are applied, or _none_ are.</p>
+
+<h3 class="function"><a name="update-4">update/4</a></h3>
+<div class="spec">
+<p><tt>update(Op::<a href="#type-orswot_op">orswot_op()</a>, Actor::<a href="#type-actor">actor()</a> | <a href="#type-dot">dot()</a>, V1Set::<a href="#type-orswot">orswot()</a>, Ctx::<a href="riak_dt.html#type-context">riak_dt:context()</a>) -&gt; {ok, <a href="#type-orswot">orswot()</a>} | <a href="#type-precondition_error">precondition_error()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="value-1">value/1</a></h3>
+<div class="spec">
+<p><tt>value(X1::<a href="#type-orswot">orswot()</a>) -&gt; [<a href="#type-member">member()</a>]</tt><br></p>
+</div>
+
+<h3 class="function"><a name="value-2">value/2</a></h3>
+<div class="spec">
+<p><tt>value(X1::<a href="#type-orswot_q">orswot_q()</a>, ORset::<a href="#type-orswot">orswot()</a>) -&gt; term()</tt><br></p>
+</div>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc, Aug 7 2015, 16:08:43.</i></p>
+</body>
+</html>

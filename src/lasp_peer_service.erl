@@ -36,24 +36,24 @@
 %%% Callback Interface
 %%%===================================================================
 
-%% @doc Attempt to join node.
+%% Attempt to join node.
 -callback join(node()) -> ok | {error, atom()}.
 
-%% @doc Attempt to join node with or without automatically claiming ring
-%%      ownership.
+%% Attempt to join node with or without automatically claiming ring
+%% ownership.
 -callback join(node(), boolean()) -> ok | {error, atom()}.
 
-%% @doc Attempt to join node with or without automatically claiming ring
-%%      ownership.
+%% Attempt to join node with or without automatically claiming ring
+%% ownership.
 -callback join(node(), node(), boolean()) -> ok | {error, atom()}.
 
-%% @doc Remove a node from the cluster.
+%% Remove a node from the cluster.
 -callback leave() -> ok.
 
-%% @doc Stop the peer service on a given node.
+%% Stop the peer service on a given node.
 -callback stop() -> ok.
 
-%% @doc Stop the peer service on a given node for a particular reason.
+%% Stop the peer service on a given node for a particular reason.
 -callback stop(iolist()) -> ok.
 
 %%%===================================================================

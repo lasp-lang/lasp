@@ -496,7 +496,6 @@ to_v1({Clock, Entries0, Deferred0}) ->
 %% `to_binary/1' will return the original `orswot()'.
 %%
 
-%% @see `to_binary/1'
 -spec from_binary(binary_orswot()) -> {ok, orswot()} | ?UNSUPPORTED_VERSION | ?INVALID_BINARY.
 from_binary(<<?TAG:8/integer, ?V1_VERS:8/integer, B/binary>>) ->
     S = riak_dt:from_binary(B),

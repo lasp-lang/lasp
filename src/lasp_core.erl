@@ -805,7 +805,6 @@ do(Function, Args) ->
 
 -else.
 
-%% @doc Execute call to the proper backend.
 do(Function, Args) ->
     Backend = lasp_ets_storage_backend,
     erlang:apply(Backend, Function, Args).

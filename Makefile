@@ -14,7 +14,7 @@ all: deps compile compile-riak-test
 compile: deps
 	$(REBAR) compile
 
-compile-riak-test: compile
+compile-riak-test: compile escriptize
 	$(REBAR) skip_deps=true riak_test_compile
 
 deps:
@@ -37,11 +37,14 @@ stage : rel
 	$(foreach dep,$(wildcard deps/*), rm -rf rel/lasp/lib/$(shell basename $(dep))-* && ln -sf $(abspath $(dep)) rel/lasp/lib;)
 	$(foreach app,$(wildcard apps/*), rm -rf rel/lasp/lib/$(shell basename $(app))-* && ln -sf $(abspath $(app)) rel/lasp/lib;)
 
-currentdevrel: stagedevrel
+escriptize:
+	(cd deps/riak_test && $(REBAR) get-deps compile && $(REBAR) skip_deps=true escriptize)
+
+current: stagedevrel
 	riak_test/bin/lasp-current.sh
 
-riak-test: compile compile-riak-test
-	$(foreach dep,$(wildcard riak_test/*_test.erl), ../riak_test/riak_test -v -c lasp -t $(dep);)
+riak-test: compile compile-riak-test current
+	$(foreach dep,$(wildcard riak_test/*_test.erl), deps/riak_test/riak_test -v -c lasp -t $(dep);)
 
 ##
 ## Developer targets

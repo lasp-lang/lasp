@@ -15,3 +15,5 @@ current_counterexample.eqc
 rel/lasp
 dialyzer_warnings
 .rebar/
+distdir
+package

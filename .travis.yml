@@ -11,3 +11,4 @@ script:
   - make test
 notifications:
   email: christopher.meiklejohn@gmail.com
+sudo: false

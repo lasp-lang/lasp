@@ -107,6 +107,10 @@ join_cluster(Nodes) ->
             ?assertEqual(ok, rt:wait_until_no_pending_changes(Nodes)),
             ok;
         lasp_plumtree_peer_service ->
+            %% Ensure plumtree has started.
+            lager:info("Wait until nodes are ready : ~p", [Nodes]),
+            [?assertEqual(ok, rt:wait_until(Node, fun plumtree_started/1)) || Node <- Nodes],
+
             %% Join nodes
             [Node1|OtherNodes] = Nodes,
             case OtherNodes of
@@ -122,6 +126,16 @@ join_cluster(Nodes) ->
         Unknown ->
             lager:error("Unknown peer service: ~p", [Unknown]),
             {error, unknown_peer_service}
+    end.
+
+%% @private
+plumtree_started(Node) ->
+    Applications = rpc:call(Node, application, which_applications, []),
+    case lists:keyfind(plumtree, 1, Applications) of
+        false ->
+            false;
+        _ ->
+            true
     end.
 
 %% @private

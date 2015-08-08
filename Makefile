@@ -1,3 +1,11 @@
+REPO            ?= lasp
+PKG_REVISION    ?= $(shell git describe --tags)
+PKG_BUILD        = 1
+BASE_DIR         = $(shell pwd)
+ERLANG_BIN       = $(shell dirname $(shell which erl))
+REBAR           ?= $(BASE_DIR)/rebar
+OVERLAY_VARS    ?=
+
 REBAR = $(shell pwd)/rebar
 .PHONY: rel deps test
 

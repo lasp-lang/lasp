@@ -24,8 +24,11 @@ clean:
 	$(REBAR) clean
 	rm -rf riak_test/ebin/*.beam
 
-distclean: clean devclean relclean
+distclean: clean devclean relclean packageclean
 	$(REBAR) delete-deps
+
+packageclean:
+	rm -rf distdir package
 
 rel: all
 	$(REBAR) generate

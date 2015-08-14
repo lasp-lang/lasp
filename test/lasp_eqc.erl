@@ -236,7 +236,7 @@ threshold(Variable, Store) ->
                     Length = length(Value),
                     case Length of
                         0 ->
-                            [];
+                            gb_trees:empty();
                         _ ->
                             Random = random:uniform(Length),
                             Threshold = lists:sublist(Value, Random, Length),

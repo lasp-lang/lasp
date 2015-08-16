@@ -25,7 +25,7 @@
 -export([start_link/2]).
 
 %% Callbacks
--export([start/2]).
+-export([start/3]).
 
 %%%===================================================================
 %%% Behaviour
@@ -42,7 +42,7 @@
 %%%===================================================================
 
 start_link(Module, Args) ->
-    Pid = spawn(?MODULE, start, [Module, Args]),
+    Pid = proc_lib:start_link(?MODULE, start, [self(), Module, Args]),
     {ok, Pid}.
 
 %%%===================================================================
@@ -50,9 +50,15 @@ start_link(Module, Args) ->
 %%%===================================================================
 
 %% @doc TODO
-start(Module, Args) ->
+start(Parent, Module, Args) ->
     %% Initialize state.
-    {ok, State} = Module:init(Args),
+    {ok, State} = case Module:init(Args) of
+        {ok, InitState} ->
+            proc_lib:init_ack(Parent, {ok, self()}),
+            {ok, InitState};
+        {error, Reason} ->
+            exit(Reason)
+    end,
     loop(Module, State, orddict:new()).
 
 %% @doc TODO

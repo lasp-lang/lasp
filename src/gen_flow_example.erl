@@ -41,8 +41,7 @@
 %%%===================================================================
 
 start_link(Args) ->
-    {ok, Pid} = gen_flow:start_link(?MODULE, Args),
-    {ok, Pid}.
+    gen_flow:start_link(?MODULE, Args).
 
 %%%===================================================================
 %%% Callbacks
@@ -75,7 +74,7 @@ process(Args, #state{source=Source}=State) ->
 -ifdef(TEST).
 
 gen_flow_test() ->
-    {ok, _Pid} = gen_flow:start_link(gen_flow_example, [self()]),
+    gen_flow:start_link(gen_flow_example, [self()]),
 
     Response = receive
         ok ->

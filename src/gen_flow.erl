@@ -42,8 +42,7 @@
 %%%===================================================================
 
 start_link(Module, Args) ->
-    Pid = proc_lib:start_link(?MODULE, start, [self(), Module, Args]),
-    {ok, Pid}.
+    proc_lib:start_link(?MODULE, start, [self(), Module, Args]).
 
 %%%===================================================================
 %%% Callbacks

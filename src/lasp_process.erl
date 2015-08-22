@@ -41,8 +41,7 @@
 %%%===================================================================
 
 start_link(Args) ->
-    {ok, Pid} = gen_flow:start_link(?MODULE, Args),
-    {ok, Pid}.
+    gen_flow:start_link(?MODULE, Args).
 
 %%%===================================================================
 %%% Callbacks

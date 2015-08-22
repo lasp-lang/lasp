@@ -25,7 +25,7 @@
 -export([start_link/2]).
 
 %% Callbacks
--export([start/3]).
+-export([init/3]).
 
 %%%===================================================================
 %%% Behaviour
@@ -42,14 +42,14 @@
 %%%===================================================================
 
 start_link(Module, Args) ->
-    proc_lib:start_link(?MODULE, start, [self(), Module, Args]).
+    proc_lib:start_link(?MODULE, init, [self(), Module, Args]).
 
 %%%===================================================================
 %%% Callbacks
 %%%===================================================================
 
 %% @doc TODO
-start(Parent, Module, Args) ->
+init(Parent, Module, Args) ->
     %% Initialize state.
     {ok, State} = case Module:init(Args) of
         {ok, InitState} ->
@@ -58,10 +58,14 @@ start(Parent, Module, Args) ->
         {error, Reason} ->
             exit(Reason)
     end,
-    loop(Module, State, orddict:new()).
+
+    %% Create debugging structure.
+    Debug = sys:debug_options([]),
+
+    loop(Parent, Debug, Module, State, orddict:new()).
 
 %% @doc TODO
-loop(Module, State0, Cache0) ->
+loop(Parent, Debug, Module, State0, Cache0) ->
     %% Get self.
     Self = self(),
 
@@ -91,6 +95,12 @@ loop(Module, State0, Cache0) ->
     %% Wait for responses.
     receive
         {ok, X, V} ->
+            %% Log result.
+            Debug1 = sys:handle_debug(Debug,
+                                      fun write_debug/3,
+                                      ?MODULE,
+                                      {ok, X, V}),
+
             %% Update cache.
             Cache = orddict:store(X, V, DefaultedCache),
 
@@ -102,5 +112,9 @@ loop(Module, State0, Cache0) ->
             {ok, State} = Module:process(RealizedCache, ReadState),
 
             %% Wait.
-            loop(Module, State, Cache)
+            loop(Parent, Debug1, Module, State, Cache)
     end.
+
+%% @private
+write_debug(Dev, Event, Name) ->
+        io:format(Dev, "~p event = ~p~n", [Name, Event]).

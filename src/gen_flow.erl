@@ -24,6 +24,12 @@
 %% API
 -export([start_link/2]).
 
+%% System message callbacks
+-export([system_continue/3,
+         system_terminate/4,
+         system_get_state/1,
+         system_replace_state/2]).
+
 %% Callbacks
 -export([init/3]).
 
@@ -31,7 +37,11 @@
 %%% Behaviour
 %%%===================================================================
 
--type state() :: term().
+-type state() :: state().
+
+-record(state, {module :: atom(),
+                module_state :: term(),
+                cache :: orddict:orddict()}).
 
 -callback init(list(term())) -> {ok, state()}.
 -callback read(state()) -> {ok, [function()], state()}.
@@ -51,7 +61,7 @@ start_link(Module, Args) ->
 %% @doc TODO
 init(Parent, Module, Args) ->
     %% Initialize state.
-    {ok, State} = case Module:init(Args) of
+    {ok, ModuleState} = case Module:init(Args) of
         {ok, InitState} ->
             proc_lib:init_ack(Parent, {ok, self()}),
             {ok, InitState};
@@ -62,15 +72,21 @@ init(Parent, Module, Args) ->
     %% Create debugging structure.
     Debug = sys:debug_options([]),
 
-    loop(Parent, Debug, Module, State, orddict:new()).
+    %% Initialize state.
+    State = #state{module=Module,
+                   module_state=ModuleState,
+                   cache=orddict:new()},
+
+    loop(Parent, Debug, State).
 
 %% @doc TODO
-loop(Parent, Debug, Module, State0, Cache0) ->
+% loop(Parent, Debug, Module, State0, Cache0) ->
+loop(Parent, Debug, #state{module=Module, module_state=ModuleState0, cache=Cache0}=State) ->
     %% Get self.
     Self = self(),
 
     %% Gather the read functions.
-    {ok, ReadFuns, ReadState} = Module:read(State0),
+    {ok, ReadFuns, ReadState} = Module:read(ModuleState0),
 
     %% Initialize bottom values in orddict.
     DefaultedCache = lists:foldl(fun(X, C) ->
@@ -94,6 +110,8 @@ loop(Parent, Debug, Module, State0, Cache0) ->
 
     %% Wait for responses.
     receive
+        {system, From, Request} ->
+            sys:handle_system_msg(Request, From, Parent, ?MODULE, Debug, State);
         {ok, X, V} ->
             %% Log result.
             Debug1 = sys:handle_debug(Debug,
@@ -105,16 +123,32 @@ loop(Parent, Debug, Module, State0, Cache0) ->
             Cache = orddict:store(X, V, DefaultedCache),
 
             %% Get current values from cache.
-            RealizedCache = [Value || {_, Value}
-                                      <- orddict:to_list(Cache)],
+            RealizedCache = [Value || {_, Value} <- orddict:to_list(Cache)],
 
             %% Call process function.
-            {ok, State} = Module:process(RealizedCache, ReadState),
+            {ok, ModuleState} = Module:process(RealizedCache, ReadState),
 
             %% Wait.
-            loop(Parent, Debug1, Module, State, Cache)
+            loop(Parent, Debug1, State#state{module_state=ModuleState, cache=Cache})
     end.
 
 %% @private
 write_debug(Dev, Event, Name) ->
         io:format(Dev, "~p event = ~p~n", [Name, Event]).
+
+%% @private
+system_continue(Parent, Debug, State) ->
+    loop(Parent, Debug, State).
+
+%% @private
+system_terminate(Reason, _Parent, _Debug, _State) ->
+    exit(Reason).
+
+%% @private
+system_get_state(State) ->
+    {ok, State, State}.
+
+%% @private
+system_replace_state(StateFun, State) ->
+    NewState = StateFun(State),
+    {ok, NewState, NewState}.

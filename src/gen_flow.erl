@@ -80,7 +80,6 @@ init(Parent, Module, Args) ->
     loop(Parent, Debug, State).
 
 %% @doc TODO
-% loop(Parent, Debug, Module, State0, Cache0) ->
 loop(Parent, Debug, #state{module=Module, module_state=ModuleState0, cache=Cache0}=State) ->
     %% Get self.
     Self = self(),

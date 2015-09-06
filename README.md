@@ -1,7 +1,11 @@
-Lasp: A Language for Distributed, Eventually Consistent Computations
+Lasp
 =======================================================
 
 [![Build Status](https://travis-ci.org/lasp-lang/lasp.svg?branch=master)](https://travis-ci.org/lasp-lang/lasp)
+
+## Overview
+
+Lasp is a Language for Distributed, Eventually Consistent Computations.
 
 ## Building
 

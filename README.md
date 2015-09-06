@@ -18,3 +18,8 @@ To run the tests:
 
 * `make riak-test` to run all integration and program tests.
 * `./rebar skip_deps=true eqc` to run the Erlang QuickCheck tests.
+
+## Riak Core Backend
+
+The Riak Core backend for Lasp is *deprecated*.  If you need it for
+it, the last supported release is tagged 'riak-core-distribution'.

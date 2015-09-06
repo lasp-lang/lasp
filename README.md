@@ -29,5 +29,5 @@ To run the tests:
 
 ## Riak Core Backend
 
-The Riak Core backend for Lasp is *deprecated*.  If you need it for
-it, the last supported release is tagged 'riak-core-distribution'.
+The Riak Core backend for Lasp is **deprecated**.  If you need it for
+it, the last supported release is tagged `riak-core-distribution`.

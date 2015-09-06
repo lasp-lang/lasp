@@ -3,10 +3,14 @@ Lasp: A Language for Distributed, Eventually Consistent Computations
 
 [![Build Status](https://travis-ci.org/lasp-lang/lasp.svg?branch=master)](https://travis-ci.org/lasp-lang/lasp)
 
+## Building
+
 To build:
 
 * `make devrel`: Build six development releases.
 * `make stagedevrel`: Build six development releases, symlinked to the same source.
+
+## Testing
 
 To configure for `riak_test`:
 

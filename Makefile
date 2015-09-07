@@ -9,23 +9,29 @@ OVERLAY_VARS    ?=
 REBAR = $(shell pwd)/rebar
 .PHONY: rel deps test
 
-all: deps compile compile-riak-test
+all: deps compile testdeps compile-riak-test
 
 compile: deps
 	$(REBAR) compile
 
-compile-riak-test: compile escriptize
+compile-riak-test: compile testdeps escriptize
 	$(REBAR) skip_deps=true riak_test_compile
 
 deps:
 	$(REBAR) get-deps
 
+testdeps: deps
+	$(REBAR) -C rebar.test.config get-deps
+	$(REBAR) -C rebar.test.config compile
+
 clean:
 	$(REBAR) clean
+	$(REBAR) -C rebar.test.config clean
 	rm -rf riak_test/ebin/*.beam
 
 distclean: clean devclean relclean packageclean
 	$(REBAR) delete-deps
+	$(REBAR) -C rebar.test.config delete-deps
 
 packageclean:
 	rm -rf distdir package
@@ -41,7 +47,7 @@ stage : rel
 	$(foreach app,$(wildcard apps/*), rm -rf rel/lasp/lib/$(shell basename $(app))-* && ln -sf $(abspath $(app)) rel/lasp/lib;)
 
 escriptize:
-	(cd deps/riak_test && $(REBAR) get-deps compile && $(REBAR) skip_deps=true escriptize)
+	(cd deps.test/riak_test && $(REBAR) get-deps compile && $(REBAR) skip_deps=true escriptize)
 
 current: stagedevrel
 	riak_test/bin/lasp-current.sh

@@ -33,8 +33,11 @@
 %% Callbacks
 -export([init/1, read/1, process/2]).
 
+%% Types
+-type read_fun() :: {atom(), function()}.
+
 %% Records
--record(state, {read_funs, function}).
+-record(state, {read_funs :: [read_fun()], function :: function()}).
 
 %%%===================================================================
 %%% API

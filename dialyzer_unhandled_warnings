@@ -1,1 +1,2 @@
-gen_flow.erl:143: Function system_terminate/4 only terminates with explicit exception
+  riak_core:down/1
+  riak_core_status:ringready/0

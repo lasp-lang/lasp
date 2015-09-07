@@ -1,9 +1,6 @@
 -define(TIMEOUT, 100000).
 
 -define(APP, lasp).
--define(VNODE, lasp).
-
--define(BUCKET, <<"lasp">>).
 
 %% Code which connects the storage backends to the implementation.
 -define(CORE, lasp_core).
@@ -14,16 +11,6 @@
 %% What the process scope is in?
 -define(SCOPE, lists).
 
--define(N, 3).
--define(W, 2).
--define(R, 2).
-
--define(PROGRAM_N, 3).
--define(PROGRAM_W, 2).
--define(PROGRAM_R, 2).
-
--define(PROCESS_R, 1).
-
 -define(PROGRAM_KEY,    registered).
 -define(PROGRAM_PREFIX, {lasp, programs}).
 
@@ -31,13 +18,6 @@
                type :: type(),
                value :: value(),
                read_fun :: function()}).
-
--record(lasp_execute_request_v1, {
-        module :: atom(),
-        req_id :: non_neg_integer(),
-        caller :: pid()}).
-
--define(EXECUTE_REQUEST, #lasp_execute_request_v1).
 
 -record(dv, {value :: value(),
              waiting_threads = [],
@@ -68,11 +48,6 @@
         after Timeout ->
             {error, timeout}
         end).
-
-%% Define default list of applications to initialize.
--define(PROGRAMS, [{global, lasp_example_keylist_program},
-                   {global, lasp_example_program},
-                   {global, lasp_riak_index_program}]).
 
 %% General types.
 -type file() :: iolist().
@@ -109,9 +84,6 @@
 %% @doc Any state that needs to be tracked from one execution to the
 %%      next execution.
 -type state() :: term().
-
-%% @doc Reasons provided by the riak_kv vnode for change.
--type reason() :: put | handoff | delete.
 
 %% @doc The type of objects that we can be notified about.
 -type object() :: crdt().

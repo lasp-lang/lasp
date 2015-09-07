@@ -40,113 +40,12 @@ start_link() ->
 %% ===================================================================
 
 init(_Args) ->
-    VMaster = {lasp_vnode_master,
-               {riak_core_vnode_master, start_link, [lasp_vnode]},
-                permanent, 5000, worker, [riak_core_vnode_master]},
-
-    DeclareFSM = {lasp_declare_fsm_sup,
-                  {lasp_declare_fsm_sup, start_link, []},
-                   permanent, infinity, supervisor, [lasp_declare_fsm_sup]},
-
-    ThreadFSM = {lasp_thread_fsm_sup,
-                 {lasp_thread_fsm_sup, start_link, []},
-                  permanent, infinity, supervisor, [lasp_thread_fsm_sup]},
-
-    FoldFSM = {lasp_fold_fsm_sup,
-               {lasp_fold_fsm_sup, start_link, []},
-                permanent, infinity, supervisor, [lasp_fold_fsm_sup]},
-
-    MapFSM = {lasp_map_fsm_sup,
-              {lasp_map_fsm_sup, start_link, []},
-               permanent, infinity, supervisor, [lasp_map_fsm_sup]},
-
-    ProductFSM = {lasp_product_fsm_sup,
-                  {lasp_product_fsm_sup, start_link, []},
-                   permanent, infinity, supervisor, [lasp_product_fsm_sup]},
-
-    UnionFSM = {lasp_union_fsm_sup,
-                  {lasp_union_fsm_sup, start_link, []},
-                   permanent, infinity, supervisor, [lasp_union_fsm_sup]},
-
-    IntersectionFSM = {lasp_intersection_fsm_sup,
-                       {lasp_intersection_fsm_sup, start_link, []},
-                        permanent, infinity, supervisor, [lasp_intersection_fsm_sup]},
-
-    FilterFSM = {lasp_filter_fsm_sup,
-                 {lasp_filter_fsm_sup, start_link, []},
-                  permanent, infinity, supervisor, [lasp_filter_fsm_sup]},
-
-    ReadFSM = {lasp_read_fsm_sup,
-               {lasp_read_fsm_sup, start_link, []},
-                permanent, infinity, supervisor, [lasp_read_fsm_sup]},
-
-    UpdateFSM = {lasp_update_fsm_sup,
-                 {lasp_update_fsm_sup, start_link, []},
-                  permanent, infinity, supervisor, [lasp_update_fsm_sup]},
-
-    BindFSM = {lasp_bind_fsm_sup,
-               {lasp_bind_fsm_sup, start_link, []},
-                permanent, infinity, supervisor, [lasp_bind_fsm_sup]},
-
-    BindToFSM = {lasp_bind_to_fsm_sup,
-               {lasp_bind_to_fsm_sup, start_link, []},
-                permanent, infinity, supervisor, [lasp_bind_to_fsm_sup]},
-
-    WaitNeededFSM = {lasp_wait_needed_fsm_sup,
-                     {lasp_wait_needed_fsm_sup, start_link, []},
-                      permanent, infinity, supervisor, [lasp_wait_needed_fsm_sup]},
-
-    RegisterFSM = {lasp_register_fsm_sup,
-                   {lasp_register_fsm_sup, start_link, []},
-                    permanent, infinity, supervisor, [lasp_register_fsm_sup]},
-
-    RegisterGlobalFSM = {lasp_register_global_fsm_sup,
-                         {lasp_register_global_fsm_sup, start_link, []},
-                          permanent, infinity, supervisor, [lasp_register_global_fsm_sup]},
-
-    ExecuteFSM = {lasp_execute_fsm_sup,
-                  {lasp_execute_fsm_sup, start_link, []},
-                   permanent, infinity, supervisor, [lasp_execute_fsm_sup]},
-
-    ProcessFSM = {lasp_process_fsm_sup,
-                  {lasp_process_fsm_sup, start_link, []},
-                   permanent, infinity, supervisor, [lasp_process_fsm_sup]},
-
     Process = {lasp_process_sup,
                {lasp_process_sup, start_link, []},
                 permanent, infinity, supervisor, [lasp_process_sup]},
-
-    ExecuteCoverageFSM = {lasp_execute_coverage_fsm_sup,
-                          {lasp_execute_coverage_fsm_sup, start_link, []},
-                           permanent, infinity, supervisor, [lasp_execute_coverage_fsm_sup]},
-
-    RiakCoreBroadcastBackend = {lasp_riak_core_broadcast_distribution_backend,
-                                {lasp_riak_core_broadcast_distribution_backend, start_link, []},
-                                 permanent, 5000, worker, [lasp_riak_core_broadcast_distribution_backend]},
 
     PlumtreeBroadcastBackend = {lasp_plumtree_broadcast_distribution_backend,
                                 {lasp_plumtree_broadcast_distribution_backend, start_link, []},
                                  permanent, 5000, worker, [lasp_plumtree_broadcast_distribution_backend]},
 
-    {ok, {{one_for_one, 5, 10}, [VMaster,
-                                 DeclareFSM,
-                                 ThreadFSM,
-                                 MapFSM,
-                                 ProductFSM,
-                                 UnionFSM,
-                                 IntersectionFSM,
-                                 FoldFSM,
-                                 FilterFSM,
-                                 ReadFSM,
-                                 UpdateFSM,
-                                 BindFSM,
-                                 BindToFSM,
-                                 WaitNeededFSM,
-                                 RegisterFSM,
-                                 RegisterGlobalFSM,
-                                 ProcessFSM,
-                                 Process,
-                                 ExecuteFSM,
-                                 ExecuteCoverageFSM,
-                                 RiakCoreBroadcastBackend,
-                                 PlumtreeBroadcastBackend]}}.
+    {ok, {{one_for_one, 5, 10}, [Process, PlumtreeBroadcastBackend]}}.

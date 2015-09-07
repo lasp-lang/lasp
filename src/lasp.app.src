@@ -7,7 +7,6 @@
   {applications, [
                   kernel,
                   stdlib,
-                  riak_core,
                   plumtree
                  ]},
   {mod, { lasp_app, []}},

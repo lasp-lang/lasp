@@ -35,16 +35,6 @@
 start(_StartType, _StartArgs) ->
     case lasp_sup:start_link() of
         {ok, Pid} ->
-            ok = riak_core:register(lasp, [{vnode_module, lasp_vnode}]),
-
-            ok = riak_core_node_watcher:service_up(lasp, self()),
-
-            ok = riak_core_ring_events:add_guarded_handler(lasp_ring_event_handler, []),
-
-            ok = riak_core_node_watcher_events:add_guarded_handler(lasp_node_event_handler, []),
-
-            ok = lasp_programs:register(),
-
             {ok, Pid};
         {error, Reason} ->
             {error, Reason}

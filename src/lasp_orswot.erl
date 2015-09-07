@@ -574,13 +574,13 @@ no_dots_left_test() ->
     {ok, A} = update({add, 'Z'}, a, new()),
     {ok, B} = update({add, 'Z'}, b, new()),
     C = A, %% replicate A to empty C
-    {ok, A2} = riak_dt_orswot:update({remove, 'Z'}, a, A),
+    {ok, A2} = ?MODULE:update({remove, 'Z'}, a, A),
     %% replicate B to A, now A has B's 'Z'
-    A3 = riak_dt_orswot:merge(A2, B),
+    A3 = ?MODULE:merge(A2, B),
     %% Remove B's 'Z'
-    {ok, B2} = riak_dt_orswot:update({remove, 'Z'}, b, B),
+    {ok, B2} = ?MODULE:update({remove, 'Z'}, b, B),
     %% Replicate C to B, now B has A's old 'Z'
-    B3 = riak_dt_orswot:merge(B2, C),
+    B3 = ?MODULE:merge(B2, C),
     %% Merge everytyhing, without the fix You end up with 'Z' present,
     %% with no dots
     Merged = lists:foldl(fun(Set, Acc) ->
@@ -639,12 +639,12 @@ generate() ->
                                          1 -> hd(Actors);
                                          _ -> lists:nth(crypto:rand_uniform(1, length(Actors)), Actors)
                                      end,
-                             case riak_dt_orswot:update(Op, Actor, Set) of
+                             case ?MODULE:update(Op, Actor, Set) of
                                  {ok, S} -> S;
                                  _ -> Set
                              end
                      end,
-                     riak_dt_orswot:new(),
+                     ?MODULE:new(),
                      Ops)).
 
 %% EQC generator

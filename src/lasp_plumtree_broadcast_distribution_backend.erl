@@ -70,7 +70,7 @@
 %% Broadcast record.
 -record(broadcast, {id :: id(),
                     type :: type(),
-                    clock :: vclock:vclock(),
+                    clock :: riak_dt_vclock:vclock(),
                     metadata :: metadata(),
                     value :: value()}).
 
@@ -87,12 +87,12 @@
 
 %% Clock mutation macros.
 -define(CLOCK_INIT, fun(Metadata) ->
-            VClock = vclock:increment(Actor, vclock:fresh()),
+            VClock = riak_dt_vclock:increment(Actor, riak_dt_vclock:fresh()),
             orddict:store(clock, VClock, Metadata)
     end).
 
 -define(CLOCK_MERG, fun(Metadata) ->
-            Merged = vclock:merge([orddict:fetch(clock, Metadata0), orddict:fetch(clock, Metadata)]),
+            Merged = riak_dt_vclock:merge([orddict:fetch(clock, Metadata0), orddict:fetch(clock, Metadata)]),
             orddict:store(clock, Merged, Metadata)
     end).
 
@@ -114,7 +114,7 @@ start_link(Opts) ->
 %%% plumtree_broadcast_handler callbacks
 %%%===================================================================
 
--type clock() :: vclock:vclock().
+-type clock() :: riak_dt_vclock:vclock().
 
 -type broadcast_message() :: #broadcast{}.
 -type broadcast_id() :: id().
@@ -382,7 +382,7 @@ handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
     Result = case get(Id, Store) of
         {ok, {Id, Type, Metadata, Value}} ->
             OurClock = orddict:fetch(clock, Metadata),
-            case vclock:equal(TheirClock, OurClock) of
+            case riak_dt_vclock:equal(TheirClock, OurClock) of
                 true ->
                     {ok, {Id, Type, Metadata, Value}};
                 false ->
@@ -396,7 +396,7 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
     Result = case get(Id, Store) of
         {ok, {_, _, Metadata, _}} ->
             OurClock = orddict:fetch(clock, Metadata),
-            vclock:descends(TheirClock, OurClock);
+            riak_dt_vclock:descends(TheirClock, OurClock);
         {error, _Error} ->
             false
     end,

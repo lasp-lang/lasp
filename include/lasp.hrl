@@ -27,10 +27,6 @@
 
 -type variable() :: #dv{}.
 
--ifndef(namespaced_types).
--type module() :: atom().
--endif.
-
 %% @doc Generate a request id.
 -define(REQID(), erlang:phash2(erlang:now())).
 

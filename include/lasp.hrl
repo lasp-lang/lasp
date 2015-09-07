@@ -20,8 +20,8 @@
                read_fun :: function()}).
 
 -record(dv, {value :: value(),
-             waiting_threads = [],
-             lazy_threads = [],
+             waiting_threads = [] :: list(pending_threshold()),
+             lazy_threads = [] :: list(pending_threshold()),
              type :: type(),
              metadata :: metadata()}).
 

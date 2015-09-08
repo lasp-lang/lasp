@@ -1,2 +1,0 @@
-  riak_core:down/1
-  riak_core_status:ringready/0

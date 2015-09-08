@@ -11,6 +11,10 @@ REBAR = $(shell pwd)/rebar
 
 all: deps compile testdeps compile-riak-test
 
+##
+## Compilation targets
+##
+
 compile: deps
 	$(REBAR) compile
 
@@ -19,10 +23,6 @@ compile-riak-test: compile testdeps escriptize
 
 deps:
 	$(REBAR) get-deps
-
-testdeps: deps
-	$(REBAR) -C rebar.test.config get-deps
-	$(REBAR) -C rebar.test.config compile
 
 clean:
 	$(REBAR) clean
@@ -46,8 +46,23 @@ stage : rel
 	$(foreach dep,$(wildcard deps/*), rm -rf rel/lasp/lib/$(shell basename $(dep))-* && ln -sf $(abspath $(dep)) rel/lasp/lib;)
 	$(foreach app,$(wildcard apps/*), rm -rf rel/lasp/lib/$(shell basename $(app))-* && ln -sf $(abspath $(app)) rel/lasp/lib;)
 
+##
+## Test targets
+##
+
+testdeps: deps
+	$(REBAR) -C rebar.test.config get-deps
+	$(REBAR) -C rebar.test.config compile
+
+##
+## Riak Test targets
+##
+
 escriptize:
 	(cd deps.test/riak_test && $(REBAR) get-deps compile && $(REBAR) skip_deps=true escriptize)
+
+setup: stagedevrel
+	riak_test/bin/lasp-setup.sh
 
 current: stagedevrel
 	riak_test/bin/lasp-current.sh

@@ -52,7 +52,16 @@ load(Node) ->
             ok;
         TestGlob ->
             Tests = filelib:wildcard(TestGlob),
-            [ok = remote_compile_and_load(Node, Test) || Test <- Tests],
+
+            Directory = case file:get_cwd() of
+                {ok, Dir} ->
+                    Dir;
+                _ ->
+                    exit("Failed to get working directory!")
+            end,
+
+            [ok = remote_compile_and_load(Node,
+                                          Directory ++ "/" ++ Test) || Test <- Tests],
             ok
     end.
 

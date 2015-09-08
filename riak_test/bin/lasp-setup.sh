@@ -3,7 +3,7 @@
 # just bail out if things go south
 set -e
 
-: ${RTEE_DEST_DIR:="$HOME/rt/lasp"}
+: ${RTEE_DEST_DIR:="$PWD/rt/lasp"}
 
 echo "Making $(pwd) the current release:"
 cwd=$(pwd)
@@ -18,15 +18,21 @@ VERSION="current"
 #     VERSION="$(git describe --tags)-$(git branch | awk '/\*/ {print $2}')"
 # fi
 
-echo $VERSION
-mkdir $RTEE_DEST_DIR
+if [ ! -d $RTEE_DEST_DIR ]; then
+  echo $VERSION
+  mkdir -p $RTEE_DEST_DIR
+fi
+
 cd $RTEE_DEST_DIR
 
 echo " - Configure $RTEE_DEST_DIR"
 git init . > /dev/null 2>&1
 
-echo " - Creating $RTEE_DEST_DIR/current"
-mkdir $RTEE_DEST_DIR/current
+if [ ! -d $RTEE_DEST_DIR/current ]; then
+  echo " - Creating $RTEE_DEST_DIR/current"
+  mkdir $RTEE_DEST_DIR/current
+fi
+
 cd $cwd
 
 echo " - Copying devrel to $RTEE_DEST_DIR/current"
@@ -36,5 +42,7 @@ echo -n $VERSION > $RTEE_DEST_DIR/current/VERSION
 cd $RTEE_DEST_DIR
 
 echo " - Reinitializing git state"
+git config --global user.email "nobody@nohost.com"
+git config --global user.name "Riak Test Runner User"
 git add .
 git commit -a -m "riak_test init" > /dev/null 2>&1

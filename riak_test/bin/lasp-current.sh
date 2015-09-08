@@ -3,7 +3,7 @@
 # just bail out if things go south
 set -e
 
-: ${RTEE_DEST_DIR:="$HOME/rt/lasp"}
+: ${RTEE_DEST_DIR:="$PWD/rt/lasp"}
 
 echo "Making $(pwd) the current release:"
 cwd=$(pwd)

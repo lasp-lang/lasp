@@ -9,6 +9,10 @@ script:
   - make xref
   - make
   - make test
+  - make riak-test
 notifications:
   email: christopher.meiklejohn@gmail.com
-sudo: false
+sudo: required
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install -qq git

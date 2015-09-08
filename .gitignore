@@ -17,3 +17,5 @@ dialyzer_warnings
 .rebar/
 distdir
 package
+deps.test/
+rt/

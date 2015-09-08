@@ -9,8 +9,8 @@ docs:
 xref: compile
 	${REBAR} xref skip_deps=true
 
-PLT ?= $(HOME)/.combo_dialyzer_plt
-LOCAL_PLT = .local_dialyzer_plt
+PLT ?= $(PWD)/.combo_dialyzer_plt
+LOCAL_PLT = $(PWD)/.local_dialyzer_plt
 DIALYZER_FLAGS ?= -Wunmatched_returns -Werror_handling -Wrace_conditions -Wunderspecs
 
 ${PLT}: compile

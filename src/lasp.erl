@@ -208,4 +208,4 @@ do(Function, Args) ->
 distribution_backend() ->
     application:get_env(?APP,
                         distribution_backend,
-                        lasp_riak_core_distribution_backend).
+                        lasp_plumtree_broadcast_distribution_backend).

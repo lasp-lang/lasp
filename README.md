@@ -9,8 +9,9 @@ Lasp is a Language for Distributed, Eventually Consistent Computations.
 
 ## Building
 
-To build:
-
+* `make`: Compile Lasp.
+* `make rel`: Build a single release.
+* `make stage`: Build a single staging release.
 * `make devrel`: Build six development releases.
 * `make stagedevrel`: Build six development releases, symlinked to the same source.
 

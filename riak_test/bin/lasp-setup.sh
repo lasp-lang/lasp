@@ -43,4 +43,5 @@ cd $RTEE_DEST_DIR
 
 echo " - Reinitializing git state"
 git add .
-git commit -a -m "riak_test init" > /dev/null 2>&1
+git commit -a -m "riak_test init"
+#> /dev/null 2>&1

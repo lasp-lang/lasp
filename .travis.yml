@@ -14,3 +14,6 @@ script:
 notifications:
   email: christopher.meiklejohn@gmail.com
 sudo: false
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install -qq git

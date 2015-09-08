@@ -42,6 +42,8 @@ echo -n $VERSION > $RTEE_DEST_DIR/current/VERSION
 cd $RTEE_DEST_DIR
 
 echo " - Reinitializing git state"
+git config --global user.email "nobody@nohost.com"
+glt config --global user.name "Riak Test Runner User"
 git add .
 git commit -a -m "riak_test init"
 #> /dev/null 2>&1

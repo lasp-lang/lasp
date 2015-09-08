@@ -9,6 +9,7 @@ script:
   - make xref
   - make
   - make test
+  - make riak-test
 notifications:
   email: christopher.meiklejohn@gmail.com
 sudo: false

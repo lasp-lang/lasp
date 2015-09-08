@@ -67,7 +67,7 @@ setup: stagedevrel
 current: stagedevrel
 	riak_test/bin/lasp-current.sh
 
-riak-test: compile compile-riak-test current
+riak-test: compile compile-riak-test setup current
 	$(foreach dep,$(wildcard riak_test/*_test.erl), deps.test/riak_test/riak_test -v -c lasp -t $(dep);)
 
 ##

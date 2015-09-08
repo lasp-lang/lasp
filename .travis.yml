@@ -12,7 +12,4 @@ script:
   - make riak-test
 notifications:
   email: christopher.meiklejohn@gmail.com
-sudo: required
-before_install:
-  - sudo apt-get update -qq
-  - sudo apt-get install -qq git
+sudo: false

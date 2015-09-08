@@ -42,7 +42,12 @@ echo -n $VERSION > $RTEE_DEST_DIR/current/VERSION
 cd $RTEE_DEST_DIR
 
 echo " - Reinitializing git state"
-git config --global user.email "nobody@nohost.com"
-git config --global user.name "Riak Test Runner User"
+
+if [ -n "$TRAVIS_CI" ]; then
+  echo " - * Configuring default user for git! *"
+  git config --global user.email "nobody@nohost.com"
+  git config --global user.name "Riak Test Runner User"
+fi
+
 git add .
 git commit -a -m "riak_test init" > /dev/null 2>&1

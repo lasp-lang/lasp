@@ -18,8 +18,9 @@ VERSION="current"
 #     VERSION="$(git describe --tags)-$(git branch | awk '/\*/ {print $2}')"
 # fi
 
+echo $VERSION
+
 if [ ! -d $RTEE_DEST_DIR ]; then
-  echo $VERSION
   mkdir -p $RTEE_DEST_DIR
 fi
 
@@ -36,12 +37,12 @@ fi
 cd $cwd
 
 echo " - Copying devrel to $RTEE_DEST_DIR/current"
-cp -p -P -R dev $RTEE_DEST_DIR/current
-echo " - Writing $RTEE_DEST_DIR/current/VERSION"
-echo -n $VERSION > $RTEE_DEST_DIR/current/VERSION
+if [ ! -e $RTEE_DEST_DIR/current/VERSION ]; then
+  cp -p -P -R dev $RTEE_DEST_DIR/current
+  echo " - Writing $RTEE_DEST_DIR/current/VERSION"
+  echo -n $VERSION > $RTEE_DEST_DIR/current/VERSION
+fi
 cd $RTEE_DEST_DIR
-
-echo " - Reinitializing git state"
 
 if [ -n "$TRAVIS_CI" ]; then
   echo " - * Configuring default user for git! *"
@@ -49,5 +50,6 @@ if [ -n "$TRAVIS_CI" ]; then
   git config --global user.name "Riak Test Runner User"
 fi
 
+echo " - Reinitializing git state"
 git add .
 git commit -a -m "riak_test init" > /dev/null 2>&1

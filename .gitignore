@@ -20,3 +20,4 @@ package
 deps.test/
 rt/
 .combo_dialyzer_plt
+build

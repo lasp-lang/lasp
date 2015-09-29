@@ -33,11 +33,16 @@ distclean: clean devclean relclean packageclean
 	$(REBAR) delete-deps
 	$(REBAR) -C rebar.test.config delete-deps
 
+generate:
+	$(REBAR) generate $(OVERLAY_VARS)
+
 packageclean:
 	rm -rf distdir package
 
-rel: all
-	$(REBAR) generate
+##
+## Release targets
+##
+rel: locked-deps compile generate
 
 relclean:
 	rm -rf rel/lasp

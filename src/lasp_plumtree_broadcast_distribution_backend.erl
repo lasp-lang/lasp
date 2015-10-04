@@ -315,7 +315,7 @@ wait_needed(Id, Threshold) ->
 %% @private
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
-    Actor = time_compat:unique_timestamp([positive, monotonic]),
+    Actor = time_compat:unique_integer([positive, monotonic]),
     Counter = 0,
     Identifier = node(),
     {ok, Store} = case ?CORE:start(Identifier) of

@@ -7,6 +7,10 @@ Lasp
 
 Lasp is a Language for Distributed, Eventually Consistent Computations.
 
+## Information
+
+See all of our papers, examples, and installation guides on the [official Lasp website](https://lasp-lang.org).
+
 ## Building
 
 * `make`: Compile Lasp.

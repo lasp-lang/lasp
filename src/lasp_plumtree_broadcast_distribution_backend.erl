@@ -315,7 +315,7 @@ wait_needed(Id, Threshold) ->
 %% @private
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
-    Actor = erlang:phash2(erlang:now()),
+    Actor = time_compat:unique_integer([positive, monotonic]),
     Counter = 0,
     Identifier = node(),
     {ok, Store} = case ?CORE:start(Identifier) of

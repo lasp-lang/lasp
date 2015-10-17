@@ -84,6 +84,7 @@ merge(A, A) ->
     A.
 
 %% @doc Test for equality.
+-spec equal(ivar(), ivar()) -> boolean().
 equal(A, A) ->
     true;
 equal(_, _) ->

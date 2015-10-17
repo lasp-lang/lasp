@@ -62,6 +62,9 @@ threshold_met(lasp_ivar, Value, Threshold) when Value =:= Threshold ->
 threshold_met(lasp_ivar, Value, Threshold) when Value =/= Threshold ->
     false;
 
+threshold_met(lasp_top_k_var, Value, Threshold) ->
+    is_inflation(lasp_top_k_var, Threshold, Value);
+
 threshold_met(lasp_orset_gbtree, Value, {strict, Threshold}) ->
     is_strict_inflation(lasp_orset_gbtree, Threshold, Value);
 threshold_met(lasp_orset_gbtree, Value, Threshold) ->
@@ -140,6 +143,16 @@ is_lattice_inflation(lasp_ivar, Previous, Current)
 is_lattice_inflation(lasp_orswot, {Previous, _, _}, {Current, _, _}) ->
     riak_dt_vclock:descends(Current, Previous);
 
+is_lattice_inflation(lasp_top_k_var, {K, Previous}, {K, Current}) ->
+    orddict:fold(fun(Key, Value, Acc) ->
+                        case orddict:find(Key, Current) of
+                            error ->
+                                Acc andalso false;
+                            {ok, Value1} ->
+                                Acc andalso (Value1 >= Value)
+                        end
+                end, true, Previous);
+
 is_lattice_inflation(lasp_orset_gbtree, Previous, Current) ->
     gb_trees_ext:foldl(fun(Element, Ids, Acc) ->
                         case gb_trees:lookup(Element, Current) of
@@ -149,7 +162,6 @@ is_lattice_inflation(lasp_orset_gbtree, Previous, Current) ->
                                 Acc andalso ids_inflated(lasp_orset_gbtree, Ids, Ids1)
                         end
                 end, true, Previous);
-
 
 is_lattice_inflation(lasp_orset, Previous, Current) ->
     lists:foldl(fun({Element, Ids}, Acc) ->

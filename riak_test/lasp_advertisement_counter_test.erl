@@ -211,15 +211,10 @@ servers(Ads, AdsWithContracts) ->
 %% @doc Launch a series of client processes, each of which is responsible
 %% for displaying a particular advertisement.
 clients(AdsWithContracts) ->
-    %% Generate a OR-set for tracking clients.
-    {ok, Clients} = lasp:declare(?SET),
-
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
     lists:map(fun(Id) ->
-                ClientPid = spawn_link(?MODULE, client, [Id, AdsWithContracts, undefined]),
-                {ok, _} = lasp:update(Clients, {add, ClientPid}, undefined),
-                ClientPid
+                spawn_link(?MODULE, client, [Id, AdsWithContracts, undefined])
                 end, lists:seq(1, ?NUM_CLIENTS)).
 
 %% @doc Summarize results.

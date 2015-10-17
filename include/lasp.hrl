@@ -63,7 +63,6 @@
 -type pending_threshold() :: {threshold, read | wait, pid(), type(), threshold()}.
 -type operation() :: {atom(), value()} | {atom(), value(), value()}.
 -type operations() :: list(operation()).
--type ivar() :: term().
 -type actor() :: term().
 -type error() :: {error, atom()}.
 -type metadata() :: orddict:orddict().

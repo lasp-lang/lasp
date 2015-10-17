@@ -83,7 +83,7 @@ get(Ref, Id) ->
 init([Identifier]) ->
     %% Get the data root directory
     Config = app_helper:get_env(?APP),
-    DataDir = filename:join(app_helper:get_prop_or_env(store_data_dir, Config, ?APP),
+    DataDir = filename:join(app_helper:get_prop_or_env(data_root, Config, eleveldb),
                             atom_to_list(Identifier)),
 
     %% Ensure directory.

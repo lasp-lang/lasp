@@ -51,7 +51,7 @@
 -type id() :: binary().
 -type idx() :: term().
 -type result() :: term().
--type type() :: lasp_ivar | lasp_orset | lasp_orset_gbtree.
+-type type() :: lasp_ivar | lasp_orset | lasp_orset_gbtree | lasp_top_k_var.
 -type value() :: term().
 -type func() :: atom().
 -type args() :: list().

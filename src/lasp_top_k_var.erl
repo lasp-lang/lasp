@@ -24,13 +24,16 @@
 %%            "A Study of CRDTs that do computations"
 %%            http://dl.acm.org/citation.cfm?id=2745948
 %%
+
 -module(lasp_top_k_var).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -include("lasp.hrl").
 
 -behaviour(riak_dt).
+-behaviour(lasp_dt).
 
+-export([new/1]).
 -export([new/0,
          value/1,
          update/3,
@@ -64,14 +67,17 @@
 %% @doc Return a new top-k variable; assumes with no arguments top-1.
 -spec new() -> top_k_var().
 new() ->
-    {1, orddict:new()}.
+    new([1]).
+
+%% @doc Return a new top-k variable.
+-spec new([non_neg_integer()]) -> top_k_var().
+new([K]) ->
+    {K, orddict:new()}.
 
 %% @doc Update the CRDT with a given key/value pair.
 -spec update(top_k_var_op(), actor(), top_k_var()) -> {ok, top_k_var()}.
 update({set, Key, Value}, _Actor, {K, Var0}) ->
-    UpdateFun = fun(Value0) ->
-                        max(Value, Value0)
-                end,
+    UpdateFun = fun(Value0) -> max(Value, Value0) end,
     Var = orddict:update(Key, UpdateFun, Value, Var0),
     {ok, enforce_k({K, Var})}.
 

@@ -49,6 +49,8 @@
 %%      `Value' and `Threshold' both should be an instance of one of the
 %%      `type()'s and not a pure value.
 %%
+threshold_met({Type, _}, Value, Current) ->
+    threshold_met(Type, Value, Current);
 threshold_met(lasp_ivar, undefined, {strict, undefined}) ->
     false;
 threshold_met(lasp_ivar, undefined, undefined) ->
@@ -100,6 +102,8 @@ threshold_met(riak_dt_gcounter, Value, Threshold) ->
 %%      Given a particular type and two instances of that type,
 %%      determine if `Current' is an inflation of `Previous'.
 %%
+is_inflation({Type, _}, Previous, Current) ->
+    is_inflation(Type, Previous, Current);
 is_inflation(Type, Previous, Current) ->
     is_lattice_inflation(Type, Previous, Current).
 
@@ -108,6 +112,8 @@ is_inflation(Type, Previous, Current) ->
 %%      Given a particular type and two instances of that type,
 %%      determine if `Current' is a strict inflation of `Previous'.
 %%
+is_strict_inflation({Type, _}, Previous, Current) ->
+    is_strict_inflation(Type, Previous, Current);
 is_strict_inflation(Type, Previous, Current) ->
     is_lattice_strict_inflation(Type, Previous, Current).
 

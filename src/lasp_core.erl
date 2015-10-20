@@ -172,7 +172,9 @@ read(Id, Store) ->
 -spec read(id(), value(), store()) -> {ok, var()}.
 read(Id, Threshold, Store) ->
     Self = self(),
-    ReplyFun = fun({_Id, Type, Metadata, Value}) -> {ok, {_Id, Type, Metadata, Value}} end,
+    ReplyFun = fun({_Id, Type, Metadata, Value}) ->
+                       {ok, {_Id, Type, Metadata, Value}}
+               end,
     BlockingFun = fun() ->
                 receive
                     X ->
@@ -221,7 +223,7 @@ declare(Id, Type, MetadataFun, Store) ->
             %% Do nothing; make declare idempotent at each replica.
             {ok, Id};
         _ ->
-            Value = Type:new(),
+            Value = lasp_type:new(Type),
             Metadata = MetadataFun(orddict:new()),
             ok = do(put, [Store, Id, #dv{value=Value,
                                          type=Type,
@@ -300,7 +302,7 @@ update(Id, Operation, Actor, Store) ->
 -spec update(id(), operation(), actor(), function(), store()) -> {ok, var()}.
 update(Id, Operation, Actor, MetadataFun, Store) ->
     {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
-    {ok, Value} = Type:update(Operation, Actor, Value0),
+    {ok, Value} = lasp_type:update(Type, Operation, Actor, Value0),
     bind(Id, Value, MetadataFun, Store).
 
 %% @doc Define a dataflow variable to be bound a value.
@@ -321,7 +323,7 @@ bind(Id, Value, MetadataFun, Store) ->
                 _ ->
                     %% Merge may throw for invalid types.
                     try
-                        Merged = Type:merge(Value0, Value),
+                        Merged = lasp_type:merge(Type, Value0, Value),
                         case lasp_lattice:is_inflation(Type, Value0, Merged) of
                             true ->
                                 {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
@@ -366,9 +368,9 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
             %%
             Threshold = case Threshold0 of
                 undefined ->
-                    Type:new();
+                    lasp_type:new(Type);
                 {strict, undefined} ->
-                    {strict, Type:new()};
+                    {strict, lasp_type:new(Type)};
                 Threshold0 ->
                     Threshold0
             end,
@@ -412,9 +414,9 @@ read_any(Reads, Self, Store) ->
                                     %%
                                     Threshold = case Threshold0 of
                                         undefined ->
-                                            Type:new();
+                                            lasp_type:new(Type);
                                         {strict, undefined} ->
-                                            {strict, Type:new()};
+                                            {strict, lasp_type:new(Type)};
                                         Threshold0 ->
                                             Threshold0
                                     end,
@@ -777,6 +779,7 @@ reply_to_all([], StillWaiting, _Result) ->
 
 %% Internal functions.
 
+%% @private
 %% @doc Send responses to waiting threads, via messages.
 %%
 %%      Perform the following operations:

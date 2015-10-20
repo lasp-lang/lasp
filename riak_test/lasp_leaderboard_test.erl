@@ -65,7 +65,7 @@ test() ->
     Self = self(),
 
     %% Create a leaderboard datatype.
-    {ok, LeaderboardId} = lasp:declare(lasp_top_k_var),
+    {ok, LeaderboardId} = lasp:declare({lasp_top_k_var, [2]}),
 
     %% Read the leaderboard's current value.
     {ok, {_, _, _, Leaderboard}} = lasp:read(LeaderboardId, undefined),
@@ -87,7 +87,7 @@ test() ->
     Final = orddict:to_list(lasp_top_k_var:value(FinalLeaderboard)),
 
     %% Assert we got the right score.
-    [{_, FinalResult}] = Final,
+    [{_, FinalResult}, {_, _}] = Final,
 
     io:format("Final Leaderboard: ~p", [Final]),
 

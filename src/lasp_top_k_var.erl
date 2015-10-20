@@ -61,11 +61,6 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
-%% EQC API
--ifdef(EQC).
--export([gen_op/0]).
--endif.
-
 %% @doc Return a new top-k variable; assumes with no arguments top-1.
 -spec new() -> top_k_var().
 new() ->

@@ -83,8 +83,8 @@ test() ->
     terminate(ClientList),
 
     %% Read the result and print it.
-    {ok, {_, _, _, FinalLeaderboard}} = lasp:read(LeaderboardId, undefined),
-    Final = orddict:to_list(lasp_top_k_var:value(FinalLeaderboard)),
+    {ok, FinalLeaderboard} = lasp:query(LeaderboardId),
+    Final = orddict:to_list(FinalLeaderboard),
 
     %% Assert we got the right score.
     [{_, FinalResult}, {_, _}] = Final,

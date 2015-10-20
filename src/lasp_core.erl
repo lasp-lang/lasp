@@ -36,6 +36,7 @@
          declare/2,
          declare/3,
          declare/4,
+         query/2,
          update/4,
          update/5,
          thread/4,
@@ -230,6 +231,14 @@ declare(Id, Type, MetadataFun, Store) ->
                                          metadata=Metadata}]),
             {ok, Id}
     end.
+
+%% @doc Return the current value of a CRDT.
+%%
+-spec query(id(), store()) -> {ok, term()}.
+query(Id, Store) ->
+    {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
+    Value = lasp_type:query(Type, Value0),
+    {ok, Value}.
 
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.

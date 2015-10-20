@@ -31,6 +31,7 @@
 
 %% lasp_distribution_backend callbacks
 -export([declare/2,
+         query/1,
          update/3,
          bind/2,
          bind_to/2,
@@ -174,6 +175,15 @@ exchange(Peer) ->
 declare(Id, Type) ->
     {ok, Id} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
     {ok, Id}.
+
+%% @doc Read the current value of a CRDT.
+%%
+%%      Given a `Id', read the current value, compute the `query'
+%%      operation for the value, and return it to the user.
+%%
+-spec query(id()) -> {ok, term()} | error().
+query(Id) ->
+    gen_server:call(?MODULE, {query, Id}, infinity).
 
 %% @doc Update a dataflow variable.
 %%
@@ -334,6 +344,9 @@ init([]) ->
 handle_call({declare, Id, Type}, _From, #state{store=Store, actor=Actor, counter=Counter}=State) ->
     {ok, Id} = ?CORE:declare(Id, Type, ?CLOCK_INIT, Store),
     {reply, {ok, Id}, State#state{counter=increment_counter(Counter)}};
+handle_call({query, Id}, _From, #state{store=Store}=State) ->
+    {ok, Value} = ?CORE:query(Id, Store),
+    {reply, {ok, Value}, State};
 handle_call({bind, Id, Value}, _From, #state{store=Store, counter=Counter}=State) ->
     Result = ?CORE:bind(Id, Value, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};

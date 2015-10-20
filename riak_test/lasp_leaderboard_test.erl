@@ -108,8 +108,6 @@ clients(Runner, LeaderboardId, Leaderboard) ->
 client(Runner, Id, LeaderboardId, Leaderboard0) ->
     receive
         {complete_game, Score} ->
-            io:format("Client ~p completed game with score ~p.", [Id, Score]),
-
             %% Update local leaderboard.
             {ok, Leaderboard} = lasp_top_k_var:update({set, Id, Score}, Id, Leaderboard0),
 
@@ -118,16 +116,12 @@ client(Runner, Id, LeaderboardId, Leaderboard0) ->
 
             client(Runner, Id, LeaderboardId, Leaderboard);
         terminate ->
-            io:format("Client ~p shutting down, issuing final synchronization.", [Id]),
-
             %% Synchronize copy of leaderboard.
             {ok, {_, _, _, Leaderboard}} = lasp:bind(LeaderboardId, Leaderboard0),
 
             ok
     after
         10 ->
-            io:format("Client ~p synchronizing leaderboard.", [Id]),
-
             %% Synchronize copy of leaderboard.
             {ok, {_, _, _, Leaderboard}} = lasp:bind(LeaderboardId, Leaderboard0),
 
@@ -158,8 +152,7 @@ wait_for_events(Count, NumEvents, MaxValue0) ->
             MaxValue = max(Score, MaxValue0),
             case Count >= NumEvents of
                 true ->
-                    io:format("~p events served, max is: ~p!",
-                              [Count, MaxValue]),
+                    io:format("~p events served, max is: ~p!", [Count, MaxValue]),
                     MaxValue;
                 false ->
                     wait_for_events(Count + 1, NumEvents, MaxValue)

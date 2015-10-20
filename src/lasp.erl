@@ -25,7 +25,8 @@
 -export([bind/4,
          declare/1]).
 
--export([declare/2,
+-export([query/1,
+         declare/2,
          update/3,
          bind/2,
          bind_to/2,
@@ -41,6 +42,15 @@
          thread/3]).
 
 %% Public Helpers
+
+%% @doc Return the current value of a CRDT.
+%%
+%%      For a given `Id', compute the current value of a CRDT and return
+%%      it.
+%%
+-spec query(id()) -> {ok, term()} | error().
+query(Id) ->
+    do(query, [Id]).
 
 %% @doc Declare a new dataflow variable of a given type.
 %%

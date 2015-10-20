@@ -30,6 +30,12 @@
 %%
 -callback declare(id(), type()) -> {ok, id()} | error().
 
+%% Return the current value of a CRDT.
+%%
+%% Read the given `Id' and compute the actual value of the CRDT.
+%%
+-callback query(id()) -> {ok, term()} | error().
+
 %% Update a dataflow variable.
 %%
 %% Read the given `Id' and update it given the provided

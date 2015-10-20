@@ -21,7 +21,7 @@
 -module(lasp_type).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
--export([new/1, update/4, merge/3]).
+-export([new/1, update/4, merge/3, query/2]).
 
 %% @doc Initialize a new variable for a given type.
 new(Type) ->
@@ -48,4 +48,13 @@ merge(Type, Value0, Value) ->
             T:merge(Value0, Value);
         T ->
             T:merge(Value0, Value)
+    end.
+
+%% @doc Return the value of a CRDT.
+query(Type, Object) ->
+    case Type of
+        {T, _Args} ->
+            T:value(Object);
+        T ->
+            T:merge(Object)
     end.

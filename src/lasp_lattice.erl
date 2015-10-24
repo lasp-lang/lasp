@@ -92,10 +92,15 @@ threshold_met(riak_dt_map, Value, {strict, Threshold}) ->
 threshold_met(riak_dt_map, Value, Threshold) ->
     is_inflation(riak_dt_map, Threshold, Value);
 
-threshold_met(riak_dt_gcounter, Value, {strict, Threshold}) ->
+threshold_met(riak_dt_gcounter, Value, {value, {strict, Threshold}}) ->
     Threshold < riak_dt_gcounter:value(Value);
+threshold_met(riak_dt_gcounter, Value, {value, Threshold}) ->
+    Threshold =< riak_dt_gcounter:value(Value);
+
+threshold_met(riak_dt_gcounter, Value, {strict, Threshold}) ->
+    is_strict_inflation(riak_dt_gcounter, Threshold, Value);
 threshold_met(riak_dt_gcounter, Value, Threshold) ->
-    Threshold =< riak_dt_gcounter:value(Value).
+    is_inflation(riak_dt_gcounter, Threshold, Value).
 
 %% @doc Determine if a change is an inflation or not.
 %%
@@ -186,8 +191,8 @@ is_lattice_inflation(riak_dt_map, {Previous, _, _}, {Current, _, _}) ->
     riak_dt_vclock:descends(Current, Previous);
 
 is_lattice_inflation(riak_dt_gcounter, Previous, Current) ->
-    PreviousList = lists:sort(orddict:to_list(Previous)),
-    CurrentList = lists:sort(orddict:to_list(Current)),
+    PreviousList = orddict:to_list(Previous),
+    CurrentList = orddict:to_list(Current),
     lists:foldl(fun({Actor, Count}, Acc) ->
             case lists:keyfind(Actor, 1, CurrentList) of
                 false ->

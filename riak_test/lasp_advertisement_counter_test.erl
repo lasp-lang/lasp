@@ -27,6 +27,16 @@
          client/5,
          server/2]).
 
+-behaviour(lasp_test).
+
+%% lasp_test callbacks
+-export([init/0,
+         clients/1,
+         simulate/1,
+         wait/1,
+         terminate/1,
+         summarize/1]).
+
 -ifdef(TEST).
 
 -export([confirm/0]).
@@ -48,14 +58,21 @@ confirm() ->
 
     lager:info("Remotely executing the test."),
     Result = rpc:call(Node, ?MODULE, test, []),
-    ?assertEqual(ok, Result),
+    ?assertMatch({ok, _}, Result),
 
     pass.
 
 -endif.
 
+test() ->
+    lasp_test:test(?MODULE).
+
+%% Macro definitions.
+
+%% Set type to use.
 -define(SET, lasp_orset).
 
+%% Counter type to use.
 -define(COUNTER, riak_dt_gcounter).
 
 %% The maximum number of impressions for each advertisement to display.
@@ -67,15 +84,30 @@ confirm() ->
 %% The number of clients.
 -define(NUM_CLIENTS, 10).
 
+%% Synchronization interval.
+-define(SYNC_INTERVAL, 10).
+
+%% Record definitions.
+
 -record(ad, {id, image, counter}).
 
 -record(contract, {id}).
 
-test() ->
-    Self = self(),
+-record(state, {runner,
+                ads,
+                ad_list,
+                ads_with_contracts,
+                client_list,
+                count_events = 1,
+                num_events = ?NUM_EVENTS}).
 
-    %% Setup lists of advertisements and lists of contracts for
-    %% advertisements.
+%% Callback functions.
+
+%% @doc Setup lists of advertisements and lists of contracts for
+%%      advertisements.
+init() ->
+    %% Get the process identifier of the runner.
+    Runner = self(),
 
     %% For each identifier, generate a contract.
     {ok, Contracts} = lasp:declare(?SET),
@@ -106,25 +138,89 @@ test() ->
     %% Store the original list of ads.
     AdList = RiotAdList ++ RovioAdList,
 
-    %% Launch client processes.
-    ClientList = clients(Self, AdsWithContracts),
-
     %% Launch server processes.
     servers(Ads, AdsWithContracts),
 
-    %% Initialize simulation.
-    simulate(Self, ClientList),
+    {ok, #state{runner=Runner,
+                ads=Ads,
+                ad_list=AdList,
+                ads_with_contracts=AdsWithContracts}}.
 
-    %% Wait until we receive num events.
-    wait_for_events(1, ?NUM_EVENTS),
+%% @doc Launch a series of client processes, each of which is responsible
+%% for displaying a particular advertisement.
+clients(#state{runner=Runner,
+               ads_with_contracts=AdsWithContracts}=State) ->
+    %% Each client takes the full list of ads when it starts, and reads
+    %% from the variable store.
+    Clients = lists:map(fun(Id) ->
+                                spawn_link(?MODULE,
+                                           client,
+                                           [Runner,
+                                            Id,
+                                            AdsWithContracts,
+                                            undefined,
+                                            dict:new()])
+                                end, lists:seq(1, ?NUM_CLIENTS)),
+    {ok, State#state{client_list=Clients}}.
 
-    %% Terminate all clients.
-    terminate(ClientList),
 
-    %% Finish and summarize.
-    summarize(AdList),
+%% @doc Terminate any running clients gracefully issuing final
+%%      synchronization.
+terminate(#state{client_list=ClientList}=State) ->
+    TerminateFun = fun(Pid) -> Pid ! terminate end,
+    lists:map(TerminateFun, ClientList),
+    {ok, State}.
 
-    ok.
+%% @doc Simulate clients viewing advertisements.
+simulate(#state{client_list=ClientList}=State) ->
+    %% Start the simulation.
+    Viewer = fun(_) ->
+            Random = random:uniform(length(ClientList)),
+
+            timer:sleep(5),
+
+            Pid = lists:nth(Random, ClientList),
+            Pid ! view_ad
+    end,
+    lists:foreach(Viewer, lists:seq(1, ?NUM_EVENTS)),
+    {ok, State}.
+
+%% @doc Summarize results.
+summarize(#state{ad_list=AdList}=State) ->
+    %% Wait until all advertisements have been exhausted before stopping
+    %% execution of the test.
+    lager:info("AdList is: ~p", [AdList]),
+    Overcounts = lists:map(fun(#ad{counter=CounterId}) ->
+                {ok, V} = lasp:query(CounterId),
+                lager:info("Advertisement ~p reached max impressions: ~p with ~p....",
+                           [CounterId, ?MAX_IMPRESSIONS, V]),
+                V - ?MAX_IMPRESSIONS
+        end, AdList),
+
+    Sum = fun(X, Acc) ->
+            X + Acc
+    end,
+    TotalOvercount = lists:foldl(Sum, 0, Overcounts),
+    io:format("----------------------------------------"),
+    io:format("Total overcount: ~p~n", [TotalOvercount]),
+    io:format("Mean overcount per client: ~p~n", [TotalOvercount / ?NUM_CLIENTS]),
+    io:format("----------------------------------------"),
+
+    {ok, State}.
+
+%% @doc Wait for all events to be delivered in the system.
+wait(#state{count_events=Count, num_events=NumEvents}=State) ->
+    receive
+        view_ad ->
+            case Count >= NumEvents of
+                true ->
+                    {ok, State};
+                false ->
+                    wait(State#state{count_events=Count + 1})
+            end
+    end.
+
+%% Internal functions.
 
 %% @doc Server functions for the advertisement counter.  After 5 views,
 %%      disable the advertisement.
@@ -152,7 +248,6 @@ client(Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0) ->
                     Random = random:uniform(dict:size(Counters0)),
                     {Ad, Counter0} = lists:nth(Random, dict:to_list(Counters0)),
                     {ok, Counter} = ?COUNTER:update(increment, Id, Counter0),
-                    lager:info("Updating ~p: ~p => ~p", [Ad, Counter0, Counter]),
                     dict:store(Ad, Counter, Counters0)
             end,
 
@@ -161,79 +256,10 @@ client(Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0) ->
 
             client(Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters)
     after
-        10 ->
+        ?SYNC_INTERVAL ->
             {ok, AdsWithContracts, Counters} = synchronize(AdsWithContractsId, AdsWithContracts0, Counters0),
             client(Runner, Id, AdsWithContractsId, AdsWithContracts, Counters)
     end.
-
-%% @doc Terminate any running clients gracefully issuing final
-%%      synchronization.
-terminate(ClientList) ->
-    TerminateFun = fun(Pid) -> Pid ! terminate end,
-    lists:map(TerminateFun, ClientList).
-
-%% @doc Simulate clients viewing advertisements.
-simulate(_Runner, ClientList) ->
-    %% Start the simulation.
-    Viewer = fun(_) ->
-            Random = random:uniform(length(ClientList)),
-
-            timer:sleep(5),
-
-            Pid = lists:nth(Random, ClientList),
-            Pid ! view_ad
-    end,
-    lists:foreach(Viewer, lists:seq(1, ?NUM_EVENTS)).
-
-%% @doc Launch a server process for each advertisement, which will block
-%% until the advertisement should be disabled.
-servers(Ads, AdsWithContracts) ->
-    %% Create a OR-set for the server list.
-    {ok, Servers} = lasp:declare(?SET),
-
-    %% Get the current advertisement list.
-    {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
-    AdList = ?SET:value(AdList0),
-
-    %% For each advertisement, launch one server for tracking it's
-    %% impressions and wait to disable.
-    lists:map(fun(Ad) ->
-                ServerPid = spawn_link(?MODULE, server, [Ad, Ads]),
-                {ok, _} = lasp:update(Servers, {add, ServerPid}, undefined),
-                ServerPid
-                end, AdList).
-
-%% @doc Launch a series of client processes, each of which is responsible
-%% for displaying a particular advertisement.
-clients(Runner, AdsWithContracts) ->
-    %% Each client takes the full list of ads when it starts, and reads
-    %% from the variable store.
-    lists:map(fun(Id) ->
-                spawn_link(?MODULE, client, [Runner, Id, AdsWithContracts, undefined, dict:new()])
-                end, lists:seq(1, ?NUM_CLIENTS)).
-
-%% @doc Summarize results.
-summarize(Ads) ->
-    %% Wait until all advertisements have been exhausted before stopping
-    %% execution of the test.
-    lager:info("Ads is: ~p", [Ads]),
-    Overcounts = lists:map(fun(#ad{counter=CounterId}) ->
-                {ok, V} = lasp:query(CounterId),
-                lager:info("Advertisement ~p reached max impressions: ~p with ~p....",
-                           [CounterId, ?MAX_IMPRESSIONS, V]),
-                V - ?MAX_IMPRESSIONS
-        end, Ads),
-
-    Sum = fun(X, Acc) ->
-            X + Acc
-    end,
-    TotalOvercount = lists:foldl(Sum, 0, Overcounts),
-    io:format("----------------------------------------"),
-    io:format("Total overcount: ~p~n", [TotalOvercount]),
-    io:format("Mean overcount per client: ~p~n", [TotalOvercount / ?NUM_CLIENTS]),
-    io:format("----------------------------------------"),
-
-    ok.
 
 %% @doc Generate advertisements and advertisement contracts.
 create_advertisements_and_contracts(Ads, Contracts) ->
@@ -256,26 +282,12 @@ create_advertisements_and_contracts(Ads, Contracts) ->
 
                 end, AdIds).
 
-%% @doc Wait for all events to be delivered in the system.
-wait_for_events(Count, NumEvents) ->
-    receive
-        view_ad ->
-            case Count >= NumEvents of
-                true ->
-                    ok;
-                false ->
-                    wait_for_events(Count + 1, NumEvents)
-            end
-    end.
-
 %% @doc Periodically synchronize state with the server.
 synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
     %% Get latest list of advertisements from the server.
     {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
     AdList = ?SET:value(AdsWithContracts),
     Identifiers = [Id || {#ad{counter=Id},_} <- AdList],
-
-    lager:info("AdsWithContracts: ~p", [AdsWithContracts]),
 
     %% Refresh our dictionary with any new values from the server.
     %%
@@ -301,7 +313,6 @@ synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
     %%
     SyncFun = fun(Ad, Counter0, Acc) ->
                     {ok, {_, _, _, Counter}} = lasp:bind(Ad, Counter0),
-                    % lager:info("Synchronizing counter ~p: ~p => ~p", [Ad, Counter0, Counter]),
                     case lists:member(Ad, Identifiers) of
                         true ->
                             dict:store(Ad, Counter, Acc);
@@ -311,7 +322,22 @@ synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
               end,
     Counters1 = dict:fold(SyncFun, dict:new(), Counters),
 
-    lager:info("Identifiers: ~p", [Identifiers]),
-    lager:info("Counters1: ~p", [Counters1]),
-
     {ok, AdsWithContracts, Counters1}.
+
+%% @doc Launch a server process for each advertisement, which will block
+%% until the advertisement should be disabled.
+servers(Ads, AdsWithContracts) ->
+    %% Create a OR-set for the server list.
+    {ok, Servers} = lasp:declare(?SET),
+
+    %% Get the current advertisement list.
+    {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
+    AdList = ?SET:value(AdList0),
+
+    %% For each advertisement, launch one server for tracking it's
+    %% impressions and wait to disable.
+    lists:map(fun(Ad) ->
+                ServerPid = spawn_link(?MODULE, server, [Ad, Ads]),
+                {ok, _} = lasp:update(Servers, {add, ServerPid}, undefined),
+                ServerPid
+                end, AdList).

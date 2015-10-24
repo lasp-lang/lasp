@@ -24,7 +24,7 @@
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
 -export([test/0,
-         client/3,
+         client/4,
          server/2]).
 
 -ifdef(TEST).
@@ -72,6 +72,8 @@ confirm() ->
 -record(contract, {id}).
 
 test() ->
+    Self = self(),
+
     %% Setup lists of advertisements and lists of contracts for
     %% advertisements.
 
@@ -82,29 +84,11 @@ test() ->
 
     %% Generate Rovio's advertisements.
     {ok, RovioAds} = lasp:declare(?SET),
-    lists:map(fun(Id) ->
-                %% Generate a G-Counter.
-                {ok, CounterId} = lasp:declare(?COUNTER),
-
-                %% Add it to the advertisement set.
-                {ok, _} = lasp:update(RovioAds,
-                                      {add, #ad{id=Id, counter=CounterId}},
-                                      undefined)
-
-                end, RovioAdIds),
+    create_advertisements(RovioAds, RovioAdIds),
 
     %% Generate Trifork's advertisements.
     {ok, TriforkAds} = lasp:declare(?SET),
-    lists:map(fun(Id) ->
-                %% Generate a G-Counter.
-                {ok, CounterId} = lasp:declare(?COUNTER),
-
-                %% Add it to the advertisement set.
-                {ok, _} = lasp:update(TriforkAds,
-                                      {add, #ad{id=Id, counter=CounterId}},
-                                      undefined)
-
-                end, TriforkAdIds),
+    create_advertisements(TriforkAds, TriforkAdIds),
 
     %% Union ads.
     {ok, Ads} = lasp:declare(?SET),
@@ -130,13 +114,13 @@ test() ->
     ok = lasp:filter(AdsContracts, FilterFun, AdsWithContracts),
 
     %% Launch client processes.
-    ClientList = clients(AdsWithContracts),
+    ClientList = clients(Self, AdsWithContracts),
 
     %% Launch server processes.
     servers(Ads, AdsWithContracts),
 
     %% Initialize simulation.
-    simulate(ClientList),
+    simulate(Self, ClientList),
 
     %% Finish and summarize.
     summarize(AdsWithContracts),
@@ -155,7 +139,7 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
     lager:info("Removing ad: ~p", [Ad]).
 
 %% @doc Client process; standard recurisve looping server.
-client(Id, AdsWithContracts, PreviousValue) ->
+client(Runner, Id, AdsWithContracts, PreviousValue) ->
     receive
         view_ad ->
             %% Get current ad list.
@@ -166,7 +150,7 @@ client(Id, AdsWithContracts, PreviousValue) ->
                 0 ->
                     %% No advertisements left to display; ignore
                     %% message.
-                    client(Id, AdsWithContracts, AdList0);
+                    client(Runner, Id, AdsWithContracts, AdList0);
                 _ ->
                     %% Select a random advertisement from the list of
                     %% active advertisements.
@@ -176,12 +160,12 @@ client(Id, AdsWithContracts, PreviousValue) ->
                     %% Increment it.
                     {ok, _} = lasp:update(Ad, increment, Id),
 
-                    client(Id, AdsWithContracts, AdList0)
+                    client(Runner, Id, AdsWithContracts, AdList0)
             end
     end.
 
 %% @doc Simulate clients viewing advertisements.
-simulate(ClientList) ->
+simulate(_Runner, ClientList) ->
     %% Start the simulation.
     Viewer = fun(_) ->
             Random = random:uniform(length(ClientList)),
@@ -210,11 +194,11 @@ servers(Ads, AdsWithContracts) ->
 
 %% @doc Launch a series of client processes, each of which is responsible
 %% for displaying a particular advertisement.
-clients(AdsWithContracts) ->
+clients(Runner, AdsWithContracts) ->
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
     lists:map(fun(Id) ->
-                spawn_link(?MODULE, client, [Id, AdsWithContracts, undefined])
+                spawn_link(?MODULE, client, [Runner, Id, AdsWithContracts, undefined])
                 end, lists:seq(1, ?NUM_CLIENTS)).
 
 %% @doc Summarize results.
@@ -242,3 +226,15 @@ summarize(AdsWithContracts) ->
     io:format("----------------------------------------"),
 
     ok.
+
+create_advertisements(Ads, AdIds) ->
+    lists:map(fun(Id) ->
+                %% Generate a G-Counter.
+                {ok, CounterId} = lasp:declare(?COUNTER),
+
+                %% Add it to the advertisement set.
+                {ok, _} = lasp:update(Ads,
+                                      {add, #ad{id=Id, counter=CounterId}},
+                                      undefined)
+
+                end, AdIds).

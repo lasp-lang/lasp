@@ -82,11 +82,11 @@ test() ->
 
     %% Generate Rovio's advertisements.
     {ok, RovioAds} = lasp:declare(?SET),
-    create_advertisements_and_contracts(RovioAds, Contracts),
+    RovioAdList = create_advertisements_and_contracts(RovioAds, Contracts),
 
     %% Generate Riot's advertisements.
     {ok, RiotAds} = lasp:declare(?SET),
-    create_advertisements_and_contracts(RiotAds, Contracts),
+    RiotAdList = create_advertisements_and_contracts(RiotAds, Contracts),
 
     %% Union ads.
     {ok, Ads} = lasp:declare(?SET),
@@ -103,6 +103,9 @@ test() ->
     end,
     ok = lasp:filter(AdsContracts, FilterFun, AdsWithContracts),
 
+    %% Store the original list of ads.
+    AdList = RiotAdList ++ RovioAdList,
+
     %% Launch client processes.
     ClientList = clients(Self, AdsWithContracts),
 
@@ -112,8 +115,11 @@ test() ->
     %% Initialize simulation.
     simulate(Self, ClientList),
 
+    %% Wait until we receive num events.
+    wait_for_events(1, ?NUM_EVENTS),
+
     %% Finish and summarize.
-    summarize(AdsWithContracts),
+    summarize(AdList),
 
     ok.
 
@@ -138,6 +144,8 @@ client(Runner, Id, AdsWithContracts, PreviousValue) ->
 
             case length(AdList) of
                 0 ->
+                    Runner ! view_ad,
+
                     %% No advertisements left to display; ignore
                     %% message.
                     client(Runner, Id, AdsWithContracts, AdList0);
@@ -149,6 +157,9 @@ client(Runner, Id, AdsWithContracts, PreviousValue) ->
 
                     %% Increment it.
                     {ok, _} = lasp:update(Ad, increment, Id),
+
+                    %% Notify the harness that an event has been processed.
+                    Runner ! view_ad,
 
                     client(Runner, Id, AdsWithContracts, AdList0)
             end
@@ -192,11 +203,11 @@ clients(Runner, AdsWithContracts) ->
                 end, lists:seq(1, ?NUM_CLIENTS)).
 
 %% @doc Summarize results.
-summarize(AdsWithContracts) ->
+summarize(Ads) ->
     %% Wait until all advertisements have been exhausted before stopping
     %% execution of the test.
-    {ok, {_, _, _, AdsWithContracts0}} = lasp:read(AdsWithContracts, {strict, undefined}),
-    Overcounts = lists:map(fun({#ad{counter=CounterId}, _}) ->
+    lager:info("Ads is: ~p", [Ads]),
+    Overcounts = lists:map(fun(#ad{counter=CounterId}) ->
                 lager:info("Waiting for advertisement ~p to reach ~p impressions...",
                            [CounterId, ?MAX_IMPRESSIONS]),
                 {ok, {_, _, _, V0}} = lasp:read(CounterId, ?MAX_IMPRESSIONS),
@@ -204,7 +215,7 @@ summarize(AdsWithContracts) ->
                 lager:info("Advertisement ~p reached max impressions: ~p with ~p....",
                            [CounterId, ?MAX_IMPRESSIONS, V]),
                 V - ?MAX_IMPRESSIONS
-        end, ?SET:value(AdsWithContracts0)),
+        end, Ads),
 
     Sum = fun(X, Acc) ->
             X + Acc
@@ -229,9 +240,23 @@ create_advertisements_and_contracts(Ads, Contracts) ->
                 %% Generate a G-Counter.
                 {ok, CounterId} = lasp:declare(?COUNTER),
 
+                Ad = #ad{id=Id, counter=CounterId},
+
                 %% Add it to the advertisement set.
-                {ok, _} = lasp:update(Ads,
-                                      {add, #ad{id=Id, counter=CounterId}},
-                                      undefined)
+                {ok, _} = lasp:update(Ads, {add, Ad}, undefined),
+
+                Ad
 
                 end, AdIds).
+
+%% @doc Wait for all events to be delivered in the system.
+wait_for_events(Count, NumEvents) ->
+    receive
+        view_ad ->
+            case Count >= NumEvents of
+                true ->
+                    ok;
+                false ->
+                    wait_for_events(Count + 1, NumEvents)
+            end
+    end.

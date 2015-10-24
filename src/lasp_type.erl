@@ -56,5 +56,5 @@ query(Type, Object) ->
         {T, _Args} ->
             T:value(Object);
         T ->
-            T:merge(Object)
+            T:value(Object)
     end.

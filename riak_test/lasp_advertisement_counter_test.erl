@@ -177,7 +177,7 @@ simulate(#state{client_list=ClientList}=State) ->
     Viewer = fun(_) ->
             Random = random:uniform(length(ClientList)),
 
-            timer:sleep(5),
+            timer:sleep(10),
 
             Pid = lists:nth(Random, ClientList),
             Pid ! view_ad

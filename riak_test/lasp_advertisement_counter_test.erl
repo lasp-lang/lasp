@@ -79,20 +79,20 @@ test() ->
 
     %% Generate a series of unique identifiers.
     RovioAdIds = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
-    TriforkAdIds = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
-    Ids = RovioAdIds ++ TriforkAdIds,
+    RiotAdIds = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
+    Ids = RovioAdIds ++ RiotAdIds,
 
     %% Generate Rovio's advertisements.
     {ok, RovioAds} = lasp:declare(?SET),
     create_advertisements(RovioAds, RovioAdIds),
 
-    %% Generate Trifork's advertisements.
-    {ok, TriforkAds} = lasp:declare(?SET),
-    create_advertisements(TriforkAds, TriforkAdIds),
+    %% Generate Riot's advertisements.
+    {ok, RiotAds} = lasp:declare(?SET),
+    create_advertisements(RiotAds, RiotAdIds),
 
     %% Union ads.
     {ok, Ads} = lasp:declare(?SET),
-    ok = lasp:union(RovioAds, TriforkAds, Ads),
+    ok = lasp:union(RovioAds, RiotAds, Ads),
 
     %% For each identifier, generate a contract.
     {ok, Contracts} = lasp:declare(?SET),

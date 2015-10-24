@@ -118,6 +118,9 @@ test() ->
     %% Wait until we receive num events.
     wait_for_events(1, ?NUM_EVENTS),
 
+    %% Terminate all clients.
+    terminate(ClientList),
+
     %% Finish and summarize.
     summarize(AdList),
 
@@ -137,6 +140,8 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
 %% @doc Client process; standard recurisve looping server.
 client(Runner, Id, AdsWithContracts, PreviousValue) ->
     receive
+        terminate ->
+            ok;
         view_ad ->
             %% Get current ad list.
             {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, PreviousValue),
@@ -164,6 +169,13 @@ client(Runner, Id, AdsWithContracts, PreviousValue) ->
                     client(Runner, Id, AdsWithContracts, AdList0)
             end
     end.
+
+%% @doc Terminate any running clients gracefully issuing final
+%%      synchronization.
+terminate(ClientList) ->
+    TerminateFun = fun(Pid) -> Pid ! terminate end,
+    lists:map(TerminateFun, ClientList).
+
 
 %% @doc Simulate clients viewing advertisements.
 simulate(_Runner, ClientList) ->

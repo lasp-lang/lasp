@@ -26,6 +26,16 @@
 -export([test/0,
          client/4]).
 
+-behaviour(lasp_test).
+
+%% lasp_test callbacks
+-export([init/0,
+         clients/1,
+         simulate/1,
+         wait/1,
+         terminate/1,
+         summarize/1]).
+
 -ifdef(TEST).
 
 -export([confirm/0]).
@@ -47,12 +57,18 @@ confirm() ->
 
     lager:info("Remotely executing the test."),
     Result = rpc:call(Node, ?MODULE, test, []),
-    ?assertEqual(ok, Result),
+    ?assertMatch({ok, _}, Result),
 
     pass.
 
 -endif.
 
+test() ->
+    lasp_test:test(?MODULE).
+
+%% Macro definitions.
+
+%% Lasp set type to use.
 -define(SET, lasp_orset).
 
 %% The number of clients.
@@ -61,8 +77,17 @@ confirm() ->
 %% The number of events to sent to clients.
 -define(NUM_EVENTS, 2000).
 
-test() ->
-    Self = self(),
+%% Record definitions.
+-record(state, {runner,
+                client_list,
+                count_events = 1,
+                num_events = ?NUM_EVENTS,
+                leaderboard,
+                leaderboard_id}).
+
+%% @doc Preconfigure the example.
+init() ->
+    Runner = self(),
 
     %% Create a leaderboard datatype.
     {ok, LeaderboardId} = lasp:declare({lasp_top_k_var, [2]}),
@@ -70,39 +95,36 @@ test() ->
     %% Read the leaderboard's current value.
     {ok, {_, _, _, Leaderboard}} = lasp:read(LeaderboardId, undefined),
 
-    %% Launch client processes.
-    ClientList = clients(Self, LeaderboardId, Leaderboard),
+    {ok, #state{runner=Runner,
+                leaderboard_id=LeaderboardId,
+                leaderboard=Leaderboard}}.
 
-    %% Initialize simulation.
-    simulate(Self, ClientList),
-
-    %% Wait until we receive num events.
-    FinalResult = wait_for_events(1, ?NUM_EVENTS, 0),
-
-    %% Terminate all clients.
-    terminate(ClientList),
-
+summarize(#state{leaderboard_id=LeaderboardId}=State) ->
     %% Read the result and print it.
     {ok, FinalLeaderboard} = lasp:query(LeaderboardId),
     Final = orddict:to_list(FinalLeaderboard),
-
-    %% Assert we got the right score.
-    [{_, FinalResult}, {_, _}] = Final,
-
     io:format("Final Leaderboard: ~p", [Final]),
 
-    ok.
+    {ok, State}.
 
 %% @doc Terminate any running clients gracefully issuing final
 %%      synchronization.
-terminate(ClientList) ->
+terminate(#state{client_list=ClientList}=State) ->
     TerminateFun = fun(Pid) -> Pid ! terminate end,
-    lists:map(TerminateFun, ClientList).
+    lists:map(TerminateFun, ClientList),
+    {ok, State}.
 
 %% @doc Launch a series of client processes.
-clients(Runner, LeaderboardId, Leaderboard) ->
-    SpawnFun = fun(Id) -> spawn_link(?MODULE, client, [Runner, Id, LeaderboardId, Leaderboard]) end,
-    lists:map(SpawnFun, lists:seq(1, ?NUM_CLIENTS)).
+clients(#state{runner=Runner,
+               leaderboard_id=LeaderboardId,
+               leaderboard=Leaderboard}=State) ->
+    SpawnFun = fun(Id) ->
+                       spawn_link(?MODULE,
+                                  client,
+                                  [Runner, Id, LeaderboardId, Leaderboard])
+               end,
+    ClientList = lists:map(SpawnFun, lists:seq(1, ?NUM_CLIENTS)),
+    {ok, State#state{client_list=ClientList}}.
 
 %% @doc Client process; standard recurisve looping server.
 client(Runner, Id, LeaderboardId, Leaderboard0) ->
@@ -129,7 +151,7 @@ client(Runner, Id, LeaderboardId, Leaderboard0) ->
     end.
 
 %% @doc Simulate clients.
-simulate(_Runner, ClientList) ->
+simulate(#state{client_list=ClientList}=State) ->
     %% Start the simulation.
     Viewer = fun(_) ->
             %% Pick a random client.
@@ -143,18 +165,17 @@ simulate(_Runner, ClientList) ->
             %% device.
             Pid ! {complete_game, random:uniform(100000000)}
     end,
-    lists:foreach(Viewer, lists:seq(1, ?NUM_EVENTS)).
+    lists:foreach(Viewer, lists:seq(1, ?NUM_EVENTS)),
+    {ok, State}.
 
 %% @doc Wait for all events to be delivered in the system.
-wait_for_events(Count, NumEvents, MaxValue0) ->
+wait(#state{count_events=Count, num_events=NumEvents}=State) ->
     receive
-        {event, Score} ->
-            MaxValue = max(Score, MaxValue0),
+        {event, _Score} ->
             case Count >= NumEvents of
                 true ->
-                    io:format("~p events served, max is: ~p!", [Count, MaxValue]),
-                    MaxValue;
+                    {ok, State};
                 false ->
-                    wait_for_events(Count + 1, NumEvents, MaxValue)
+                    wait(State#state{count_events=Count + 1})
             end
     end.

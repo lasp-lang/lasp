@@ -77,30 +77,20 @@ test() ->
     %% Setup lists of advertisements and lists of contracts for
     %% advertisements.
 
-    %% Generate a series of unique identifiers.
-    RovioAdIds = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
-    RiotAdIds = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
-    Ids = RovioAdIds ++ RiotAdIds,
+    %% For each identifier, generate a contract.
+    {ok, Contracts} = lasp:declare(?SET),
 
     %% Generate Rovio's advertisements.
     {ok, RovioAds} = lasp:declare(?SET),
-    create_advertisements(RovioAds, RovioAdIds),
+    create_advertisements_and_contracts(RovioAds, Contracts),
 
     %% Generate Riot's advertisements.
     {ok, RiotAds} = lasp:declare(?SET),
-    create_advertisements(RiotAds, RiotAdIds),
+    create_advertisements_and_contracts(RiotAds, Contracts),
 
     %% Union ads.
     {ok, Ads} = lasp:declare(?SET),
     ok = lasp:union(RovioAds, RiotAds, Ads),
-
-    %% For each identifier, generate a contract.
-    {ok, Contracts} = lasp:declare(?SET),
-    lists:map(fun(Id) ->
-                {ok, _} = lasp:update(Contracts,
-                                      {add, #contract{id=Id}},
-                                      undefined)
-                end, Ids),
 
     %% Compute the Cartesian product of both ads and contracts.
     {ok, AdsContracts} = lasp:declare(?SET),
@@ -227,7 +217,14 @@ summarize(AdsWithContracts) ->
 
     ok.
 
-create_advertisements(Ads, AdIds) ->
+%% @doc Generate advertisements and advertisement contracts.
+create_advertisements_and_contracts(Ads, Contracts) ->
+    AdIds = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
+    lists:map(fun(Id) ->
+                {ok, _} = lasp:update(Contracts,
+                                      {add, #contract{id=Id}},
+                                      undefined)
+                end, AdIds),
     lists:map(fun(Id) ->
                 %% Generate a G-Counter.
                 {ok, CounterId} = lasp:declare(?COUNTER),

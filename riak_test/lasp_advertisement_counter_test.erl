@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
+%% Copyright (c) 2015 Christopher S. Meiklejohn.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -21,10 +21,10 @@
 %% @doc Advertisement counter.
 
 -module(lasp_advertisement_counter_test).
--author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
+-author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -export([test/0,
-         client/4,
+         client/5,
          server/2]).
 
 -ifdef(TEST).
@@ -130,7 +130,7 @@ test() ->
 %%      disable the advertisement.
 server({#ad{counter=Counter}=Ad, _}, Ads) ->
     %% Blocking threshold read for 5 advertisement impressions.
-    {ok, _} = lasp:read(Counter, ?MAX_IMPRESSIONS),
+    {ok, _} = lasp:read(Counter, {value, ?MAX_IMPRESSIONS}),
 
     %% Remove the advertisement.
     {ok, _} = lasp:update(Ads, {remove, Ad}, Ad),
@@ -138,36 +138,32 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
     lager:info("Removing ad: ~p", [Ad]).
 
 %% @doc Client process; standard recurisve looping server.
-client(Runner, Id, AdsWithContracts, PreviousValue) ->
+client(Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0) ->
     receive
         terminate ->
             ok;
         view_ad ->
-            %% Get current ad list.
-            {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, PreviousValue),
-            AdList = ?SET:value(AdList0),
-
-            case length(AdList) of
+            Counters = case dict:size(Counters0) of
                 0 ->
-                    Runner ! view_ad,
-
-                    %% No advertisements left to display; ignore
-                    %% message.
-                    client(Runner, Id, AdsWithContracts, AdList0);
+                    Counters0;
                 _ ->
                     %% Select a random advertisement from the list of
                     %% active advertisements.
-                    {#ad{counter=Ad}, _} = lists:nth(
-                            random:uniform(length(AdList)), AdList),
+                    Random = random:uniform(dict:size(Counters0)),
+                    {Ad, Counter0} = lists:nth(Random, dict:to_list(Counters0)),
+                    {ok, Counter} = ?COUNTER:update(increment, Id, Counter0),
+                    lager:info("Updating ~p: ~p => ~p", [Ad, Counter0, Counter]),
+                    dict:store(Ad, Counter, Counters0)
+            end,
 
-                    %% Increment it.
-                    {ok, _} = lasp:update(Ad, increment, Id),
+            %% Notify the harness that an event has been processed.
+            Runner ! view_ad,
 
-                    %% Notify the harness that an event has been processed.
-                    Runner ! view_ad,
-
-                    client(Runner, Id, AdsWithContracts, AdList0)
-            end
+            client(Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters)
+    after
+        10 ->
+            {ok, AdsWithContracts, Counters} = synchronize(AdsWithContractsId, AdsWithContracts0, Counters0),
+            client(Runner, Id, AdsWithContractsId, AdsWithContracts, Counters)
     end.
 
 %% @doc Terminate any running clients gracefully issuing final
@@ -176,12 +172,14 @@ terminate(ClientList) ->
     TerminateFun = fun(Pid) -> Pid ! terminate end,
     lists:map(TerminateFun, ClientList).
 
-
 %% @doc Simulate clients viewing advertisements.
 simulate(_Runner, ClientList) ->
     %% Start the simulation.
     Viewer = fun(_) ->
             Random = random:uniform(length(ClientList)),
+
+            timer:sleep(5),
+
             Pid = lists:nth(Random, ClientList),
             Pid ! view_ad
     end,
@@ -211,7 +209,7 @@ clients(Runner, AdsWithContracts) ->
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
     lists:map(fun(Id) ->
-                spawn_link(?MODULE, client, [Runner, Id, AdsWithContracts, undefined])
+                spawn_link(?MODULE, client, [Runner, Id, AdsWithContracts, undefined, dict:new()])
                 end, lists:seq(1, ?NUM_CLIENTS)).
 
 %% @doc Summarize results.
@@ -220,10 +218,7 @@ summarize(Ads) ->
     %% execution of the test.
     lager:info("Ads is: ~p", [Ads]),
     Overcounts = lists:map(fun(#ad{counter=CounterId}) ->
-                lager:info("Waiting for advertisement ~p to reach ~p impressions...",
-                           [CounterId, ?MAX_IMPRESSIONS]),
-                {ok, {_, _, _, V0}} = lasp:read(CounterId, ?MAX_IMPRESSIONS),
-                V = ?COUNTER:value(V0),
+                {ok, V} = lasp:query(CounterId),
                 lager:info("Advertisement ~p reached max impressions: ~p with ~p....",
                            [CounterId, ?MAX_IMPRESSIONS, V]),
                 V - ?MAX_IMPRESSIONS
@@ -272,3 +267,51 @@ wait_for_events(Count, NumEvents) ->
                     wait_for_events(Count + 1, NumEvents)
             end
     end.
+
+%% @doc Periodically synchronize state with the server.
+synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
+    %% Get latest list of advertisements from the server.
+    {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
+    AdList = ?SET:value(AdsWithContracts),
+    Identifiers = [Id || {#ad{counter=Id},_} <- AdList],
+
+    lager:info("AdsWithContracts: ~p", [AdsWithContracts]),
+
+    %% Refresh our dictionary with any new values from the server.
+    %%
+    %% 1.) Given the list of new values from the server...
+    %% 2.) ...fill in any holes in our dictionary accordingly.
+    %%
+    RefreshFun = fun({#ad{counter=Ad}, _}, Acc) ->
+                      case dict:is_key(Ad, Acc) of
+                          false ->
+                              {ok, {_, _, _, Counter}} = lasp:read(Ad, undefined),
+                              dict:store(Ad, Counter, Acc);
+                          true ->
+                              Acc
+                      end
+              end,
+    Counters = lists:foldl(RefreshFun, Counters0, AdList),
+
+    %% Bind our latest values with the server process.
+    %%
+    %% 1.) Send our dictionary of values to server.
+    %% 2.) Server computes a bind operation with the incoming value.
+    %% 3.) Server returns the merged value to the client.
+    %%
+    SyncFun = fun(Ad, Counter0, Acc) ->
+                    {ok, {_, _, _, Counter}} = lasp:bind(Ad, Counter0),
+                    % lager:info("Synchronizing counter ~p: ~p => ~p", [Ad, Counter0, Counter]),
+                    case lists:member(Ad, Identifiers) of
+                        true ->
+                            dict:store(Ad, Counter, Acc);
+                        false ->
+                            Acc
+                    end
+              end,
+    Counters1 = dict:fold(SyncFun, dict:new(), Counters),
+
+    lager:info("Identifiers: ~p", [Identifiers]),
+    lager:info("Counters1: ~p", [Counters1]),
+
+    {ok, AdsWithContracts, Counters1}.

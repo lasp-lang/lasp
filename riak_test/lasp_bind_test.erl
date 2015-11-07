@@ -63,9 +63,9 @@ test() ->
 %% @doc Test single-assignment variables.
 test_ivars() ->
     %% Single-assignment variables.
-    {ok, I1} = lasp:declare(lasp_ivar),
-    {ok, I2} = lasp:declare(lasp_ivar),
-    {ok, I3} = lasp:declare(lasp_ivar),
+    {ok, {I1, _, _, _}} = lasp:declare(lasp_ivar),
+    {ok, {I2, _, _, _}} = lasp:declare(lasp_ivar),
+    {ok, {I3, _, _, _}} = lasp:declare(lasp_ivar),
 
     V1 = 1,
 
@@ -88,9 +88,9 @@ test_ivars() ->
 %% @doc Test lattice-based variables.
 test_lattice(Type) ->
     %% G-Set variables.
-    {ok, L1} = lasp:declare(Type),
-    {ok, L2} = lasp:declare(Type),
-    {ok, L3} = lasp:declare(Type),
+    {ok, {L1, _, _, _}} = lasp:declare(Type),
+    {ok, {L2, _, _, _}} = lasp:declare(Type),
+    {ok, {L3, _, _, _}} = lasp:declare(Type),
 
     %% Attempt pre, and post- dataflow variable bind operations.
     ok = lasp:bind_to(L2, L1),
@@ -132,8 +132,8 @@ test_lattice(Type) ->
             ok
     end,
 
-    {ok, L5} = lasp:declare(Type),
-    {ok, L6} = lasp:declare(Type),
+    {ok, {L5, _, _, _}} = lasp:declare(Type),
+    {ok, {L6, _, _, _}} = lasp:declare(Type),
 
     spawn_link(fun() ->
                 {ok, _} = lasp:read_any([{L5, {strict, undefined}}, {L6, {strict, undefined}}]),

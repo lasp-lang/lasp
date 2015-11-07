@@ -90,7 +90,7 @@ init() ->
     Runner = self(),
 
     %% Create a leaderboard datatype.
-    {ok, LeaderboardId} = lasp:declare({lasp_top_k_var, [2]}),
+    {ok, {LeaderboardId, _, _, _}} = lasp:declare({lasp_top_k_var, [2]}),
 
     %% Read the leaderboard's current value.
     {ok, {_, _, _, Leaderboard}} = lasp:read(LeaderboardId, undefined),

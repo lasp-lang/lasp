@@ -96,7 +96,7 @@ start() ->
     lager:info("Replica started!"),
 
     %% Create a CRDT map.
-    {ok, Map} = lasp:declare(?MAP),
+    {ok, {Map, _, _, _}} = lasp:declare(?MAP),
 
     %% Wait for messages, and process them.
     receiver(Map, 1).

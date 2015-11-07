@@ -58,11 +58,11 @@ confirm() ->
 
 test(Type) ->
     %% Create initial sets.
-    {ok, S1} = lasp:declare(Type),
-    {ok, S2} = lasp:declare(Type),
+    {ok, {S1, _, _, _}} = lasp:declare(Type),
+    {ok, {S2, _, _, _}} = lasp:declare(Type),
 
     %% Create output set.
-    {ok, S3} = lasp:declare(Type),
+    {ok, {S3, _, _, _}} = lasp:declare(Type),
 
     %% Populate initial sets.
     {ok, _} = lasp:update(S1, {add_all, [1,2,3]}, a),

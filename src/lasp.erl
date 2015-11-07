@@ -214,7 +214,6 @@ do(Function, Args) ->
     Backend = distribution_backend(),
     erlang:apply(Backend, Function, Args).
 
-%% @doc Return the currently active distribution backend.
 distribution_backend() ->
     application:get_env(?APP,
                         distribution_backend,

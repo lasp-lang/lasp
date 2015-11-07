@@ -58,13 +58,13 @@ confirm() ->
 
 test(Type) ->
     %% Create initial set.
-    {ok, S1} = lasp:declare(Type),
+    {ok, {S1, _, _, _}} = lasp:declare(Type),
 
     %% Add elements to initial set and update.
     {ok, _} = lasp:update(S1, {add_all, [1,2,3]}, a),
 
     %% Create second set.
-    {ok, S2} = lasp:declare(Type),
+    {ok, {S2, _, _, _}} = lasp:declare(Type),
 
     %% Apply map.
     ok = lasp:map(S1, fun(X) -> X * 2 end, S2),

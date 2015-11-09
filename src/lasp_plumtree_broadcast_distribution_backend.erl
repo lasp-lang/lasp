@@ -66,7 +66,7 @@
 
 %% State record.
 -record(state, {store :: store(),
-                actor :: non_neg_integer(),
+                actor :: binary(),
                 counter :: non_neg_integer()}).
 
 %% Broadcast record.

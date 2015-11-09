@@ -88,14 +88,52 @@
 
 -define(BLOCKING, fun() -> {noreply, State} end).
 
-%% Clock mutation macros.
+%% Metadata mutation macros.
+
 -define(CLOCK_INIT, fun(Metadata) ->
             VClock = riak_dt_vclock:increment(Actor, riak_dt_vclock:fresh()),
             orddict:store(clock, VClock, Metadata)
     end).
 
+-define(CLOCK_INCR, fun(Metadata) ->
+            %% Incoming request has to have a clock, given it's coming
+            %% in the broadcast path.
+            TheirClock = orddict:fetch(clock, Metadata0),
+
+            %% We may not have a clock yet, if we are first initializing
+            %% an object.
+            OurClock = case orddict:find(clock, Metadata) of
+                {ok, Clock} ->
+                    Clock;
+                _ ->
+                    riak_dt_vclock:fresh()
+            end,
+
+            %% Merge the clocks.
+            Merged = riak_dt_vclock:merge([TheirClock, OurClock]),
+
+            %% Increment the clock, so we can successfully broadcast
+            %% message.
+            VClock = riak_dt_vclock:increment(Actor, Merged),
+            orddict:store(clock, VClock, Metadata)
+    end).
+
 -define(CLOCK_MERG, fun(Metadata) ->
-            Merged = riak_dt_vclock:merge([orddict:fetch(clock, Metadata0), orddict:fetch(clock, Metadata)]),
+            %% Incoming request has to have a clock, given it's coming
+            %% in the broadcast path.
+            TheirClock = orddict:fetch(clock, Metadata0),
+
+            %% We may not have a clock yet, if we are first initializing
+            %% an object.
+            OurClock = case orddict:find(clock, Metadata) of
+                {ok, Clock} ->
+                    Clock;
+                _ ->
+                    riak_dt_vclock:fresh()
+            end,
+
+            %% Merge the clocks.
+            Merged = riak_dt_vclock:merge([TheirClock, OurClock]),
             orddict:store(clock, Merged, Metadata)
     end).
 

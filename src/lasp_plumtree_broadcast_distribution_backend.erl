@@ -466,11 +466,8 @@ broadcast({Id, Type, Metadata, Value}) ->
 
 %% @private
 local_bind(Id, Type, Metadata, Value) ->
-    lager:warning("id: ~p, type: ~p value: ~p", [Id, Type, Value]),
-
     case gen_server:call(?MODULE, {bind, Id, Metadata, Value}, infinity) of
         {error, not_found} ->
-            lager:warning("not found; declaring!"),
             {ok, _} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
             local_bind(Id, Type, Metadata, Value);
         {ok, X} ->

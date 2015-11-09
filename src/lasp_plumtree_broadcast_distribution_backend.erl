@@ -168,7 +168,9 @@ start_link(Opts) ->
 broadcast_data(#broadcast{id=Id, type=Type, clock=Clock, metadata=Metadata, value=Value}) ->
     {{Id, Clock}, {Id, Type, Metadata, Value}}.
 
-%% @todo doc
+%% @doc Perform a merge of an incoming object with an object in the
+%%      local datastore, as long as we haven't seen a more recent clock 
+%%      for the same object.
 -spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) -> boolean().
 merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
     case is_stale({Id, Clock}) of
@@ -180,7 +182,7 @@ merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
     end.
 
 %% @doc Use the clock on the object to determine if this message is
-%% stale or not.
+%%      stale or not.
 -spec is_stale({broadcast_id(), broadcast_clock()}) -> boolean().
 is_stale({Id, Clock}) ->
     gen_server:call(?MODULE, {is_stale, Id, Clock}, infinity).

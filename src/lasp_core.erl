@@ -393,13 +393,13 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
                     {Object#dv{lazy_threads=SL}, {ok, {Id, Type, Metadata, Value}}};
                 false ->
                     WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
-                    {Object#dv{waiting_threads=WT, lazy_threads=SL}, error}
+                    {Object#dv{waiting_threads=WT, lazy_threads=SL}, {error, threshold_not_met}}
             end
     end,
     case do(update, [Store, Id, Mutator]) of
         {ok, {Id, Type, Metadata, Value}} ->
             ReplyFun({Id, Type, Metadata, Value});
-        error ->
+        {error, threshold_not_met} ->
             %% Not valid for threshold; wait.
             BlockingFun();
         {error, Error} ->

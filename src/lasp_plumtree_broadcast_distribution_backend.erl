@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 Christopher Meiklejohn.  All Rights Reserved.
+%% Copyright (c) 2015 Christopher Meiklejohn.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -169,7 +169,7 @@ broadcast_data(#broadcast{id=Id, type=Type, clock=Clock, metadata=Metadata, valu
     {{Id, Clock}, {Id, Type, Metadata, Value}}.
 
 %% @doc Perform a merge of an incoming object with an object in the
-%%      local datastore, as long as we haven't seen a more recent clock 
+%%      local datastore, as long as we haven't seen a more recent clock
 %%      for the same object.
 -spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) -> boolean().
 merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
@@ -389,7 +389,11 @@ init([]) ->
     {ok, #state{actor=Actor, counter=Counter, store=Store}}.
 
 %% @private
--spec handle_call(term(), {pid(), term()}, #state{}) -> {reply, term(), #state{}}.
+-spec handle_call(term(), {pid(), term()}, #state{}) ->
+    {reply, term(), #state{}}.
+
+%% Local declare operation, which will need to initialize metadata and
+%% broadcast the value to the remote nodes.
 handle_call({declare, Id, Type}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
     Result = ?CORE:declare(Id, Type, ?CLOCK_INIT, Store),
@@ -408,10 +412,16 @@ handle_call({declare, Id, IncomingMetadata, Type}, _From,
     end,
     Result = ?CORE:declare(Id, Type, ?CLOCK_MERG, Metadata0, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
+
+%% Issue a local dynamic declare operation, which should initialize
+%% metadata and result in the broadcast operation.
 handle_call({declare_dynamic, Id, Type}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
     Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
+
+%% Local query operation.
+%% Return the value of a value in the datastore to the user.
 handle_call({query, Id}, _From, #state{store=Store}=State) ->
     {ok, Value} = ?CORE:query(Id, Store),
     {reply, {ok, Value}, State};
@@ -427,9 +437,13 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 handle_call({update, Id, Operation, Actor}, _From, #state{store=Store, counter=Counter}=State) ->
     {ok, Result} = ?CORE:update(Id, Operation, Actor, Store),
     {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};
+
+%% Spawn a function.
 handle_call({thread, Module, Function, Args}, _From, #state{store=Store}=State) ->
     ok = ?CORE:thread(Module, Function, Args, Store),
     {reply, ok, State};
+
+%% Block, enforcing lazy evaluation of the provided function.
 handle_call({wait_needed, Id, Threshold}, From, #state{store=Store}=State) ->
     ReplyFun = fun(ReadThreshold) -> {reply, {ok, ReadThreshold}, State} end,
     ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
@@ -441,24 +455,42 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
                     {reply, {error, Error}, State}
                end,
     ?CORE:read(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
+
+%% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, ok, State};
+
+%% Spawn a process to compute a product.
 handle_call({product, Left, Right, Product}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?BIND, ?READ, ?READ),
     {reply, ok, State};
+
+%% Spawn a process to compute the intersection.
 handle_call({intersection, Left, Right, Intersection}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:intersection(Left, Right, Intersection, Store, ?BIND, ?READ, ?READ),
     {reply, ok, State};
+
+%% Spawn a process to compute the union.
 handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?BIND, ?READ, ?READ),
     {reply, ok, State};
+
+%% Spawn a process to perform a map.
 handle_call({map, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, ok, State};
+
+%% Spawn a process to perform a fold.
 handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:fold(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, ok, State};
+
+%% Graft part of the tree back.  If the value that's being asked for is
+%% stale: that is, it has an earlier vector clock than one that's stored
+%% locally, ignore and return the stale marker, preventing tree repair
+%% given we've shown we already have some connection to retrieve data
+%% for that node.  If not, return the the value and repair the tree.
 handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
     Result = case get(Id, Store) of
         {ok, {Id, Type, Metadata, Value}} ->
@@ -473,6 +505,9 @@ handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
             {error, Error}
     end,
     {reply, Result, State};
+
+%% Given a message identifer, return stale if we've seen an object with
+%% a vector clock that's greater than the provided one.
 handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
     Result = case get(Id, Store) of
         {ok, {_, _, Metadata, _}} ->
@@ -482,6 +517,8 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
             false
     end,
     {reply, Result, State};
+
+%% @private
 handle_call(Msg, _From, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.

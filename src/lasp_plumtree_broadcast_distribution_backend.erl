@@ -31,6 +31,7 @@
 
 %% lasp_distribution_backend callbacks
 -export([declare/2,
+         declare_dynamic/2,
          query/1,
          update/3,
          bind/2,
@@ -144,17 +145,13 @@ merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
 %% stale or not.
 -spec is_stale({broadcast_id(), broadcast_clock()}) -> boolean().
 is_stale({Id, Clock}) ->
-    Result = gen_server:call(?MODULE, {is_stale, Id, Clock}, infinity),
-    lager:info("id: ~p, clock: ~p, result: ~p", [Id, Clock, Result]),
-    Result.
+    gen_server:call(?MODULE, {is_stale, Id, Clock}, infinity).
 
 %% @doc Given a message identifier and a clock, return a given message.
 -spec graft({broadcast_id(), broadcast_clock()}) ->
     stale | {ok, broadcast_payload()} | {error, term()}.
 graft({Id, Clock}) ->
-    Result = gen_server:call(?MODULE, {graft, Id, Clock}, infinity),
-    lager:info("id: ~p, clock: ~p, result: ~p", [Id, Clock, Result]),
-    Result.
+    gen_server:call(?MODULE, {graft, Id, Clock}, infinity).
 
 %% @todo doc
 %% @todo spec
@@ -173,8 +170,20 @@ exchange(Peer) ->
 %%
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
-    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
-    {ok, {Id, Type, Metadata, Value}}.
+    {ok, Variable} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
+    broadcast(Variable),
+    {ok, Variable}.
+
+%% @doc Declare a new dynamic variable of a given type.
+%%
+%%      Valid values for `Type' are any of lattices supporting the
+%%      `riak_dt' behavior.  Type is declared with the provided `Id'.
+%%
+-spec declare_dynamic(id(), type()) -> {ok, var()}.
+declare_dynamic(Id, Type) ->
+    {ok, Variable} = gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity),
+    broadcast(Variable),
+    {ok, Variable}.
 
 %% @doc Read the current value of a CRDT.
 %%
@@ -203,9 +212,9 @@ update(Id, Operation, Actor) ->
 %%
 -spec bind(id(), value()) -> {ok, var()}.
 bind(Id, Value0) ->
-    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE, {bind, Id, Value0}, infinity),
-    broadcast({Id, Type, Metadata, Value}),
-    {ok, {Id, Type, Metadata, Value}}.
+    {ok, Variable} = gen_server:call(?MODULE, {bind, Id, Value0}, infinity),
+    broadcast(Variable),
+    {ok, Variable}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -341,8 +350,13 @@ init([]) ->
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) -> {reply, term(), #state{}}.
-handle_call({declare, Id, Type}, _From, #state{store=Store, actor=Actor, counter=Counter}=State) ->
+handle_call({declare, Id, Type}, _From,
+            #state{store=Store, actor=Actor, counter=Counter}=State) ->
     Result = ?CORE:declare(Id, Type, ?CLOCK_INIT, Store),
+    {reply, Result, State#state{counter=increment_counter(Counter)}};
+handle_call({declare_dynamic, Id, Type}, _From,
+            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 handle_call({query, Id}, _From, #state{store=Store}=State) ->
     {ok, Value} = ?CORE:query(Id, Store),
@@ -452,12 +466,9 @@ broadcast({Id, Type, Metadata, Value}) ->
 
 %% @private
 local_bind(Id, Type, Metadata, Value) ->
-    lager:warning("id: ~p, type: ~p value: ~p", [Id, Type, Value]),
-
     case gen_server:call(?MODULE, {bind, Id, Metadata, Value}, infinity) of
         {error, not_found} ->
-            lager:warning("not found; declaring!"),
-            {ok, {Id, _, _, _}} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
+            {ok, _} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
             local_bind(Id, Type, Metadata, Value);
         {ok, X} ->
            {ok, X}
@@ -479,7 +490,7 @@ get(Id, Store) ->
     BlockingFun = fun() ->
             {error, blocking}
     end,
-    Threshold = {strict, undefined},
+    Threshold = undefined,
     ?CORE:read(Id, Threshold, Store, self(), ReplyFun, BlockingFun).
 
 %% @private

@@ -36,6 +36,7 @@
          declare/2,
          declare/3,
          declare/4,
+         declare_dynamic/4,
          query/2,
          update/4,
          update/5,
@@ -232,6 +233,14 @@ declare(Id, Type, MetadataFun, Store) ->
             {ok, {Id, Type, Metadata, Value}}
     end.
 
+%% @doc Declare a dynamic variable in a provided by identifer.
+-spec declare_dynamic(id(), type(), function(), store()) -> {ok, var()}.
+declare_dynamic(Id, Type, MetadataFun0, Store) ->
+    MetadataFun = fun(X) ->
+                          orddict:store(dynamic, true, MetadataFun0(X))
+                  end,
+    declare(Id, Type, MetadataFun, Store).
+
 %% @doc Return the current value of a CRDT.
 %%
 -spec query(id(), store()) -> {ok, term()}.
@@ -393,13 +402,13 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
                     {Object#dv{lazy_threads=SL}, {ok, {Id, Type, Metadata, Value}}};
                 false ->
                     WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
-                    {Object#dv{waiting_threads=WT, lazy_threads=SL}, error}
+                    {Object#dv{waiting_threads=WT, lazy_threads=SL}, {error, threshold_not_met}}
             end
     end,
     case do(update, [Store, Id, Mutator]) of
         {ok, {Id, Type, Metadata, Value}} ->
             ReplyFun({Id, Type, Metadata, Value});
-        error ->
+        {error, threshold_not_met} ->
             %% Not valid for threshold; wait.
             BlockingFun();
         {error, Error} ->

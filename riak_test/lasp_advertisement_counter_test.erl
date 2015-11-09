@@ -110,26 +110,26 @@ init() ->
     Runner = self(),
 
     %% For each identifier, generate a contract.
-    {ok, Contracts} = lasp:declare(?SET),
+    {ok, {Contracts, _, _, _}} = lasp:declare(?SET),
 
     %% Generate Rovio's advertisements.
-    {ok, RovioAds} = lasp:declare(?SET),
+    {ok, {RovioAds, _, _, _}} = lasp:declare(?SET),
     RovioAdList = create_advertisements_and_contracts(RovioAds, Contracts),
 
     %% Generate Riot's advertisements.
-    {ok, RiotAds} = lasp:declare(?SET),
+    {ok, {RiotAds, _, _, _}} = lasp:declare(?SET),
     RiotAdList = create_advertisements_and_contracts(RiotAds, Contracts),
 
     %% Union ads.
-    {ok, Ads} = lasp:declare(?SET),
+    {ok, {Ads, _, _, _}} = lasp:declare(?SET),
     ok = lasp:union(RovioAds, RiotAds, Ads),
 
     %% Compute the Cartesian product of both ads and contracts.
-    {ok, AdsContracts} = lasp:declare(?SET),
+    {ok, {AdsContracts, _, _, _}} = lasp:declare(?SET),
     ok = lasp:product(Ads, Contracts, AdsContracts),
 
     %% Filter items by join on item it.
-    {ok, AdsWithContracts} = lasp:declare(?SET),
+    {ok, {AdsWithContracts, _, _, _}} = lasp:declare(?SET),
     FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
         Id1 =:= Id2
     end,
@@ -271,7 +271,7 @@ create_advertisements_and_contracts(Ads, Contracts) ->
                 end, AdIds),
     lists:map(fun(Id) ->
                 %% Generate a G-Counter.
-                {ok, CounterId} = lasp:declare(?COUNTER),
+                {ok, {CounterId, _, _, _}} = lasp:declare(?COUNTER),
 
                 Ad = #ad{id=Id, counter=CounterId},
 
@@ -328,7 +328,7 @@ synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
 %% until the advertisement should be disabled.
 servers(Ads, AdsWithContracts) ->
     %% Create a OR-set for the server list.
-    {ok, Servers} = lasp:declare(?SET),
+    {ok, {Servers, _, _, _}} = lasp:declare(?SET),
 
     %% Get the current advertisement list.
     {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),

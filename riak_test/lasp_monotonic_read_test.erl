@@ -54,7 +54,7 @@ confirm() ->
 
 test() ->
     %% Create new set-based CRDT.
-    {ok, SetId} = lasp:declare(?SET),
+    {ok, {SetId, _, _, _}} = lasp:declare(?SET),
 
     %% Determine my pid.
     Me = self(),

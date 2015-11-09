@@ -28,7 +28,7 @@
 %% Valid values for `Type' are any of lattices supporting the
 %% `riak_dt' behavior.  Type is declared with the provided `Id'.
 %%
--callback declare(id(), type()) -> {ok, id()} | error().
+-callback declare(id(), type()) -> {ok, var()} | error().
 
 %% Return the current value of a CRDT.
 %%

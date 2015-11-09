@@ -171,10 +171,10 @@ exchange(Peer) ->
 %%      Valid values for `Type' are any of lattices supporting the
 %%      `riak_dt' behavior.  Type is declared with the provided `Id'.
 %%
--spec declare(id(), type()) -> {ok, id()}.
+-spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
-    {ok, Id} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
-    {ok, Id}.
+    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
+    {ok, {Id, Type, Metadata, Value}}.
 
 %% @doc Read the current value of a CRDT.
 %%
@@ -342,8 +342,8 @@ init([]) ->
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) -> {reply, term(), #state{}}.
 handle_call({declare, Id, Type}, _From, #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    {ok, Id} = ?CORE:declare(Id, Type, ?CLOCK_INIT, Store),
-    {reply, {ok, Id}, State#state{counter=increment_counter(Counter)}};
+    Result = ?CORE:declare(Id, Type, ?CLOCK_INIT, Store),
+    {reply, Result, State#state{counter=increment_counter(Counter)}};
 handle_call({query, Id}, _From, #state{store=Store}=State) ->
     {ok, Value} = ?CORE:query(Id, Store),
     {reply, {ok, Value}, State};
@@ -457,7 +457,7 @@ local_bind(Id, Type, Metadata, Value) ->
     case gen_server:call(?MODULE, {bind, Id, Metadata, Value}, infinity) of
         {error, not_found} ->
             lager:warning("not found; declaring!"),
-            {ok, Id} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
+            {ok, {Id, _, _, _}} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
             local_bind(Id, Type, Metadata, Value);
         {ok, X} ->
            {ok, X}

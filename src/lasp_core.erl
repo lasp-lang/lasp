@@ -201,35 +201,35 @@ read_any(Reads, Store) ->
     end.
 
 %% @doc Declare a dataflow variable in a provided by identifer.
--spec declare(store()) -> {ok, id()}.
+-spec declare(store()) -> {ok, var()}.
 declare(Store) ->
     declare(lasp_ivar, Store).
 
 %% @doc Declare a dataflow variable, as a given type.
--spec declare(type(), store()) -> {ok, id()}.
+-spec declare(type(), store()) -> {ok, var()}.
 declare(Type, Store) ->
     declare(druuid:v4(), Type, Store).
 
 %% @doc Declare a dataflow variable in a provided by identifer.
--spec declare(id(), type(), store()) -> {ok, id()}.
+-spec declare(id(), type(), store()) -> {ok, var()}.
 declare(Id, Type, Store) ->
     MetadataFun = fun(X) -> X end,
     declare(Id, Type, MetadataFun, Store).
 
 %% @doc Declare a dataflow variable in a provided by identifer.
--spec declare(id(), type(), function(), store()) -> {ok, id()}.
+-spec declare(id(), type(), function(), store()) -> {ok, var()}.
 declare(Id, Type, MetadataFun, Store) ->
     case do(get, [Store, Id]) of
-        {ok, _} ->
+        {ok, #dv{value=Value, metadata=Metadata}} ->
             %% Do nothing; make declare idempotent at each replica.
-            {ok, Id};
+            {ok, {Id, Type, Metadata, Value}};
         _ ->
             Value = lasp_type:new(Type),
             Metadata = MetadataFun(orddict:new()),
             ok = do(put, [Store, Id, #dv{value=Value,
                                          type=Type,
                                          metadata=Metadata}]),
-            {ok, Id}
+            {ok, {Id, Type, Metadata, Value}}
     end.
 
 %% @doc Return the current value of a CRDT.

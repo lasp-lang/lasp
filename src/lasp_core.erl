@@ -36,6 +36,7 @@
          declare/2,
          declare/3,
          declare/4,
+         declare/5,
          declare_dynamic/4,
          query/2,
          update/4,
@@ -220,13 +221,18 @@ declare(Id, Type, Store) ->
 %% @doc Declare a dataflow variable in a provided by identifer.
 -spec declare(id(), type(), function(), store()) -> {ok, var()}.
 declare(Id, Type, MetadataFun, Store) ->
+    declare(Id, Type, MetadataFun, orddict:new(), Store).
+
+%% @doc Declare a dataflow variable in a provided by identifer.
+-spec declare(id(), type(), function(), any(), store()) -> {ok, var()}.
+declare(Id, Type, MetadataFun, MetadataNew, Store) ->
     case do(get, [Store, Id]) of
         {ok, #dv{value=Value, metadata=Metadata}} ->
             %% Do nothing; make declare idempotent at each replica.
             {ok, {Id, Type, Metadata, Value}};
         _ ->
             Value = lasp_type:new(Type),
-            Metadata = MetadataFun(orddict:new()),
+            Metadata = MetadataFun(MetadataNew),
             ok = do(put, [Store, Id, #dv{value=Value,
                                          type=Type,
                                          metadata=Metadata}]),

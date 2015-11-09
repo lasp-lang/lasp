@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 Christopher Meiklejohn.  All Rights Reserved.
+%% Copyright (c) 2015 Christopher Meiklejohn.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -31,6 +31,7 @@
 
 %% lasp_distribution_backend callbacks
 -export([declare/2,
+         declare_dynamic/2,
          query/1,
          update/3,
          bind/2,
@@ -65,7 +66,7 @@
 
 %% State record.
 -record(state, {store :: store(),
-                actor :: non_neg_integer(),
+                actor :: binary(),
                 counter :: non_neg_integer()}).
 
 %% Broadcast record.
@@ -76,6 +77,7 @@
                     value :: value()}).
 
 %% Definitions for the bind/read fun abstraction.
+
 -define(BIND, fun(_AccId, _AccValue, _Store) ->
                 ?CORE:bind(_AccId, _AccValue, _Store)
               end).
@@ -86,14 +88,35 @@
 
 -define(BLOCKING, fun() -> {noreply, State} end).
 
-%% Clock mutation macros.
+%% Metadata mutation macros.
+
 -define(CLOCK_INIT, fun(Metadata) ->
             VClock = riak_dt_vclock:increment(Actor, riak_dt_vclock:fresh()),
             orddict:store(clock, VClock, Metadata)
     end).
 
+-define(CLOCK_INCR, fun(Metadata) ->
+            Clock = orddict:fetch(clock, Metadata),
+            VClock = riak_dt_vclock:increment(Actor, Clock),
+            orddict:store(clock, VClock, Metadata)
+    end).
+
 -define(CLOCK_MERG, fun(Metadata) ->
-            Merged = riak_dt_vclock:merge([orddict:fetch(clock, Metadata0), orddict:fetch(clock, Metadata)]),
+            %% Incoming request has to have a clock, given it's coming
+            %% in the broadcast path.
+            TheirClock = orddict:fetch(clock, Metadata0),
+
+            %% We may not have a clock yet, if we are first initializing
+            %% an object.
+            OurClock = case orddict:find(clock, Metadata) of
+                {ok, Clock} ->
+                    Clock;
+                _ ->
+                    riak_dt_vclock:fresh()
+            end,
+
+            %% Merge the clocks.
+            Merged = riak_dt_vclock:merge([TheirClock, OurClock]),
             orddict:store(clock, Merged, Metadata)
     end).
 
@@ -123,15 +146,16 @@ start_link(Opts) ->
 -type broadcast_payload() :: {id(), type(), metadata(), value()}.
 
 %% @doc Returns from the broadcast message the identifier and the payload.
--spec broadcast_data(broadcast_message()) -> {{broadcast_id(), broadcast_clock()}, broadcast_payload()}.
+-spec broadcast_data(broadcast_message()) ->
+    {{broadcast_id(), broadcast_clock()}, broadcast_payload()}.
 broadcast_data(#broadcast{id=Id, type=Type, clock=Clock, metadata=Metadata, value=Value}) ->
     {{Id, Clock}, {Id, Type, Metadata, Value}}.
 
-%% @todo doc
+%% @doc Perform a merge of an incoming object with an object in the
+%%      local datastore, as long as we haven't seen a more recent clock
+%%      for the same object.
 -spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) -> boolean().
 merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
-    lager:info("id: ~p, clock: ~p", [Id, Clock]),
-
     case is_stale({Id, Clock}) of
         true ->
             false;
@@ -141,20 +165,16 @@ merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
     end.
 
 %% @doc Use the clock on the object to determine if this message is
-%% stale or not.
+%%      stale or not.
 -spec is_stale({broadcast_id(), broadcast_clock()}) -> boolean().
 is_stale({Id, Clock}) ->
-    Result = gen_server:call(?MODULE, {is_stale, Id, Clock}, infinity),
-    lager:info("id: ~p, clock: ~p, result: ~p", [Id, Clock, Result]),
-    Result.
+    gen_server:call(?MODULE, {is_stale, Id, Clock}, infinity).
 
 %% @doc Given a message identifier and a clock, return a given message.
 -spec graft({broadcast_id(), broadcast_clock()}) ->
     stale | {ok, broadcast_payload()} | {error, term()}.
 graft({Id, Clock}) ->
-    Result = gen_server:call(?MODULE, {graft, Id, Clock}, infinity),
-    lager:info("id: ~p, clock: ~p, result: ~p", [Id, Clock, Result]),
-    Result.
+    gen_server:call(?MODULE, {graft, Id, Clock}, infinity).
 
 %% @todo doc
 %% @todo spec
@@ -173,8 +193,20 @@ exchange(Peer) ->
 %%
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
-    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
-    {ok, {Id, Type, Metadata, Value}}.
+    {ok, Variable} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
+    broadcast(Variable),
+    {ok, Variable}.
+
+%% @doc Declare a new dynamic variable of a given type.
+%%
+%%      Valid values for `Type' are any of lattices supporting the
+%%      `riak_dt' behavior.  Type is declared with the provided `Id'.
+%%
+-spec declare_dynamic(id(), type()) -> {ok, var()}.
+declare_dynamic(Id, Type) ->
+    {ok, Variable} = gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity),
+    broadcast(Variable),
+    {ok, Variable}.
 
 %% @doc Read the current value of a CRDT.
 %%
@@ -204,7 +236,13 @@ update(Id, Operation, Actor) ->
 -spec bind(id(), value()) -> {ok, var()}.
 bind(Id, Value0) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE, {bind, Id, Value0}, infinity),
-    broadcast({Id, Type, Metadata, Value}),
+    case orddict:find(dynamic, Metadata) of
+        {ok, true} ->
+            %% Ignore: this is a dynamic variable.
+            ok;
+        _ ->
+            broadcast({Id, Type, Metadata, Value})
+    end,
     {ok, {Id, Type, Metadata, Value}}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
@@ -325,7 +363,7 @@ wait_needed(Id, Threshold) ->
 %% @private
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
-    Actor = time_compat:unique_integer([positive, monotonic]),
+    Actor = gen_actor(),
     Counter = 0,
     Identifier = node(),
     {ok, Store} = case ?CORE:start(Identifier) of
@@ -340,57 +378,127 @@ init([]) ->
     {ok, #state{actor=Actor, counter=Counter, store=Store}}.
 
 %% @private
--spec handle_call(term(), {pid(), term()}, #state{}) -> {reply, term(), #state{}}.
-handle_call({declare, Id, Type}, _From, #state{store=Store, actor=Actor, counter=Counter}=State) ->
+-spec handle_call(term(), {pid(), term()}, #state{}) ->
+    {reply, term(), #state{}}.
+
+%% Local declare operation, which will need to initialize metadata and
+%% broadcast the value to the remote nodes.
+handle_call({declare, Id, Type}, _From,
+            #state{store=Store, actor=Actor, counter=Counter}=State) ->
     Result = ?CORE:declare(Id, Type, ?CLOCK_INIT, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
+
+%% Incoming bind request, where we do not have information about the
+%% variable yet.  In this case, take the remote metadata, if we don't
+%% have local metadata.
+handle_call({declare, Id, IncomingMetadata, Type}, _From,
+            #state{store=Store, counter=Counter}=State) ->
+    Metadata0 = case get(Id, Store) of
+        {ok, {_, _, Metadata, _}} ->
+            Metadata;
+        {error, _Error} ->
+            IncomingMetadata
+    end,
+    Result = ?CORE:declare(Id, Type, ?CLOCK_MERG, Metadata0, Store),
+    {reply, Result, State#state{counter=increment_counter(Counter)}};
+
+%% Issue a local dynamic declare operation, which should initialize
+%% metadata and result in the broadcast operation.
+handle_call({declare_dynamic, Id, Type}, _From,
+            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT, Store),
+    {reply, Result, State#state{counter=increment_counter(Counter)}};
+
+%% Local query operation.
+%% Return the value of a value in the datastore to the user.
 handle_call({query, Id}, _From, #state{store=Store}=State) ->
     {ok, Value} = ?CORE:query(Id, Store),
     {reply, {ok, Value}, State};
-handle_call({bind, Id, Value}, _From, #state{store=Store, counter=Counter}=State) ->
-    Result = ?CORE:bind(Id, Value, Store),
+
+%% Issue a local bind, which should increment the local clock and
+%% broadcast the result.
+handle_call({bind, Id, Value}, _From,
+            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    Result = ?CORE:bind(Id, Value, ?CLOCK_INCR, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
-handle_call({bind, Id, Metadata0, Value}, _From, #state{store=Store, counter=Counter}=State) ->
+
+%% Incoming bind operation; merge incoming clock with the remote clock.
+%%
+%% Note: we don't need to rebroadcast, because if the value resulting
+%% from the merge changes and we issue re-bind, it should trigger the
+%% clock to be incremented again and a subsequent broadcast.  However,
+%% this could change if the other module is later refactored.
+handle_call({bind, Id, Metadata0, Value}, _From,
+            #state{store=Store, counter=Counter}=State) ->
     Result = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
+
+%% Bind two variables together.
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?BIND, ?READ),
     {reply, ok, State};
-handle_call({update, Id, Operation, Actor}, _From, #state{store=Store, counter=Counter}=State) ->
-    {ok, Result} = ?CORE:update(Id, Operation, Actor, Store),
+
+%% Perform an update, and ensure that we bump the logical clock as we
+%% perform the update.
+handle_call({update, Id, Operation, Actor}, _From,
+            #state{store=Store, counter=Counter}=State) ->
+    {ok, Result} = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR, Store),
     {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};
+
+%% Spawn a function.
 handle_call({thread, Module, Function, Args}, _From, #state{store=Store}=State) ->
     ok = ?CORE:thread(Module, Function, Args, Store),
     {reply, ok, State};
+
+%% Block, enforcing lazy evaluation of the provided function.
 handle_call({wait_needed, Id, Threshold}, From, #state{store=Store}=State) ->
     ReplyFun = fun(ReadThreshold) -> {reply, {ok, ReadThreshold}, State} end,
     ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
+
+%% Attempt to read a value.
 handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
-    %% @todo Normalize this ReplyFun in the future.
     ReplyFun = fun({_Id, Type, Metadata, Value}) ->
                     {reply, {ok, {_Id, Type, Metadata, Value}}, State};
                   ({error, Error}) ->
                     {reply, {error, Error}, State}
                end,
     ?CORE:read(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
+
+%% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, ok, State};
+
+%% Spawn a process to compute a product.
 handle_call({product, Left, Right, Product}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?BIND, ?READ, ?READ),
     {reply, ok, State};
+
+%% Spawn a process to compute the intersection.
 handle_call({intersection, Left, Right, Intersection}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:intersection(Left, Right, Intersection, Store, ?BIND, ?READ, ?READ),
     {reply, ok, State};
+
+%% Spawn a process to compute the union.
 handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?BIND, ?READ, ?READ),
     {reply, ok, State};
+
+%% Spawn a process to perform a map.
 handle_call({map, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, ok, State};
+
+%% Spawn a process to perform a fold.
 handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:fold(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, ok, State};
+
+%% Graft part of the tree back.  If the value that's being asked for is
+%% stale: that is, it has an earlier vector clock than one that's stored
+%% locally, ignore and return the stale marker, preventing tree repair
+%% given we've shown we already have some connection to retrieve data
+%% for that node.  If not, return the the value and repair the tree.
 handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
     Result = case get(Id, Store) of
         {ok, {Id, Type, Metadata, Value}} ->
@@ -405,6 +513,9 @@ handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
             {error, Error}
     end,
     {reply, Result, State};
+
+%% Given a message identifer, return stale if we've seen an object with
+%% a vector clock that's greater than the provided one.
 handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
     Result = case get(Id, Store) of
         {ok, {_, _, Metadata, _}} ->
@@ -414,6 +525,8 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
             false
     end,
     {reply, Result, State};
+
+%% @private
 handle_call(Msg, _From, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
@@ -452,12 +565,9 @@ broadcast({Id, Type, Metadata, Value}) ->
 
 %% @private
 local_bind(Id, Type, Metadata, Value) ->
-    lager:warning("id: ~p, type: ~p value: ~p", [Id, Type, Value]),
-
     case gen_server:call(?MODULE, {bind, Id, Metadata, Value}, infinity) of
         {error, not_found} ->
-            lager:warning("not found; declaring!"),
-            {ok, {Id, _, _, _}} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
+            {ok, _} = gen_server:call(?MODULE, {declare, Id, Metadata, Type}, infinity),
             local_bind(Id, Type, Metadata, Value);
         {ok, X} ->
            {ok, X}
@@ -479,9 +589,17 @@ get(Id, Store) ->
     BlockingFun = fun() ->
             {error, blocking}
     end,
-    Threshold = {strict, undefined},
+    Threshold = undefined,
     ?CORE:read(Id, Threshold, Store, self(), ReplyFun, BlockingFun).
 
 %% @private
 increment_counter(Counter) ->
     Counter + 1.
+
+%% @private
+gen_actor() ->
+    Node = atom_to_list(node()),
+    Unique = time_compat:unique_integer([monotonic, positive]),
+    TS = integer_to_list(Unique),
+    Term = Node ++ TS,
+    crypto:hash(sha, Term).

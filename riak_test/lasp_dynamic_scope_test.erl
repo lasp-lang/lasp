@@ -54,18 +54,24 @@ confirm() ->
 -define(ID, <<"myidentifier">>).
 
 test([Node1, Node2]) ->
+    %% Setup a dynamic variable.
     {ok, {Id, _, _, Value}} = rpc:call(Node1, lasp, declare_dynamic, [?ID, lasp_ivar]),
+
+    %% Now, the following action should be idempotent.
     {ok, {Id, _, _, Value}} = rpc:call(Node2, lasp, declare_dynamic, [?ID, lasp_ivar]),
 
+    %% Bind node 1's name to the value on node 1: this should not
+    %% trigger a broadcast message because the variable is dynamic.
     {ok, {Id, _, _, Node1}} = rpc:call(Node1, lasp, bind, [?ID, Node1]),
+
+    %% Bind node 1's name to the value on node 1: this should not
+    %% trigger a broadcast message because the variable is dynamic.
     {ok, {Id, _, _, Node2}} = rpc:call(Node2, lasp, bind, [?ID, Node2]),
 
+    %% Verify variable has the correct value.
     {ok, Node1} = rpc:call(Node1, lasp, query, [?ID]),
-    {ok, Node2} = rpc:call(Node2, lasp, query, [?ID]),
 
-    timer:sleep(1000),
-
-    {ok, Node1} = rpc:call(Node1, lasp, query, [?ID]),
+    %% Verify variable has the correct value.
     {ok, Node2} = rpc:call(Node2, lasp, query, [?ID]),
 
     ok.

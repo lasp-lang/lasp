@@ -132,8 +132,6 @@ broadcast_data(#broadcast{id=Id, type=Type, clock=Clock, metadata=Metadata, valu
 %% @todo doc
 -spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) -> boolean().
 merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
-    lager:info("id: ~p, clock: ~p", [Id, Clock]),
-
     case is_stale({Id, Clock}) of
         true ->
             false;

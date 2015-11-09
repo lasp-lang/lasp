@@ -124,7 +124,8 @@ start_link(Opts) ->
 -type broadcast_payload() :: {id(), type(), metadata(), value()}.
 
 %% @doc Returns from the broadcast message the identifier and the payload.
--spec broadcast_data(broadcast_message()) -> {{broadcast_id(), broadcast_clock()}, broadcast_payload()}.
+-spec broadcast_data(broadcast_message()) ->
+    {{broadcast_id(), broadcast_clock()}, broadcast_payload()}.
 broadcast_data(#broadcast{id=Id, type=Type, clock=Clock, metadata=Metadata, value=Value}) ->
     {{Id, Clock}, {Id, Type, Metadata, Value}}.
 

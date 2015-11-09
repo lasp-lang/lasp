@@ -170,6 +170,7 @@ exchange(Peer) ->
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
+    broadcast({Id, Type, Metadata, Value}),
     {ok, {Id, Type, Metadata, Value}}.
 
 %% @doc Read the current value of a CRDT.

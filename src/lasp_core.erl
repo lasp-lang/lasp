@@ -36,6 +36,7 @@
          declare/2,
          declare/3,
          declare/4,
+         declare_dynamic/4,
          query/2,
          update/4,
          update/5,
@@ -231,6 +232,14 @@ declare(Id, Type, MetadataFun, Store) ->
                                          metadata=Metadata}]),
             {ok, {Id, Type, Metadata, Value}}
     end.
+
+%% @doc Declare a dynamic variable in a provided by identifer.
+-spec declare_dynamic(id(), type(), function(), store()) -> {ok, var()}.
+declare_dynamic(Id, Type, MetadataFun0, Store) ->
+    MetadataFun = fun(X) ->
+                          orddict:store(dynamic, true, MetadataFun0(X))
+                  end,
+    declare(Id, Type, MetadataFun, Store).
 
 %% @doc Return the current value of a CRDT.
 %%

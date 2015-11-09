@@ -19,14 +19,17 @@
 %% -------------------------------------------------------------------
 
 -module(lasp).
+-author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -include("lasp.hrl").
 
 -export([bind/4,
-         declare/1]).
+         declare/1,
+         declare_dynamic/1]).
 
 -export([query/1,
          declare/2,
+         declare_dynamic/2,
          update/3,
          bind/2,
          bind_to/2,
@@ -60,6 +63,24 @@ query(Id) ->
 -spec declare(type()) -> {ok, id()} | {error, timeout}.
 declare(Type) ->
     declare(druuid:v4(), Type).
+
+%% @doc Declare a new dynamic variable of a given type.
+%%
+%%      Valid values for `Type' are any of lattices supporting the
+%%      `riak_dt' behavior.
+%%
+-spec declare_dynamic(type()) -> {ok, id()} | {error, timeout}.
+declare_dynamic(Type) ->
+    declare_dynamic(druuid:v4(), Type).
+
+%% @doc Declare a new dynamic variable of a given type and identifier.
+%%
+%%      Valid values for `Type' are any of lattices supporting the
+%%      `riak_dt' behavior.
+%%
+-spec declare_dynamic(id(), type()) -> {ok, id()} | {error, timeout}.
+declare_dynamic(Id, Type) ->
+    do(declare_dynamic, [Id, Type]).
 
 %% @doc Bind a dataflow variable to the result of a function call.
 %%

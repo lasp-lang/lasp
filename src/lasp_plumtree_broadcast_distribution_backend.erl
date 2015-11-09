@@ -31,6 +31,7 @@
 
 %% lasp_distribution_backend callbacks
 -export([declare/2,
+         declare_dynamic/2,
          query/1,
          update/3,
          bind/2,
@@ -169,9 +170,20 @@ exchange(Peer) ->
 %%
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
-    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
-    broadcast({Id, Type, Metadata, Value}),
-    {ok, {Id, Type, Metadata, Value}}.
+    {ok, Variable} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
+    broadcast(Variable),
+    {ok, Variable}.
+
+%% @doc Declare a new dynamic variable of a given type.
+%%
+%%      Valid values for `Type' are any of lattices supporting the
+%%      `riak_dt' behavior.  Type is declared with the provided `Id'.
+%%
+-spec declare_dynamic(id(), type()) -> {ok, var()}.
+declare_dynamic(Id, Type) ->
+    {ok, Variable} = gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity),
+    broadcast(Variable),
+    {ok, Variable}.
 
 %% @doc Read the current value of a CRDT.
 %%
@@ -200,9 +212,9 @@ update(Id, Operation, Actor) ->
 %%
 -spec bind(id(), value()) -> {ok, var()}.
 bind(Id, Value0) ->
-    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE, {bind, Id, Value0}, infinity),
-    broadcast({Id, Type, Metadata, Value}),
-    {ok, {Id, Type, Metadata, Value}}.
+    {ok, Variable} = gen_server:call(?MODULE, {bind, Id, Value0}, infinity),
+    broadcast(Variable),
+    {ok, Variable}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -338,8 +350,13 @@ init([]) ->
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) -> {reply, term(), #state{}}.
-handle_call({declare, Id, Type}, _From, #state{store=Store, actor=Actor, counter=Counter}=State) ->
+handle_call({declare, Id, Type}, _From,
+            #state{store=Store, actor=Actor, counter=Counter}=State) ->
     Result = ?CORE:declare(Id, Type, ?CLOCK_INIT, Store),
+    {reply, Result, State#state{counter=increment_counter(Counter)}};
+handle_call({declare_dynamic, Id, Type}, _From,
+            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 handle_call({query, Id}, _From, #state{store=Store}=State) ->
     {ok, Value} = ?CORE:query(Id, Store),
@@ -454,7 +471,7 @@ local_bind(Id, Type, Metadata, Value) ->
     case gen_server:call(?MODULE, {bind, Id, Metadata, Value}, infinity) of
         {error, not_found} ->
             lager:warning("not found; declaring!"),
-            {ok, {Id, _, _, _}} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
+            {ok, _} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
             local_bind(Id, Type, Metadata, Value);
         {ok, X} ->
            {ok, X}

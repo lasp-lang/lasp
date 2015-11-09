@@ -479,7 +479,7 @@ get(Id, Store) ->
     BlockingFun = fun() ->
             {error, blocking}
     end,
-    Threshold = {strict, undefined},
+    Threshold = undefined,
     ?CORE:read(Id, Threshold, Store, self(), ReplyFun, BlockingFun).
 
 %% @private

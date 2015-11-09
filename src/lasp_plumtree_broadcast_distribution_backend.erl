@@ -392,6 +392,20 @@ handle_call({declare, Id, Type}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
     Result = ?CORE:declare(Id, Type, ?CLOCK_INIT, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
+
+%% Incoming bind request, where we do not have information about the
+%% variable yet.  In this case, take the remote metadata, if we don't
+%% have local metadata.
+handle_call({declare, Id, IncomingMetadata, Type}, _From,
+            #state{store=Store, counter=Counter}=State) ->
+    Metadata0 = case get(Id, Store) of
+        {ok, {_, _, Metadata, _}} ->
+            Metadata;
+        {error, _Error} ->
+            IncomingMetadata
+    end,
+    Result = ?CORE:declare(Id, Type, ?CLOCK_MERG, Metadata0, Store),
+    {reply, Result, State#state{counter=increment_counter(Counter)}};
 handle_call({declare_dynamic, Id, Type}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
     Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT, Store),
@@ -506,7 +520,7 @@ broadcast({Id, Type, Metadata, Value}) ->
 local_bind(Id, Type, Metadata, Value) ->
     case gen_server:call(?MODULE, {bind, Id, Metadata, Value}, infinity) of
         {error, not_found} ->
-            {ok, _} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
+            {ok, _} = gen_server:call(?MODULE, {declare, Id, Metadata, Type}, infinity),
             local_bind(Id, Type, Metadata, Value);
         {ok, X} ->
            {ok, X}

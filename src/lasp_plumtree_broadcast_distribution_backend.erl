@@ -77,6 +77,7 @@
                     value :: value()}).
 
 %% Definitions for the bind/read fun abstraction.
+
 -define(BIND, fun(_AccId, _AccValue, _Store) ->
                 ?CORE:bind(_AccId, _AccValue, _Store)
               end).

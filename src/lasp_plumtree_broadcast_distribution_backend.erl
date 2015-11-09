@@ -96,25 +96,8 @@
     end).
 
 -define(CLOCK_INCR, fun(Metadata) ->
-            %% Incoming request has to have a clock, given it's coming
-            %% in the broadcast path.
-            TheirClock = orddict:fetch(clock, Metadata0),
-
-            %% We may not have a clock yet, if we are first initializing
-            %% an object.
-            OurClock = case orddict:find(clock, Metadata) of
-                {ok, Clock} ->
-                    Clock;
-                _ ->
-                    riak_dt_vclock:fresh()
-            end,
-
-            %% Merge the clocks.
-            Merged = riak_dt_vclock:merge([TheirClock, OurClock]),
-
-            %% Increment the clock, so we can successfully broadcast
-            %% message.
-            VClock = riak_dt_vclock:increment(Actor, Merged),
+            Clock = orddict:fetch(clock, Metadata),
+            VClock = riak_dt_vclock:increment(Actor, Clock),
             orddict:store(clock, VClock, Metadata)
     end).
 
@@ -252,9 +235,15 @@ update(Id, Operation, Actor) ->
 %%
 -spec bind(id(), value()) -> {ok, var()}.
 bind(Id, Value0) ->
-    {ok, Variable} = gen_server:call(?MODULE, {bind, Id, Value0}, infinity),
-    broadcast(Variable),
-    {ok, Variable}.
+    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE, {bind, Id, Value0}, infinity),
+    case orddict:find(dynamic, Metadata) of
+        {ok, true} ->
+            %% Ignore: this is a dynamic variable.
+            ok;
+        _ ->
+            broadcast({Id, Type, Metadata, Value})
+    end,
+    {ok, {Id, Type, Metadata, Value}}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -425,17 +414,35 @@ handle_call({declare_dynamic, Id, Type}, _From,
 handle_call({query, Id}, _From, #state{store=Store}=State) ->
     {ok, Value} = ?CORE:query(Id, Store),
     {reply, {ok, Value}, State};
-handle_call({bind, Id, Value}, _From, #state{store=Store, counter=Counter}=State) ->
-    Result = ?CORE:bind(Id, Value, Store),
+
+%% Issue a local bind, which should increment the local clock and
+%% broadcast the result.
+handle_call({bind, Id, Value}, _From,
+            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    Result = ?CORE:bind(Id, Value, ?CLOCK_INCR, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
-handle_call({bind, Id, Metadata0, Value}, _From, #state{store=Store, counter=Counter}=State) ->
+
+%% Incoming bind operation; merge incoming clock with the remote clock.
+%%
+%% Note: we don't need to rebroadcast, because if the value resulting
+%% from the merge changes and we issue re-bind, it should trigger the
+%% clock to be incremented again and a subsequent broadcast.  However,
+%% this could change if the other module is later refactored.
+handle_call({bind, Id, Metadata0, Value}, _From,
+            #state{store=Store, counter=Counter}=State) ->
     Result = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
+
+%% Bind two variables together.
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?BIND, ?READ),
     {reply, ok, State};
-handle_call({update, Id, Operation, Actor}, _From, #state{store=Store, counter=Counter}=State) ->
-    {ok, Result} = ?CORE:update(Id, Operation, Actor, Store),
+
+%% Perform an update, and ensure that we bump the logical clock as we
+%% perform the update.
+handle_call({update, Id, Operation, Actor}, _From,
+            #state{store=Store, counter=Counter}=State) ->
+    {ok, Result} = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR, Store),
     {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};
 
 %% Spawn a function.
@@ -447,8 +454,9 @@ handle_call({thread, Module, Function, Args}, _From, #state{store=Store}=State) 
 handle_call({wait_needed, Id, Threshold}, From, #state{store=Store}=State) ->
     ReplyFun = fun(ReadThreshold) -> {reply, {ok, ReadThreshold}, State} end,
     ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
+
+%% Attempt to read a value.
 handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
-    %% @todo Normalize this ReplyFun in the future.
     ReplyFun = fun({_Id, Type, Metadata, Value}) ->
                     {reply, {ok, {_Id, Type, Metadata, Value}}, State};
                   ({error, Error}) ->

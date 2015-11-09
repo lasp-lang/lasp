@@ -32,7 +32,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 confirm() ->
-    [Nodes] = lasp_test_helpers:build_clusters([2]),
+    [Nodes] = lasp_test_helpers:build_clusters([3]),
     lager:info("Nodes: ~p", [Nodes]),
     Node = hd(Nodes),
 
@@ -53,7 +53,12 @@ confirm() ->
 
 -define(ID, <<"myidentifier">>).
 
-test([Node1, Node2]) ->
+test(Nodes) ->
+    test_ivar_declare(Nodes),
+    test_ivar_update(Nodes),
+    ok.
+
+test_ivar_declare([Node1, Node2, _Node3]) ->
     %% Setup a dynamic variable.
     {ok, {Id, _, _, Value}} = rpc:call(Node1, lasp, declare_dynamic, [?ID, lasp_ivar]),
 
@@ -73,5 +78,14 @@ test([Node1, Node2]) ->
 
     %% Verify variable has the correct value.
     {ok, Node2} = rpc:call(Node2, lasp, query, [?ID]),
+
+    ok.
+
+test_ivar_update([_Node1, _Node2, Node3]) ->
+    %% Setup a dynamic variable.
+    {ok, {Id, _, _, _}} = rpc:call(Node3, lasp, declare_dynamic, [?ID, lasp_ivar]),
+
+    %% Update it.
+    {ok, {Id, _, _, Node3}} = rpc:call(Node3, lasp, update, [?ID, {set, Node3}, Node3]),
 
     ok.

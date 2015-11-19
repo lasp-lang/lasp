@@ -1,4 +1,40 @@
-REBAR ?= ./rebar
+#  -------------------------------------------------------------------
+#
+#  Copyright (c) 2014 Basho Technologies, Inc.
+#
+#  This file is provided to you under the Apache License,
+#  Version 2.0 (the "License"); you may not use this file
+#  except in compliance with the License.  You may obtain
+#  a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing,
+#  software distributed under the License is distributed on an
+#  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+#  KIND, either express or implied.  See the License for the
+#  specific language governing permissions and limitations
+#  under the License.
+#
+#  -------------------------------------------------------------------
+
+#  -------------------------------------------------------------------
+#  NOTE: This file is is from https://github.com/basho/tools.mk.
+#  It should not be edited in a project. It should simply be updated
+#  wholesale when a new version of tools.mk is released.
+#  -------------------------------------------------------------------
+
+REBAR ?= ./rebar3
+REVISION ?= $(shell git rev-parse --short HEAD)
+PROJECT ?= $(shell basename `find src -name "*.app.src"` .app.src)
+DEP_DIR ?= "deps"
+EBIN_DIR ?= "ebin"
+
+.PHONY: compile-no-deps test docs xref dialyzer-run dialyzer-quick dialyzer \
+		cleanplt upload-docs
+
+compile-no-deps:
+	${REBAR} compile skip_deps=true
 
 test: compile
 	${REBAR} eunit skip_deps=true
@@ -9,54 +45,5 @@ docs:
 xref: compile
 	${REBAR} xref skip_deps=true
 
-PLT ?= $(PWD)/.combo_dialyzer_plt
-LOCAL_PLT = $(PWD)/.local_dialyzer_plt
-DIALYZER_FLAGS ?= -Wunmatched_returns -Werror_handling -Wrace_conditions -Wunderspecs
-
-${PLT}: compile
-	@if [ -f $(PLT) ]; then \
-		dialyzer --check_plt --plt $(PLT) --apps $(DIALYZER_APPS) && \
-		dialyzer --add_to_plt --plt $(PLT) --output_plt $(PLT) --apps $(DIALYZER_APPS) ; test $$? -ne 1; \
-	else \
-		dialyzer --build_plt --output_plt $(PLT) --apps $(DIALYZER_APPS); test $$? -ne 1; \
-	fi
-
-${LOCAL_PLT}: compile
-	@if [ -d deps ]; then \
-		if [ -f $(LOCAL_PLT) ]; then \
-			dialyzer --check_plt --plt $(LOCAL_PLT) deps/*/ebin riak_test/ebin && \
-			dialyzer --add_to_plt --plt $(LOCAL_PLT) --output_plt $(LOCAL_PLT) deps/*/ebin riak_test/ebin ; test $$? -ne 1; \
-		else \
-			dialyzer --build_plt --output_plt $(LOCAL_PLT) deps/*/ebin riak_test/ebin ; test $$? -ne 1; \
-		fi \
-	fi
-
-dialyzer: ${PLT} ${LOCAL_PLT}
-	@echo "==> $(shell basename $(shell pwd)) (dialyzer)"
-	@if [ -f $(LOCAL_PLT) ]; then \
-		PLTS="$(PLT) $(LOCAL_PLT)"; \
-	else \
-		PLTS=$(PLT); \
-	fi; \
-	if [ -f dialyzer.ignore-warnings ]; then \
-		if [ $$(grep -cvE '[^[:space:]]' dialyzer.ignore-warnings) -ne 0 ]; then \
-			echo "ERROR: dialyzer.ignore-warnings contains a blank/empty line, this will match all messages!"; \
-			exit 1; \
-		fi; \
-		dialyzer $(DIALYZER_FLAGS) --plts $${PLTS} -c ebin > dialyzer_warnings ; \
-		egrep -v "^[[:space:]]*(done|Checking|Proceeding|Compiling)" dialyzer_warnings | grep -F -f dialyzer.ignore-warnings -v > dialyzer_unhandled_warnings ; \
-		cat dialyzer_unhandled_warnings ; \
-		[ $$(cat dialyzer_unhandled_warnings | wc -l) -eq 0 ] ; \
-	else \
-		dialyzer $(DIALYZER_FLAGS) --plts $${PLTS} -c ebin; \
-	fi
-
-cleanplt:
-	@echo
-	@echo "Are you sure?  It takes several minutes to re-build."
-	@echo Deleting $(PLT) and $(LOCAL_PLT) in 5 seconds.
-	@echo
-	sleep 5
-	rm $(PLT)
-	rm $(LOCAL_PLT)
-
+dialyzer: compile
+	${REBAR} dialyzer

@@ -9,8 +9,20 @@
                   stdlib,
                   riak_dt,
                   gen_flow,
+                  lager,
+                  druuid,
+                  gb_trees_ext,
+                  time_compat,
                   plumtree
                  ]},
-  {mod, { lasp_app, []}},
-  {env, []}
+  {mod, {lasp_app, []}},
+  {env, [%% Which peer service to use.
+        {peer_service, lasp_plumtree_peer_service},
+
+        %% Which distribution backend to use.
+        {distribution_backend, lasp_plumtree_broadcast_distribution_backend},
+
+        %% Which storage backend to use.
+        {storage_backend, lasp_eleveldb_storage_backend}
+        ]}
  ]}.

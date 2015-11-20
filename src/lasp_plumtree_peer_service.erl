@@ -23,12 +23,16 @@
 
 -include("lasp.hrl").
 
+-behaviour(lasp_peer_service).
+
 -define(PEER_SERVICE, plumtree_peer_service).
+-define(PEER_SERVICE_MANAGER, plumtree_peer_service_manager).
 
 -export([join/1,
          join/2,
          join/3,
          leave/0,
+         members/0,
          stop/0,
          stop/1]).
 
@@ -54,6 +58,10 @@ join(Node, Node, Auto) ->
 leave() ->
     do(leave, []).
 
+%% @doc Leave the cluster.
+members() ->
+    do(?PEER_SERVICE_MANAGER, members, []).
+
 %% @doc Stop node.
 stop() ->
     stop("received stop request").
@@ -69,3 +77,7 @@ stop(Reason) ->
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
     erlang:apply(?PEER_SERVICE, Function, Args).
+
+%% @doc Execute call to the proper backend.
+do(Module, Function, Args) ->
+    erlang:apply(Module, Function, Args).

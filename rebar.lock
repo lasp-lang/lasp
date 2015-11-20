@@ -50,6 +50,7 @@
   {git,"git://github.com/lasp-lang/plumtree",
        {ref,"c300021377e9c43d337fd3eac58653d48d42038a"}},
   0},
+ {<<"rebar3_hex">>,{pkg,<<"rebar3_hex">>,<<"1.9.1">>},0},
  {<<"riak_dt">>,
   {git,"git://github.com/lasp-lang/riak_dt",
        {ref,"a2986bccd1cc42facdfe739495c6d13762ae0f37"}},

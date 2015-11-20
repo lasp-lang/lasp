@@ -4,11 +4,9 @@ otp_release:
   - 17.4
   - R16B03
 script:
-  - make dialyzer
-  - make xref
-  - make
   - make test
-  - make riak-test
+  - make xref
+  - make dialyzer
 notifications:
   email: christopher.meiklejohn@gmail.com
 sudo: false

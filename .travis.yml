@@ -9,4 +9,5 @@ script:
   - make dialyzer
 notifications:
   email: christopher.meiklejohn@gmail.com
+  irc: "irc.freenode.org#lasp-lang"
 sudo: false

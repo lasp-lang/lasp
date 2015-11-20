@@ -24,3 +24,5 @@ build
 .vagrant
 _build/
 TEST-*
+data/
+undefined/

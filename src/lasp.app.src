@@ -1,7 +1,7 @@
 %% -*- erlang -*-
 {application, lasp,
  [
-  {description, "Distributed deterministic dataflow programming for Erlang"},
+  {description, "Declarative, distributed, eventually consistent, compuations."},
   {vsn, "0.0.1"},
   {registered, []},
   {applications, [

@@ -24,7 +24,7 @@ clean:
 ## Test targets
 ##
 
-test: ct eunit eqc
+test: ct eunit
 
 lint:
 	./rebar3 as lint lint

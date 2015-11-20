@@ -4,7 +4,7 @@
      {vsn,"0.0.1-beta1"},
      {maintainers,["Christopher S. Meiklejohn"]},
      {links,[{"Github","https://github.com/lasp-lang/lasp"}]},
-     {licenses,["APL2"]},
+     {licenses,["Apache"]},
      {registered,[]},
      {applications,
          [kernel,stdlib,riak_dt,gen_flow,lager,druuid,gb_trees_ext,

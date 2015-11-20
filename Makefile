@@ -21,6 +21,24 @@ clean:
 	$(REBAR) clean
 
 ##
+## Test targets
+##
+
+test: ct eunit eqc
+
+lint:
+	./rebar3 as lint lint
+
+eqc:
+	./rebar3 as test eqc
+
+eunit:
+	./rebar3 eunit
+
+ct:
+	./rebar3 ct
+
+##
 ## Release targets
 ##
 

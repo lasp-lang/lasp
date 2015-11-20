@@ -1,14 +1,13 @@
 language: erlang
 otp_release:
   - 18.1
-  - 17.4
-  - R16B03
-script:
-  - make dialyzer
-  - make xref
+install:
   - make
+script:
   - make test
-  - make riak-test
+  - make xref
+  - make dialyzer
 notifications:
   email: christopher.meiklejohn@gmail.com
+  irc: "irc.freenode.org#lasp-lang"
 sudo: false

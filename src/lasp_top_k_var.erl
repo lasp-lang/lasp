@@ -135,13 +135,15 @@ stat(_, _) -> undefined.
 to_binary(IVar) ->
     <<?TAG:8/integer, ?V1_VERS:8/integer, (riak_dt:to_binary(IVar))/binary>>.
 
--spec to_binary(Vers :: pos_integer(), top_k_var()) -> {ok, binary_top_k_var()} | ?UNSUPPORTED_VERSION.
+-spec to_binary(Vers :: pos_integer(), top_k_var()) ->
+    {ok, binary_top_k_var()} | ?UNSUPPORTED_VERSION.
 to_binary(1, Set) ->
     {ok, to_binary(Set)};
 to_binary(Vers, _Set) ->
     ?UNSUPPORTED_VERSION(Vers).
 
--spec from_binary(binary_top_k_var()) -> {ok, top_k_var()} | ?UNSUPPORTED_VERSION | ?INVALID_BINARY.
+-spec from_binary(binary_top_k_var()) ->
+    {ok, top_k_var()} | ?UNSUPPORTED_VERSION | ?INVALID_BINARY.
 from_binary(<<?TAG:8/integer, ?V1_VERS:8/integer, Bin/binary>>) ->
     riak_dt:from_binary(Bin);
 from_binary(<<?TAG:8/integer, Vers:8/integer, _Bin/binary>>) ->
@@ -157,7 +159,8 @@ to_version(_Version, IVar) ->
 parent_clock(_Clock, IVar) ->
     IVar.
 
--spec update(top_k_var_op(), actor(), top_k_var(), riak_dt:context()) -> {ok, top_k_var()}.
+-spec update(top_k_var_op(), actor(), top_k_var(),
+             riak_dt:context()) -> {ok, top_k_var()}.
 update(Op, Actor, ORDict, _Ctx) ->
     update(Op, Actor, ORDict).
 

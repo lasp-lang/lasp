@@ -60,7 +60,7 @@ query(Id) ->
 %%      Valid values for `Type' are any of lattices supporting the
 %%      `riak_dt' behavior.
 %%
--spec declare(type()) -> {ok, id()} | {error, timeout}.
+-spec declare(type()) -> {ok, var()} | {error, timeout}.
 declare(Type) ->
     declare(druuid:v4(), Type).
 
@@ -69,7 +69,7 @@ declare(Type) ->
 %%      Valid values for `Type' are any of lattices supporting the
 %%      `riak_dt' behavior.
 %%
--spec declare_dynamic(type()) -> {ok, id()} | {error, timeout}.
+-spec declare_dynamic(type()) -> {ok, var()} | {error, timeout}.
 declare_dynamic(Type) ->
     declare_dynamic(druuid:v4(), Type).
 
@@ -78,7 +78,7 @@ declare_dynamic(Type) ->
 %%      Valid values for `Type' are any of lattices supporting the
 %%      `riak_dt' behavior.
 %%
--spec declare_dynamic(id(), type()) -> {ok, id()} | {error, timeout}.
+-spec declare_dynamic(id(), type()) -> {ok, var()} | {error, timeout}.
 declare_dynamic(Id, Type) ->
     do(declare_dynamic, [Id, Type]).
 
@@ -87,7 +87,7 @@ declare_dynamic(Id, Type) ->
 %%      Execute `Module:Function(Args)' and bind the result using {@link
 %%      bind/2}.
 %%
--spec bind(id(), module(), func(), args()) -> {ok, id()} | {error, timeout}.
+-spec bind(id(), module(), func(), args()) -> {ok, var()} | {error, timeout}.
 bind(Id, Module, Function, Args) ->
     bind(Id, Module:Function(Args)).
 
@@ -100,7 +100,7 @@ bind(Id, Module, Function, Args) ->
 %%
 %%      Type is declared with the provided `Id'.
 %%
--spec declare(id(), type()) -> {ok, id()} | {error, timeout}.
+-spec declare(id(), type()) -> {ok, var()} | {error, timeout}.
 declare(Id, Type) ->
     do(declare, [Id, Type]).
 
@@ -120,7 +120,7 @@ update(Id, Operation, Actor) ->
 %%      {@link declare/0}) dataflow variable.  The `Value' provided is
 %%      the value to bind.
 %%
--spec bind(id(), value()) -> {ok, id()} | {error, timeout}.
+-spec bind(id(), value()) -> {ok, var()} | {error, timeout}.
 bind(Id, Value) ->
     do(bind, [Id, Value]).
 

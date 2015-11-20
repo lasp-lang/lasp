@@ -29,6 +29,7 @@
          join/2,
          join/3,
          leave/0,
+         members/0,
          stop/0,
          stop/1]).
 
@@ -49,6 +50,9 @@
 
 %% Remove a node from the cluster.
 -callback leave() -> ok.
+
+%% Return members of the cluster.
+-callback members() -> {ok, [node()]}.
 
 %% Stop the peer service on a given node.
 -callback stop() -> ok.
@@ -73,6 +77,10 @@ join(Node, Auto) when is_atom(Node) ->
 %% @doc Initiate join. Nodes cannot join themselves.
 join(Node, Node, Auto) ->
     do(join, [Node, Node, Auto]).
+
+%% @doc Return cluster members.
+members() ->
+    do(members, []).
 
 %% @doc Leave the cluster.
 leave() ->

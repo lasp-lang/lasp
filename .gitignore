@@ -22,3 +22,7 @@ rt/
 .combo_dialyzer_plt
 build
 .vagrant
+_build/
+TEST-*
+data/
+undefined/

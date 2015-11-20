@@ -20,15 +20,15 @@
 
 %% @doc Leaderboard example.
 
--module(lasp_leaderboard_test).
+-module(lasp_leaderboard).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
--export([test/0,
+-export([run/0,
          client/4]).
 
--behaviour(lasp_test).
+-behaviour(lasp_simulation).
 
-%% lasp_test callbacks
+%% lasp_simulation callbacks
 -export([init/0,
          clients/1,
          simulate/1,
@@ -36,35 +36,8 @@
          terminate/1,
          summarize/1]).
 
--ifdef(TEST).
-
--export([confirm/0]).
-
--define(HARNESS, (rt_config:get(rt_harness))).
-
--include_lib("eunit/include/eunit.hrl").
-
-confirm() ->
-    [Nodes] = lasp_test_helpers:build_clusters([1]),
-    lager:info("Nodes: ~p", [Nodes]),
-    Node = hd(Nodes),
-
-    lager:info("Remotely loading code on node ~p", [Node]),
-    ok = lasp_test_helpers:load(Nodes),
-    lager:info("Remote code loading complete."),
-
-    ok = lasp_test_helpers:wait_for_cluster(Nodes),
-
-    lager:info("Remotely executing the test."),
-    Result = rpc:call(Node, ?MODULE, test, []),
-    ?assertMatch({ok, _}, Result),
-
-    pass.
-
--endif.
-
-test() ->
-    lasp_test:test(?MODULE).
+run() ->
+    lasp_simulator:run(?MODULE).
 
 %% Macro definitions.
 

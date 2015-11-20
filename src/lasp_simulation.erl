@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_test).
+-module(lasp_simulation).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -type state() :: any().
@@ -54,30 +54,3 @@
 
 %% Perform any summarization needed.
 -callback summarize(state()) -> {ok, state()}.
-
--export([test/1]).
-
-%% @doc Prototype new simulator harness.
-%%
-%% @clippy Hey, it looks like you're writing a State monad here!  Would
-%%         you like some help?
-%%
-test(Module) ->
-    {ok, State} = Module:init(),
-
-    %% Launch client processes.
-    {ok, State1} = Module:clients(State),
-
-    %% Initialize simulation.
-    {ok, State2} = Module:simulate(State1),
-
-    %% Wait until we receive num events.
-    {ok, State3} = Module:wait(State2),
-
-    %% Terminate all clients.
-    {ok, State4} = Module:terminate(State3),
-
-    %% Finish and summarize.
-    {ok, State5} = Module:summarize(State4),
-
-    {ok, State5}.

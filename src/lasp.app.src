@@ -2,7 +2,7 @@
     [{description,
          "Declarative, distributed, eventually consistent, compuations."},
      {vsn,"0.0.1-beta1"},
-     {contributors,["Christopher S. Meiklejohn"]},
+     {maintainers,["Christopher S. Meiklejohn"]},
      {links,[{"Github","https://github.com/lasp-lang/lasp"}]},
      {licenses,["APL2"]},
      {registered,[]},

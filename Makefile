@@ -33,10 +33,10 @@ eqc:
 	./rebar3 as test eqc
 
 eunit:
-	./rebar3 eunit
+	./rebar3 as test eunit
 
 ct:
-	./rebar3 ct
+	./rebar3 as test ct
 
 ##
 ## Release targets

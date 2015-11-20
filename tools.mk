@@ -36,9 +36,6 @@ EBIN_DIR ?= "ebin"
 compile-no-deps:
 	${REBAR} compile skip_deps=true
 
-test: compile
-	${REBAR} eunit skip_deps=true
-
 docs:
 	${REBAR} doc skip_deps=true
 

@@ -101,12 +101,14 @@
 
 -type any_orswot() :: v2_orswot() | v2ord_orswot().
 
--type v2ord_orswot() :: {riak_dt_vclock:vclock(), orddict:orddict(), orddict:orddict()}.
+-type v2ord_orswot() :: {riak_dt_vclock:vclock(), orddict:orddict(),
+                         orddict:orddict()}.
 
 %% Only removes can be deferred, so a list of members to be removed
 %% per context.
 -type deferred() :: dict(riak_dt_vclock:vclock(), [member()]).
--type binary_orswot() :: binary(). %% A binary that from_binary/1 will operate on.
+%% A binary that from_binary/1 will operate on.
+-type binary_orswot() :: binary().
 
 -type orswot_op() ::  {add, member()} | {remove, member()} |
                       {add_all, [member()]} | {remove_all, [member()]} |
@@ -126,7 +128,7 @@
 -type dot() :: riak_dt:dot().
 -type member() :: term().
 
--type precondition_error() :: {error, {precondition ,{not_present, member()}}}.
+-type precondition_error() :: {error, {precondition, {not_present, member()}}}.
 
 -ifdef(namespaced_types).
 -type dict(A, B) :: dict:dict(A, B).
@@ -185,7 +187,8 @@ update({remove_all, Elems}, Actor, ORSet) ->
 
 -spec update(orswot_op(), actor() | dot(), orswot(), riak_dt:context()) ->
                     {ok, orswot()} | precondition_error().
-update(Op, Actor, {_Clock, Entries, _Deferred}=V1Set, Ctx) when is_list(Entries) ->
+update(Op, Actor, {_Clock, Entries, _Deferred}=V1Set, Ctx)
+  when is_list(Entries) ->
     update(Op, Actor, to_v2(V1Set), Ctx);
 update(Op, Actor, ORSet, undefined) ->
     update(Op, Actor, ORSet);
@@ -204,7 +207,8 @@ update({remove, Elem}, _Actor, {Clock, Entries, Deferred}, Ctx) ->
                 [] ->
                     {ok, {Clock, ?DICT:erase(Elem, Entries), Deferred2}};
                 _ ->
-                    {ok, {Clock, ?DICT:store(Elem, ElemClock2, Entries), Deferred2}}
+                    {ok, {Clock, ?DICT:store(Elem, ElemClock2, Entries),
+                          Deferred2}}
             end;
         error ->
             %% Do we not have the element because we removed it
@@ -244,8 +248,8 @@ update({add_all, Elems}, Actor, ORSet, _Ctx) ->
 %% @TODO revist this, as it might be meaningful in some cases (for
 %% true idempotence) and we can have merges triggering updates,
 %% maybe.)
--spec defer_remove(riak_dt_vclock:vclock(), riak_dt_vclock:vclock(), orswot_op(), deferred()) ->
-                      deferred().
+-spec defer_remove(riak_dt_vclock:vclock(), riak_dt_vclock:vclock(),
+                   orswot_op(), deferred()) -> deferred().
 defer_remove(Clock, Ctx, Elem, Deferred) ->
     case riak_dt_vclock:descends(Clock, Ctx) of
         %% no need to save this remove, we're done
@@ -325,7 +329,8 @@ merge({LHSClock, LHSEntries, LHSDeferred}, {RHSClock, RHSEntries, RHSDeferred}) 
                  end,
                  {?DICT:new(), RHSEntries},
                  LHSEntries),
-    %%Now what about the stuff left from the right hand side? Do the same to that!
+    %% Now what about the stuff left from the right hand side? Do the
+    %% same to that!
     Entries = ?DICT:fold(fun(Elem, Dots, Acc) ->
                          case riak_dt_vclock:subtract_dots(Dots, LHSClock) of
                              [] ->
@@ -357,7 +362,8 @@ merge_deferred(LHS, RHS) ->
                             orswot().
 apply_deferred(Clock, Entries, Deferred) ->
     ?DICT:fold(fun(Ctx, Elems, ORSwot) ->
-                       {ok, ORSwot2} = remove_all(Elems, undefined,  ORSwot, Ctx),
+                       {ok, ORSwot2} = remove_all(Elems, undefined,
+                                                  ORSwot, Ctx),
                        ORSwot2
                 end,
                {Clock, Entries, ?DICT:new()}, %% Start with an empty deferred list
@@ -432,7 +438,7 @@ stat(max_dot_length, {_Clock, Dict, _}) ->
                end, 0, Dict);
 stat(deferred_length, {_Clock, _Dict, Deferred}) ->
     ?DICT:size(Deferred);
-stat(_,_) -> undefined.
+stat(_, _) -> undefined.
 
 -include_lib("riak_dt/include/riak_dt_tags.hrl").
 -define(TAG, ?DT_ORSWOT_TAG).
@@ -454,7 +460,8 @@ to_binary(S) ->
 
 %% @private encode v1 sets as v2, and vice versa. The first argument
 %% is the target binary type.
--spec to_binary(Vers :: pos_integer(), orswot()) -> {ok, binary_orswot()} | ?UNSUPPORTED_VERSION.
+-spec to_binary(Vers :: pos_integer(), orswot()) ->
+    {ok, binary_orswot()} | ?UNSUPPORTED_VERSION.
 to_binary(?V1_VERS, S0) ->
     S = to_v1(S0),
     {ok, <<?TAG:8/integer, ?V1_VERS:8/integer, (riak_dt:to_binary(S))/binary>>};
@@ -496,7 +503,9 @@ to_v1({Clock, Entries0, Deferred0}) ->
 %% `to_binary/1' will return the original `orswot()'.
 %%
 
--spec from_binary(binary_orswot()) -> {ok, orswot()} | ?UNSUPPORTED_VERSION | ?INVALID_BINARY.
+-spec from_binary(binary_orswot()) -> {ok, orswot()} |
+                                      ?UNSUPPORTED_VERSION |
+                                      ?INVALID_BINARY.
 from_binary(<<?TAG:8/integer, ?V1_VERS:8/integer, B/binary>>) ->
     S = riak_dt:from_binary(B),
     %% Now upgrade the structure to dict from orddict
@@ -591,15 +600,21 @@ no_dots_left_test() ->
 
 %% A test I thought up
 %% - existing replica of ['A'] at a and b,
-%% - add ['B'] at b, but not communicated to any other nodes, context returned to client
+%% - add ['B'] at b, but not communicated to any other nodes,
+%%      context returned to client
 %% - b goes down forever
 %% - remove ['A'] at a, using the context the client got from b
 %% - will that remove happen?
-%%   case for shouldn't: the context at b will always be bigger than that at a
-%%   case for should: we have the information in dots that may allow us to realise it can be removed
+%%   case for shouldn't: the context at b will always be bigger than
+%%                       that at a
+%%   case for should: we have the information in dots that may allow
+%%                    us to realise it can be removed
 %%     without us caring.
 %%
-%% as the code stands, 'A' *is* removed, which is almost certainly correct. This behaviour should
+%% as the code stands, 'A' *is* removed, which is almost certainly
+%% correct.
+%%
+%% This behaviour should
 %% always happen, but may not. (ie, the test needs expanding)
 dead_node_update_test() ->
     {ok, A} = update({add, 'A'}, a, new()),
@@ -612,9 +627,11 @@ dead_node_update_test() ->
 batch_order_test() ->
     {ok, Set} = update({add_all, [<<"bar">>, <<"baz">>]}, a, new()),
     Context  = precondition_context(Set),
-    {ok, Set2} = update({update, [{remove, <<"baz">>}, {add, <<"baz">>}]}, a, Set, Context),
+    {ok, Set2} = update({update, [{remove, <<"baz">>},
+                                  {add, <<"baz">>}]}, a, Set, Context),
     ?assertEqual([<<"bar">>, <<"baz">>], value(Set2)),
-    {ok, Set3} = update({update, [{remove, <<"baz">>}, {add, <<"baz">>}]}, a, Set),
+    {ok, Set3} = update({update, [{remove, <<"baz">>},
+                                  {add, <<"baz">>}]}, a, Set),
     ?assertEqual([<<"bar">>, <<"baz">>], value(Set3)),
     {ok, Set4} = update({remove, <<"baz">>}, a, Set),
     {ok, Set5} = update({add, <<"baz">>}, a, Set4),
@@ -633,11 +650,15 @@ size(Set) ->
 
 generate() ->
     %% Only generate add ops
-    ?LET({Ops, Actors}, {non_empty(list({add, bitstring(20*8)})), non_empty(list(bitstring(16*8)))},
+    ?LET({Ops, Actors}, {non_empty(list({add, bitstring(20*8)})),
+                         non_empty(list(bitstring(16*8)))},
          lists:foldl(fun(Op, Set) ->
                              Actor = case length(Actors) of
                                          1 -> hd(Actors);
-                                         _ -> lists:nth(crypto:rand_uniform(1, length(Actors)), Actors)
+                                         _ ->
+                                             lists:nth(crypto:rand_uniform(1,
+                                                        length(Actors)),
+                                                       Actors)
                                      end,
                              case ?MODULE:update(Op, Actor, Set) of
                                  {ok, S} -> S;
@@ -709,7 +730,8 @@ update_expected(ID, {add_all, Elems}, State) ->
 update_expected(ID, {remove_all, Elems}, {_Cnt, Dict}=State) ->
     %% Only if _all_ elements are in the set do we remove any elems
     {A, R} = dict:fetch(ID, Dict),
-    %% DO NOT consider tombstones as "in" the set, orswot does not have idempotent remove
+    %% DO NOT consider tombstones as "in" the set, orswot does not have
+    %% idempotent remove
     In = sets:subtract(A, R),
     Members = [ Elem || {Elem, _X} <- sets:to_list(In)],
     case is_sub_bag(Elems, lists:usort(Members)) of
@@ -724,7 +746,8 @@ update_expected(ID, {remove_all, Elems}, {_Cnt, Dict}=State) ->
 
 eqc_state_value({_Cnt, Dict}) ->
     {A, R} = dict:fold(fun(_K, {Add, Rem}, {AAcc, RAcc}) ->
-                               {sets:union(Add, AAcc), sets:union(Rem, RAcc)} end,
+                               {sets:union(Add, AAcc),
+                                sets:union(Rem, RAcc)} end,
                        {sets:new(), sets:new()},
                        Dict),
     Remaining = sets:subtract(A, R),

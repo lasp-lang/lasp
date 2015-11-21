@@ -94,18 +94,18 @@ value(removed, ORDict0) ->
                                      length(ValidTokens) > 0
                              end, ORDict0),
     orddict:fetch_keys(ORDict1);
-value(_,ORSet) ->
+value(_, ORSet) ->
     value(ORSet).
 
 -spec update(orset_op(), actor(), orset()) -> {ok, orset()} |
-                                              {error, {precondition ,{not_present, member()}}}.
-update({add_by_token,Token,Elem}, _Actor, ORDict) ->
-    add_elem(Elem,Token,ORDict);
+                                              {error, {precondition, {not_present, member()}}}.
+update({add_by_token, Token, Elem}, _Actor, ORDict) ->
+    add_elem(Elem, Token, ORDict);
 update({add,Elem}, Actor, ORDict) ->
     Token = unique(Actor),
-    add_elem(Elem,Token,ORDict);
+    add_elem(Elem, Token, ORDict);
 update({add_all,Elems}, Actor, ORDict0) ->
-    OD = lists:foldl(fun(Elem,ORDict) ->
+    OD = lists:foldl(fun(Elem, ORDict) ->
                 {ok, ORDict1} = update({add,Elem},Actor,ORDict),
                 ORDict1
             end, ORDict0, Elems),

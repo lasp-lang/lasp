@@ -37,7 +37,7 @@
          summarize/1]).
 
 run() ->
-    lasp_simulator:run(?MODULE).
+    lasp_simulation:run(?MODULE).
 
 %% Macro definitions.
 

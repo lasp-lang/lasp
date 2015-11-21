@@ -103,7 +103,9 @@ client(Runner, Id, LeaderboardId, Leaderboard0) ->
     receive
         {complete_game, Score} ->
             %% Update local leaderboard.
-            {ok, Leaderboard} = lasp_top_k_var:update({set, Id, Score}, Id, Leaderboard0),
+            {ok, Leaderboard} = lasp_top_k_var:update({set, Id, Score},
+                                                      Id,
+                                                      Leaderboard0),
 
             %% Notify the harness that an event has been processed.
             Runner ! {event, Score},
@@ -111,13 +113,15 @@ client(Runner, Id, LeaderboardId, Leaderboard0) ->
             client(Runner, Id, LeaderboardId, Leaderboard);
         terminate ->
             %% Synchronize copy of leaderboard.
-            {ok, {_, _, _, Leaderboard}} = lasp:bind(LeaderboardId, Leaderboard0),
+            {ok, {_, _, _, Leaderboard}} = lasp:bind(LeaderboardId,
+                                                     Leaderboard0),
 
             ok
     after
         10 ->
             %% Synchronize copy of leaderboard.
-            {ok, {_, _, _, Leaderboard}} = lasp:bind(LeaderboardId, Leaderboard0),
+            {ok, {_, _, _, Leaderboard}} = lasp:bind(LeaderboardId,
+                                                     Leaderboard0),
 
             client(Runner, Id, LeaderboardId, Leaderboard)
     end.

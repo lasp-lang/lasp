@@ -71,7 +71,8 @@ update(Ref, Id, Function) ->
     gen_server:call(Ref, {update, Id, Function}, infinity).
 
 %% @doc Retrieve a record from the backend.
--spec get(ref(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
+-spec get(ref(), id()) -> {ok, variable()} | {error, not_found} |
+                          {error, atom()}.
 get(Ref, Id) ->
     gen_server:call(Ref, {get, Id}, infinity).
 
@@ -83,7 +84,9 @@ get(Ref, Id) ->
 init([Identifier]) ->
     %% Get the data root directory
     Config = app_helper:get_env(?APP),
-    DataDir = filename:join(app_helper:get_prop_or_env(data_root, Config, eleveldb),
+    DataDir = filename:join(app_helper:get_prop_or_env(data_root,
+                                                       Config,
+                                                       eleveldb),
                             atom_to_list(Identifier)),
 
     %% Ensure directory.

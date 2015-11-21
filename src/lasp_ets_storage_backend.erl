@@ -53,7 +53,10 @@
 %% @doc Start and link to calling process.
 -spec start(atom())-> {ok, atom()}.
 start(Identifier) ->
-    {ok, _Pid} = gen_server:start_link({local, Identifier}, ?MODULE, [Identifier], []),
+    {ok, _Pid} = gen_server:start_link({local, Identifier},
+                                       ?MODULE,
+                                       [Identifier],
+                                       []),
     {ok, Identifier}.
 
 %% @doc Write a record to the backend.
@@ -62,12 +65,14 @@ put(Ref, Id, Record) ->
     gen_server:call(Ref, {put, Id, Record}, infinity).
 
 %% @doc In-place update given a mutation function.
--spec update(ref(), id(), function()) -> {ok, any()} | error | {error, atom()}.
+-spec update(ref(), id(), function()) -> {ok, any()} | error |
+                                         {error, atom()}.
 update(Ref, Id, Function) ->
     gen_server:call(Ref, {update, Id, Function}, infinity).
 
 %% @doc Retrieve a record from the backend.
--spec get(ref(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
+-spec get(ref(), id()) -> {ok, variable()} | {error, not_found} |
+                          {error, atom()}.
 get(Ref, Id) ->
     gen_server:call(Ref, {get, Id}, infinity).
 
@@ -135,7 +140,8 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @doc Retrieve a record from the backend.
--spec do_get(ref(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
+-spec do_get(ref(), id()) -> {ok, variable()} | {error, not_found} |
+                             {error, atom()}.
 do_get(Ref, Id) ->
     case ets:lookup(Ref, Id) of
         [{_Key, Record}] ->

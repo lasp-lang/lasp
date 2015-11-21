@@ -49,7 +49,7 @@
 
 -export_type([ivar/0, binary_ivar/0, ivar_op/0]).
 -type ivar() :: term().
--type binary_ivar() :: <<_:16,_:_*8>>.
+-type binary_ivar() :: <<_:16, _:_*8>>.
 -type ivar_op() :: {set, term()}.
 
 -ifdef(EQC).
@@ -118,13 +118,15 @@ stat(_, _) -> undefined.
 to_binary(IVar) ->
     <<?TAG:8/integer, ?V1_VERS:8/integer, (riak_dt:to_binary(IVar))/binary>>.
 
--spec to_binary(Vers :: pos_integer(), ivar()) -> {ok, binary_ivar()} | ?UNSUPPORTED_VERSION.
+-spec to_binary(Vers :: pos_integer(), ivar()) -> {ok, binary_ivar()} |
+                                                  ?UNSUPPORTED_VERSION.
 to_binary(1, Set) ->
     {ok, to_binary(Set)};
 to_binary(Vers, _Set) ->
     ?UNSUPPORTED_VERSION(Vers).
 
--spec from_binary(binary_ivar()) -> {ok, ivar()} | ?UNSUPPORTED_VERSION | ?INVALID_BINARY.
+-spec from_binary(binary_ivar()) -> {ok, ivar()} | ?UNSUPPORTED_VERSION
+                                    | ?INVALID_BINARY.
 from_binary(<<?TAG:8/integer, ?V1_VERS:8/integer, Bin/binary>>) ->
     riak_dt:from_binary(Bin);
 from_binary(<<?TAG:8/integer, Vers:8/integer, _Bin/binary>>) ->

@@ -338,7 +338,8 @@ bind(Id, Value, Store) ->
 %% @doc Define a dataflow variable to be bound a value.
 -spec bind(id(), value(), function(), store()) -> {ok, var()}.
 bind(Id, Value, MetadataFun, Store) ->
-    Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0, waiting_threads=WT}=Object) ->
+    Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
+                      waiting_threads=WT}=Object) ->
             Metadata = MetadataFun(Metadata0),
             case Value0 of
                 Value ->

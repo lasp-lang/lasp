@@ -175,8 +175,8 @@ read(Id, Store) ->
 -spec read(id(), value(), store()) -> {ok, var()}.
 read(Id, Threshold, Store) ->
     Self = self(),
-    ReplyFun = fun({_Id, Type, Metadata, Value}) ->
-                       {ok, {_Id, Type, Metadata, Value}}
+    ReplyFun = fun({Id1, Type, Metadata, Value}) ->
+                       {ok, {Id1, Type, Metadata, Value}}
                end,
     BlockingFun = fun() ->
                 receive

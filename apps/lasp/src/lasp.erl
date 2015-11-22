@@ -62,7 +62,8 @@ query(Id) ->
 %%
 -spec declare(type()) -> {ok, var()} | {error, timeout}.
 declare(Type) ->
-    declare(druuid:v4(), Type).
+    {ok, Unique} = lasp_unique:unique(),
+    declare(Unique, Type).
 
 %% @doc Declare a new dynamic variable of a given type.
 %%
@@ -71,7 +72,8 @@ declare(Type) ->
 %%
 -spec declare_dynamic(type()) -> {ok, var()} | {error, timeout}.
 declare_dynamic(Type) ->
-    declare_dynamic(druuid:v4(), Type).
+    {ok, Unique} = lasp_unique:unique(),
+    declare_dynamic(Unique, Type).
 
 %% @doc Declare a new dynamic variable of a given type and identifier.
 %%

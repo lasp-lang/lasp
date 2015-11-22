@@ -210,7 +210,8 @@ declare(Store) ->
 %% @doc Declare a dataflow variable, as a given type.
 -spec declare(type(), store()) -> {ok, var()}.
 declare(Type, Store) ->
-    declare(druuid:v4(), Type, Store).
+    {ok, Unique} = lasp_unique:unique(),
+    declare(Unique, Type, Store).
 
 %% @doc Declare a dataflow variable in a provided by identifer.
 -spec declare(id(), type(), store()) -> {ok, var()}.

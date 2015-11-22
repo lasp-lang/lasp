@@ -13,4 +13,4 @@
      {env,
          [{peer_service,lasp_plumtree_peer_service},
           {distribution_backend,lasp_plumtree_broadcast_distribution_backend},
-          {storage_backend,lasp_eleveldb_storage_backend}]}]}.
+          {storage_backend,lasp_dets_storage_backend}]}]}.

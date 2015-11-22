@@ -829,7 +829,7 @@ write(Type, Value, Key, Store) ->
 do(Function, Args) ->
     Backend = application:get_env(?APP,
                                   storage_backend,
-                                  lasp_eleveldb_storage_backend),
+                                  lasp_dets_storage_backend),
     erlang:apply(Backend, Function, Args).
 
 -else.

@@ -58,7 +58,7 @@
 -type bound() :: true | false.
 -type supervisor() :: pid().
 -type stream() :: list(#dv{}).
--type store() :: ets:tid() | eleveldb:db_ref() | atom() | reference() | pid().
+-type store() :: ets:tid() | atom() | reference() | pid().
 -type threshold() :: value() | {strict, value()}.
 -type pending_threshold() :: {threshold, read | wait, pid(), type(), threshold()}.
 -type operation() :: {atom(), value()} | {atom(), value(), value()}.

@@ -370,7 +370,7 @@ wait_needed(Id, Threshold) ->
 %% @private
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
-    Actor = gen_actor(),
+    {ok, Actor} = lasp_unique:unique(),
     Counter = 0,
     Identifier = node(),
     {ok, Store} = case ?CORE:start(Identifier) of
@@ -614,11 +614,3 @@ get(Id, Store) ->
 %% @private
 increment_counter(Counter) ->
     Counter + 1.
-
-%% @private
-gen_actor() ->
-    Node = atom_to_list(node()),
-    Unique = time_compat:unique_integer([monotonic, positive]),
-    TS = integer_to_list(Unique),
-    Term = Node ++ TS,
-    crypto:hash(sha, Term).

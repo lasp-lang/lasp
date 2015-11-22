@@ -237,7 +237,10 @@ client(Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0) ->
 
 %% @doc Generate advertisements and advertisement contracts.
 create_advertisements_and_contracts(Ads, Contracts) ->
-    AdIds = lists:map(fun(_) -> druuid:v4() end, lists:seq(1, 10)),
+    AdIds = lists:map(fun(_) ->
+                              {ok, Unique} = lasp_unique:unique(),
+                              Unique
+                      end, lists:seq(1, 10)),
     lists:map(fun(Id) ->
                 {ok, _} = lasp:update(Contracts,
                                       {add, #contract{id=Id}},

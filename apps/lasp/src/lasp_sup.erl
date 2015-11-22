@@ -44,9 +44,14 @@ init(_Args) ->
                {lasp_process_sup, start_link, []},
                 permanent, infinity, supervisor, [lasp_process_sup]},
 
+    Unique = {lasp_unique,
+                {lasp_unique, start_link, []},
+                 permanent, 5000, worker,
+                 [lasp_unique]},
+
     Plumtree = {lasp_plumtree_broadcast_distribution_backend,
                 {lasp_plumtree_broadcast_distribution_backend, start_link, []},
                  permanent, 5000, worker,
                  [lasp_plumtree_broadcast_distribution_backend]},
 
-    {ok, {{one_for_one, 5, 10}, [Process, Plumtree]}}.
+    {ok, {{one_for_one, 5, 10}, [Process, Unique, Plumtree]}}.

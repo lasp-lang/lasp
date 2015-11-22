@@ -7,7 +7,6 @@ script:
   - make test
   - make xref
   - make dialyzer
-  - make lint
 notifications:
   email: christopher.meiklejohn@gmail.com
   irc: "irc.freenode.org#lasp-lang"

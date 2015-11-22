@@ -106,31 +106,31 @@ value(removed, ORSet) ->
                         Acc0
                 end
         end, [], ORSet);
-value(_,ORSet) ->
+value(_, ORSet) ->
     value(ORSet).
 
 -spec update(orset_op(), actor(), orset()) ->
     {ok, orset()} | {error, {precondition, {not_present, member()}}}.
-update({add_by_token,Token,Elem}, _Actor, ORDict) ->
-    add_elem(Elem,Token,ORDict);
-update({add,Elem}, Actor, ORDict) ->
+update({add_by_token, Token, Elem}, _Actor, ORDict) ->
+    add_elem(Elem, Token, ORDict);
+update({add, Elem}, Actor, ORDict) ->
     Token = unique(Actor),
-    add_elem(Elem,Token,ORDict);
-update({add_all,Elems}, Actor, ORDict0) ->
-    OD = lists:foldl(fun(Elem,ORDict) ->
-                {ok, ORDict1} = update({add,Elem},Actor,ORDict),
+    add_elem(Elem, Token, ORDict);
+update({add_all, Elems}, Actor, ORDict0) ->
+    OD = lists:foldl(fun(Elem, ORDict) ->
+                {ok, ORDict1} = update({add, Elem}, Actor, ORDict),
                 ORDict1
             end, ORDict0, Elems),
     {ok, OD};
-update({remove,Elem}, _Actor, ORSet) ->
+update({remove, Elem}, _Actor, ORSet) ->
     remove_elem(Elem, ORSet);
-update({remove_all,Elems}, _Actor, ORSet0) ->
+update({remove_all, Elems}, _Actor, ORSet0) ->
     remove_elems(Elems, ORSet0);
 update({update, Ops}, Actor, ORSet) ->
     apply_ops(Ops, Actor, ORSet).
 
 -spec update(orset_op(), actor(), orset(), riak_dt:context()) ->
-    {ok, orset()} | {error, {precondition ,{not_present, member()}}}.
+    {ok, orset()} | {error, {precondition, {not_present, member()}}}.
 update(Op, Actor, ORSet, _Ctx) ->
     update(Op, Actor, ORSet).
 
@@ -200,7 +200,7 @@ stat(waste_pct, ORSet) ->
                                                    (_Tag, true, {As, Rs}) ->
                                                         {As, Rs + 1}
                                           end, Acc0, Tags)
-                      end, {0,0}, ORSet),
+                      end, {0, 0}, ORSet),
     AllTags = Tags + Tombs,
     case Tags of
         0 -> 0;
@@ -436,7 +436,7 @@ update_expected(ID, {add_all, Elems}, State) ->
 update_expected(ID, {remove_all, Elems}, {_Cnt, Dict}=State) ->
     %% Only if _all_ elements are in the set do we remove any elems
     {A, R} = dict:fetch(ID, Dict),
-    Members = [E ||  {E, _X} <- sets:to_list(sets:union(A,R))],
+    Members = [E ||  {E, _X} <- sets:to_list(sets:union(A, R))],
     case sets:is_subset(sets:from_list(Elems), sets:from_list(Members)) of
         true ->
             lists:foldl(fun(Elem, S) ->

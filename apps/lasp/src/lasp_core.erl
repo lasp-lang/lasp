@@ -175,8 +175,8 @@ read(Id, Store) ->
 -spec read(id(), value(), store()) -> {ok, var()}.
 read(Id, Threshold, Store) ->
     Self = self(),
-    ReplyFun = fun({_Id, Type, Metadata, Value}) ->
-                       {ok, {_Id, Type, Metadata, Value}}
+    ReplyFun = fun({Id1, Type, Metadata, Value}) ->
+                       {ok, {Id1, Type, Metadata, Value}}
                end,
     BlockingFun = fun() ->
                 receive
@@ -338,7 +338,8 @@ bind(Id, Value, Store) ->
 %% @doc Define a dataflow variable to be bound a value.
 -spec bind(id(), value(), function(), store()) -> {ok, var()}.
 bind(Id, Value, MetadataFun, Store) ->
-    Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0, waiting_threads=WT}=Object) ->
+    Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
+                      waiting_threads=WT}=Object) ->
             Metadata = MetadataFun(Metadata0),
             case Value0 of
                 Value ->

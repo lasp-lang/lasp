@@ -148,13 +148,15 @@ start_link(Opts) ->
 %% @doc Returns from the broadcast message the identifier and the payload.
 -spec broadcast_data(broadcast_message()) ->
     {{broadcast_id(), broadcast_clock()}, broadcast_payload()}.
-broadcast_data(#broadcast{id=Id, type=Type, clock=Clock, metadata=Metadata, value=Value}) ->
+broadcast_data(#broadcast{id=Id, type=Type, clock=Clock,
+                          metadata=Metadata, value=Value}) ->
     {{Id, Clock}, {Id, Type, Metadata, Value}}.
 
 %% @doc Perform a merge of an incoming object with an object in the
 %%      local datastore, as long as we haven't seen a more recent clock
 %%      for the same object.
--spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) -> boolean().
+-spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) ->
+    boolean().
 merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
     case is_stale({Id, Clock}) of
         true ->
@@ -204,7 +206,8 @@ declare(Id, Type) ->
 %%
 -spec declare_dynamic(id(), type()) -> {ok, var()}.
 declare_dynamic(Id, Type) ->
-    {ok, Variable} = gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity),
+    {ok, Variable} = gen_server:call(?MODULE,
+                                     {declare_dynamic, Id, Type}, infinity),
     broadcast(Variable),
     {ok, Variable}.
 
@@ -235,7 +238,9 @@ update(Id, Operation, Actor) ->
 %%
 -spec bind(id(), value()) -> {ok, var()}.
 bind(Id, Value0) ->
-    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE, {bind, Id, Value0}, infinity),
+    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
+                                                        {bind, Id, Value0},
+                                                        infinity),
     case orddict:find(dynamic, Metadata) of
         {ok, true} ->
             %% Ignore: this is a dynamic variable.
@@ -306,7 +311,9 @@ union(Left, Right, Union) ->
 %%
 -spec intersection(id(), id(), id()) -> ok | error().
 intersection(Left, Right, Intersection) ->
-    gen_server:call(?MODULE, {intersection, Left, Right, Intersection}, infinity).
+    gen_server:call(?MODULE,
+                    {intersection, Left, Right, Intersection},
+                    infinity).
 
 %% @doc Map values from one lattice into another.
 %%
@@ -446,7 +453,9 @@ handle_call({update, Id, Operation, Actor}, _From,
     {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};
 
 %% Spawn a function.
-handle_call({thread, Module, Function, Args}, _From, #state{store=Store}=State) ->
+handle_call({thread, Module, Function, Args},
+            _From,
+            #state{store=Store}=State) ->
     ok = ?CORE:thread(Module, Function, Args, Store),
     {reply, ok, State};
 
@@ -470,18 +479,25 @@ handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     {reply, ok, State};
 
 %% Spawn a process to compute a product.
-handle_call({product, Left, Right, Product}, _From, #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?BIND, ?READ, ?READ),
+handle_call({product, Left, Right, Product},
+            _From,
+            #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?BIND,
+                               ?READ, ?READ),
     {reply, ok, State};
 
 %% Spawn a process to compute the intersection.
-handle_call({intersection, Left, Right, Intersection}, _From, #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:intersection(Left, Right, Intersection, Store, ?BIND, ?READ, ?READ),
+handle_call({intersection, Left, Right, Intersection},
+            _From,
+            #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:intersection(Left, Right, Intersection, Store,
+                                    ?BIND, ?READ, ?READ),
     {reply, ok, State};
 
 %% Spawn a process to compute the union.
 handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?BIND, ?READ, ?READ),
+    {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?BIND, ?READ,
+                             ?READ),
     {reply, ok, State};
 
 %% Spawn a process to perform a map.
@@ -560,14 +576,17 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 broadcast({Id, Type, Metadata, Value}) ->
     Clock = orddict:fetch(clock, Metadata),
-    Broadcast = #broadcast{id=Id, clock=Clock, type=Type, metadata=Metadata, value=Value},
+    Broadcast = #broadcast{id=Id, clock=Clock, type=Type,
+                           metadata=Metadata, value=Value},
     plumtree_broadcast:broadcast(Broadcast, ?MODULE).
 
 %% @private
 local_bind(Id, Type, Metadata, Value) ->
     case gen_server:call(?MODULE, {bind, Id, Metadata, Value}, infinity) of
         {error, not_found} ->
-            {ok, _} = gen_server:call(?MODULE, {declare, Id, Metadata, Type}, infinity),
+            {ok, _} = gen_server:call(?MODULE,
+                                      {declare, Id, Metadata, Type},
+                                      infinity),
             local_bind(Id, Type, Metadata, Value);
         {ok, X} ->
            {ok, X}

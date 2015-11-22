@@ -30,7 +30,8 @@
 
 %% API
 -export([new/0, value/1, update/3, merge/2, equal/2,
-         to_binary/1, from_binary/1, value/2, precondition_context/1, stats/1, stat/2]).
+         to_binary/1, from_binary/1, value/2, precondition_context/1,
+         stats/1, stat/2]).
 -export([update/4, parent_clock/2]).
 -export([to_binary/2]).
 -export([to_version/2]).
@@ -52,7 +53,8 @@
 -export_type([orset/0, binary_orset/0, orset_op/0]).
 -opaque orset() :: orddict:orddict().
 
--type binary_orset() :: binary(). %% A binary that from_binary/1 will operate on.
+%% A binary that from_binary/1 will operate on.
+-type binary_orset() :: binary().
 
 -type orset_op() :: {add, member()} | {remove, member()} |
                     {add_all, [member()]} | {remove_all, [member()]} |
@@ -94,31 +96,31 @@ value(removed, ORDict0) ->
                                      length(ValidTokens) > 0
                              end, ORDict0),
     orddict:fetch_keys(ORDict1);
-value(_,ORSet) ->
+value(_, ORSet) ->
     value(ORSet).
 
 -spec update(orset_op(), actor(), orset()) -> {ok, orset()} |
-                                              {error, {precondition ,{not_present, member()}}}.
-update({add_by_token,Token,Elem}, _Actor, ORDict) ->
-    add_elem(Elem,Token,ORDict);
-update({add,Elem}, Actor, ORDict) ->
+                                              {error, {precondition, {not_present, member()}}}.
+update({add_by_token, Token, Elem}, _Actor, ORDict) ->
+    add_elem(Elem, Token, ORDict);
+update({add, Elem}, Actor, ORDict) ->
     Token = unique(Actor),
-    add_elem(Elem,Token,ORDict);
-update({add_all,Elems}, Actor, ORDict0) ->
-    OD = lists:foldl(fun(Elem,ORDict) ->
-                {ok, ORDict1} = update({add,Elem},Actor,ORDict),
+    add_elem(Elem, Token, ORDict);
+update({add_all, Elems}, Actor, ORDict0) ->
+    OD = lists:foldl(fun(Elem, ORDict) ->
+                {ok, ORDict1} = update({add, Elem}, Actor, ORDict),
                 ORDict1
             end, ORDict0, Elems),
     {ok, OD};
-update({remove,Elem}, _Actor, ORDict) ->
+update({remove, Elem}, _Actor, ORDict) ->
     remove_elem(Elem, ORDict);
-update({remove_all,Elems}, _Actor, ORDict0) ->
+update({remove_all, Elems}, _Actor, ORDict0) ->
     remove_elems(Elems, ORDict0);
 update({update, Ops}, Actor, ORDict) ->
     apply_ops(Ops, Actor, ORDict).
 
 -spec update(orset_op(), actor(), orset(), riak_dt:context()) ->
-                    {ok, orset()} | {error, {precondition ,{not_present, member()}}}.
+                    {ok, orset()} | {error, {precondition, {not_present, member()}}}.
 update(Op, Actor, ORDict, _Ctx) ->
     update(Op, Actor, ORDict).
 
@@ -128,8 +130,8 @@ parent_clock(_Clock, ORSet) ->
 
 -spec merge(orset(), orset()) -> orset().
 merge(ORDictA, ORDictB) ->
-    orddict:merge(fun(_Elem,TokensA,TokensB) ->
-            orddict:merge(fun(_Token,BoolA,BoolB) ->
+    orddict:merge(fun(_Elem, TokensA, TokensB) ->
+            orddict:merge(fun(_Token, BoolA, BoolB) ->
                     BoolA or BoolB
                 end, TokensA, TokensB)
         end, ORDictA, ORDictB).
@@ -184,7 +186,7 @@ stat(waste_pct, ORSet) ->
                                              ({_Tag, true}, {As, Rs}) ->
                                                   {As, Rs + 1}
                                           end, Acc0, Tags)
-                      end, {0,0}, ORSet),
+                      end, {0, 0}, ORSet),
     AllTags = Tags + Tombs,
     case Tags of
         0 -> 0;
@@ -255,7 +257,7 @@ filter(Function, V) ->
 
 
 %% Private
-add_elem(Elem,Token,ORDict) ->
+add_elem(Elem, Token, ORDict) ->
     case orddict:find(Elem, ORDict) of
         {ok, Tokens} ->
             Tokens1 = orddict:store(Token, false, Tokens),
@@ -280,7 +282,7 @@ remove_elem(Elem, ORDict) ->
 remove_elems([], ORDict) ->
     {ok, ORDict};
 remove_elems([Elem|Rest], ORDict) ->
-    case remove_elem(Elem,ORDict) of
+    case remove_elem(Elem, ORDict) of
         {ok, ORDict1} -> remove_elems(Rest, ORDict1);
         Error         -> Error
     end.
@@ -397,7 +399,7 @@ update_expected(ID, {add_all, Elems}, State) ->
 update_expected(ID, {remove_all, Elems}, {_Cnt, Dict}=State) ->
     %% Only if _all_ elements are in the set do we remove any elems
     {A, R} = dict:fetch(ID, Dict),
-    Members = [E ||  {E, _X} <- sets:to_list(sets:union(A,R))],
+    Members = [E ||  {E, _X} <- sets:to_list(sets:union(A, R))],
     case sets:is_subset(sets:from_list(Elems), sets:from_list(Members)) of
         true ->
             lists:foldl(fun(Elem, S) ->

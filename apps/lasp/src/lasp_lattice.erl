@@ -170,7 +170,8 @@ is_lattice_inflation(lasp_orset_gbtree, Previous, Current) ->
                             none ->
                                 Acc andalso false;
                             {value, Ids1} ->
-                                Acc andalso ids_inflated(lasp_orset_gbtree, Ids, Ids1)
+                                Acc andalso ids_inflated(lasp_orset_gbtree,
+                                                         Ids, Ids1)
                         end
                 end, true, Previous);
 
@@ -274,8 +275,11 @@ is_lattice_strict_inflation(lasp_orset, Previous, Current) ->
     NewElements = length(Previous) < length(Current),
     IsLatticeInflation andalso (DeletedElements orelse NewElements);
 
-is_lattice_strict_inflation(riak_dt_orswot, {PV, PE, _}=Previous, {CV, CE, _}=Current) ->
-    IsLatticeInflation = is_lattice_inflation(riak_dt_orswot, Previous, Current),
+is_lattice_strict_inflation(riak_dt_orswot,
+                            {PV, PE, _}=Previous,
+                            {CV, CE, _}=Current) ->
+    IsLatticeInflation = is_lattice_inflation(riak_dt_orswot, Previous,
+                                              Current),
     DeletedElements = dict:size(PE) > dict:size(CE),
     DominatedClock = riak_dt_vclock:dominates(CV, PV),
     EqualClocks = riak_dt_vclock:equal(CV, PV),
@@ -283,8 +287,11 @@ is_lattice_strict_inflation(riak_dt_orswot, {PV, PE, _}=Previous, {CV, CE, _}=Cu
         (EqualClocks andalso DeletedElements) orelse
         DominatedClock);
 
-is_lattice_strict_inflation(riak_dt_map, {PV, PE, _}=Previous, {CV, CE, _}=Current) ->
-    IsLatticeInflation = is_lattice_inflation(riak_dt_orswot, Previous, Current),
+is_lattice_strict_inflation(riak_dt_map,
+                            {PV, PE, _}=Previous,
+                            {CV, CE, _}=Current) ->
+    IsLatticeInflation = is_lattice_inflation(riak_dt_orswot, Previous,
+                                              Current),
     DeletedElements = dict:size(PE) > dict:size(CE),
     DominatedClock = riak_dt_vclock:dominates(CV, PV),
     EqualClocks = riak_dt_vclock:equal(CV, PV),
@@ -331,7 +338,8 @@ causal_product(lasp_orset, Xs, Ys) ->
 causal_product(lasp_orset_gbtree, Xs, Ys) ->
     gb_trees_ext:foldl(fun(X, XDeleted, XAcc) ->
                 gb_trees_ext:foldl(fun(Y, YDeleted, YAcc) ->
-                            gb_trees:enter([X, Y], XDeleted orelse YDeleted, YAcc)
+                            gb_trees:enter([X, Y], XDeleted orelse YDeleted,
+                                           YAcc)
                     end, XAcc, Ys)
         end, gb_trees:empty(), Xs).
 
@@ -500,9 +508,15 @@ riak_dt_map_inflation_test() ->
     A1 = riak_dt_map:new(),
     B1 = riak_dt_map:new(),
 
-    {ok, A2} = riak_dt_map:update({update, [{update, {'X', riak_dt_orset}, {add, 1}}]}, a, A1),
-    {ok, B2} = riak_dt_map:update({update, [{update, {'X', riak_dt_orset}, {add, 2}}]}, b, B1),
-    {ok, A3} = riak_dt_map:update({update, [{update, {'X', riak_dt_orset}, {remove, 1}}]}, a, A2),
+    {ok, A2} = riak_dt_map:update({update, [{update,
+                                             {'X', riak_dt_orset},
+                                              {add, 1}}]}, a, A1),
+    {ok, B2} = riak_dt_map:update({update, [{update,
+                                             {'X', riak_dt_orset},
+                                              {add, 2}}]}, b, B1),
+    {ok, A3} = riak_dt_map:update({update, [{update,
+                                             {'X', riak_dt_orset},
+                                              {remove, 1}}]}, a, A2),
 
     %% A1 and B1 are equivalent.
     ?assertEqual(true, is_lattice_inflation(riak_dt_map, A1, B1)),
@@ -520,9 +534,15 @@ riak_dt_map_strict_inflation_test() ->
     A1 = riak_dt_map:new(),
     B1 = riak_dt_map:new(),
 
-    {ok, A2} = riak_dt_map:update({update, [{update, {'X', riak_dt_orset}, {add, 1}}]}, a, A1),
-    {ok, B2} = riak_dt_map:update({update, [{update, {'X', riak_dt_orset}, {add, 2}}]}, b, B1),
-    {ok, A3} = riak_dt_map:update({update, [{update, {'X', riak_dt_orset}, {remove, 1}}]}, a, A2),
+    {ok, A2} = riak_dt_map:update({update, [{update,
+                                             {'X', riak_dt_orset},
+                                              {add, 1}}]}, a, A1),
+    {ok, B2} = riak_dt_map:update({update, [{update,
+                                             {'X', riak_dt_orset},
+                                              {add, 2}}]}, b, B1),
+    {ok, A3} = riak_dt_map:update({update, [{update,
+                                             {'X', riak_dt_orset},
+                                              {remove, 1}}]}, a, A2),
 
     %% A1 and B1 are equivalent.
     ?assertEqual(false, is_lattice_strict_inflation(riak_dt_map, A1, B1)),

@@ -37,7 +37,7 @@
          summarize/1]).
 
 run() ->
-    lasp_simulator:run(?MODULE).
+    lasp_simulation:run(?MODULE).
 
 %% Macro definitions.
 
@@ -76,8 +76,7 @@ summarize(#state{leaderboard_id=LeaderboardId}=State) ->
     %% Read the result and print it.
     {ok, FinalLeaderboard} = lasp:query(LeaderboardId),
     Final = orddict:to_list(FinalLeaderboard),
-    io:format("Final Leaderboard: ~p", [Final]),
-
+    lager:info("Final Leaderboard: ~p", [Final]),
     {ok, State}.
 
 %% @doc Terminate any running clients gracefully issuing final
@@ -104,7 +103,9 @@ client(Runner, Id, LeaderboardId, Leaderboard0) ->
     receive
         {complete_game, Score} ->
             %% Update local leaderboard.
-            {ok, Leaderboard} = lasp_top_k_var:update({set, Id, Score}, Id, Leaderboard0),
+            {ok, Leaderboard} = lasp_top_k_var:update({set, Id, Score},
+                                                      Id,
+                                                      Leaderboard0),
 
             %% Notify the harness that an event has been processed.
             Runner ! {event, Score},
@@ -112,13 +113,15 @@ client(Runner, Id, LeaderboardId, Leaderboard0) ->
             client(Runner, Id, LeaderboardId, Leaderboard);
         terminate ->
             %% Synchronize copy of leaderboard.
-            {ok, {_, _, _, Leaderboard}} = lasp:bind(LeaderboardId, Leaderboard0),
+            {ok, {_, _, _, Leaderboard}} = lasp:bind(LeaderboardId,
+                                                     Leaderboard0),
 
             ok
     after
         10 ->
             %% Synchronize copy of leaderboard.
-            {ok, {_, _, _, Leaderboard}} = lasp:bind(LeaderboardId, Leaderboard0),
+            {ok, {_, _, _, Leaderboard}} = lasp:bind(LeaderboardId,
+                                                     Leaderboard0),
 
             client(Runner, Id, LeaderboardId, Leaderboard)
     end.

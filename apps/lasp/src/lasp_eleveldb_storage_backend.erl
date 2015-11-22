@@ -18,8 +18,8 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_ets_storage_backend).
--author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
+-module(lasp_eleveldb_storage_backend).
+-author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).
 -behaviour(lasp_storage_backend).
@@ -41,20 +41,24 @@
          code_change/3]).
 
 %% reference tpe
--type ref() :: atom().
+-type ref() :: eleveldb:db_ref().
 
 %% State record
 -record(state, {ref :: ref()}).
+
+%% eleveldb configuration options.
+-define(OPEN_OPTS, [{create_if_missing, true}]).
+-define(READ_OPTS, []).
+-define(WRITE_OPTS, []).
 
 %%%===================================================================
 %%% lasp_storage_backend callbacks
 %%%===================================================================
 
 %% @doc Start and link to calling process.
--spec start(atom())-> {ok, atom()}.
+-spec start(atom())-> {ok, pid()} | ignore | {error, term()}.
 start(Identifier) ->
-    {ok, _Pid} = gen_server:start_link({local, Identifier}, ?MODULE, [Identifier], []),
-    {ok, Identifier}.
+    gen_server:start_link({local, Identifier}, ?MODULE, [Identifier], []).
 
 %% @doc Write a record to the backend.
 -spec put(ref(), id(), variable()) -> ok | {error, atom()}.
@@ -67,7 +71,8 @@ update(Ref, Id, Function) ->
     gen_server:call(Ref, {update, Id, Function}, infinity).
 
 %% @doc Retrieve a record from the backend.
--spec get(ref(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
+-spec get(ref(), id()) -> {ok, variable()} | {error, not_found} |
+                          {error, atom()}.
 get(Ref, Id) ->
     gen_server:call(Ref, {get, Id}, infinity).
 
@@ -77,15 +82,21 @@ get(Ref, Id) ->
 
 %% @private
 init([Identifier]) ->
-    try
-        Identifier = ets:new(Identifier, [set,
-                                          named_table,
-                                          public,
-                                          {write_concurrency, true}]),
-        {ok, #state{ref=Identifier}}
-    catch
-        _:Reason ->
-            lager:info("Backend initialization failed!"),
+    %% Get the data root directory
+    Config = app_helper:get_env(?APP),
+    DataDir = filename:join(app_helper:get_prop_or_env(data_root,
+                                                       Config,
+                                                       eleveldb),
+                            atom_to_list(Identifier)),
+
+    %% Ensure directory.
+    ok = filelib:ensure_dir(filename:join(DataDir, "leveldb")),
+
+    case eleveldb:open(DataDir, ?OPEN_OPTS) of
+        {ok, Ref} ->
+            {ok, #state{ref=Ref}};
+        {error, Reason} ->
+            lager:info("Failed to open backend: ~p", [Reason]),
             {stop, Reason}
     end.
 
@@ -102,7 +113,9 @@ handle_call({update, Id, Function}, _From, #state{ref=Ref}=State) ->
             {NewValue, InnerResult} = Function(Value),
             case do_put(Ref, Id, NewValue) of
                 ok ->
-                    InnerResult
+                    InnerResult;
+                Error ->
+                    Error
             end;
         Error ->
             Error
@@ -134,18 +147,36 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-%% @doc Retrieve a record from the backend.
--spec do_get(ref(), id()) -> {ok, variable()} | {error, not_found} | {error, atom()}.
+%% @doc Encoding of object to binary before LevelDB write.
+encode(X) ->
+    term_to_binary(X).
+
+%% @doc Decoding of object to binary after LevelDB read.
+decode(X) ->
+    binary_to_term(X).
+
 do_get(Ref, Id) ->
-    case ets:lookup(Ref, Id) of
-        [{_Key, Record}] ->
-            {ok, Record};
-        [] ->
-            {error, not_found}
+    StorageKey = encode(Id),
+    case eleveldb:get(Ref, StorageKey, ?READ_OPTS) of
+        {ok, Value} ->
+            {ok, decode(Value)};
+        not_found ->
+            {error, not_found};
+        {error, Reason} ->
+            lager:info("Error reading object; id: ~p, reason: ~p",
+                       [Id, Reason]),
+            {error, Reason}
     end.
 
-%% @doc Write a record to the backend.
--spec do_put(ref(), id(), variable()) -> ok.
 do_put(Ref, Id, Record) ->
-    true = ets:insert(Ref, {Id, Record}),
-    ok.
+    StorageKey = encode(Id),
+    StorageValue = encode(Record),
+    Updates = [{put, StorageKey, StorageValue}],
+    case eleveldb:write(Ref, Updates, ?WRITE_OPTS) of
+        ok ->
+            ok;
+        {error, Reason} ->
+            lager:info("Error writing object; id: ~p, reason: ~p",
+                       [Id, Reason]),
+            {error, Reason}
+    end.

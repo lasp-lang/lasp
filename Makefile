@@ -24,6 +24,8 @@ clean:
 ## Test targets
 ##
 
+check: test xref dialyzer lint
+
 test: ct eunit
 
 lint:

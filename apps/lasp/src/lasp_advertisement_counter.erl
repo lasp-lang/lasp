@@ -38,7 +38,7 @@
          summarize/1]).
 
 run() ->
-    lasp_simulator:run(?MODULE).
+    lasp_simulation:run(?MODULE).
 
 %% Macro definitions.
 
@@ -165,7 +165,7 @@ summarize(#state{ad_list=AdList}=State) ->
     lager:info("AdList is: ~p", [AdList]),
     Overcounts = lists:map(fun(#ad{counter=CounterId}) ->
                 {ok, V} = lasp:query(CounterId),
-                lager:info("Advertisement ~p reached max impressions: ~p with ~p....",
+                lager:info("Advertisement ~p reached max: ~p with ~p....",
                            [CounterId, ?MAX_IMPRESSIONS, V]),
                 V - ?MAX_IMPRESSIONS
         end, AdList),
@@ -176,7 +176,8 @@ summarize(#state{ad_list=AdList}=State) ->
     TotalOvercount = lists:foldl(Sum, 0, Overcounts),
     io:format("----------------------------------------"),
     io:format("Total overcount: ~p~n", [TotalOvercount]),
-    io:format("Mean overcount per client: ~p~n", [TotalOvercount / ?NUM_CLIENTS]),
+    io:format("Mean overcount per client: ~p~n",
+              [TotalOvercount / ?NUM_CLIENTS]),
     io:format("----------------------------------------"),
 
     {ok, State}.
@@ -260,7 +261,7 @@ synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
     %% Get latest list of advertisements from the server.
     {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
     AdList = ?SET:value(AdsWithContracts),
-    Identifiers = [Id || {#ad{counter=Id},_} <- AdList],
+    Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
     %% Refresh our dictionary with any new values from the server.
     %%

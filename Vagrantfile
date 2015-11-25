@@ -32,7 +32,7 @@ Vagrant.configure(2) do |config|
       rm erlang-solutions_1.0_all.deb
 
       # Install fpm
-      sudo apt-get install ruby-dev gcc make
+      sudo apt-get install -y ruby-dev gcc make
       sudo gem install fpm
     SHELL
   end

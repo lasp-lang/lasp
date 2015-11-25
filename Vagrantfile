@@ -22,7 +22,18 @@ Vagrant.configure(2) do |config|
 
     trusty64.vm.provision "shell", inline: <<-SHELL
       sudo apt-get update
-      sudo apt-get install -y build-essential git devscripts debhelper erlang
+      sudo apt-get install -y build-essential git devscripts debhelper
+
+      # Use Erlang Solutions packages for Erlang 18.
+      wget http://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb
+      sudo dpkg -i erlang-solutions_1.0_all.deb
+      sudo apt-get update
+      sudo apt-get install -y erlang
+      rm erlang-solutions_1.0_all.deb
+
+      # Install fpm
+      sudo apt-get install ruby-dev gcc make
+      sudo gem install fpm
     SHELL
   end
 

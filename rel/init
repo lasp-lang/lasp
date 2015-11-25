@@ -7,6 +7,6 @@ HOME=/opt/$PACKAGE/
 
 mkdir -p /var/log/$PACKAGE
 
-chown -R /opt/$PACKAGE /var/lib/$PACKAGE /opt/$PACKAGE/log /var/log/$PACKAGE
+chown -R $PACKAGE /opt/$PACKAGE /var/lib/$PACKAGE /opt/$PACKAGE/log /var/log/$PACKAGE
 
 su $PACKAGE -mc "/opt/$PACKAGE/bin/$PACKAGE $@"

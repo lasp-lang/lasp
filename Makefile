@@ -15,8 +15,12 @@ all: compile
 compile:
 	$(REBAR) compile
 
-clean:
+clean: packageclean
 	$(REBAR) clean
+
+packageclean:
+	rm -fr *.deb
+	rm -fr *.tar.gz
 
 ##
 ## Test targets
@@ -52,7 +56,7 @@ stage:
 ## Packaging targets
 ##
 
-package:
+package: rel
 	fpm -s dir -t deb -n $(PACKAGE) -v $(VERSION) \
 	    --before-install=rel/before-install \
 	    _build/default/rel/$(PACKAGE)=/opt/ \
@@ -60,6 +64,12 @@ package:
 	    rel/var/lib/$(PACKAGE)/=/var/lib/$(PACKAGE)/ \
 	    rel/etc/$(PACKAGE)/$(PACKAGE).config=/etc/$(PACKAGE)/$(PACKAGE).config \
 	    rel/etc/default/$(PACKAGE)=/etc/default/$(PACKAGE)
+
+cut:
+	./rebar3 as package hex cut
+
+publish:
+	./rebar3 as package hex publish
 
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 

@@ -63,6 +63,7 @@ package: rel
 	    _build/default/rel/$(PACKAGE)=/opt/ \
 	    rel/init=/etc/init.d/$(PACKAGE) \
 	    rel/var/lib/$(PACKAGE)/=/var/lib/$(PACKAGE)/ \
+	    rel/var/log/$(PACKAGE)/=/var/log/$(PACKAGE)/ \
 	    rel/etc/$(PACKAGE)/$(PACKAGE).config=/etc/$(PACKAGE)/$(PACKAGE).config \
 	    rel/etc/default/$(PACKAGE)=/etc/default/$(PACKAGE)
 

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-export PACKAGE=lasp
+PACKAGE=lasp
 HOME=/opt/$PACKAGE/
 
 [ -f /etc/default/$PACKAGE ] && . /etc/default/$PACKAGE

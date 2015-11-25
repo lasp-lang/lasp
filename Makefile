@@ -1,9 +1,7 @@
-REPO            ?= lasp
-PKG_REVISION    ?= $(shell git describe --tags)
-PKG_BUILD        = 1
+PACKAGE         ?= lasp
+VERSION         ?= $(shell git describe --tags)
 BASE_DIR         = $(shell pwd)
 ERLANG_BIN       = $(shell dirname $(shell which erl))
-OVERLAY_VARS    ?=
 REBAR            = $(shell pwd)/rebar3
 
 .PHONY: rel deps test eqc
@@ -49,6 +47,19 @@ rel:
 
 stage:
 		./rebar3 release -d
+
+##
+## Packaging targets
+##
+
+package:
+	fpm -s dir -t deb -n $(PACKAGE) -v $(VERSION) \
+	    --before-install=rel/before-install \
+	    _build/default/rel/$(PACKAGE)=/opt/ \
+	    rel/init=/etc/init.d/$(PACKAGE) \
+	    rel/var/lib/$(PACKAGE)/=/var/lib/$(PACKAGE)/ \
+	    rel/etc/$(PACKAGE)/$(PACKAGE).config=/etc/$(PACKAGE)/$(PACKAGE).config \
+	    rel/etc/default/$(PACKAGE)=/etc/default/$(PACKAGE)
 
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 

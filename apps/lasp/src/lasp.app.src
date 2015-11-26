@@ -11,6 +11,7 @@
           time_compat,plumtree]},
      {mod,{lasp_app,[]}},
      {env,
-         [{peer_service,lasp_plumtree_peer_service},
+         [{data_root, "data"},
+          {peer_service,lasp_plumtree_peer_service},
           {distribution_backend,lasp_plumtree_broadcast_distribution_backend},
           {storage_backend,lasp_dets_storage_backend}]}]}.

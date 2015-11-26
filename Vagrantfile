@@ -15,12 +15,15 @@ Vagrant.configure(2) do |config|
   config.vm.define "trusty64" do |trusty64|
     trusty64.vm.box = "ubuntu/trusty64"
 
+    trusty64.vm.hostname = "localhost.tld"
+
     trusty64.vm.provider :virtualbox do |vb|
       vb.customize ["modifyvm", :id, "--memory", "2048"]
       vb.customize ["modifyvm", :id, "--cpus", "2"]
     end
 
     trusty64.vm.provision "shell", inline: <<-SHELL
+      # Packages
       sudo apt-get update
       sudo apt-get install -y build-essential git devscripts debhelper
 

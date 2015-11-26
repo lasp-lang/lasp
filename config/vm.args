@@ -1,0 +1,5 @@
+## Name of the node
+-name lasp
+
+## Cookie for distributed erlang
+-setcookie lasp

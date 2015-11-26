@@ -119,7 +119,7 @@ start_node(Name, Config, Case) ->
             ok = rpc:call(Node, application, set_env, [plumtree,
                                                        plumtree_data_dir,
                                                        NodeDir]),
-            ok = rpc:call(Node, application, set_env, [eleveldb,
+            ok = rpc:call(Node, application, set_env, [lasp,
                                                        data_root,
                                                        NodeDir]),
             {ok, _} = rpc:call(Node, application, ensure_all_started, [lasp]),

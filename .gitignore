@@ -25,3 +25,4 @@ build
 _build/
 TEST-*
 data/
+*.deb

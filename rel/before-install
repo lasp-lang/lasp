@@ -1,1 +1,2 @@
-adduser lasp --system
+addgroup lasp 
+adduser lasp --ingroup lasp --system

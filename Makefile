@@ -59,6 +59,7 @@ stage:
 package: rel
 	fpm -s dir -t deb -n $(PACKAGE) -v $(VERSION) \
 	    --deb-user $(PACKAGE) \
+	    --deb-group $(PACKAGE) \
 	    --before-install=rel/before-install \
 	    _build/default/rel/$(PACKAGE)=/opt/ \
 	    rel/init=/etc/init.d/$(PACKAGE) \

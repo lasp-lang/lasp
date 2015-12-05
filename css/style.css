@@ -39,11 +39,17 @@ body {
 .jumbotron {
   text-align: center;
   border-bottom: 1px solid #e5e5e5;
+  margin-top: 4em;
+  color: #3F1F69;
 }
 
 .jumbobtn {
   padding: 14px 24px;
   font-size: 21px;
+}
+
+a.heading-link {
+  padding-top: 2em;
 }
 
 .inlineblock {
@@ -72,14 +78,26 @@ body {
   }
 }
 
+.navbar-default .navbar-nav > li > a:hover, .navbar-default .navbar-nav > li > a:focus {
+  color: #3F1F69;
+}
+
+a {
+  color: #3F1F69;
+}
+
+a:hover, a:focus {
+  color: #777;
+}
+
 .ribbon {
+  z-index: 999999999999999999999999999999999999;
   background-color: #a00;
-  overflow: hidden;
   white-space: nowrap;
   /* top left corner */
   position: fixed;
   left: -50px;
-  top: 40px;
+  top: 30px;
   /* 45 deg ccw rotation */
   -webkit-transform: rotate(-45deg);
      -moz-transform: rotate(-45deg);
@@ -102,4 +120,8 @@ body {
   text-decoration: none;
   /* shadow */
   text-shadow: 0 0 5px #444;
+}
+
+li iframe {
+  margin-top: 0.75em;
 }

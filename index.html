@@ -25,23 +25,52 @@
     <![endif]-->
   </head>
   <body>
-    <div class="container">
-      <div class="header clearfix">
-        <div class="pull-right">
-          <a aria-label="Star lasp-lang/lasp on GitHub" data-count-aria-label="# stargazers on GitHub" data-count-api="/repos/lasp-lang/lasp#stargazers_count" data-count-href="/lasp-lang/lasp/stargazers" data-style="mega" data-icon="octicon-star" href="https://github.com/lasp-lang/lasp" class="github-button">Star</a>
-          <a aria-label="Watch lasp-lang/lasp on GitHub" data-count-aria-label="# watchers on GitHub" data-count-api="/repos/lasp-lang/lasp#subscribers_count" data-count-href="/lasp-lang/lasp/watchers" data-style="mega" data-icon="octicon-eye" href="https://github.com/lasp-lang/lasp" class="github-button">Watch</a>
-        </div>
-        <img src="images/lasp-logo-tiny.png" />
-      </div>
+    <!-- Fixed navbar -->
+    <div class="ribbon">
+      <a href="https://github.com/lasp-lang/lasp">Visit us on GitHub</a>
+    </div>
 
-      <div class="ribbon">
-        <a href="https://github.com/lasp-lang/lasp">Visit us on GitHub</a>
+    <nav class="navbar navbar-default navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a href="#">
+            <img src="images/lasp-logo-tiny.png" />
+          </a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+          <ul class="nav navbar-nav">
+            <li><a href="#why-lasp">Why Lasp?</a></li>
+            <li><a href="#learn-it">Learn</a></li>
+            <li><a href="#run-it">Run</a></li>
+            <li><a href="#sample-code">Sample</a></li>
+            <li><a href="#resources">Resources</a></li>
+          </ul>
+          <ul class="nav navbar-nav navbar-right">
+            <li>
+              <a aria-label="Star lasp-lang/lasp on GitHub" data-count-aria-label="# stargazers on GitHub" data-count-api="/repos/lasp-lang/lasp#stargazers_count" data-count-href="/lasp-lang/lasp/stargazers" data-style="mega" data-icon="octicon-star" href="https://github.com/lasp-lang/lasp" class="github-button">Star</a>
+            </li>
+            <li>
+              <a aria-label="Watch lasp-lang/lasp on GitHub" data-count-aria-label="# watchers on GitHub" data-count-api="/repos/lasp-lang/lasp#subscribers_count" data-count-href="/lasp-lang/lasp/watchers" data-style="mega" data-icon="octicon-eye" href="https://github.com/lasp-lang/lasp" class="github-button">Watch</a>
+            </li>
+          </ul>
+        </div><!--/.nav-collapse -->
       </div>
+    </nav>
+
+    <div class="container">
 
       <div class="jumbotron">
         <img src="images/lasp-logo-text-small.png" />
         <p class="lead">A Language for Distributed, Eventually Consistent Computations</p>
       </div>
+
+      <a class="heading-link" name="why-lasp"></a>
 
       <div class="row marketing">
         <div class="col-lg-12">
@@ -49,7 +78,9 @@
           <p align="justify">Lasp is a new programming model designed to simplify large scale, fault-tolerant, distributed programming. It leverages ideas from distributed dataflow extended with <a href="http://en.wikipedia.org/wiki/Conflict-free_replicated_data_type">convergent replicated data types, or CRDTs</a>. This supports computations where not all participants are online together at a given moment. The initial design supports synchronization-free programming by combining CRDTs together with primitives for composing them inspired by functional programming. This lets us write long-lived fault-tolerant distributed applications, including ones with nonmonotonic behavior, in a functional paradigm.</p>
         </div>
 
+
         <div class="col-lg-12">
+          <a class="heading-link" name="learn-it"></a>
           <h4>Learn about Lasp!</h4>
           <p align="justify">Listen to Christopher Meiklejohn discuss the inspiration and design for the Lasp programming model.</p>
           <div style="text-align:center">
@@ -57,29 +88,54 @@
           </div>
         </div>
 
+
         <div class="col-lg-12">
+          <a class="heading-link" name="run-it"></a>
           <h4>Run Lasp with Docker!</h4>
           <p align="justify">Follow these two easy steps to get a Lasp instance running with Docker! (For this image to run correctly, the docker-machine needs to be configured with more than one processor.)</p>
           <pre data-src="samples/docker.sh" class="language-bash"></pre>
         </div>
 
+
         <div class="col-lg-12">
+          <a class="heading-link" name="sample-code"></a>
           <h4>Erlang Code Sample</h4>
           <p align="justify">Lasp's prototype implementation is provided
           as an Erlang library.  Erlang is an excellent language for distribution and concurrency, and allows us to prototype new features for Lasp quickly.  Below is a code sample for creating a distributed set and applying a map function to the set.</p>
           <pre data-src="samples/map.erl" class="language-erlang"></pre>
         </div>
 
+
+        <div class="col-lg-12">
+          <a class="heading-link" name="resources"></a>
+          <h4>Resources</h4>
+        </div>
+
         <div class="col-lg-6">
-          <h4>Talks</h4>
+          <h5>Talks</h5>
           <p align="justify">There have been several talks about Lasp, but for a good overview of how the language and runtime work:</p>
           <ul>
             <li><a href="https://www.youtube.com/watch?v=uwpakTIg9r8&index=3&list=PLWbHc_FXPo2h0sJW6X2RZDtT1ndw6KKpQ">Erlang Factory 2015</a></li>
             <li><a href="https://www.youtube.com/watch?v=AF8fpDzfUOc">GOTO Chicago 2015</a></li>
             <li><a href="https://www.youtube.com/watch?v=lsKaNDj4TrE">Strange Loop 2015</a></li>
           </ul>
+        </div>
 
-          <h4>Blogs and Articles</h4>
+        <div class="col-lg-6">
+          <h5>Proceedings</h5>
+          <p align="justify">Conference and workshop papers relating to Lasp and its predecesors, have been presented at:</p>
+          <ul>
+            <li><a href="http://dl.acm.org/citation.cfm?id=2633451">Erlang Workshop 2014</a></li>
+            <li><a href="http://christophermeiklejohn.com/publications/derflowl-ladis.pdf">LADIS Workshop 2014</a></li>
+            <li><a href="http://dl.acm.org/citation.cfm?id=2745954">PaPoC 2015</a></li>
+            <li><a href="http://dl.acm.org/citation.cfm?id=2790525">PPDP 2015</a></li>
+            <li><a href="https://christophermeiklejohn.com/publications/wpsds-2015-preprint.pdf">W-PSDS 2015</a></li>
+            <li><a href="http://dl.acm.org/citation.cfm?id=2804300">Erlang Workshop 2015</a></li>
+          </ul>
+        </div>
+
+        <div class="col-lg-6">
+          <h5>Blogs and Articles</h5>
           <p align="justify">A blog series on Lasp is available:
             <ul>
               <li><a href="http://christophermeiklejohn.com/derflow/erlang/2014/09/28/try-derflow.html">Part 1</a></li>
@@ -90,21 +146,10 @@
             </ul>
             Lasp has also been featured in <a href="http://www.infoq.com/articles/Highly-Distributed-Computations-Without-Synchronization">InfoQ</a>.
           </p>
-
         </div>
-        <div class="col-lg-6">
-          <h4>Proceedings</h4>
-          <p align="justify">Conference and workshop papers relating to Lasp and its predecesors, have been presented at:</p>
-          <ul>
-            <li><a href="http://dl.acm.org/citation.cfm?id=2633451">Erlang Workshop 2014</a></li>
-            <li><a href="http://christophermeiklejohn.com/publications/derflowl-ladis.pdf">LADIS Workshop 2014</a></li>
-            <li><a href="http://dl.acm.org/citation.cfm?id=2745954">PaPoC 2015</a></li>
-            <li><a href="http://dl.acm.org/citation.cfm?id=2790525">PPDP 2015</a></li>
-            <li><a href="https://christophermeiklejohn.com/publications/wpsds-2015-preprint.pdf">W-PSDS 2015</a></li>
-            <li><a href="http://dl.acm.org/citation.cfm?id=2804300">Erlang Workshop 2015</a></li>
-          </ul>
 
-          <h4>Seminars</h4>
+        <div class="col-lg-6">
+          <h5>Seminars</h5>
           <p align="justify">Lasp has been presented at:</>
           <ul>
             <li><a href="https://www.inesc-id.pt/seminars.php?i=597">INESC-ID</a></li>

@@ -51,7 +51,9 @@
 -type id() :: binary().
 -type idx() :: term().
 -type result() :: term().
--type type() :: lasp_ivar | lasp_orset | lasp_orset_gbtree | lasp_top_k_var | {lasp_top_k_var, [any()]} | riak_dt_gcounter.
+-type type() :: lasp_ivar | lasp_orset | lasp_orset_gbtree |
+    lasp_top_k_var | {lasp_top_k_var, [any()]} | riak_dt_gcounter |
+    lasp_pncounter.
 -type value() :: term().
 -type func() :: atom().
 -type args() :: list().

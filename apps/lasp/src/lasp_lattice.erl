@@ -64,6 +64,11 @@ threshold_met(lasp_ivar, Value, Threshold) when Value =:= Threshold ->
 threshold_met(lasp_ivar, Value, Threshold) when Value =/= Threshold ->
     false;
 
+threshold_met(lasp_pncounter, Value, {strict, Threshold}) ->
+    is_strict_inflation(lasp_pncounter, Threshold, Value);
+threshold_met(lasp_pncounter, Value, Threshold) ->
+    is_inflation(lasp_pncounter, Threshold, Value);
+
 threshold_met(lasp_top_k_var, Value, Threshold) ->
     is_inflation(lasp_top_k_var, Threshold, Value);
 
@@ -151,6 +156,9 @@ is_lattice_inflation(lasp_ivar, Previous, Current)
         when Previous =:= Current ->
     true;
 
+is_lattice_inflation(lasp_pncounter, [], _Current) ->
+    true;
+
 is_lattice_inflation(lasp_orswot, {Previous, _, _}, {Current, _, _}) ->
     riak_dt_vclock:descends(Current, Previous);
 
@@ -233,6 +241,13 @@ is_lattice_strict_inflation(lasp_ivar, undefined, Current)
     true;
 is_lattice_strict_inflation(lasp_ivar, _Previous, _Current) ->
     false;
+
+is_lattice_strict_inflation(lasp_pncounter, Previous, Current) when Previous =:= Current ->
+    false;
+is_lattice_strict_inflation(lasp_pncounter, [], []) ->
+    false;
+is_lattice_strict_inflation(lasp_pncounter, [], _Current) ->
+    true;
 
 is_lattice_strict_inflation(lasp_orswot, {Previous, _, _}, {Current, _, _}) ->
     riak_dt_vclock:dominates(Current, Previous);

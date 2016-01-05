@@ -46,7 +46,7 @@ run() ->
 -define(SET, lasp_orset).
 
 %% Counter type to use.
--define(COUNTER, lasp_pncounter).
+-define(COUNTER, riak_dt_gcounter).
 
 %% The maximum number of impressions for each advertisement to display.
 -define(MAX_IMPRESSIONS, 5).

@@ -156,8 +156,15 @@ is_lattice_inflation(lasp_ivar, Previous, Current)
         when Previous =:= Current ->
     true;
 
-is_lattice_inflation(lasp_pncounter, [], _Current) ->
-    true;
+is_lattice_inflation(lasp_pncounter, Previous, Current) ->
+    lists:foldl(fun({Actor, Inc, Dec}, Acc) ->
+            case lists:keyfind(Actor, 1, Current) of
+                false ->
+                    Acc andalso false;
+                {_Actor1, Inc1, Dec1} ->
+                    Acc andalso (Inc =< Inc1) andalso (Dec =< Dec1)
+            end
+            end, true, Previous);
 
 is_lattice_inflation(lasp_orswot, {Previous, _, _}, {Current, _, _}) ->
     riak_dt_vclock:descends(Current, Previous);

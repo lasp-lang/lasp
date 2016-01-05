@@ -76,6 +76,7 @@ all() ->
 %% ===================================================================
 
 -define(SET, lasp_orset).
+-define(COUNTER, lasp_pncounter).
 -define(ID, <<"myidentifier">>).
 
 ivar_test(Config) ->
@@ -182,20 +183,29 @@ fold_test(Config) ->
     %% Create initial set.
     {ok, {S1, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
 
-    %% Add elements to initial set and update.
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S1, {add_all, [1,2,3]}, a])),
+    %% Perform some operations.
+    ?assertMatch({ok, _},
+                 rpc:call(Node1, lasp, update, [S1, {add_all, [1,2,3]}, a])),
+    ?assertMatch({ok, _},
+                 rpc:call(Node1, lasp, update, [S1, {remove_all, [2,3]}, b])),
+    ?assertMatch({ok, _},
+                 rpc:call(Node1, lasp, update, [S1, {add, 2}, c])),
 
     %% Create second set.
-    {ok, {S2, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {S2, _, _, _}} = rpc:call(Node1, lasp, declare, [?COUNTER]),
+
+    %% Define the fold function.
+    FoldFun = fun(X, _Acc) ->
+                      case (X band 1) == 0 of
+                          true ->
+                              [{increment, 1}];
+                          false ->
+                              []
+                      end
+              end,
 
     %% Apply fold.
-    ?assertMatch(ok, rpc:call(Node1, lasp, fold, [S1, fun(X) -> [{X, X*2}] end, S2])),
-
-    %% Wait.
-    timer:sleep(4000),
-
-    %% Bind again.
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S1, {add_all, [4,5,6]}, a])),
+    ?assertMatch(ok, rpc:call(Node1, lasp, fold, [S1, FoldFun, S2])),
 
     %% Wait.
     timer:sleep(4000),
@@ -206,8 +216,8 @@ fold_test(Config) ->
     %% Read resulting value.
     {ok, {_, _, _, S2V1}} = rpc:call(Node1, lasp, read, [S2, {strict, undefined}]),
 
-    ?assertEqual({ok, [1,2,3,4,5,6], [{1,2},{2,4},{3,6},{4,8},{5,10},{6,12}]},
-                 {ok, ?SET:value(S1V4), ?SET:value(S2V1)}),
+    ?assertEqual({ok, [1,2], 1},
+                 {ok, ?SET:value(S1V4), ?COUNTER:value(S2V1)}),
 
     ok.
 

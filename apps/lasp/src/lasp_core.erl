@@ -1,5 +1,4 @@
-
-% -------------------------------------------------------------------
+%% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
 %%
@@ -513,26 +512,34 @@ bind_to(AccId, Id, Store, BindFun, ReadFun) ->
 -spec fold(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
+    {ok, {_, AccType, _, AccInitValue}} = ReadFun(AccId, undefined),
     Fun = fun({_, T, _, V}) ->
-            AccValue = case T of
-                lasp_orset_gbtree ->
-                    FolderFun = fun(X, Causality, Acc) ->
-                            lists:foldl(fun(Z, InnerAcc) ->
-                                        gb_trees:enter(Z,
-                                                       Causality,
-                                                       InnerAcc)
-                                end, Acc, Function(X))
-                    end,
-                    gb_trees_ext:foldl(FolderFun, T:new(), V);
-                lasp_orset ->
-                    FolderFun = fun({X, Causality}, Acc) ->
-                            Acc ++ [{Z, Causality} || Z <- Function(X)]
-                    end,
-                    lists:foldl(FolderFun, T:new(), V)
-            end,
+            AccValue = fold_internal(T, V, Function, AccType, AccInitValue),
             {ok, _} = BindFun(AccId, AccValue, Store)
     end,
     gen_flow:start_link(lasp_process, [[{Id, ReadFun}], Fun]).
+
+fold_internal(lasp_orset, Value, Function, AccType, AccValue) ->
+    lists:foldl(fun({X, Causality}, AccValue1) ->
+        lists:foldl(fun({Actor, Deleted}, AccValue2) ->
+                            %% Execute the fold function for the current
+                            %% element.
+                            Ops = Function(X, AccValue2),
+
+                            %% Apply all operations to the accumulator.
+                            lists:foldl(fun(Op, Acc) ->
+                                                {ok, A} = AccType:update(Op, Actor, Acc),
+                                                case Deleted of
+                                                    true ->
+                                                        InverseOp = lasp_operations:inverse(AccType, Op),
+                                                        {ok, B} = AccType:update(InverseOp, Actor, A),
+                                                        B;
+                                                    false ->
+                                                        A
+                                                end
+                                        end, AccValue2, Ops)
+            end, AccValue1, Causality)
+        end, AccValue, Value).
 
 %% @doc Compute the cartesian product of two sets.
 %%

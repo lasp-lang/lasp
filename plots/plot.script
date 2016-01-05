@@ -39,10 +39,6 @@ set key bottom right
 # set yrange [0:1]
 
 # Input file contains comma-separated values fields
-# set datafile separator ","
+set datafile separator ","
 
-# plot "template.dat" # \
-   # index 0 title "Example line" w lp ls 1, \
-# "" index 1 title "Another example" w lp ls 2
-plot 'plot.dat' using 1:2 title 'actual speedup' with linespoints, \
-     'plot.dat' using 1:3 title 'ideal speedup' with lines
+plot "/tmp/lasp_instrumentation.csv" using 1:2 title 'Anonymous CRDTs' with linespoints

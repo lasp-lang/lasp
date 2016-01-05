@@ -162,11 +162,8 @@ simulate(#state{client_list=ClientList}=State) ->
 summarize(#state{ad_list=AdList}=State) ->
     %% Wait until all advertisements have been exhausted before stopping
     %% execution of the test.
-    lager:info("AdList is: ~p", [AdList]),
     Overcounts = lists:map(fun(#ad{counter=CounterId}) ->
                 {ok, V} = lasp:query(CounterId),
-                lager:info("Advertisement ~p reached max: ~p with ~p....",
-                           [CounterId, ?MAX_IMPRESSIONS, V]),
                 V - ?MAX_IMPRESSIONS
         end, AdList),
 
@@ -203,9 +200,7 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
     {ok, _} = lasp:read(Counter, {value, ?MAX_IMPRESSIONS}),
 
     %% Remove the advertisement.
-    {ok, _} = lasp:update(Ads, {remove, Ad}, Ad),
-
-    lager:info("Removing ad: ~p", [Ad]).
+    {ok, _} = lasp:update(Ads, {remove, Ad}, Ad).
 
 %% @doc Client process; standard recurisve looping server.
 client(Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0) ->
@@ -262,7 +257,8 @@ create_advertisements_and_contracts(Ads, Contracts) ->
 %% @doc Periodically synchronize state with the server.
 synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
     %% Get latest list of advertisements from the server.
-    {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
+    Term1 = {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
+    log(Term1),
     AdList = ?SET:value(AdsWithContracts),
     Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
@@ -274,7 +270,8 @@ synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
     RefreshFun = fun({#ad{counter=Ad}, _}, Acc) ->
                       case dict:is_key(Ad, Acc) of
                           false ->
-                              {ok, {_, _, _, Counter}} = lasp:read(Ad, undefined),
+                              Term2 = {ok, {_, _, _, Counter}} = lasp:read(Ad, undefined),
+                              log(Term2),
                               dict:store(Ad, Counter, Acc);
                           true ->
                               Acc
@@ -289,7 +286,8 @@ synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
     %% 3.) Server returns the merged value to the client.
     %%
     SyncFun = fun(Ad, Counter0, Acc) ->
-                    {ok, {_, _, _, Counter}} = lasp:bind(Ad, Counter0),
+                    Term3 = {ok, {_, _, _, Counter}} = lasp:bind(Ad, Counter0),
+                    log(Term3),
                     case lists:member(Ad, Identifiers) of
                         true ->
                             dict:store(Ad, Counter, Acc);
@@ -318,3 +316,7 @@ servers(Ads, AdsWithContracts) ->
                 {ok, _} = lasp:update(Servers, {add, ServerPid}, undefined),
                 ServerPid
                 end, AdList).
+
+%% @private
+log(Term) ->
+    lasp_instrumentation:log(Term).

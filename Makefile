@@ -2,7 +2,7 @@ PACKAGE         ?= lasp
 VERSION         ?= $(shell git describe --tags)
 BASE_DIR         = $(shell pwd)
 ERLANG_BIN       = $(shell dirname $(shell which erl))
-REBAR            = rebar3
+REBAR            = $(shell pwd)/rebar3
 
 .PHONY: rel deps test eqc
 

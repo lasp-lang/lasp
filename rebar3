@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+
+erl -pz /Users/cmeiklejohn/.cache/rebar3/lib/*/ebin +sbtu +A0  -noshell -boot start_clean -s rebar3 main -extra "$@"

@@ -376,7 +376,7 @@ dynamic_ivar_test(Config) ->
     %% trigger a broadcast message because the variable is dynamic.
     {ok, {Id, _, _, Node1}} = rpc:call(Node1, lasp, bind, [?ID, Node1]),
 
-    %% Bind node 1's name to the value on node 1: this should not
+    %% Bind node 2's name to the value on node 2: this should not
     %% trigger a broadcast message because the variable is dynamic.
     {ok, {Id, _, _, Node2}} = rpc:call(Node2, lasp, bind, [?ID, Node2]),
 

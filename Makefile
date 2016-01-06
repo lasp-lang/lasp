@@ -2,7 +2,7 @@ PACKAGE         ?= lasp
 VERSION         ?= $(shell git describe --tags)
 BASE_DIR         = $(shell pwd)
 ERLANG_BIN       = $(shell dirname $(shell which erl))
-REBAR            = $(shell pwd)/rebar3
+REBAR            = rebar3
 
 .PHONY: rel deps test eqc
 
@@ -31,26 +31,26 @@ check: test xref dialyzer lint
 test: ct eunit
 
 lint:
-	./rebar3 as lint lint
+	${REBAR} as lint lint
 
 eqc:
-	./rebar3 as test eqc
+	${REBAR} as test eqc
 
 eunit:
-	./rebar3 as test eunit
+	${REBAR} as test eunit
 
 ct:
-	./rebar3 as test ct
+	${REBAR} as test ct
 
 ##
 ## Release targets
 ##
 
 rel:
-		./rebar3 release
+	${REBAR} release
 
 stage:
-		./rebar3 release -d
+	${REBAR} release -d
 
 ##
 ## Packaging targets
@@ -69,10 +69,10 @@ package: rel
 	    rel/etc/default/$(PACKAGE)=/etc/default/$(PACKAGE)
 
 cut:
-	./rebar3 as package hex cut
+	${REBAR} as package hex cut
 
 publish:
-	./rebar3 as package hex publish
+	${REBAR} as package hex publish
 
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 

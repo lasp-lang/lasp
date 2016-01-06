@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_instrumentation).
+-module(lasp_transmission_instrumentation).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).
@@ -26,6 +26,7 @@
 %% API
 -export([start_link/0,
          start_link/1,
+         start/2,
          log/1]).
 
 %% gen_server callbacks
@@ -39,9 +40,14 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {size=0, lines=""}).
+-record(state, {size=0,
+                clients=0,
+                lines="",
+                clock=0,
+                status=init,
+                filename}).
 
--define(FILENAME, "/tmp/lasp_instrumentation.csv").
+-define(INTERVAL, 10000).
 
 %%%===================================================================
 %%% API
@@ -61,6 +67,10 @@ start_link(Opts) ->
 log(Term) ->
     gen_server:call(?MODULE, {log, Term}, infinity).
 
+-spec start(list(), pos_integer()) -> ok | error().
+start(Filename, Clients) ->
+    gen_server:call(?MODULE, {start, Filename, Clients}, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -68,9 +78,9 @@ log(Term) ->
 %% @private
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
-    start_timer(),
-    Line = io_lib:format("Bytes\n", []),
-    {ok, #state{lines=Line}}.
+    Line = io_lib:format("Seconds,MegaBytes,MeanMegaBytesPerClient\n", []),
+    Line2 = io_lib:format("0,0,0\n", []),
+    {ok, #state{lines=Line ++ Line2}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -79,6 +89,10 @@ init([]) ->
 handle_call({log, Term}, _From, #state{size=Size0}=State) ->
     Size = termsize(Term),
     {reply, ok, State#state{size=Size0 + Size}};
+
+handle_call({start, Filename, Clients}, _From, State) ->
+    start_timer(),
+    {reply, ok, State#state{clock=0, clients=Clients, filename=Filename, status=running}};
 
 %% @private
 handle_call(Msg, _From, State) ->
@@ -93,13 +107,17 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(record, #state{size=Size, lines=Lines0}=State) ->
+handle_info(record, #state{filename=Filename, clients=Clients,
+                           size=Size, clock=Clock0, status=running, lines=Lines0}=State) ->
     start_timer(),
-    Line = io_lib:format("~w\n", [Size]),
+    Clock = Clock0 + ?INTERVAL,
+    Line = io_lib:format("~w,~w,~w\n",
+                         [clock(Clock),
+                          megasize(Size),
+                          megasize(Size) / Clients]),
     Lines = Lines0 ++ Line,
-    lager:info("~s", [Lines]),
-    ok = file:write_file(?FILENAME, Lines),
-    {noreply, State#state{size=0, lines=Lines}};
+    ok = file:write_file(filename(Filename), Lines),
+    {noreply, State#state{clock=Clock, size=0, lines=Lines}};
 
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
@@ -125,4 +143,18 @@ termsize(Term) ->
 
 %% @private
 start_timer() ->
-    timer:send_after(1000, record).
+    timer:send_after(?INTERVAL, record).
+
+%% @private
+filename(Filename) ->
+    "/tmp/lasp_transmission_instrumentation-" ++ Filename ++ ".csv".
+
+%% @private
+megasize(Size) ->
+    KiloSize = Size / 1024,
+    MegaSize = KiloSize / 1024,
+    MegaSize.
+
+%% @private
+clock(Clock) ->
+    Clock / 1000.

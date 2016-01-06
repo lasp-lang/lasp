@@ -54,9 +54,12 @@ init(_Args) ->
                  permanent, 5000, worker,
                  [lasp_plumtree_broadcast_distribution_backend]},
 
-    Instrumentation = {lasp_instrumentation,
-                {lasp_instrumentation, start_link, []},
-                 permanent, 5000, worker,
-                 [lasp_instrumentation]},
+    Transmission = {lasp_transmission_instrumentation,
+                    {lasp_transmission_instrumentation, start_link, []},
+                     permanent, 5000, worker,
+                     [lasp_transmission_instrumentation]},
 
-    {ok, {{one_for_one, 5, 10}, [Process, Unique, Plumtree, Instrumentation]}}.
+    {ok, {{one_for_one, 5, 10}, [Process,
+                                 Unique,
+                                 Plumtree,
+                                 Transmission]}}.

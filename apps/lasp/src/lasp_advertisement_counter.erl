@@ -49,13 +49,13 @@ run() ->
 -define(COUNTER, riak_dt_gcounter).
 
 %% The maximum number of impressions for each advertisement to display.
--define(MAX_IMPRESSIONS, 5).
+-define(MAX_IMPRESSIONS, 100).
 
 %% The number of events to sent to clients.
--define(NUM_EVENTS, 5000).
+-define(NUM_EVENTS, 10000).
 
 %% The number of clients.
--define(NUM_CLIENTS, 10).
+-define(NUM_CLIENTS, 100).
 
 %% Synchronization interval.
 -define(SYNC_INTERVAL, 10).
@@ -113,6 +113,9 @@ init() ->
 
     %% Launch server processes.
     servers(Ads, AdsWithContracts),
+
+    %% Initialize transmission instrumentation.
+    lasp_transmission_instrumentation:start(atom_to_list(?SET), ?NUM_CLIENTS),
 
     {ok, #state{runner=Runner,
                 ads=Ads,
@@ -258,7 +261,7 @@ create_advertisements_and_contracts(Ads, Contracts) ->
 synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
     %% Get latest list of advertisements from the server.
     Term1 = {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
-    log(Term1),
+    log_transmission(Term1),
     AdList = ?SET:value(AdsWithContracts),
     Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
@@ -271,7 +274,7 @@ synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
                       case dict:is_key(Ad, Acc) of
                           false ->
                               Term2 = {ok, {_, _, _, Counter}} = lasp:read(Ad, undefined),
-                              log(Term2),
+                              log_transmission(Term2),
                               dict:store(Ad, Counter, Acc);
                           true ->
                               Acc
@@ -287,7 +290,7 @@ synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
     %%
     SyncFun = fun(Ad, Counter0, Acc) ->
                     Term3 = {ok, {_, _, _, Counter}} = lasp:bind(Ad, Counter0),
-                    log(Term3),
+                    log_transmission(Term3),
                     case lists:member(Ad, Identifiers) of
                         true ->
                             dict:store(Ad, Counter, Acc);
@@ -318,5 +321,5 @@ servers(Ads, AdsWithContracts) ->
                 end, AdList).
 
 %% @private
-log(Term) ->
-    lasp_instrumentation:log(Term).
+log_transmission(Term) ->
+    lasp_transmission_instrumentation:log(Term).

@@ -30,15 +30,25 @@ set style line 3 lt rgb "#5060D0" lw 2 pt 2
 set style line 4 lt rgb "#F25900" lw 2 pt 9
 
 set output "plot.pdf"
-set xlabel "x axis label"
-set ylabel "y axis label"
+set xlabel "Time in Seconds"
+set ylabel "MB Transmitted"
 
-set key bottom right
+set key top right
 
-# set xrange [0:1]
+set datafile missing '0'
+
+# log scale on the y axis
+set logscale y 2
+# set format y ""
+# set ytics 1e-6, 10, 1
+# set ytics add ("1" 1, ".1" 0.1, ".01" 0.01, "10^-3" 0.001, \
+#                "10^-4" 0.0001)
+set mytics 10
+
+# set xrange [0:60]
 # set yrange [0:1]
 
 # Input file contains comma-separated values fields
 set datafile separator ","
 
-plot "/tmp/lasp_instrumentation.csv" using 1:2 title 'Anonymous CRDTs' with linespoints
+plot "/tmp/lasp_transmission_instrumentation-lasp_orset.csv" using 1:2 title 'OR-Set' with linespoints

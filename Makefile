@@ -3,8 +3,9 @@ VERSION         ?= $(shell git describe --tags)
 BASE_DIR         = $(shell pwd)
 ERLANG_BIN       = $(shell dirname $(shell which erl))
 REBAR            = $(shell pwd)/rebar3
+MAKE						 = make
 
-.PHONY: rel deps test eqc
+.PHONY: rel deps test eqc plots
 
 all: compile
 
@@ -73,6 +74,9 @@ cut:
 
 publish:
 	${REBAR} as package hex publish
+
+plots:
+	cd plots; ${MAKE}
 
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 

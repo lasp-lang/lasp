@@ -68,36 +68,29 @@ end_per_testcase(_, _Config) ->
 
 all() ->
     [
-        advertisement_counter_low_event_low_client_test,
-        advertisement_counter_low_event_high_client_test,
-        advertisement_counter_high_event_low_client_test,
-        advertisement_counter_high_event_high_client_test
+        advertisement_counter_orset_gcounter_10000_100_10_test,
+        advertisement_counter_orset_gcounter_10000_500_10_test,
+        advertisement_counter_orset_gcounter_10000_1000_10_test
     ].
 
 %% ===================================================================
 %% tests
 %% ===================================================================
 
-advertisement_counter_low_event_low_client_test(Config) ->
+advertisement_counter_orset_gcounter_10000_100_10_test(Config) ->
     [Node1 | _Nodes] = proplists:get_value(nodes, Config),
     {ok, _} = rpc:call(Node1, lasp_advertisement_counter, run,
-                       [[lasp_orset, lasp_gcounter, 10000, 200, 10]]),
+                       [[lasp_orset, lasp_gcounter, 10000, 100, 10]]),
     ok.
 
-advertisement_counter_low_event_high_client_test(Config) ->
+advertisement_counter_orset_gcounter_10000_500_10_test(Config) ->
     [Node1 | _Nodes] = proplists:get_value(nodes, Config),
     {ok, _} = rpc:call(Node1, lasp_advertisement_counter, run,
-                       [[lasp_orset, lasp_gcounter, 10000, 300, 10]]),
+                       [[lasp_orset, lasp_gcounter, 10000, 500, 10]]),
     ok.
 
-advertisement_counter_high_event_low_client_test(Config) ->
+advertisement_counter_orset_gcounter_10000_1000_10_test(Config) ->
     [Node1 | _Nodes] = proplists:get_value(nodes, Config),
     {ok, _} = rpc:call(Node1, lasp_advertisement_counter, run,
-                       [[lasp_orset, lasp_gcounter, 30000, 200, 10]]),
-    ok.
-
-advertisement_counter_high_event_high_client_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-    {ok, _} = rpc:call(Node1, lasp_advertisement_counter, run,
-                       [[lasp_orset, lasp_gcounter, 30000, 300, 10]]),
+                       [[lasp_orset, lasp_gcounter, 10000, 1000, 10]]),
     ok.

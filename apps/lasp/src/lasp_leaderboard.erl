@@ -23,21 +23,21 @@
 -module(lasp_leaderboard).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
--export([run/0,
+-export([run/1,
          client/4]).
 
 -behaviour(lasp_simulation).
 
 %% lasp_simulation callbacks
--export([init/0,
+-export([init/1,
          clients/1,
          simulate/1,
          wait/1,
          terminate/1,
          summarize/1]).
 
-run() ->
-    lasp_simulation:run(?MODULE).
+run(Args) ->
+    lasp_simulation:run(?MODULE, Args).
 
 %% Macro definitions.
 
@@ -59,7 +59,7 @@ run() ->
                 leaderboard_id}).
 
 %% @doc Preconfigure the example.
-init() ->
+init(_Args) ->
     Runner = self(),
 
     %% Create a leaderboard datatype.

@@ -29,7 +29,7 @@
 %% computational graph defined and return any state information needed
 %% to run the simulation.
 %%
--callback init() -> {ok, state()}.
+-callback init([any()]) -> {ok, state()}.
 
 %% Initialize a series of clients that will perform computations and
 %% receive messages from the simulator.
@@ -55,15 +55,15 @@
 %% Perform any summarization needed.
 -callback summarize(state()) -> {ok, state()}.
 
--export([run/1]).
+-export([run/2]).
 
 %% @doc Prototype new simulator harness.
 %%
 %% @clippy Hey, it looks like you're writing a State monad here!  Would
 %%         you like some help?
 %%
-run(Module) ->
-    {ok, State} = Module:init(),
+run(Module, Args) ->
+    {ok, State} = Module:init(Args),
 
     %% Launch client processes.
     {ok, State1} = Module:clients(State),

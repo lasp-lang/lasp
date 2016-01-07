@@ -1,4 +1,26 @@
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
+%%
+
 -module(lasp_SUITE).
+-author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 %% common_test callbacks
 -export([%% suite/0,
@@ -14,7 +36,6 @@
          dynamic_ivar_test/1,
          dynamic_fold_test/1,
          leaderboard_test/1,
-         advertisement_counter_test/1,
          monotonic_read_test/1,
          map_test/1,
          filter_test/1,
@@ -63,7 +84,6 @@ all() ->
      dynamic_ivar_test,
      dynamic_fold_test,
      leaderboard_test,
-     advertisement_counter_test,
      monotonic_read_test,
      map_test,
      filter_test,
@@ -394,19 +414,20 @@ dynamic_fold_test(Config) ->
     [Node1 | _Nodes] = proplists:get_value(nodes, Config),
 
     %% Define a pair of counters to store the global average.
-    {ok, {_GA, _, _, _}} = rpc:call(Node1, lasp, declare, [global, {lasp_pair, [lasp_gcounter, lasp_gcounter]}]),
+    {ok, {_GA, _, _, _}} = rpc:call(Node1, lasp, declare,
+                                    [global,
+                                     {lasp_pair, [lasp_pncounter, lasp_pncounter]}]),
+
+    %% Declare a set for local samples.
+    {ok, {_S, _, _, _}} = rpc:call(Node1, lasp, declare_dynamic,
+                                   [{lasp_top_k_var, [2]}]),
+
+    %% Define a local average; this will be computed from the local samples.
+    {ok, {_LA, _, _, _}} = rpc:call(Node1, lasp, declare_dynamic,
+                                    [{lasp_pair, [lasp_pncounter, lasp_pncounter]}]),
 
     ok.
 
-% %% Declare a dynamic variable.
-% Samples = lasp:declare_dynamic(
-%     {bounded_lww_set, 100}),
-    
-% %% Define a local average; this will be 
-% %% computed from the local Bounded-LWW set.
-% LocalAverage = lasp:declare_dynamic(
-%     {counter, counter}),
-    
 % %% Register an event handler with the sensor 
 % %% that is triggered each time an event X is 
 % %% triggered at a given timestamp T.
@@ -492,9 +513,4 @@ orset_test(Config) ->
 leaderboard_test(Config) ->
     [Node1 | _Nodes] = proplists:get_value(nodes, Config),
     rpc:call(Node1, lasp_leaderboard, run, []),
-    ok.
-
-advertisement_counter_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-    rpc:call(Node1, lasp_advertisement_counter, run, []),
     ok.

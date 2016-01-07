@@ -97,6 +97,16 @@ threshold_met(riak_dt_map, Value, {strict, Threshold}) ->
 threshold_met(riak_dt_map, Value, Threshold) ->
     is_inflation(riak_dt_map, Threshold, Value);
 
+threshold_met(lasp_gcounter, Value, {value, {strict, Threshold}}) ->
+    Threshold < lasp_gcounter:value(Value);
+threshold_met(lasp_gcounter, Value, {value, Threshold}) ->
+    Threshold =< lasp_gcounter:value(Value);
+
+threshold_met(lasp_gcounter, Value, {strict, Threshold}) ->
+    is_strict_inflation(lasp_gcounter, Threshold, Value);
+threshold_met(lasp_gcounter, Value, Threshold) ->
+    is_inflation(lasp_gcounter, Threshold, Value);
+
 threshold_met(riak_dt_gcounter, Value, {value, {strict, Threshold}}) ->
     Threshold < riak_dt_gcounter:value(Value);
 threshold_met(riak_dt_gcounter, Value, {value, Threshold}) ->
@@ -205,6 +215,18 @@ is_lattice_inflation(riak_dt_orswot, {Previous, _, _}, {Current, _, _}) ->
 
 is_lattice_inflation(riak_dt_map, {Previous, _, _}, {Current, _, _}) ->
     riak_dt_vclock:descends(Current, Previous);
+
+is_lattice_inflation(lasp_gcounter, Previous, Current) ->
+    PreviousList = orddict:to_list(Previous),
+    CurrentList = orddict:to_list(Current),
+    lists:foldl(fun({Actor, Count}, Acc) ->
+            case lists:keyfind(Actor, 1, CurrentList) of
+                false ->
+                    Acc andalso false;
+                {_Actor1, Count1} ->
+                    Acc andalso (Count =< Count1)
+            end
+            end, true, PreviousList);
 
 is_lattice_inflation(riak_dt_gcounter, Previous, Current) ->
     PreviousList = orddict:to_list(Previous),
@@ -320,6 +342,10 @@ is_lattice_strict_inflation(riak_dt_map,
     IsLatticeInflation andalso (
         (EqualClocks andalso DeletedElements) orelse
         DominatedClock);
+
+is_lattice_strict_inflation(lasp_gcounter, Previous, Current) ->
+    %% Massive shortcut here -- get the value and see if it's different.
+    lasp_gcounter:value(Previous) < lasp_gcounter:value(Current);
 
 is_lattice_strict_inflation(riak_dt_gcounter, Previous, Current) ->
     %% Massive shortcut here -- get the value and see if it's different.

@@ -122,7 +122,7 @@ stats(_) ->
 stat(_, _) -> undefined.
 
 -include_lib("riak_dt/include/riak_dt_tags.hrl").
--define(DT_PAIR_TAG, 101).
+-define(DT_PAIR_TAG, 102).
 -define(TAG, ?DT_PAIR_TAG).
 -define(V1_VERS, 1).
 

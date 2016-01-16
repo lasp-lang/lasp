@@ -25,7 +25,7 @@
 %%            http://dl.acm.org/citation.cfm?id=2745948
 %%
 
--module(lasp_top_k_var).
+-module(lasp_top_k_set).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -include("lasp.hrl").
@@ -50,11 +50,11 @@
 -export([to_binary/2]).
 -export([to_version/2]).
 
--export_type([top_k_var/0, binary_top_k_var/0, top_k_var_op/0]).
+-export_type([top_k_set/0, binary_top_k_set/0, top_k_set_op/0]).
 -type k() :: non_neg_integer().
--type top_k_var() :: {k(), orddict:orddict()}.
--type binary_top_k_var() :: binary().
--type top_k_var_op() :: {set, term(), term()}.
+-type top_k_set() :: {k(), orddict:orddict()}.
+-type binary_top_k_set() :: binary().
+-type top_k_set_op() :: {set, term(), term()}.
 
 -ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
@@ -65,24 +65,24 @@
 -endif.
 
 %% @doc Return a new top-k variable; assumes with no arguments top-1.
--spec new() -> top_k_var().
+-spec new() -> top_k_set().
 new() ->
     new([1]).
 
 %% @doc Return a new top-k variable.
--spec new([non_neg_integer()]) -> top_k_var().
+-spec new([non_neg_integer()]) -> top_k_set().
 new([K]) ->
     {K, orddict:new()}.
 
 %% @doc Update the CRDT with a given key/value pair.
--spec update(top_k_var_op(), actor(), top_k_var()) -> {ok, top_k_var()}.
+-spec update(top_k_set_op(), actor(), top_k_set()) -> {ok, top_k_set()}.
 update({set, Key, Value}, _Actor, {K, Var0}) ->
     UpdateFun = fun(Value0) -> max(Value, Value0) end,
     Var = orddict:update(Key, UpdateFun, Value, Var0),
     {ok, enforce_k({K, Var})}.
 
 %% @doc Determine if two ordered dictionaries are equivalent.
--spec equal(top_k_var(), top_k_var()) -> boolean().
+-spec equal(top_k_set(), top_k_set()) -> boolean().
 equal({K, Orddict1}, {K, Orddict2}) ->
     orddict:to_list(Orddict1) =:= orddict:to_list(Orddict2);
 equal(_, _) ->
@@ -90,24 +90,24 @@ equal(_, _) ->
 
 %% @doc Merge function for two top-k CRDTs.
 %% @todo Make much more efficient.
--spec merge(top_k_var(), top_k_var()) -> top_k_var().
+-spec merge(top_k_set(), top_k_set()) -> top_k_set().
 merge({K, A}, {K, B}) ->
     MergeFun = fun(_, AValue, BValue) -> max(AValue, BValue) end,
     Merged = orddict:merge(MergeFun, A, B),
     enforce_k({K, Merged}).
 
 %% @doc Return the value of the top-K CRDT.
--spec value(top_k_var()) -> orddict:orddict().
+-spec value(top_k_set()) -> orddict:orddict().
 value({_, Dict}) ->
     Dict.
 
--spec value(any(), top_k_var()) -> orddict:orddict().
+-spec value(any(), top_k_set()) -> orddict:orddict().
 value(_, Dict) ->
     value(Dict).
 
 %% @doc Enforce K after update or merge.
 %% @todo Optimize.
--spec enforce_k(top_k_var()) -> top_k_var().
+-spec enforce_k(top_k_set()) -> top_k_set().
 enforce_k({K, Dict}) ->
     Unsorted = orddict:to_list(Dict),
     SortFun = fun({K1, V1}, {K2, V2}) -> V2 =< V1 andalso K1 =< K2 end,
@@ -115,35 +115,35 @@ enforce_k({K, Dict}) ->
     Truncated = lists:sublist(Sorted, K),
     {K, orddict:from_list(Truncated)}.
 
--spec precondition_context(top_k_var()) -> top_k_var().
+-spec precondition_context(top_k_set()) -> top_k_set().
 precondition_context(Var) ->
     Var.
 
--spec stats(top_k_var()) -> [].
+-spec stats(top_k_set()) -> [].
 stats(_) ->
     [].
 
--spec stat(atom(), top_k_var()) -> undefined.
+-spec stat(atom(), top_k_set()) -> undefined.
 stat(_, _) -> undefined.
 
 -include_lib("riak_dt/include/riak_dt_tags.hrl").
--define(DT_TOP_K_VAR_TAG, 101).
--define(TAG, ?DT_TOP_K_VAR_TAG).
+-define(DT_TOP_K_SET_TAG, 101).
+-define(TAG, ?DT_TOP_K_SET_TAG).
 -define(V1_VERS, 1).
 
--spec to_binary(top_k_var()) -> binary_top_k_var().
+-spec to_binary(top_k_set()) -> binary_top_k_set().
 to_binary(IVar) ->
     <<?TAG:8/integer, ?V1_VERS:8/integer, (riak_dt:to_binary(IVar))/binary>>.
 
--spec to_binary(Vers :: pos_integer(), top_k_var()) ->
-    {ok, binary_top_k_var()} | ?UNSUPPORTED_VERSION.
+-spec to_binary(Vers :: pos_integer(), top_k_set()) ->
+    {ok, binary_top_k_set()} | ?UNSUPPORTED_VERSION.
 to_binary(1, Set) ->
     {ok, to_binary(Set)};
 to_binary(Vers, _Set) ->
     ?UNSUPPORTED_VERSION(Vers).
 
--spec from_binary(binary_top_k_var()) ->
-    {ok, top_k_var()} | ?UNSUPPORTED_VERSION | ?INVALID_BINARY.
+-spec from_binary(binary_top_k_set()) ->
+    {ok, top_k_set()} | ?UNSUPPORTED_VERSION | ?INVALID_BINARY.
 from_binary(<<?TAG:8/integer, ?V1_VERS:8/integer, Bin/binary>>) ->
     riak_dt:from_binary(Bin);
 from_binary(<<?TAG:8/integer, Vers:8/integer, _Bin/binary>>) ->
@@ -151,16 +151,16 @@ from_binary(<<?TAG:8/integer, Vers:8/integer, _Bin/binary>>) ->
 from_binary(_B) ->
     ?INVALID_BINARY.
 
--spec to_version(pos_integer(), top_k_var()) -> top_k_var().
+-spec to_version(pos_integer(), top_k_set()) -> top_k_set().
 to_version(_Version, IVar) ->
     IVar.
 
--spec parent_clock(riak_dt_vclock:vclock(), top_k_var()) -> top_k_var().
+-spec parent_clock(riak_dt_vclock:vclock(), top_k_set()) -> top_k_set().
 parent_clock(_Clock, IVar) ->
     IVar.
 
--spec update(top_k_var_op(), actor(), top_k_var(),
-             riak_dt:context()) -> {ok, top_k_var()}.
+-spec update(top_k_set_op(), actor(), top_k_set(),
+             riak_dt:context()) -> {ok, top_k_set()}.
 update(Op, Actor, ORDict, _Ctx) ->
     update(Op, Actor, ORDict).
 
@@ -170,14 +170,14 @@ update(Op, Actor, ORDict, _Ctx) ->
 -ifdef(TEST).
 
 basic_test() ->
-    A1 = lasp_top_k_var:new(),
-    B1 = lasp_top_k_var:new(),
-    {ok, A2} = lasp_top_k_var:update({set, chris, 1}, undefined, A1),
-    {ok, B2} = lasp_top_k_var:update({set, chris, 100}, undefined, B1),
-    A3 = lasp_top_k_var:merge(A2, B2),
-    {ok, A4} = lasp_top_k_var:update({set, jordan, 500}, undefined, A3),
-    {ok, A5} = lasp_top_k_var:update({set, chris, 50}, undefined, A4),
-    Value = orddict:to_list(lasp_top_k_var:value(A5)),
+    A1 = lasp_top_k_set:new(),
+    B1 = lasp_top_k_set:new(),
+    {ok, A2} = lasp_top_k_set:update({set, chris, 1}, undefined, A1),
+    {ok, B2} = lasp_top_k_set:update({set, chris, 100}, undefined, B1),
+    A3 = lasp_top_k_set:merge(A2, B2),
+    {ok, A4} = lasp_top_k_set:update({set, jordan, 500}, undefined, A3),
+    {ok, A5} = lasp_top_k_set:update({set, chris, 50}, undefined, A4),
+    Value = orddict:to_list(lasp_top_k_set:value(A5)),
     ?assertEqual([{jordan, 500}], Value).
 
 -endif.

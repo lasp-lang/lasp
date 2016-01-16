@@ -54,8 +54,7 @@
 -type type() :: lasp_ivar
               | lasp_orset
               | lasp_orset_gbtree
-              | lasp_top_kvar
-              | {lasp_top_k_var, [any()]}
+              | {lasp_top_k_set, [any()]}
               | {lasp_pair, [type()]}
               | riak_dt_gcounter
               | lasp_pncounter

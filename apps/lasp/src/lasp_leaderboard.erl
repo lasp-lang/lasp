@@ -63,7 +63,7 @@ init(_Args) ->
     Runner = self(),
 
     %% Create a leaderboard datatype.
-    {ok, {LeaderboardId, _, _, _}} = lasp:declare({lasp_top_k_var, [2]}),
+    {ok, {LeaderboardId, _, _, _}} = lasp:declare({lasp_top_k_set, [2]}),
 
     %% Read the leaderboard's current value.
     {ok, {_, _, _, Leaderboard}} = lasp:read(LeaderboardId, undefined),
@@ -103,7 +103,7 @@ client(Runner, Id, LeaderboardId, Leaderboard0) ->
     receive
         {complete_game, Score} ->
             %% Update local leaderboard.
-            {ok, Leaderboard} = lasp_top_k_var:update({set, Id, Score},
+            {ok, Leaderboard} = lasp_top_k_set:update({set, Id, Score},
                                                       Id,
                                                       Leaderboard0),
 

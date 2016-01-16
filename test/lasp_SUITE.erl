@@ -420,7 +420,7 @@ dynamic_fold_test(Config) ->
 
     %% Declare a set for local samples.
     {ok, {_S, _, _, _}} = rpc:call(Node1, lasp, declare_dynamic,
-                                   [{lasp_top_k_var, [2]}]),
+                                   [{lasp_top_k_set, [2]}]),
 
     %% Define a local average; this will be computed from the local samples.
     {ok, {_LA, _, _, _}} = rpc:call(Node1, lasp, declare_dynamic,

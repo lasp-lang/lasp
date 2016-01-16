@@ -69,8 +69,8 @@ threshold_met(lasp_pncounter, Value, {strict, Threshold}) ->
 threshold_met(lasp_pncounter, Value, Threshold) ->
     is_inflation(lasp_pncounter, Threshold, Value);
 
-threshold_met(lasp_top_k_var, Value, Threshold) ->
-    is_inflation(lasp_top_k_var, Threshold, Value);
+threshold_met(lasp_top_k_set, Value, Threshold) ->
+    is_inflation(lasp_top_k_set, Threshold, Value);
 
 threshold_met(lasp_orset_gbtree, Value, {strict, Threshold}) ->
     is_strict_inflation(lasp_orset_gbtree, Threshold, Value);
@@ -179,7 +179,7 @@ is_lattice_inflation(lasp_pncounter, Previous, Current) ->
 is_lattice_inflation(lasp_orswot, {Previous, _, _}, {Current, _, _}) ->
     riak_dt_vclock:descends(Current, Previous);
 
-is_lattice_inflation(lasp_top_k_var, {K, Previous}, {K, Current}) ->
+is_lattice_inflation(lasp_top_k_set, {K, Previous}, {K, Current}) ->
     orddict:fold(fun(Key, Value, Acc) ->
                         case orddict:find(Key, Current) of
                             error ->

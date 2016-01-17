@@ -103,7 +103,7 @@ client(Runner, Id, LeaderboardId, Leaderboard0) ->
     receive
         {complete_game, Score} ->
             %% Update local leaderboard.
-            {ok, Leaderboard} = lasp_top_k_set:update({set, Id, Score},
+            {ok, Leaderboard} = lasp_top_k_set:update({add, Id, Score},
                                                       Id,
                                                       Leaderboard0),
 

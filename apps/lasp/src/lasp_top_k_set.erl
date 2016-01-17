@@ -54,7 +54,7 @@
 -type k() :: non_neg_integer().
 -type top_k_set() :: {k(), orddict:orddict()}.
 -type binary_top_k_set() :: binary().
--type top_k_set_op() :: {set, term(), term()}.
+-type top_k_set_op() :: {add, term(), term()}.
 
 -ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
@@ -76,7 +76,7 @@ new([K]) ->
 
 %% @doc Update the CRDT with a given key/value pair.
 -spec update(top_k_set_op(), actor(), top_k_set()) -> {ok, top_k_set()}.
-update({set, Key, Value}, _Actor, {K, Var0}) ->
+update({add, Key, Value}, _Actor, {K, Var0}) ->
     UpdateFun = fun(Value0) -> max(Value, Value0) end,
     Var = orddict:update(Key, UpdateFun, Value, Var0),
     {ok, enforce_k({K, Var})}.
@@ -172,11 +172,11 @@ update(Op, Actor, ORDict, _Ctx) ->
 basic_test() ->
     A1 = lasp_top_k_set:new(),
     B1 = lasp_top_k_set:new(),
-    {ok, A2} = lasp_top_k_set:update({set, chris, 1}, undefined, A1),
-    {ok, B2} = lasp_top_k_set:update({set, chris, 100}, undefined, B1),
+    {ok, A2} = lasp_top_k_set:update({add, chris, 1}, undefined, A1),
+    {ok, B2} = lasp_top_k_set:update({add, chris, 100}, undefined, B1),
     A3 = lasp_top_k_set:merge(A2, B2),
-    {ok, A4} = lasp_top_k_set:update({set, jordan, 500}, undefined, A3),
-    {ok, A5} = lasp_top_k_set:update({set, chris, 50}, undefined, A4),
+    {ok, A4} = lasp_top_k_set:update({add, jordan, 500}, undefined, A3),
+    {ok, A5} = lasp_top_k_set:update({add, chris, 50}, undefined, A4),
     Value = orddict:to_list(lasp_top_k_set:value(A5)),
     ?assertEqual([{jordan, 500}], Value).
 

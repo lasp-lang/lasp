@@ -23,42 +23,27 @@
 -module(lasp_advertisement_counter).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
--export([run/0,
-         client/5,
+-export([run/1,
+         client/8,
          server/2]).
 
 -behaviour(lasp_simulation).
 
 %% lasp_simulation callbacks
--export([init/0,
+-export([init/1,
          clients/1,
          simulate/1,
          wait/1,
          terminate/1,
          summarize/1]).
 
-run() ->
-    lasp_simulation:run(?MODULE).
+run(Args) ->
+    lasp_simulation:run(?MODULE, Args).
 
 %% Macro definitions.
 
-%% Set type to use.
--define(SET, lasp_orset).
-
-%% Counter type to use.
--define(COUNTER, riak_dt_gcounter).
-
 %% The maximum number of impressions for each advertisement to display.
--define(MAX_IMPRESSIONS, 5).
-
-%% The number of events to sent to clients.
--define(NUM_EVENTS, 5000).
-
-%% The number of clients.
--define(NUM_CLIENTS, 10).
-
-%% Synchronization interval.
--define(SYNC_INTERVAL, 10).
+-define(MAX_IMPRESSIONS, 100).
 
 %% Record definitions.
 
@@ -72,37 +57,41 @@ run() ->
                 ads_with_contracts,
                 client_list,
                 count_events = 1,
-                num_events = ?NUM_EVENTS}).
+                set_type,
+                counter_type,
+                num_events,
+                num_clients,
+                sync_interval}).
 
 %% Callback functions.
 
 %% @doc Setup lists of advertisements and lists of contracts for
 %%      advertisements.
-init() ->
+init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
     %% Get the process identifier of the runner.
     Runner = self(),
 
     %% For each identifier, generate a contract.
-    {ok, {Contracts, _, _, _}} = lasp:declare(?SET),
+    {ok, {Contracts, _, _, _}} = lasp:declare(SetType),
 
     %% Generate Rovio's advertisements.
-    {ok, {RovioAds, _, _, _}} = lasp:declare(?SET),
-    RovioAdList = create_advertisements_and_contracts(RovioAds, Contracts),
+    {ok, {RovioAds, _, _, _}} = lasp:declare(SetType),
+    RovioAdList = create_advertisements_and_contracts(CounterType, RovioAds, Contracts),
 
     %% Generate Riot's advertisements.
-    {ok, {RiotAds, _, _, _}} = lasp:declare(?SET),
-    RiotAdList = create_advertisements_and_contracts(RiotAds, Contracts),
+    {ok, {RiotAds, _, _, _}} = lasp:declare(SetType),
+    RiotAdList = create_advertisements_and_contracts(CounterType, RiotAds, Contracts),
 
     %% Union ads.
-    {ok, {Ads, _, _, _}} = lasp:declare(?SET),
+    {ok, {Ads, _, _, _}} = lasp:declare(SetType),
     ok = lasp:union(RovioAds, RiotAds, Ads),
 
     %% Compute the Cartesian product of both ads and contracts.
-    {ok, {AdsContracts, _, _, _}} = lasp:declare(?SET),
+    {ok, {AdsContracts, _, _, _}} = lasp:declare(SetType),
     ok = lasp:product(Ads, Contracts, AdsContracts),
 
     %% Filter items by join on item it.
-    {ok, {AdsWithContracts, _, _, _}} = lasp:declare(?SET),
+    {ok, {AdsWithContracts, _, _, _}} = lasp:declare(SetType),
     FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
         Id1 =:= Id2
     end,
@@ -112,28 +101,45 @@ init() ->
     AdList = RiotAdList ++ RovioAdList,
 
     %% Launch server processes.
-    servers(Ads, AdsWithContracts),
+    servers(SetType, Ads, AdsWithContracts),
+
+    %% Initialize transmission instrumentation.
+    lasp_transmission_instrumentation:start(
+      atom_to_list(SetType) ++ "-" ++
+      atom_to_list(CounterType) ++ "-" ++
+      integer_to_list(NumEvents) ++ "-" ++
+      integer_to_list(NumClients) ++ "-" ++
+      integer_to_list(SyncInterval), NumClients),
 
     {ok, #state{runner=Runner,
                 ads=Ads,
                 ad_list=AdList,
-                ads_with_contracts=AdsWithContracts}}.
+                ads_with_contracts=AdsWithContracts,
+                set_type=SetType,
+                counter_type=CounterType,
+                num_events=NumEvents,
+                num_clients=NumClients,
+                sync_interval=SyncInterval}}.
 
 %% @doc Launch a series of client processes, each of which is responsible
 %% for displaying a particular advertisement.
-clients(#state{runner=Runner,
+clients(#state{runner=Runner, num_clients=NumClients, set_type=SetType,
+               counter_type=CounterType, sync_interval=SyncInterval,
                ads_with_contracts=AdsWithContracts}=State) ->
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
     Clients = lists:map(fun(Id) ->
                                 spawn_link(?MODULE,
                                            client,
-                                           [Runner,
+                                           [SetType,
+                                            CounterType,
+                                            SyncInterval,
+                                            Runner,
                                             Id,
                                             AdsWithContracts,
                                             undefined,
                                             dict:new()])
-                                end, lists:seq(1, ?NUM_CLIENTS)),
+                                end, lists:seq(1, NumClients)),
     {ok, State#state{client_list=Clients}}.
 
 
@@ -145,7 +151,7 @@ terminate(#state{client_list=ClientList}=State) ->
     {ok, State}.
 
 %% @doc Simulate clients viewing advertisements.
-simulate(#state{client_list=ClientList}=State) ->
+simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
     %% Start the simulation.
     Viewer = fun(_) ->
             Random = random:uniform(length(ClientList)),
@@ -155,18 +161,15 @@ simulate(#state{client_list=ClientList}=State) ->
             Pid = lists:nth(Random, ClientList),
             Pid ! view_ad
     end,
-    lists:foreach(Viewer, lists:seq(1, ?NUM_EVENTS)),
+    lists:foreach(Viewer, lists:seq(1, NumEvents)),
     {ok, State}.
 
 %% @doc Summarize results.
-summarize(#state{ad_list=AdList}=State) ->
+summarize(#state{num_clients=NumClients, ad_list=AdList}=State) ->
     %% Wait until all advertisements have been exhausted before stopping
     %% execution of the test.
-    lager:info("AdList is: ~p", [AdList]),
     Overcounts = lists:map(fun(#ad{counter=CounterId}) ->
                 {ok, V} = lasp:query(CounterId),
-                lager:info("Advertisement ~p reached max: ~p with ~p....",
-                           [CounterId, ?MAX_IMPRESSIONS, V]),
                 V - ?MAX_IMPRESSIONS
         end, AdList),
 
@@ -177,7 +180,7 @@ summarize(#state{ad_list=AdList}=State) ->
     io:format("----------------------------------------"),
     io:format("Total overcount: ~p~n", [TotalOvercount]),
     io:format("Mean overcount per client: ~p~n",
-              [TotalOvercount / ?NUM_CLIENTS]),
+              [TotalOvercount / NumClients]),
     io:format("----------------------------------------"),
 
     {ok, State}.
@@ -203,12 +206,10 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
     {ok, _} = lasp:read(Counter, {value, ?MAX_IMPRESSIONS}),
 
     %% Remove the advertisement.
-    {ok, _} = lasp:update(Ads, {remove, Ad}, Ad),
-
-    lager:info("Removing ad: ~p", [Ad]).
+    {ok, _} = lasp:update(Ads, {remove, Ad}, Ad).
 
 %% @doc Client process; standard recurisve looping server.
-client(Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0) ->
+client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0) ->
     receive
         terminate ->
             ok;
@@ -221,22 +222,22 @@ client(Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0) ->
                     %% active advertisements.
                     Random = random:uniform(dict:size(Counters0)),
                     {Ad, Counter0} = lists:nth(Random, dict:to_list(Counters0)),
-                    {ok, Counter} = ?COUNTER:update(increment, Id, Counter0),
+                    {ok, Counter} = CounterType:update(increment, Id, Counter0),
                     dict:store(Ad, Counter, Counters0)
             end,
 
             %% Notify the harness that an event has been processed.
             Runner ! view_ad,
 
-            client(Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters)
+            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters)
     after
-        ?SYNC_INTERVAL ->
-            {ok, AdsWithContracts, Counters} = synchronize(AdsWithContractsId, AdsWithContracts0, Counters0),
-            client(Runner, Id, AdsWithContractsId, AdsWithContracts, Counters)
+        SyncInterval ->
+            {ok, AdsWithContracts, Counters} = synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0),
+            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts, Counters)
     end.
 
 %% @doc Generate advertisements and advertisement contracts.
-create_advertisements_and_contracts(Ads, Contracts) ->
+create_advertisements_and_contracts(Counter, Ads, Contracts) ->
     AdIds = lists:map(fun(_) ->
                               {ok, Unique} = lasp_unique:unique(),
                               Unique
@@ -248,7 +249,7 @@ create_advertisements_and_contracts(Ads, Contracts) ->
                 end, AdIds),
     lists:map(fun(Id) ->
                 %% Generate a G-Counter.
-                {ok, {CounterId, _, _, _}} = lasp:declare(?COUNTER),
+                {ok, {CounterId, _, _, _}} = lasp:declare(Counter),
 
                 Ad = #ad{id=Id, counter=CounterId},
 
@@ -260,10 +261,11 @@ create_advertisements_and_contracts(Ads, Contracts) ->
                 end, AdIds).
 
 %% @doc Periodically synchronize state with the server.
-synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
+synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0) ->
     %% Get latest list of advertisements from the server.
-    {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
-    AdList = ?SET:value(AdsWithContracts),
+    Term1 = {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
+    log_transmission(Term1),
+    AdList = SetType:value(AdsWithContracts),
     Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
     %% Refresh our dictionary with any new values from the server.
@@ -274,7 +276,8 @@ synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
     RefreshFun = fun({#ad{counter=Ad}, _}, Acc) ->
                       case dict:is_key(Ad, Acc) of
                           false ->
-                              {ok, {_, _, _, Counter}} = lasp:read(Ad, undefined),
+                              Term2 = {ok, {_, _, _, Counter}} = lasp:read(Ad, undefined),
+                              log_transmission(Term2),
                               dict:store(Ad, Counter, Acc);
                           true ->
                               Acc
@@ -289,7 +292,8 @@ synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
     %% 3.) Server returns the merged value to the client.
     %%
     SyncFun = fun(Ad, Counter0, Acc) ->
-                    {ok, {_, _, _, Counter}} = lasp:bind(Ad, Counter0),
+                    Term3 = {ok, {_, _, _, Counter}} = lasp:bind(Ad, Counter0),
+                    log_transmission(Term3),
                     case lists:member(Ad, Identifiers) of
                         true ->
                             dict:store(Ad, Counter, Acc);
@@ -303,13 +307,13 @@ synchronize(AdsWithContractsId, AdsWithContracts0, Counters0) ->
 
 %% @doc Launch a server process for each advertisement, which will block
 %% until the advertisement should be disabled.
-servers(Ads, AdsWithContracts) ->
+servers(SetType, Ads, AdsWithContracts) ->
     %% Create a OR-set for the server list.
-    {ok, {Servers, _, _, _}} = lasp:declare(?SET),
+    {ok, {Servers, _, _, _}} = lasp:declare(SetType),
 
     %% Get the current advertisement list.
     {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
-    AdList = ?SET:value(AdList0),
+    AdList = SetType:value(AdList0),
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
@@ -318,3 +322,7 @@ servers(Ads, AdsWithContracts) ->
                 {ok, _} = lasp:update(Servers, {add, ServerPid}, undefined),
                 ServerPid
                 end, AdList).
+
+%% @private
+log_transmission(Term) ->
+    lasp_transmission_instrumentation:log(Term).

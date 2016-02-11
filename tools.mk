@@ -24,11 +24,11 @@
 #  wholesale when a new version of tools.mk is released.
 #  -------------------------------------------------------------------
 
-REBAR ?= ./rebar3
-REVISION ?= $(shell git rev-parse --short HEAD)
-PROJECT ?= $(shell basename `find src -name "*.app.src"` .app.src)
-DEP_DIR ?= "deps"
-EBIN_DIR ?= "ebin"
+REBAR            = $(shell pwd)/rebar3
+REVISION 		    ?= $(shell git rev-parse --short HEAD)
+PROJECT         ?= $(shell basename `find src -name "*.app.src"` .app.src)
+DEP_DIR         ?= "deps"
+EBIN_DIR        ?= "ebin"
 
 .PHONY: compile-no-deps test docs xref dialyzer-run dialyzer-quick dialyzer \
 		cleanplt upload-docs

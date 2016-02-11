@@ -1,4 +1,26 @@
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
+%%
+
 -module(lasp_SUITE).
+-author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 %% common_test callbacks
 -export([%% suite/0,
@@ -12,8 +34,8 @@
 -export([ivar_test/1,
          orset_test/1,
          dynamic_ivar_test/1,
+         dynamic_fold_test/1,
          leaderboard_test/1,
-         advertisement_counter_test/1,
          monotonic_read_test/1,
          map_test/1,
          filter_test/1,
@@ -60,8 +82,8 @@ all() ->
      ivar_test,
      orset_test,
      dynamic_ivar_test,
+     dynamic_fold_test,
      leaderboard_test,
-     advertisement_counter_test,
      monotonic_read_test,
      map_test,
      filter_test,
@@ -76,6 +98,7 @@ all() ->
 %% ===================================================================
 
 -define(SET, lasp_orset).
+-define(COUNTER, lasp_pncounter).
 -define(ID, <<"myidentifier">>).
 
 ivar_test(Config) ->
@@ -182,20 +205,29 @@ fold_test(Config) ->
     %% Create initial set.
     {ok, {S1, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
 
-    %% Add elements to initial set and update.
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S1, {add_all, [1,2,3]}, a])),
+    %% Perform some operations.
+    ?assertMatch({ok, _},
+                 rpc:call(Node1, lasp, update, [S1, {add_all, [1,2,3]}, a])),
+    ?assertMatch({ok, _},
+                 rpc:call(Node1, lasp, update, [S1, {remove_all, [2,3]}, b])),
+    ?assertMatch({ok, _},
+                 rpc:call(Node1, lasp, update, [S1, {add, 2}, c])),
 
     %% Create second set.
-    {ok, {S2, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {S2, _, _, _}} = rpc:call(Node1, lasp, declare, [?COUNTER]),
+
+    %% Define the fold function.
+    FoldFun = fun(X, _Acc) ->
+                      case (X band 1) == 0 of
+                          true ->
+                              [{increment, 1}];
+                          false ->
+                              []
+                      end
+              end,
 
     %% Apply fold.
-    ?assertMatch(ok, rpc:call(Node1, lasp, fold, [S1, fun(X) -> [{X, X*2}] end, S2])),
-
-    %% Wait.
-    timer:sleep(4000),
-
-    %% Bind again.
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S1, {add_all, [4,5,6]}, a])),
+    ?assertMatch(ok, rpc:call(Node1, lasp, fold, [S1, FoldFun, S2])),
 
     %% Wait.
     timer:sleep(4000),
@@ -206,8 +238,8 @@ fold_test(Config) ->
     %% Read resulting value.
     {ok, {_, _, _, S2V1}} = rpc:call(Node1, lasp, read, [S2, {strict, undefined}]),
 
-    ?assertEqual({ok, [1,2,3,4,5,6], [{1,2},{2,4},{3,6},{4,8},{5,10},{6,12}]},
-                 {ok, ?SET:value(S1V4), ?SET:value(S2V1)}),
+    ?assertEqual({ok, [1,2], 1},
+                 {ok, ?SET:value(S1V4), ?COUNTER:value(S2V1)}),
 
     ok.
 
@@ -366,7 +398,7 @@ dynamic_ivar_test(Config) ->
     %% trigger a broadcast message because the variable is dynamic.
     {ok, {Id, _, _, Node1}} = rpc:call(Node1, lasp, bind, [?ID, Node1]),
 
-    %% Bind node 1's name to the value on node 1: this should not
+    %% Bind node 2's name to the value on node 2: this should not
     %% trigger a broadcast message because the variable is dynamic.
     {ok, {Id, _, _, Node2}} = rpc:call(Node2, lasp, bind, [?ID, Node2]),
 
@@ -377,6 +409,42 @@ dynamic_ivar_test(Config) ->
     {ok, Node2} = rpc:call(Node2, lasp, query, [?ID]),
 
     ok.
+
+dynamic_fold_test(Config) ->
+    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
+
+    %% Define a pair of counters to store the global average.
+    {ok, {_GA, _, _, _}} = rpc:call(Node1, lasp, declare,
+                                    [global,
+                                     {lasp_pair, [lasp_pncounter, lasp_pncounter]}]),
+
+    %% Declare a set for local samples.
+    {ok, {_S, _, _, _}} = rpc:call(Node1, lasp, declare_dynamic,
+                                   [{lasp_top_k_set, [2]}]),
+
+    %% Define a local average; this will be computed from the local samples.
+    {ok, {_LA, _, _, _}} = rpc:call(Node1, lasp, declare_dynamic,
+                                    [{lasp_pair, [lasp_pncounter, lasp_pncounter]}]),
+
+    ok.
+
+% %% Register an event handler with the sensor 
+% %% that is triggered each time an event X is 
+% %% triggered at a given timestamp T.
+% EventHandler = fun({X, T} ->
+%     lasp:update(Samples, {add, x, t}, Actor)
+% end,
+% register_event_handler(EventHandler),
+    
+% %% Fold the samples using the binary function 
+% %% `avg' into a local average.
+% lasp:fold(Samples, fun avg/2, LocalAverage)
+    
+% %% Fold the local average using the binary 
+% %% function `avg' into a global average.
+% lasp:fold_dynamic(LocalAverage, 
+%                         fun sum_pairs/2, 
+%                         GlobalAverage)
 
 orset_test(Config) ->
     [Node1 | _Nodes] = proplists:get_value(nodes, Config),
@@ -445,9 +513,4 @@ orset_test(Config) ->
 leaderboard_test(Config) ->
     [Node1 | _Nodes] = proplists:get_value(nodes, Config),
     rpc:call(Node1, lasp_leaderboard, run, []),
-    ok.
-
-advertisement_counter_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-    rpc:call(Node1, lasp_advertisement_counter, run, []),
     ok.

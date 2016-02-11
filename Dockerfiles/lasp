@@ -6,4 +6,4 @@ RUN apt-get -y install curl && \
     curl -s https://packagecloud.io/install/repositories/cmeiklejohn/lasp/script.deb.sh | sudo bash && \
     apt-get install lasp
 
-CMD sudo lasp console
+CMD sh -c "/opt/lasp/bin/lasp start; sleep 10; tail -F /opt/lasp/log/console.log /opt/lasp/log/error.log"

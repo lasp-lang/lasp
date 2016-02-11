@@ -1,7 +1,7 @@
 {application,lasp,
     [{description,
          "Declarative, distributed, eventually consistent, compuations."},
-     {vsn,"0.0.3"},
+     {vsn,"0.0.4"},
      {maintainers,["Christopher S. Meiklejohn"]},
      {links,[{"Github","https://github.com/lasp-lang/lasp"}]},
      {licenses,["Apache"]},
@@ -11,7 +11,7 @@
           time_compat,plumtree]},
      {mod,{lasp_app,[]}},
      {env,
-         [{data_root, "data"},
+         [{data_root,"data"},
           {peer_service,lasp_plumtree_peer_service},
           {distribution_backend,lasp_plumtree_broadcast_distribution_backend},
           {storage_backend,lasp_dets_storage_backend}]}]}.

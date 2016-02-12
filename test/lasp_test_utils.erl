@@ -122,6 +122,9 @@ start_node(Name, Config, Case) ->
             ok = rpc:call(Node, application, set_env, [lasp,
                                                        data_root,
                                                        NodeDir]),
+            ok = rpc:call(Node, application, set_env, [lasp,
+                                                       web_port,
+                                                       web_port(Name)]),
             {ok, _} = rpc:call(Node, application, ensure_all_started, [lasp]),
             ok = wait_until(fun() ->
                             case rpc:call(Node, lasp_peer_service, members, []) of
@@ -153,3 +156,12 @@ heal_cluster(ANodes, BNodes) ->
         end,
          [{Node1, Node2} || Node1 <- ANodes, Node2 <- BNodes]),
     ok.
+
+web_port(jaguar) ->
+    8000;
+web_port(shadow) ->
+    8001;
+web_port(thorn) ->
+    8002;
+web_port(pyros) ->
+    8003.

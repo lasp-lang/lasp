@@ -19,6 +19,7 @@
 %% -------------------------------------------------------------------
 
 -module(lasp_sup).
+-author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(supervisor).
 
@@ -59,7 +60,13 @@ init(_Args) ->
                      permanent, 5000, worker,
                      [lasp_transmission_instrumentation]},
 
-    {ok, {{one_for_one, 5, 10}, [Process,
+    Web = {webmachine_mochiweb,
+           {webmachine_mochiweb, start, [lasp_config:web_config()]},
+            permanent, 5000, worker,
+            [mochiweb_socket_server]},
+
+    {ok, {{one_for_one, 5, 10}, [Web,
+                                 Process,
                                  Unique,
                                  Plumtree,
                                  Transmission]}}.

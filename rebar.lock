@@ -30,6 +30,7 @@
   {git,"git://github.com/lasp-lang/lasp_support",
        {ref,"f682f79801d3573db86bc55d849529a2a98edcfc"}},
   0},
+ {<<"mochiweb">>,{pkg,<<"mochiweb">>,<<"2.12.2">>},1},
  {<<"neotoma">>,
   {git,"git://github.com/seancribbs/neotoma.git",
        {ref,"6ac6007c7713712a80096de5c7cdf5b85b01374e"}},
@@ -53,4 +54,8 @@
  {<<"time_compat">>,
   {git,"git://github.com/lasp-lang/time_compat.git",
        {ref,"adfae4409187cc1a9f79028986e92e8730b5eda5"}},
+  0},
+ {<<"webmachine">>,
+  {git,"https://github.com/webmachine/webmachine.git",
+       {ref,"03d243937d16bf8cbd7feddfe0ad830808494732"}},
   0}].

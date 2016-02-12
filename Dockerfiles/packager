@@ -1,0 +1,18 @@
+FROM ubuntu:trusty
+
+MAINTAINER Christopher Meiklejohn <christopher.meiklejohn@gmail.com>
+
+RUN cd /tmp && \
+    apt-get update && \
+    apt-get -y install wget build-essential make gcc ruby-dev git && \
+    wget http://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb && \
+    dpkg -i erlang-solutions_1.0_all.deb && \
+    apt-get update && \
+    apt-get -y install erlang && \
+    gem install package_cloud fpm && \
+    git clone https://github.com/lasp-lang/lasp.git && \
+    cd lasp && make && make package && \
+    locale-gen en_US en_US.UTF-8 && \
+    dpkg-reconfigure locales
+
+CMD LC_ALL="en_US.UTF-8" package_cloud push cmeiklejohn/lasp/ubuntu/trusty `find /tmp/lasp -name *.deb | tail -1`

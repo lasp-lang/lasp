@@ -8,7 +8,7 @@
      {registered,[]},
      {applications,
          [kernel,stdlib,riak_dt,gen_flow,lager,gb_trees_ext,lasp_support,sasl,
-          time_compat,plumtree,webmachine]},
+          time_compat,plumtree,webmachine,jsx]},
      {mod,{lasp_app,[]}},
      {env,
          [{data_root,"data"},

@@ -82,6 +82,9 @@ publish:
 plots:
 	cd plots; ${MAKE}
 
+shell:
+	${REBAR} shell --apps lasp
+
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 
 include tools.mk

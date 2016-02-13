@@ -26,7 +26,9 @@
 -spec dispatch() -> [webmachine_dispatcher:route()].
 dispatch() ->
     lists:flatten([
-        {["api", "health"], lasp_health_check_resource, []}
+        {[],                lasp_gui_resource,          index},
+        {['*'],             lasp_gui_resource,          undefined},
+        {["api", "health"], lasp_health_check_resource, undefined}
     ]).
 
 web_config() ->

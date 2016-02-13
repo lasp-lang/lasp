@@ -26,7 +26,7 @@
 -include_lib("webmachine/include/webmachine.hrl").
 
 -spec init(list()) -> {ok, term()}.
-init([]) ->
+init(_) ->
     {ok, undefined}.
 
 -spec to_html(wrq:reqdata(), term()) -> {iodata(), wrq:reqdata(), term()}.

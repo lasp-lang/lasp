@@ -1,6 +1,24 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
 <html>
   <head>
     <title>Lasp</title>
+    <script src="//code.jquery.com/jquery-1.12.0.min.js"></script>
+    <script src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+    <link rel="icon" type="image/vnd.microsoft.icon" href="/favicon.ico" />
+
+    <style type="text/css">
+    .node {
+      stroke: #fff;
+      stroke-width: 1.5px;
+    }
+
+    .link {
+      stroke: #999;
+      stroke-opacity: .6;
+    }
+    </style>
+
     <style type="text/css">
       .centered {
         position: fixed;
@@ -13,6 +31,10 @@
     </style>
   </head>
   <body>
-    <img class="centered" src="images/lasp-logo-large.png">
+    <div id="logo">
+      <img class="centered" src="images/lasp-logo-large.png" alt="Lasp logo">
+    </div>
+    <script src="//d3js.org/d3.v3.min.js"></script>
+    <script src="js/main.js"></script>
   </body>
 </html>

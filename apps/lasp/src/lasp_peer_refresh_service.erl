@@ -18,6 +18,9 @@
 %%
 %% -------------------------------------------------------------------
 
+%% @doc Read configuration information from Mesos DNS and auto-cluster
+%%      Erlang nodes based on this.
+
 -module(lasp_peer_refresh_service).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
@@ -92,8 +95,7 @@ handle_info(?POLL, #state{nodes=SeenNodes}=State) ->
     Nodes = case resolve() of
         {ok, DnsMsg} ->
             lists:usort(generate_nodes(DnsMsg));
-        Error ->
-            lager:info("=> Error received: ~p", [Error]),
+        _Error ->
             SeenNodes
     end,
 
@@ -148,7 +150,7 @@ resolve() ->
 %% @doc Attempt to connect disconnected nodes.
 %% @private
 maybe_connect(Nodes, SeenNodes) ->
-    ToConnect = Nodes -- SeenNodes,
+    ToConnect = Nodes -- (SeenNodes ++ [node()]),
 
     %% Attempt connection.
     Attempted = case ToConnect of

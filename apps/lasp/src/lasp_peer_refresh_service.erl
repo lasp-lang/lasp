@@ -175,7 +175,7 @@ maybe_connect(Nodes, SeenNodes) ->
         [] ->
             [];
         _ ->
-            lists:map(fun(Node) -> {Node, net_adm:ping(Node)} end, ToConnect)
+            lists:map(fun connect/1, ToConnect)
     end,
 
     %% Log the output of the attempt.
@@ -188,3 +188,14 @@ maybe_connect(Nodes, SeenNodes) ->
 
     %% Return list of connected nodes.
     nodes().
+
+%% @private
+connect(Node) ->
+    Ping = net_adm:ping(Node),
+    case Ping of
+        pang ->
+            ok;
+        pong ->
+            lasp_peer_service:join(Node)
+    end,
+    {Node, Ping}.

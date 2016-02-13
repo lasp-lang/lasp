@@ -1,7 +1,9 @@
 #!/bin/bash
 
 # Get instance IP.
-IP=127.0.0.1
+if [ -z "$IP" ]; then
+    export IP=localhost
+fi
 
 # Use mesos task id as node name, else, use the default.
 if [ ! -z "$MESOS_TASK_ID" ]; then

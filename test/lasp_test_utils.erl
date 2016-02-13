@@ -109,6 +109,7 @@ start_node(Name, Config, Case) ->
         {ok, Node} ->
             PrivDir = proplists:get_value(priv_dir, Config),
             NodeDir = filename:join([PrivDir, Node, Case]),
+            WebPort = web_port(Name),
             ok = rpc:call(Node, application, load, [plumtree]),
             ok = rpc:call(Node, application, load, [lager]),
             ok = rpc:call(Node, application, load, [lasp]),
@@ -124,7 +125,7 @@ start_node(Name, Config, Case) ->
                                                        NodeDir]),
             ok = rpc:call(Node, application, set_env, [lasp,
                                                        web_port,
-                                                       web_port(Name)]),
+                                                       WebPort]),
             {ok, _} = rpc:call(Node, application, ensure_all_started, [lasp]),
             ok = wait_until(fun() ->
                             case rpc:call(Node, lasp_peer_service, members, []) of

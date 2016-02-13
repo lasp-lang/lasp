@@ -16,6 +16,7 @@ fi
 
 export RELX_REPLACE_OS_VARS=true
 export COOKIE=lasp
+export WEB_PORT=${PORT0}
 
 echo "MESOS_TASK_ID: ${MESOS_TASK_ID}"
 echo "PORT0: ${PORT0}"

@@ -70,6 +70,8 @@ generate_links(NodeList) ->
                                 pong ->
                                     [#{source => Source, target => Target}];
                                 pang ->
+                                    [];
+                                {badrpc, _} ->
                                     []
                             end
                     end, NodeList) end, NodeList).

@@ -1,5 +1,20 @@
 #!/bin/bash
 
+# Get instance IP.
+IP=127.0.0.1
+
+# Use mesos task id as node name, else, use the default.
+if [ ! -z "$MESOS_TASK_ID" ]; then
+    export NODE_NAME=${MESOS_TASK_ID}@${IP}
+fi
+
+if [ -z "$NODE_NAME" ]; then
+    export NODE_NAME=lasp@${IP}
+fi
+
+echo "NODE_NAME: ${NODE_NAME}"
+echo "COOKIE: ${COOKIE}"
+
 export RELX_REPLACE_OS_VARS=true
 export NODE_NAME=lasp
 export COOKIE=lasp

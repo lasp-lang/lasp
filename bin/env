@@ -5,7 +5,8 @@ IP=127.0.0.1
 
 # Use mesos task id as node name, else, use the default.
 if [ ! -z "$MESOS_TASK_ID" ]; then
-    export NODE_NAME=${MESOS_TASK_ID}@${IP}
+    SANITIZED_MESOS_TASK_ID=`echo "${MESOS_TASK_ID}" | sed 's/\./-/g'`
+    export NODE_NAME=${SANITIZED_MESOS_TASK_ID}@${IP}
 fi
 
 if [ -z "$NODE_NAME" ]; then

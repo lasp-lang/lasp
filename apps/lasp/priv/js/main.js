@@ -1,7 +1,7 @@
 $(document).ready(function() {
   $("#logo").fadeOut("slow", function() {
 
-    var width = 960,
+    var width = 1024,
         height = 500;
 
     var color = d3.scale.category10();
@@ -17,7 +17,7 @@ $(document).ready(function() {
         .size([width, height])
         .on("tick", tick);
 
-    var svg = d3.select("body").append("svg")
+    var svg = d3.select("#topology").append("svg")
         .attr("width", width)
         .attr("height", height);
 

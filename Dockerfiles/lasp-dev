@@ -14,4 +14,4 @@ CMD cd /opt && \
     git clone https://github.com/lasp-lang/lasp.git -b unstable && \
     cd lasp && \
     make stage && \
-    /opt/lasp/_build/default/rel/lasp/bin/env foreground
+    /opt/lasp/_build/default/rel/lasp/bin/env

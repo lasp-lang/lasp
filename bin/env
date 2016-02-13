@@ -12,10 +12,10 @@ if [ -z "$NODE_NAME" ]; then
     export NODE_NAME=lasp@${IP}
 fi
 
+export RELX_REPLACE_OS_VARS=true
+export COOKIE=lasp
+
 echo "NODE_NAME: ${NODE_NAME}"
 echo "COOKIE: ${COOKIE}"
 
-export RELX_REPLACE_OS_VARS=true
-export NODE_NAME=lasp
-export COOKIE=lasp
 exec _build/default/rel/lasp/bin/lasp foreground "$@"

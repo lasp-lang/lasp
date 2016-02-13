@@ -40,9 +40,13 @@
 
 -include("lasp.hrl").
 
--define(INTERVAL, 1000).
--define(POLL,     poll).
+-define(REFRESH_INTERVAL, 1000).
+-define(REFRESH_MESSAGE,  refresh).
 
+-define(NODES_INTERVAL, 5000).
+-define(NODES_MESSAGE,  nodes).
+
+%% @todo Fix me to make me get my information from mesos.
 -define(OPTIONS,  [{nameservers, [{{10,141,141,10}, 53}]}]).
 
 %% State record.
@@ -74,7 +78,8 @@ init([]) ->
         false ->
             ok;
         _ ->
-            timer:send_after(0, ?POLL)
+            timer:send_after(0, ?NODES_MESSAGE),
+            timer:send_after(0, ?REFRESH_MESSAGE)
     end,
     {ok, #state{}}.
 
@@ -95,8 +100,8 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(?POLL, #state{nodes=SeenNodes}=State) ->
-    timer:send_after(?INTERVAL, ?POLL),
+handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
+    timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE),
 
     Nodes = case resolve() of
         {ok, DnsMsg} ->
@@ -109,6 +114,10 @@ handle_info(?POLL, #state{nodes=SeenNodes}=State) ->
     ConnectedNodes = maybe_connect(Nodes, SeenNodes),
 
     {noreply, State#state{nodes=ConnectedNodes}};
+handle_info(?NODES_MESSAGE, State) ->
+    timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
+    lager:info("Currently connected nodes: ~p", [nodes()]),
+    {noreply, State};
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.

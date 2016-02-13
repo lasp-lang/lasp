@@ -78,8 +78,9 @@ init([]) ->
         false ->
             ok;
         _ ->
-            timer:send_after(0, ?NODES_MESSAGE),
-            timer:send_after(0, ?REFRESH_MESSAGE)
+            %% @todo Stall messages, because Plumtree has a race on startup, again.
+            timer:send_after(?NODES_MESSAGE, ?NODES_MESSAGE),
+            timer:send_after(?REFRESH_MESSAGE, ?REFRESH_MESSAGE)
     end,
     {ok, #state{}}.
 

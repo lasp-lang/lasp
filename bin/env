@@ -5,8 +5,7 @@ IP=127.0.0.1
 
 # Use mesos task id as node name, else, use the default.
 if [ ! -z "$MESOS_TASK_ID" ]; then
-    SANITIZED_MESOS_TASK_ID=`echo "${MESOS_TASK_ID}" | sed 's/\./-/g'`
-    export NODE_NAME=${SANITIZED_MESOS_TASK_ID}@${IP}
+    export NODE_NAME=lasp-${PORT0}@${IP}
 fi
 
 if [ -z "$NODE_NAME" ]; then
@@ -16,7 +15,8 @@ fi
 export RELX_REPLACE_OS_VARS=true
 export COOKIE=lasp
 
-echo "PORT0: ${PORT}"
+echo "MESOS_TASK_ID: ${MESOS_TASK_ID}"
+echo "PORT0: ${PORT0}"
 echo "NODE_NAME: ${NODE_NAME}"
 echo "COOKIE: ${COOKIE}"
 

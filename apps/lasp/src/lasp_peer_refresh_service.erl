@@ -43,7 +43,7 @@
 -define(REFRESH_INTERVAL, 1000).
 -define(REFRESH_MESSAGE,  refresh).
 
--define(NODES_INTERVAL, 5000).
+-define(NODES_INTERVAL, 20000).
 -define(NODES_MESSAGE,  nodes).
 
 %% @todo Fix me to make me get my information from mesos.
@@ -116,7 +116,10 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
     {noreply, State#state{nodes=ConnectedNodes}};
 handle_info(?NODES_MESSAGE, State) ->
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
-    lager:info("Currently connected nodes: ~p", [nodes()]),
+    lager:info("Currently connected nodes via distributed erlang: ~p",
+               [nodes()]),
+    lager:info("Currently connected nodes via Lasp peer service: ~p",
+               [lasp_peer_service:members()]),
     {noreply, State};
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),

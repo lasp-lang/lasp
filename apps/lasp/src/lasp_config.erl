@@ -26,6 +26,7 @@
 dispatch() ->
     lists:flatten([
         {["api", "health"], lasp_health_check_resource, undefined},
+        {["api", "status"], lasp_status_resource,       undefined},
         {[],                lasp_gui_resource,          index},
         {['*'],             lasp_gui_resource,          undefined}
     ]).

@@ -20,6 +20,7 @@ export WEB_PORT=${PORT0}
 
 echo "MESOS_TASK_ID: ${MESOS_TASK_ID}"
 echo "PORT0: ${PORT0}"
+echo "WEB_PORT: ${WEB_PORT}"
 echo "NODE_NAME: ${NODE_NAME}"
 echo "COOKIE: ${COOKIE}"
 

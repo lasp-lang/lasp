@@ -23,7 +23,6 @@
 
 -export([dispatch/0, web_config/0]).
 
--spec dispatch() -> [webmachine_dispatcher:route()].
 dispatch() ->
     lists:flatten([
         {[],                lasp_gui_resource,          index},

@@ -69,7 +69,13 @@ start_link(Opts) ->
 %% @private
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
-    timer:send_after(0, ?POLL),
+    %% Don't start the timer if we're not running in Mesos.
+    case os:getenv("MESOS_TASK_ID") of
+        false ->
+            ok;
+        _ ->
+            timer:send_after(0, ?POLL)
+    end,
     {ok, #state{}}.
 
 %% @private

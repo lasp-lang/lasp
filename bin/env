@@ -8,6 +8,7 @@ fi
 # Use mesos task id as node name, else, use the default.
 if [ ! -z "$MESOS_TASK_ID" ]; then
     export NODE_NAME=lasp-${PORT0}@${IP}
+    export WEB_PORT=${PORT0}
 fi
 
 if [ -z "$NODE_NAME" ]; then
@@ -16,7 +17,6 @@ fi
 
 export RELX_REPLACE_OS_VARS=true
 export COOKIE=lasp
-export WEB_PORT=${PORT0}
 
 echo "MESOS_TASK_ID: ${MESOS_TASK_ID}"
 echo "PORT0: ${PORT0}"

@@ -46,9 +46,6 @@
 -define(NODES_INTERVAL, 20000).
 -define(NODES_MESSAGE,  nodes).
 
-%% @todo Fix me to make me get my information from mesos.
--define(OPTIONS,  [{nameservers, [{{10,141,141,10}, 53}]}]).
-
 %% State record.
 -record(state, {nodes = [] :: [node()]}).
 
@@ -107,7 +104,9 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
     Nodes = case resolve() of
         {ok, DnsMsg} ->
             lists:usort(generate_nodes(DnsMsg));
-        _Error ->
+        Error ->
+            lager:info("Failed to receive information from DNS: ~p",
+                       [Error]),
             SeenNodes
     end,
 
@@ -165,7 +164,8 @@ parse_additionals(ArList) ->
 
 %% @private
 resolve() ->
-    inet_res:resolve("_lasp._tcp.marathon.mesos", any, srv, ?OPTIONS).
+    Options = options(),
+    inet_res:resolve("_lasp._tcp.marathon.mesos", any, srv, Options).
 
 %% @doc Attempt to connect disconnected nodes.
 %% @private
@@ -201,3 +201,8 @@ connect(Node) ->
             lasp_peer_service:join(Node)
     end,
     {Node, Ping}.
+
+%% @private
+options() ->
+    {ok, IpAddress} = os:getenv("IP", "127.0.0.1"),
+    [{nameservers, [{IpAddress, 53}]}].

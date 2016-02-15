@@ -1,13 +1,12 @@
 #!/bin/bash
 
-# Assume 127.0.0.1 as bind host.
-if [ -z "$IP" ]; then
-  echo "IP Address not currently set; defaulting to 127.0.0.1."
-  export IP=127.0.0.1
-fi
-
 # If we're running in Mesos...
 if [ ! -z "$MESOS_TASK_ID" ]; then
+  # Choose publicly routable IP.
+  if [ -z "$IP" ]; then
+    export IP=$(ip route get 8.8.8.8 | head -1 | cut -d' ' -f8)
+  fi
+
   # Choose the hostname for the epmd long name if the hostname exists
   # and if it resolves through the resolver; using a resolvable name
   # that's only resolvable with resolv.conf won't work for long names.
@@ -27,6 +26,12 @@ if [ ! -z "$MESOS_TASK_ID" ]; then
   # The running port should be used as the name, given this is the
   # only identifier that is available via service discovery.
   export WEB_PORT=${PORT0}
+fi
+
+# Assume 127.0.0.1 as bind host.
+if [ -z "$IP" ]; then
+  echo "IP address not set; defaulting to 127.0.0.1."
+  export IP=127.0.0.1
 fi
 
 if [ -z "$NODE_NAME" ]; then

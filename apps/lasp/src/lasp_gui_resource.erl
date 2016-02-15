@@ -34,26 +34,25 @@
 -type context() :: #ctx{}.
 
 %% mappings to the various content types supported for this resource
--define(CONTENT_TYPES,[{"text/css", to_resource},
-                       {"text/html",to_resource},
-                       {"text/plain",to_resource},
-                       {"text/javascript",to_resource}
-                      ]).
+-define(CONTENT_TYPES, [{"text/css", to_resource},
+                        {"text/html", to_resource},
+                        {"text/plain", to_resource},
+                        {"text/javascript", to_resource}]).
 
 %% entry-point for the resource from webmachine
 -spec init(any()) -> {ok, any()}.
-init(Resource) -> {ok,Resource}.
+init(Resource) -> {ok, Resource}.
 
 %% return the list of available content types for webmachine
 -spec content_types_provided(wrq:reqdata(), context()) ->
          {[{ContentType::string(), HandlerFunction::atom()}],
           wrq:reqdata(), context()}.
-content_types_provided(Req,Ctx=index) ->
-    {[{"text/html", to_resource}],Req, Ctx};
-content_types_provided(Req,Ctx) ->
+content_types_provided(Req, Ctx=index) ->
+    {[{"text/html", to_resource}], Req, Ctx};
+content_types_provided(Req, Ctx) ->
     Index = file_path(Req),
     MimeType = webmachine_util:guess_mime(Index),
-    {[{MimeType, to_resource}],Req, Ctx}.
+    {[{MimeType, to_resource}], Req, Ctx}.
 
 %% return file path
 -spec file_path(wrq:reqdata() | list()) -> string().
@@ -67,19 +66,19 @@ file_path(Req) ->
 -spec get_file(wrq:reqdata()) -> binary().
 get_file(Req) ->
     Index = file_path(Req),
-    {ok,Source}=file:read_file(Index),
+    {ok, Source}=file:read_file(Index),
     Source.
 
 %% read a file from disk and return it
 read_file(File) ->
     Index = file_path(File),
-    {ok,Source}=file:read_file(Index),
+    {ok, Source}=file:read_file(Index),
     Source.
 
 %% respond to an index or file request
 -spec to_resource(wrq:reqdata(), context()) ->
                          {binary(), wrq:reqdata(), context()}.
-to_resource(Req,Ctx=index) ->
-    {read_file("index.html"),Req,Ctx};
-to_resource(Req,Ctx) ->
-    {get_file(Req),Req,Ctx}.
+to_resource(Req, Ctx=index) ->
+    {read_file("index.html"), Req, Ctx};
+to_resource(Req, Ctx) ->
+    {get_file(Req), Req, Ctx}.

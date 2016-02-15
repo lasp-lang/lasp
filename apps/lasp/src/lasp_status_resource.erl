@@ -32,7 +32,7 @@ init(_) ->
     {ok, undefined}.
 
 %% return the list of available content types for webmachine
-content_types_provided(Req,Ctx) ->
+content_types_provided(Req, Ctx) ->
     {[{"application/json", to_json}], Req, Ctx}.
 
 -ifdef(TEST).

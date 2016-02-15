@@ -1,20 +1,30 @@
 #!/bin/bash
 
-# Get instance IP.
+# Assume localhost as bind host.
 if [ -z "$IP" ]; then
     export IP=localhost
 fi
 
-# Use mesos task id as node name, else, use the default.
+# If we're running in Mesos...
 if [ ! -z "$MESOS_TASK_ID" ]; then
+    # Choose the hostname for the epmd long name if the hostname exists
+    # and if it resolves through the resolver; using a resolvable name
+    # that's only resolvable with resolv.conf won't work for long names.
     if [ ! -z "$HOSTNAME" ]; then
-      export NODE_NAME=lasp-${PORT0}@${HOSTNAME}
+      if dig ${HOSTNAME} | grep -q 'NXDOMAIN'
+        export NODE_NAME=lasp-${PORT0}@${IP}
+      then
+        export NODE_NAME=lasp-${PORT0}@${HOSTNAME}
+      fi
     fi
 
+    # Else, default to IP.
     if [ -z "$NODE_NAME" ]; then
       export NODE_NAME=lasp-${PORT0}@${IP}
     fi
 
+    # The running port should be used as the name, given this is the
+    # only identifier that is available via service discovery.
     export WEB_PORT=${PORT0}
 fi
 
@@ -22,14 +32,18 @@ if [ -z "$NODE_NAME" ]; then
     export NODE_NAME=lasp@${IP}
 fi
 
+if [ -z "$COOKIE" ]; then
+    export COOKIE=lasp
+fi
+
 export RELX_REPLACE_OS_VARS=true
-export COOKIE=lasp
 
 echo "MESOS_TASK_ID: ${MESOS_TASK_ID}"
 echo "PORT0: ${PORT0}"
 echo "WEB_PORT: ${WEB_PORT}"
 echo "NODE_NAME: ${NODE_NAME}"
 echo "COOKIE: ${COOKIE}"
+echo "IP: ${IP}"
 echo "HOSTNAME: ${HOSTNAME}"
 
 RELNAME="`dirname \"$0\"`"/lasp

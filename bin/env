@@ -23,6 +23,7 @@ echo "PORT0: ${PORT0}"
 echo "WEB_PORT: ${WEB_PORT}"
 echo "NODE_NAME: ${NODE_NAME}"
 echo "COOKIE: ${COOKIE}"
+echo "HOSTNAME: ${HOSTNAME}"
 
 RELNAME="`dirname \"$0\"`"/lasp
 exec ${RELNAME} foreground "$@"

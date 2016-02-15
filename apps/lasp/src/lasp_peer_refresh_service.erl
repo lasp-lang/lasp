@@ -204,5 +204,5 @@ connect(Node) ->
 
 %% @private
 options() ->
-    {ok, IpAddress} = os:getenv("IP", "127.0.0.1"),
+    {ok, IpAddress} = inet:parse_address(os:getenv("IP", "127.0.0.1")),
     [{nameservers, [{IpAddress, 53}]}].

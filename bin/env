@@ -7,7 +7,14 @@ fi
 
 # Use mesos task id as node name, else, use the default.
 if [ ! -z "$MESOS_TASK_ID" ]; then
-    export NODE_NAME=lasp-${PORT0}@${IP}
+    if [ ! -z "$HOSTNAME" ]; then
+      export NODE_NAME=lasp-${PORT0}@${HOSTNAME}
+    fi
+
+    if [ -z "$NODE_NAME" ]; then
+      export NODE_NAME=lasp-${PORT0}@${IP}
+    fi
+
     export WEB_PORT=${PORT0}
 fi
 

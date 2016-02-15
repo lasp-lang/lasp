@@ -1,39 +1,40 @@
 #!/bin/bash
 
-# Assume localhost as bind host.
+# Assume 127.0.0.1 as bind host.
 if [ -z "$IP" ]; then
-    export IP=localhost
+  echo "IP Address not currently set; defaulting to 127.0.0.1."
+  export IP=127.0.0.1
 fi
 
 # If we're running in Mesos...
 if [ ! -z "$MESOS_TASK_ID" ]; then
-    # Choose the hostname for the epmd long name if the hostname exists
-    # and if it resolves through the resolver; using a resolvable name
-    # that's only resolvable with resolv.conf won't work for long names.
-    if [ ! -z "$HOSTNAME" ]; then
-      if dig ${HOSTNAME} | grep -q 'NXDOMAIN'
-        export NODE_NAME=lasp-${PORT0}@${HOSTNAME}
-      then
-        export NODE_NAME=lasp-${PORT0}@${IP}
-      fi
-    fi
-
-    # Else, default to IP.
-    if [ -z "$NODE_NAME" ]; then
+  # Choose the hostname for the epmd long name if the hostname exists
+  # and if it resolves through the resolver; using a resolvable name
+  # that's only resolvable with resolv.conf won't work for long names.
+  if [ ! -z "$HOSTNAME" ]; then
+    if dig ${HOSTNAME} | grep -q 'NXDOMAIN'
+      export NODE_NAME=lasp-${PORT0}@${HOSTNAME}
+    then
       export NODE_NAME=lasp-${PORT0}@${IP}
     fi
+  fi
 
-    # The running port should be used as the name, given this is the
-    # only identifier that is available via service discovery.
-    export WEB_PORT=${PORT0}
+  # Else, default to IP.
+  if [ -z "$NODE_NAME" ]; then
+    export NODE_NAME=lasp-${PORT0}@${IP}
+  fi
+
+  # The running port should be used as the name, given this is the
+  # only identifier that is available via service discovery.
+  export WEB_PORT=${PORT0}
 fi
 
 if [ -z "$NODE_NAME" ]; then
-    export NODE_NAME=lasp@${IP}
+  export NODE_NAME=lasp@${IP}
 fi
 
 if [ -z "$COOKIE" ]; then
-    export COOKIE=lasp
+  export COOKIE=lasp
 fi
 
 export RELX_REPLACE_OS_VARS=true

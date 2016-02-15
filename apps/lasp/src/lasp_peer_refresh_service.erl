@@ -149,7 +149,6 @@ generate_nodes(DnsMsg) ->
 %% @doc Generate a single Erlang node name from DNS records.
 generate_node(DnsRr, Additionals) ->
     {_, _, Port, Host} = inet_dns:rr(DnsRr, data),
-    lager:info("Received host: ~p, port: ~p", [Host, Port]),
     {Host, IP} = lists:keyfind(Host, 1, Additionals),
     Name = "lasp-" ++ integer_to_list(Port) ++ "@" ++ inet:ntoa(IP),
     list_to_atom(Name).

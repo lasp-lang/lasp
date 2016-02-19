@@ -23,16 +23,20 @@
 
 -export([dispatch/0, web_config/0]).
 
--spec dispatch() -> [webmachine_dispatcher:route()].
 dispatch() ->
     lists:flatten([
-        {["api", "health"], lasp_health_check_resource, []}
+        {["api", "health"], lasp_health_check_resource, undefined},
+        {["api", "status"], lasp_status_resource,       undefined},
+        {[],                lasp_gui_resource,          index},
+        {['*'],             lasp_gui_resource,          undefined}
     ]).
 
 web_config() ->
     {ok, App} = application:get_application(?MODULE),
     {ok, Ip} = application:get_env(App, web_ip),
-    {ok, Port} = application:get_env(App, web_port),
+    DefaultPort = application:get_env(App, web_port, 8080),
+    Port = list_to_integer(os:getenv("WEB_PORT", integer_to_list(DefaultPort))),
+    lager:info("Port override: ~p", [Port]),
     [
         {ip, Ip},
         {port, Port},

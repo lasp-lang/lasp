@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<html>
+  <head>
+    <title>Lasp</title>
+    <link rel="stylesheet"
+          href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css"
+          integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7"
+          crossorigin="anonymous">
+    <link rel="stylesheet"
+          href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css"
+          integrity="sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r"
+          crossorigin="anonymous">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"
+            integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS"
+            crossorigin="anonymous"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="//code.jquery.com/jquery-1.12.0.min.js"></script>
+    <script src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+    <link rel="icon" type="image/vnd.microsoft.icon" href="/favicon.ico" />
+
+    <style type="text/css">
+    .node {
+      stroke: #fff;
+      stroke-width: 1.5px;
+    }
+
+    .link {
+      stroke: #999;
+      stroke-opacity: .6;
+    }
+
+    svg {
+      border: 1px solid #ccc;
+      border-radius: 5px;
+      display: block;
+      margin: auto;
+    }
+
+    .topology {
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    h2 {
+      height: 50px;
+      padding-top: 8px;
+      padding-left: 45px;
+      background-image: url("images/lasp-logo-tiny.png");
+      background-position: left top, right bottom;
+      background-repeat: no-repeat;
+    }
+
+    .container {
+      margin-top: 20px;
+    }
+    </style>
+
+    <style type="text/css">
+      .centered {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        /* bring your own prefixes */
+        transform: translate(-50%, -50%);
+        height: 200px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row">
+        <div id="topology" class="col-md-12"></div>
+      </div>
+      <div class="row">
+      </div>
+      <div id="logo">
+        <img class="centered" src="images/lasp-logo-large.png" alt="Lasp logo">
+      </div>
+    </div>
+    <script src="//d3js.org/d3.v3.min.js"></script>
+    <script src="js/main.js"></script>
+  </body>
+</html>

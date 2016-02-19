@@ -65,8 +65,14 @@ init(_Args) ->
             permanent, 5000, worker,
             [mochiweb_socket_server]},
 
+    PeerRefresh = {lasp_peer_refresh_service,
+                   {lasp_peer_refresh_service, start_link, []},
+                    permanent, 5000, worker,
+                    [lasp_peer_refresh_service]},
+
     {ok, {{one_for_one, 5, 10}, [Web,
                                  Process,
                                  Unique,
                                  Plumtree,
+                                 PeerRefresh,
                                  Transmission]}}.

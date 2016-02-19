@@ -1,0 +1,56 @@
+#!/bin/bash
+
+# If we're running in Mesos...
+if [ ! -z "$MESOS_TASK_ID" ]; then
+  # Choose publicly routable IP.
+  if [ -z "$IP" ]; then
+    export IP=$(ip route get 8.8.8.8 | head -1 | cut -d' ' -f8)
+  fi
+
+  # Choose the hostname for the epmd long name if the hostname exists
+  # and if it resolves through the resolver; using a resolvable name
+  # that's only resolvable with resolv.conf won't work for long names.
+  if [ ! -z "$HOSTNAME" ]; then
+    if dig ${HOSTNAME} | grep -q 'NXDOMAIN'
+      export NODE_NAME=lasp-${PORT0}@${HOSTNAME}
+    then
+      export NODE_NAME=lasp-${PORT0}@${IP}
+    fi
+  fi
+
+  # Else, default to IP.
+  if [ -z "$NODE_NAME" ]; then
+    export NODE_NAME=lasp-${PORT0}@${IP}
+  fi
+
+  # The running port should be used as the name, given this is the
+  # only identifier that is available via service discovery.
+  export WEB_PORT=${PORT0}
+fi
+
+# Assume 127.0.0.1 as bind host.
+if [ -z "$IP" ]; then
+  echo "IP address not set; defaulting to 127.0.0.1."
+  export IP=127.0.0.1
+fi
+
+if [ -z "$NODE_NAME" ]; then
+  export NODE_NAME=lasp@${IP}
+fi
+
+if [ -z "$COOKIE" ]; then
+  export COOKIE=lasp
+fi
+
+export RELX_REPLACE_OS_VARS=true
+
+echo "MESOS_TASK_ID: ${MESOS_TASK_ID}"
+echo "PORT0: ${PORT0}"
+echo "WEB_PORT: ${WEB_PORT}"
+echo "NODE_NAME: ${NODE_NAME}"
+echo "COOKIE: ${COOKIE}"
+echo "IP: ${IP}"
+echo "HOSTNAME: ${HOSTNAME}"
+
+RELNAME="`dirname \"$0\"`"/lasp
+exec ${RELNAME} foreground "$@"

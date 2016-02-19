@@ -1,0 +1,17 @@
+FROM ubuntu:trusty
+
+MAINTAINER Christopher Meiklejohn <christopher.meiklejohn@gmail.com>
+
+RUN cd /tmp && \
+    apt-get update && \
+    apt-get -y install wget build-essential make gcc ruby-dev git && \
+    wget http://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb && \
+    dpkg -i erlang-solutions_1.0_all.deb && \
+    apt-get update && \
+    apt-get -y install erlang
+
+CMD cd /opt && \
+    git clone https://github.com/lasp-lang/lasp.git -b unstable && \
+    cd lasp && \
+    make stage && \
+    /opt/lasp/_build/default/rel/lasp/bin/env

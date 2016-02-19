@@ -58,7 +58,19 @@ end_per_suite(_Config) ->
     _Config.
 
 init_per_testcase(Case, Config) ->
-    Nodes = lasp_test_utils:pmap(fun(N) -> lasp_test_utils:start_node(N, Config, Case) end, [jaguar, shadow, thorn, pyros]),
+    Nodes = [First|Rest] = lasp_test_utils:pmap(fun(N) -> lasp_test_utils:start_node(N, Config, Case) end, [jaguar, shadow, thorn, pyros]),
+    ct:pal("Nodes: ~p", [Nodes]),
+
+    %% Attempt to join all nodes in the cluster.
+    lists:foreach(fun(N) ->
+                        ct:pal("Joining node: ~p to ~p", [N, First]),
+                        ok = rpc:call(First, lasp_peer_service, join, [N])
+                  end, Rest),
+
+    %% Wait until convergence.
+    lasp_test_utils:wait_until_joined(Nodes, Nodes),
+    ct:pal("Cluster converged."),
+
     {ok, _} = ct_cover:add_nodes(Nodes),
     [{nodes, Nodes}|Config].
 

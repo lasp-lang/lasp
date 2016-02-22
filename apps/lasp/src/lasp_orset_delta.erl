@@ -101,21 +101,22 @@ value(_, ORSet) ->
 
 -spec update(orset_delta_op(), actor(), orset_delta()) -> {ok, orset_delta()} |
                                               {error, {precondition, {not_present, member()}}}.
-update({add_by_token, Token, Elem}, _Actor, ORDict) ->
-    add_elem(Elem, Token, ORDict);
-update({add, Elem}, Actor, ORDict) ->
+update({add_by_token,Token,Elem}, _Actor, _ORDict) ->
+    add_elem(Elem,Token,orddict:new());
+update({add,Elem}, Actor, _ORDict) ->
     Token = unique(Actor),
-    add_elem(Elem, Token, ORDict);
-update({add_all, Elems}, Actor, ORDict0) ->
-    OD = lists:foldl(fun(Elem, ORDict) ->
-                {ok, ORDict1} = update({add, Elem}, Actor, ORDict),
+    add_elem(Elem,Token,orddict:new());
+update({add_all,Elems}, Actor, _ORDict0) ->
+	Token = unique(Actor),
+    OD = lists:foldl(fun(Elem,ORDict) ->
+                {ok, ORDict1} = add_elem(Elem,Token,ORDict),
                 ORDict1
-            end, ORDict0, Elems),
+            end, orddict:new(), Elems),
     {ok, OD};
-update({remove, Elem}, _Actor, ORDict) ->
-    remove_elem(Elem, ORDict);
-update({remove_all, Elems}, _Actor, ORDict0) ->
-    remove_elems(Elems, ORDict0);
+update({remove,Elem}, _Actor, ORDict) ->
+    remove_elem(Elem, ORDict, orddict:new());
+update({remove_all,Elems}, _Actor, ORDict0) ->
+    remove_elems(Elems, ORDict0, orddict:new());
 update({update, Ops}, Actor, ORDict) ->
     apply_ops(Ops, Actor, ORDict).
 
@@ -257,33 +258,33 @@ filter(Function, V) ->
 
 
 %% Private
-add_elem(Elem, Token, ORDict) ->
-    case orddict:find(Elem, ORDict) of
+add_elem(Elem,Token,DeltaORDict) ->
+    case orddict:find(Elem, DeltaORDict) of
         {ok, Tokens} ->
             Tokens1 = orddict:store(Token, false, Tokens),
-            {ok, orddict:store(Elem, Tokens1, ORDict)};
+            {ok, orddict:store(Elem, Tokens1, DeltaORDict)};
         error ->
             Tokens = orddict:store(Token, false, orddict:new()),
-            {ok, orddict:store(Elem, Tokens, ORDict)}
+            {ok, orddict:store(Elem, Tokens, DeltaORDict)}
     end.
 
-remove_elem(Elem, ORDict) ->
+remove_elem(Elem, ORDict, DeltaORDict) ->
     case orddict:find(Elem, ORDict) of
         {ok, Tokens} ->
             Tokens1 = orddict:fold(fun(Token, _, Tokens0) ->
                                            orddict:store(Token, true, Tokens0)
                                    end, orddict:new(), Tokens),
-            {ok, orddict:store(Elem, Tokens1, ORDict)};
+			{ok, orddict:store(Elem, Tokens1, DeltaORDict)};
         error ->
             {error, {precondition, {not_present, Elem}}}
     end.
 
 
-remove_elems([], ORDict) ->
-    {ok, ORDict};
-remove_elems([Elem|Rest], ORDict) ->
-    case remove_elem(Elem, ORDict) of
-        {ok, ORDict1} -> remove_elems(Rest, ORDict1);
+remove_elems([], _ORDict, DeltaORDict) ->
+    {ok, DeltaORDict};
+remove_elems([Elem|Rest], ORDict, DeltaORDict) ->
+    case remove_elem(Elem, ORDict, DeltaORDict) of
+        {ok, DeltaORDict1} -> remove_elems(Rest, ORDict, DeltaORDict1);
         Error         -> Error
     end.
 
@@ -310,19 +311,20 @@ minimum_tokens(Tokens) ->
 -ifdef(TEST).
 stat_test() ->
     Set = new(),
-    {ok, Set1} = update({add, <<"foo">>}, 1, Set),
-    {ok, Set2} = update({add, <<"foo">>}, 2, Set1),
-    {ok, Set3} = update({add, <<"bar">>}, 3, Set2),
-    {ok, Set4} = update({remove, <<"foo">>}, 1, Set3),
+    %% This test is not valid for the delta-mutation.
+    %%{ok, Set1} = update({add, <<"foo">>}, 1, Set),
+    %%{ok, Set2} = update({add, <<"foo">>}, 2, Set1),
+    %%{ok, Set3} = update({add, <<"bar">>}, 3, Set2),
+    %%{ok, Set4} = update({remove, <<"foo">>}, 1, Set3),
     ?assertEqual([{element_count, 0},
                   {adds_count, 0},
                   {removes_count, 0},
-                  {waste_pct, 0}], stats(Set)),
+                  {waste_pct, 0}], stats(Set)).
     %% Note this doesn't exclude things that are not all removed!
-    ?assertEqual(2, stat(element_count, Set4)),
-    ?assertEqual(1, stat(adds_count, Set4)),
-    ?assertEqual(2, stat(removes_count, Set4)),
-    ?assertEqual(67, stat(waste_pct, Set4)).
+    %%?assertEqual(2, stat(element_count, Set4)),
+    %%?assertEqual(1, stat(adds_count, Set4)),
+    %%?assertEqual(2, stat(removes_count, Set4)),
+    %%?assertEqual(67, stat(waste_pct, Set4)).
 
 -ifdef(EQC).
 eqc_value_test_() ->

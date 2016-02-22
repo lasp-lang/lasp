@@ -54,6 +54,7 @@
 -type type() :: lasp_ivar
               | lasp_orset
               | lasp_orset_gbtree
+              | lasp_orset_delta
               | {lasp_top_k_set, [any()]}
               | {lasp_pair, [type()]}
               | riak_dt_gcounter

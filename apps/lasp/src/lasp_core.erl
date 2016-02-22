@@ -351,7 +351,13 @@ bind(Id, Value, MetadataFun, Store) ->
                         Merged = lasp_type:merge(Type, Value0, Value),
                         case lasp_lattice:is_inflation(Type, Value0, Merged) of
                             true ->
-                                {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
+                                {ok, SW} = case Type of
+                                    %% The 'Value' contains a delta-state.
+                                	lasp_orset_delta ->
+										reply_to_all(WT, [], {ok, {Id, Type, Metadata, Value}});
+									_ ->
+										reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}})
+								end,
                                 NewObject = #dv{type=Type, metadata=Metadata, value=Merged, waiting_threads=SW},
                                 {NewObject, {ok, {Id, Type, Metadata, Merged}}};
                             false ->
@@ -561,6 +567,11 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                     ok;
                 {_, _} ->
                     AccValue = case T of
+                        lasp_orset_delta ->
+                            FolderFun = fun({X, XCausality}, Acc) ->
+                                    Acc ++ [{{X, Y}, lasp_lattice:causal_product(T, XCausality, YCausality)} || {Y, YCausality} <- RValue]
+                            end,
+                            lists:foldl(FolderFun, T:new(), LValue);
                         lasp_orset_gbtree ->
                             FolderFun = fun(X, XCausality, XAcc) ->
                                     InnerFoldFun = fun(Y, YCausality, YAcc) ->
@@ -604,6 +615,8 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                     ok;
                 {_, _} ->
                     AccValue = case T of
+                                   lasp_orset_delta ->
+                                       lasp_orset_delta:intersect(LValue, RValue);
                                    lasp_orset_gbtree ->
                                        lasp_orset_gbtree:intersect(LValue, RValue);
                                    lasp_orset ->
@@ -636,6 +649,8 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                     ok;
                 {_, _} ->
                     AccValue = case T of
+                        lasp_orset_delta ->
+                            lasp_orset_delta:merge(LValue, RValue);
                         lasp_orset_gbtree ->
                             lasp_orset_gbtree:merge(LValue, RValue);
                         lasp_orset ->
@@ -661,6 +676,8 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun({_, T, _, V}) ->
                   AccValue = case T of
+                                 lasp_orset_delta ->
+                                     lasp_orset_delta:map(Function, V);
                                  lasp_orset_gbtree ->
                                      lasp_orset_gbtree:map(Function, V);
                                  lasp_orset ->
@@ -685,6 +702,7 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun({_, T, _, V}) ->
             AccValue = case T of
+                lasp_orset_delta -> lasp_orset_delta:filter(Function, V);
                 lasp_orset_gbtree -> lasp_orset_gbtree:filter(Function, V);
                 lasp_orset -> lasp_orset:filter(Function, V)
             end,

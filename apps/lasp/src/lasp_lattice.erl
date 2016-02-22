@@ -72,6 +72,11 @@ threshold_met(lasp_pncounter, Value, Threshold) ->
 threshold_met(lasp_top_k_set, Value, Threshold) ->
     is_inflation(lasp_top_k_set, Threshold, Value);
 
+threshold_met(lasp_orset_delta, Value, {strict, _Threshold}) ->
+	not orddict:is_empty(Value);
+threshold_met(lasp_orset_delta, Value, _Threshold) ->
+	not orddict:is_empty(Value);
+
 threshold_met(lasp_orset_gbtree, Value, {strict, Threshold}) ->
     is_strict_inflation(lasp_orset_gbtree, Threshold, Value);
 threshold_met(lasp_orset_gbtree, Value, Threshold) ->
@@ -189,6 +194,16 @@ is_lattice_inflation(lasp_top_k_set, {K, Previous}, {K, Current}) ->
                         end
                 end, true, Previous);
 
+is_lattice_inflation(lasp_orset_delta, Previous, Current) ->
+    lists:foldl(fun({Element, Ids}, Acc) ->
+                        case lists:keyfind(Element, 1, Current) of
+                            false ->
+                                Acc andalso false;
+                            {_, Ids1} ->
+                                Acc andalso ids_inflated(lasp_orset_delta, Ids, Ids1)
+                        end
+                end, true, Previous);
+
 is_lattice_inflation(lasp_orset_gbtree, Previous, Current) ->
     gb_trees_ext:foldl(fun(Element, Ids, Acc) ->
                         case gb_trees:lookup(Element, Current) of
@@ -281,6 +296,26 @@ is_lattice_strict_inflation(lasp_pncounter, [], _Current) ->
 is_lattice_strict_inflation(lasp_orswot, {Previous, _, _}, {Current, _, _}) ->
     riak_dt_vclock:dominates(Current, Previous);
 
+is_lattice_strict_inflation(lasp_orset_delta, [], Current) when Current =/= [] ->
+    true;
+is_lattice_strict_inflation(lasp_orset_delta, Previous, Current) ->
+    %% We already know that `Previous' is fully covered in `Current', so
+    %% we just need to look for a change -- removal (false -> true), or
+    %% addition of a new element.
+    IsLatticeInflation = is_lattice_inflation(lasp_orset_delta,
+                                              Previous,
+                                              Current),
+    DeletedElements = lists:foldl(fun({Element, Ids}, Acc) ->
+                    case lists:keyfind(Element, 1, Current) of
+                        false ->
+                            Acc;
+                        {_, Ids1} ->
+                            Acc orelse Ids =/= Ids1
+                    end
+                    end, false, Previous),
+    NewElements = length(Previous) < length(Current),
+    IsLatticeInflation andalso (DeletedElements orelse NewElements);
+
 is_lattice_strict_inflation(lasp_orset_gbtree, Previous, Current) ->
     %% We already know that `Previous' is fully covered in `Current', so
     %% we just need to look for a change -- removal (false -> true), or
@@ -351,6 +386,16 @@ is_lattice_strict_inflation(riak_dt_gcounter, Previous, Current) ->
     %% Massive shortcut here -- get the value and see if it's different.
     riak_dt_gcounter:value(Previous) < riak_dt_gcounter:value(Current).
 
+ids_inflated(lasp_orset_delta, Previous, Current) ->
+    lists:foldl(fun({Id, _}, Acc) ->
+                        case lists:keyfind(Id, 1, Current) of
+                            false ->
+                                Acc andalso false;
+                            _ ->
+                                Acc andalso true
+                        end
+                end, true, Previous);
+
 ids_inflated(lasp_orset, Previous, Current) ->
     lists:foldl(fun({Id, _}, Acc) ->
                         case lists:keyfind(Id, 1, Current) of
@@ -377,6 +422,12 @@ ids_inflated(lasp_orset_gbtree, Previous, Current) ->
 %%      Computes product of `Xs' and `Ys' and map deleted through using
 %%      an or operation.
 %%
+causal_product(lasp_orset_delta, Xs, Ys) ->
+    lists:foldl(fun({X, XDeleted}, XAcc) ->
+                lists:foldl(fun({Y, YDeleted}, YAcc) ->
+                            [{[X, Y], XDeleted orelse YDeleted}] ++ YAcc
+                    end, [], Ys) ++ XAcc
+        end, [], Xs);
 causal_product(lasp_orset, Xs, Ys) ->
     lists:foldl(fun({X, XDeleted}, XAcc) ->
                 lists:foldl(fun({Y, YDeleted}, YAcc) ->
@@ -392,6 +443,8 @@ causal_product(lasp_orset_gbtree, Xs, Ys) ->
         end, gb_trees:empty(), Xs).
 
 %% @doc Compute the union of causal metadata.
+causal_union(lasp_orset_delta, Xs, Ys) ->
+    Xs ++ Ys;
 causal_union(lasp_orset, Xs, Ys) ->
     Xs ++ Ys;
 causal_union(lasp_orset_gbtree, Xs, Ys) ->
@@ -402,6 +455,10 @@ causal_union(lasp_orset_gbtree, Xs, Ys) ->
 
 %% @doc Given the metadata for a given value, force that the object
 %%      appears removed by marking all of the metadata as removed.
+causal_remove(lasp_orset_delta, Metadata) ->
+    orddict:fold(fun(Key, _Value, Acc) ->
+                orddict:store(Key, true, Acc)
+        end, orddict:new(), Metadata);
 causal_remove(lasp_orset, Metadata) ->
     orddict:fold(fun(Key, _Value, Acc) ->
                 orddict:store(Key, true, Acc)

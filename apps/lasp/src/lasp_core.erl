@@ -347,7 +347,7 @@ bind(Id, {delta, Value}, MetadataFun, Store) ->
                 {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
                 NewObject = #dv{type=Type, metadata=Metadata, value=Merged, waiting_threads=SW},
                 %% Return value is a delta state
-                {NewObject, {ok, {Id, Type, Metadata, Value}}}
+                {NewObject, {ok, {Id, Type, Metadata, {delta, Value, Merged}}}}
             catch
                 _:Reason ->
                     %% Merge threw.

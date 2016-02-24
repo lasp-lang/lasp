@@ -230,14 +230,26 @@ update(Id, Operation, Actor) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {update, Id, Operation, Actor},
                                                         infinity),
+    BroadcastState = case Value of
+                         {delta, DeltaState, _MergedState} ->
+                             {delta, DeltaState};
+                         _ ->
+                             Value
+                     end,
+    ReturnState = case Value of
+                      {delta, _DeltaState, MergedState} ->
+                          MergedState;
+                      _ ->
+                          Value
+                  end,
     case orddict:find(dynamic, Metadata) of
         {ok, true} ->
             %% Ignore: this is a dynamic variable.
             ok;
         _ ->
-            broadcast({Id, Type, Metadata, Value})
+            broadcast({Id, Type, Metadata, BroadcastState})
     end,
-    {ok, {Id, Type, Metadata, Value}}.
+    {ok, {Id, Type, Metadata, ReturnState}}.
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -250,14 +262,26 @@ bind(Id, Value0) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {bind, Id, Value0},
                                                         infinity),
+    BroadcastState = case Value of
+                         {delta, DeltaState, _MergedState} ->
+                             {delta, DeltaState};
+                         _ ->
+                             Value
+                     end,
+    ReturnState = case Value of
+                      {delta, _DeltaState, MergedState} ->
+                          MergedState;
+                      _ ->
+                          Value
+                  end,
     case orddict:find(dynamic, Metadata) of
         {ok, true} ->
             %% Ignore: this is a dynamic variable.
             ok;
         _ ->
-            broadcast({Id, Type, Metadata, Value})
+            broadcast({Id, Type, Metadata, BroadcastState})
     end,
-    {ok, {Id, Type, Metadata, Value}}.
+    {ok, {Id, Type, Metadata, ReturnState}}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%

@@ -100,7 +100,7 @@ value(_, ORSet) ->
     value(ORSet).
 
 -spec update(orset_op(), actor(), orset()) -> {ok, orset()} |
-                                              {delta, orset()} |
+                                              {ok, {delta, orset()}} |
                                               {error, {precondition, {not_present, member()}}}.
 update({add_by_token, Token, Elem}, _Actor, ORDict) ->
     case application:get_env(lasp, delta_mode, true) of

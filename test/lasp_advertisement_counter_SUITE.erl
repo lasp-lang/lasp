@@ -67,6 +67,10 @@ init_per_testcase(Case, Config) ->
                         ok = rpc:call(First, lasp_peer_service, join, [N])
                   end, Rest),
 
+    %% Sleep until application is fully started.
+    %% @todo: Change to a wait_until, eventually.
+    timer:sleep(60),
+
     %% Wait until convergence.
     ok = lasp_test_utils:wait_until_joined(Nodes, Nodes),
     ct:pal("Cluster converged."),

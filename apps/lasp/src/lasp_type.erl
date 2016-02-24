@@ -36,9 +36,19 @@ new(Type) ->
 update(Type, Operation, Actor, Value) ->
     case Type of
         {T, _Args} ->
-            T:update(Operation, Actor, Value);
+            case application:get_env(lasp, delta_mode, true) of
+                true ->
+                    T:update_delta(Operation, Actor, Value);
+                false ->
+                    T:update(Operation, Actor, Value)
+            end;
         T ->
-            T:update(Operation, Actor, Value)
+            case application:get_env(lasp, delta_mode, true) of
+                true ->
+                    T:update_delta(Operation, Actor, Value);
+                false ->
+                    T:update(Operation, Actor, Value)
+            end
     end.
 
 %% @doc Call the correct merge function for a given type.

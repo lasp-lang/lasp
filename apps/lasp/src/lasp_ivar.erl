@@ -34,6 +34,7 @@
 -export([new/0,
          value/1,
          update/3,
+         update_delta/3,
          merge/2,
          equal/2,
          to_binary/1,
@@ -73,6 +74,10 @@ new() ->
 %% @doc Set the value of a single-assignment variable.
 update({set, Value}, _Actor, undefined) ->
     {ok, Value}.
+
+update_delta(Op, Actor, IVar) ->
+    %% update_delta() is not implemented.
+    update(Op, Actor, IVar).
 
 %% @doc Single assignment merge; undefined for two bound variables.
 -spec merge(ivar(), ivar()) -> ivar().

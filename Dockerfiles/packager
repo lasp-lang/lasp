@@ -9,10 +9,11 @@ RUN cd /tmp && \
     dpkg -i erlang-solutions_1.0_all.deb && \
     apt-get update && \
     apt-get -y install erlang && \
-    gem install package_cloud fpm && \
+    gem install package_cloud fpm
+
+CMD cd /tmp && \
     git clone https://github.com/lasp-lang/lasp.git && \
     cd lasp && make && make package && \
     locale-gen en_US en_US.UTF-8 && \
-    dpkg-reconfigure locales
-
-CMD LC_ALL="en_US.UTF-8" package_cloud push cmeiklejohn/lasp/ubuntu/trusty `find /tmp/lasp -name *.deb | tail -1`
+    dpkg-reconfigure locales && \
+    LC_ALL="en_US.UTF-8" package_cloud push cmeiklejohn/lasp/ubuntu/trusty `find /tmp/lasp -name *.deb | tail -1`

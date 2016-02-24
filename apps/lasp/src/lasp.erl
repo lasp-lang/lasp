@@ -112,8 +112,7 @@ declare(Id, Type) ->
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation(), actor()) -> {ok, {value(), id()}} |
-                                            {error, timeout}.
+-spec update(id(), operation(), actor()) -> {ok, var()} | {error, timeout}.
 update(Id, Operation, Actor) ->
     do(update, [Id, Operation, Actor]).
 

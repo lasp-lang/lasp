@@ -226,7 +226,7 @@ query(Id) ->
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation(), actor()) -> {ok, {value(), id()}} | error().
+-spec update(id(), operation(), actor()) -> {ok, var()} | error().
 update(Id, Operation, Actor) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {update, Id, Operation, Actor},

@@ -100,24 +100,55 @@ value(_, ORSet) ->
     value(ORSet).
 
 -spec update(orset_op(), actor(), orset()) -> {ok, orset()} |
+                                              {delta, orset()} |
                                               {error, {precondition, {not_present, member()}}}.
 update({add_by_token, Token, Elem}, _Actor, ORDict) ->
-    add_elem(Elem, Token, ORDict);
+    case application:get_env(lasp, delta_mode, true) of
+        true ->
+            update_delta({add_by_token, Token, Elem}, _Actor, ORDict);
+        false ->
+            add_elem(Elem, Token, ORDict)
+    end;
 update({add, Elem}, Actor, ORDict) ->
-    Token = unique(Actor),
-    add_elem(Elem, Token, ORDict);
+    case application:get_env(lasp, delta_mode, true) of
+        true ->
+            update_delta({add, Elem}, Actor, ORDict);
+        false ->
+            Token = unique(Actor),
+            add_elem(Elem, Token, ORDict)
+    end;
 update({add_all, Elems}, Actor, ORDict0) ->
-    OD = lists:foldl(fun(Elem, ORDict) ->
-                {ok, ORDict1} = update({add, Elem}, Actor, ORDict),
-                ORDict1
-            end, ORDict0, Elems),
-    {ok, OD};
+    case application:get_env(lasp, delta_mode, true) of
+        true ->
+            update_delta({add_all, Elems}, Actor, ORDict0);
+        false ->
+            OD = lists:foldl(fun(Elem, ORDict) ->
+                        {ok, ORDict1} = update({add, Elem}, Actor, ORDict),
+                        ORDict1
+                    end, ORDict0, Elems),
+            {ok, OD}
+    end;
 update({remove, Elem}, _Actor, ORDict) ->
-    remove_elem(Elem, ORDict);
+    case application:get_env(lasp, delta_mode, true) of
+        true ->
+            update_delta({remove, Elem}, _Actor, ORDict);
+        false ->
+            remove_elem(Elem, ORDict)
+    end;
 update({remove_all, Elems}, _Actor, ORDict0) ->
-    remove_elems(Elems, ORDict0);
+    case application:get_env(lasp, delta_mode, true) of
+        true ->
+            update_delta({remove_all, Elems}, _Actor, ORDict0);
+        false ->
+            remove_elems(Elems, ORDict0)
+    end;
 update({update, Ops}, Actor, ORDict) ->
-    apply_ops(Ops, Actor, ORDict).
+    case application:get_env(lasp, delta_mode, true) of
+        true ->
+            update_delta({update, Ops}, Actor, ORDict);
+        false ->
+            apply_ops(Ops, Actor, ORDict)
+    end.
 
 -spec update(orset_op(), actor(), orset(), riak_dt:context()) ->
                     {ok, orset()} | {error, {precondition, {not_present, member()}}}.
@@ -303,6 +334,45 @@ minimum_tokens(Tokens) ->
     orddict:filter(fun(_Token, Removed) ->
             not Removed
         end, Tokens).
+
+update_delta({add_by_token, Token, Elem}, _Actor, _ORDict) ->
+    {ok, DeltaORDict} = add_elem(Elem, Token, orddict:new()),
+    {ok, {delta, DeltaORDict}};
+update_delta({add, Elem}, Actor, _ORDict) ->
+    Token = unique(Actor),
+    {ok, DeltaORDict} = add_elem(Elem, Token, orddict:new()),
+    {ok, {delta, DeltaORDict}};
+update_delta({add_all, Elems}, Actor, _ORDict0) ->
+    OD = lists:foldl(fun(Elem, ORDict) ->
+                {ok, ORDict1} = update({add, Elem}, Actor, ORDict),
+                ORDict1
+            end, orddict:new(), Elems),
+    {ok, {delta, OD}};
+update_delta({remove, Elem}, _Actor, ORDict) ->
+    remove_elem(Elem, ORDict, orddict:new());
+update_delta({remove_all, Elems}, _Actor, ORDict0) ->
+    remove_elems(Elems, ORDict0, orddict:new());
+update_delta({update, Ops}, Actor, ORDict) ->
+    apply_ops(Ops, Actor, ORDict).
+
+remove_elem(Elem, ORDict, DeltaORDict) ->
+    case orddict:find(Elem, ORDict) of
+        {ok, Tokens} ->
+            Tokens1 = orddict:fold(fun(Token, _, Tokens0) ->
+                                           orddict:store(Token, true, Tokens0)
+                                   end, orddict:new(), Tokens),
+            {ok, {delta, orddict:store(Elem, Tokens1, DeltaORDict)}};
+        error ->
+            {error, {precondition, {not_present, Elem}}}
+    end.
+
+remove_elems([], _ORDict, DeltaORDict) ->
+    {ok, {delta, DeltaORDict}};
+remove_elems([Elem|Rest], ORDict, DeltaORDict) ->
+    case remove_elem(Elem, ORDict, DeltaORDict) of
+        {ok, {delta, DeltaORDict1}} -> remove_elems(Rest, ORDict, DeltaORDict1);
+        Error         -> Error
+    end.
 
 %% ===================================================================
 %% EUnit tests

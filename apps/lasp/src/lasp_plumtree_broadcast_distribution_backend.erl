@@ -228,7 +228,17 @@ query(Id) ->
 %%
 -spec update(id(), operation(), actor()) -> {ok, {value(), id()}} | error().
 update(Id, Operation, Actor) ->
-    gen_server:call(?MODULE, {update, Id, Operation, Actor}, infinity).
+    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
+                                                        {update, Id, Operation, Actor},
+                                                        infinity),
+    case orddict:find(dynamic, Metadata) of
+        {ok, true} ->
+            %% Ignore: this is a dynamic variable.
+            ok;
+        _ ->
+            broadcast({Id, Type, Metadata, Value})
+    end,
+    {ok, {Id, Type, Metadata, Value}}.
 
 %% @doc Bind a dataflow variable to a value.
 %%

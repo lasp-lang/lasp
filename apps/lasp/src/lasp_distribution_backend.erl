@@ -49,7 +49,7 @@
 %% `Operation', which should be valid for the type of CRDT stored
 %% at the given `Id'.
 %%
--callback update(id(), operation(), actor()) -> {ok, {value(), id()}} | error().
+-callback update(id(), operation(), actor()) -> {ok, var()} | error().
 
 %% Bind a dataflow variable to a value.
 %%

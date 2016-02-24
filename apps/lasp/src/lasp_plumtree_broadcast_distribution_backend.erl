@@ -178,11 +178,10 @@ is_stale({Id, Clock}) ->
 graft({Id, Clock}) ->
     gen_server:call(?MODULE, {graft, Id, Clock}, infinity).
 
-%% @todo doc
-%% @todo spec
-exchange(Peer) ->
-    lager:warning("peer: ~p", [Peer]),
-    {error, not_implemented}.
+%% @doc Naive anti-entropy mechanism; re-broadcast all messages.
+-spec exchange(node()) -> {ok, pid()}.
+exchange(_Peer) ->
+    gen_server:call(?MODULE, exchange, infinity).
 
 %%%===================================================================
 %%% lasp_distribution_backend callbacks
@@ -226,9 +225,19 @@ query(Id) ->
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation(), actor()) -> {ok, {value(), id()}} | error().
+-spec update(id(), operation(), actor()) -> {ok, var()} | error().
 update(Id, Operation, Actor) ->
-    gen_server:call(?MODULE, {update, Id, Operation, Actor}, infinity).
+    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
+                                                        {update, Id, Operation, Actor},
+                                                        infinity),
+    case orddict:find(dynamic, Metadata) of
+        {ok, true} ->
+            %% Ignore: this is a dynamic variable.
+            ok;
+        _ ->
+            broadcast({Id, Type, Metadata, Value})
+    end,
+    {ok, {Id, Type, Metadata, Value}}.
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -542,6 +551,21 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
     end,
     {reply, Result, State};
 
+%% Naive anti-entropy mechanism; periodically re-broadcast all messages.
+handle_call(exchange, _From, #state{store=Store}=State) ->
+    Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
+                    case orddict:find(dynamic, Metadata) of
+                        {ok, true} ->
+                            %% Ignore: this is a dynamic variable.
+                            ok;
+                        _ ->
+                            broadcast({Id, Type, Metadata, Value})
+                    end,
+                    [{ok, {Id, Type, Metadata, Value}}|Acc0]
+               end,
+    Pid = spawn(fun() -> do(fold, [Store, Function, []]) end),
+    {reply, {ok, Pid}, State};
+
 %% @private
 handle_call(Msg, _From, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
@@ -614,3 +638,20 @@ get(Id, Store) ->
 %% @private
 increment_counter(Counter) ->
     Counter + 1.
+
+-ifdef(TEST).
+
+do(Function, Args) ->
+    Backend = lasp_ets_storage_backend,
+    erlang:apply(Backend, Function, Args).
+
+-else.
+
+%% @doc Execute call to the proper backend.
+do(Function, Args) ->
+    Backend = application:get_env(?APP,
+                                  storage_backend,
+                                  lasp_dets_storage_backend),
+    erlang:apply(Backend, Function, Args).
+
+-endif.

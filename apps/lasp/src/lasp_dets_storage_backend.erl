@@ -30,7 +30,8 @@
 -export([start/1,
          put/3,
          update/3,
-         get/2]).
+         get/2,
+         fold/3]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -76,6 +77,11 @@ update(Ref, Id, Function) ->
 get(Ref, Id) ->
     gen_server:call(Ref, {get, Id}, infinity).
 
+%% @doc Fold operation.
+-spec fold(store(), function(), term()) -> {ok, term()}.
+fold(Ref, Function, Acc) ->
+    gen_server:call(Ref, {fold, Function, Acc}, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -119,6 +125,9 @@ handle_call({update, Id, Function}, _From, #state{ref=Ref}=State) ->
             Error
     end,
     {reply, Result, State};
+handle_call({fold, Function, Acc0}, _From, #state{ref=Ref}=State) ->
+    Acc1 = dets:foldl(Function, Acc0, Ref),
+    {reply, {ok, Acc1}, State};
 handle_call(Msg, _From, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.

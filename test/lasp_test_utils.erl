@@ -99,12 +99,8 @@ wait_until_connected(Node1, Node2) ->
 start_node(Name, Config, Case) ->
     CodePath = lists:filter(fun filelib:is_dir/1, code:get_path()),
     %% have the slave nodes monitor the runner node, so they can't outlive it
-    NodeConfig = [
-            {monitor_master, true},
-            {erl_flags, "-smp"}, %% smp for the eleveldb god
-            {startup_functions, [
-                    {code, set_path, [CodePath]}
-                    ]}],
+    NodeConfig = [ {monitor_master, true},
+                   {startup_functions, [ {code, set_path, [CodePath]} ]}],
     case ct_slave:start(Name, NodeConfig) of
         {ok, Node} ->
             PrivDir = proplists:get_value(priv_dir, Config),
@@ -113,13 +109,18 @@ start_node(Name, Config, Case) ->
             ok = rpc:call(Node, application, load, [plumtree]),
             ok = rpc:call(Node, application, load, [lager]),
             ok = rpc:call(Node, application, load, [lasp]),
-            ok = rpc:call(Node, application, load, [eleveldb]),
             ok = rpc:call(Node, application, set_env, [lager,
                                                        log_root,
                                                        NodeDir]),
             ok = rpc:call(Node, application, set_env, [plumtree,
                                                        plumtree_data_dir,
                                                        NodeDir]),
+            ok = rpc:call(Node, application, set_env, [plumtree,
+                                                       broadcast_exchange_timer,
+                                                       60]),
+            ok = rpc:call(Node, application, set_env, [plumtree,
+                                                       broadcast_mods,
+                                                       [lasp_plumtree_broadcast_distribution_backend, plumtree_metadata_manager]]),
             ok = rpc:call(Node, application, set_env, [lasp,
                                                        data_root,
                                                        NodeDir]),

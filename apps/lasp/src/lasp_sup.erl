@@ -23,6 +23,8 @@
 
 -behaviour(supervisor).
 
+-include("lasp.hrl").
+
 %% API
 -export([start_link/0]).
 
@@ -70,9 +72,15 @@ init(_Args) ->
                     permanent, 5000, worker,
                     [lasp_peer_refresh_service]},
 
-    {ok, {{one_for_one, 5, 10}, [Web,
-                                 Process,
-                                 Unique,
-                                 Plumtree,
-                                 PeerRefresh,
-                                 Transmission]}}.
+    InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
+    Instrumentation = application:get_env(?APP, instrumentation, InstrDefault),
+
+    Children = case Instrumentation of
+        true ->
+            lager:info("Instrumentation: ~p", [Instrumentation]),
+            [Web, Process, Unique, Plumtree, PeerRefresh, Transmission];
+        false ->
+            [Web, Process, Unique, Plumtree, PeerRefresh]
+    end,
+
+    {ok, {{one_for_one, 5, 10}, Children}}.

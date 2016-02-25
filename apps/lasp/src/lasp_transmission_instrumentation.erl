@@ -27,7 +27,7 @@
 -export([start_link/0,
          start_link/1,
          start/2,
-         log/1]).
+         log/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -61,15 +61,15 @@ start_link() ->
 %% @doc Start and link to calling process.
 -spec start_link(list())-> {ok, pid()} | ignore | {error, term()}.
 start_link(Opts) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
+    gen_server:start_link({global, ?MODULE}, ?MODULE, Opts, []).
 
--spec log(term()) -> ok | error().
-log(Term) ->
-    gen_server:call(?MODULE, {log, Term}, infinity).
+-spec log(term(), node()) -> ok | error().
+log(Term, Node) ->
+    gen_server:call({global, ?MODULE}, {log, Term, Node}, infinity).
 
 -spec start(list(), pos_integer()) -> ok | error().
 start(Filename, Clients) ->
-    gen_server:call(?MODULE, {start, Filename, Clients}, infinity).
+    gen_server:call({global, ?MODULE}, {start, Filename, Clients}, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -86,8 +86,9 @@ init([]) ->
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({log, Term}, _From, #state{size=Size0}=State) ->
+handle_call({log, Term, Node}, _From, #state{size=Size0}=State) ->
     Size = termsize(Term),
+    lager:info("Instrumentation: received ~p bytes from node ~p", [Size, Node]),
     {reply, ok, State#state{size=Size0 + Size}};
 
 handle_call({start, Filename, Clients}, _From, State) ->
@@ -117,6 +118,7 @@ handle_info(record, #state{filename=Filename, clients=Clients,
                           megasize(Size) / Clients]),
     Lines = Lines0 ++ Line,
     ok = file:write_file(filename(Filename), Lines),
+    lager:info("Instrumentation: wrote ~p", [Filename]),
     {noreply, State#state{clock=Clock, size=0, lines=Lines}};
 
 handle_info(Msg, State) ->

@@ -43,6 +43,7 @@
 
 init_per_suite(_Config) ->
     lager:start(),
+
     %% this might help, might not...
     os:cmd(os:find_executable("epmd")++" -daemon"),
     {ok, Hostname} = inet:gethostname(),
@@ -51,9 +52,16 @@ init_per_suite(_Config) ->
         {error, {already_started, _}} -> ok
     end,
     lager:info("node name ~p", [node()]),
+
+    %% Start Lasp on the runner and enable instrumentation.
+    ok = application:load(lasp),
+    ok = application:set_env(lasp, instrumentation, true),
+    {ok, _} = application:ensure_all_started(lasp),
+
     _Config.
 
 end_per_suite(_Config) ->
+    application:stop(lasp),
     application:stop(lager),
     _Config.
 
@@ -84,6 +92,7 @@ end_per_testcase(_, _Config) ->
 
 all() ->
     [
+        setup_test,
         advertisement_counter_orset_gcounter_10000_100_10_test,
         advertisement_counter_orset_gcounter_10000_500_10_test,
         advertisement_counter_orset_gcounter_10000_1000_10_test
@@ -92,6 +101,9 @@ all() ->
 %% ===================================================================
 %% tests
 %% ===================================================================
+
+setup_test(_Config) ->
+    ok.
 
 advertisement_counter_orset_gcounter_10000_100_10_test(Config) ->
     ct:pal("Executing advertisement_counter_orset_gcounter_10000_100_10_test..."),

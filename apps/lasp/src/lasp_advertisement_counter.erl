@@ -325,4 +325,4 @@ servers(SetType, Ads, AdsWithContracts) ->
 
 %% @private
 log_transmission(Term) ->
-    lasp_transmission_instrumentation:log(Term).
+    lasp_transmission_instrumentation:log(Term, node()).

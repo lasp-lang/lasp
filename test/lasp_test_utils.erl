@@ -101,6 +101,7 @@ start_node(Name, Config, Case) ->
     %% have the slave nodes monitor the runner node, so they can't outlive it
     NodeConfig = [ {monitor_master, true},
                    {startup_functions, [ {code, set_path, [CodePath]} ]}],
+
     case ct_slave:start(Name, NodeConfig) of
         {ok, Node} ->
             PrivDir = proplists:get_value(priv_dir, Config),
@@ -120,7 +121,7 @@ start_node(Name, Config, Case) ->
                                                        60]),
             ok = rpc:call(Node, application, set_env, [plumtree,
                                                        broadcast_mods,
-                                                       [lasp_plumtree_broadcast_distribution_backend, plumtree_metadata_manager]]),
+                                                       [lasp_plumtree_broadcast_distribution_backend]]),
             ok = rpc:call(Node, application, set_env, [lasp,
                                                        data_root,
                                                        NodeDir]),

@@ -23,6 +23,8 @@
 
 -behaviour(supervisor).
 
+-include("lasp.hrl").
+
 %% API
 -export([start_link/0]).
 
@@ -55,11 +57,6 @@ init(_Args) ->
                  permanent, 5000, worker,
                  [lasp_plumtree_broadcast_distribution_backend]},
 
-    Transmission = {lasp_transmission_instrumentation,
-                    {lasp_transmission_instrumentation, start_link, []},
-                     permanent, 5000, worker,
-                     [lasp_transmission_instrumentation]},
-
     Web = {webmachine_mochiweb,
            {webmachine_mochiweb, start, [lasp_config:web_config()]},
             permanent, 5000, worker,
@@ -70,9 +67,27 @@ init(_Args) ->
                     permanent, 5000, worker,
                     [lasp_peer_refresh_service]},
 
-    {ok, {{one_for_one, 5, 10}, [Web,
-                                 Process,
-                                 Unique,
-                                 Plumtree,
-                                 PeerRefresh,
-                                 Transmission]}}.
+    BaseSpecs = [Web, Process, Unique, Plumtree, PeerRefresh],
+
+    InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
+    InstrEnabled = application:get_env(?APP, instrumentation, InstrDefault),
+
+    Children = case InstrEnabled of
+        true ->
+            ok = application:set_env(?APP, instrumentation, InstrEnabled),
+            lager:info("Instrumentation: ~p", [InstrEnabled]),
+            ClientTrans = {lasp_client_transmission_instrumentation,
+                           {lasp_transmission_instrumentation, start_link, [client]},
+                            permanent, 5000, worker,
+                            [lasp_transmission_instrumentation]},
+            ServerTrans = {lasp_server_transmission_instrumentation,
+                           {lasp_transmission_instrumentation, start_link, [server]},
+                            permanent, 5000, worker,
+                            [lasp_transmission_instrumentation]},
+            BaseSpecs ++ [ClientTrans, ServerTrans];
+        false ->
+            ok = application:set_env(?APP, instrumentation, InstrEnabled),
+            BaseSpecs
+    end,
+
+    {ok, {{one_for_one, 5, 10}, Children}}.

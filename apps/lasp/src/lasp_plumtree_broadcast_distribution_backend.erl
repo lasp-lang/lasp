@@ -684,9 +684,14 @@ do(Function, Args) ->
 
 %% @private
 log_transmission(Term) ->
-    case application:get_env(?APP, instrumentation, false) of
-        true ->
-            lasp_transmission_instrumentation:log(server, Term, node());
-        false ->
-            ok
+    try
+        case application:get_env(?APP, instrumentation, false) of
+            true ->
+                lasp_transmission_instrumentation:log(server, Term, node());
+            false ->
+                ok
+        end
+    catch
+        _:_ ->
+            lager:info("Logging failed; couldn't send message.")
     end.

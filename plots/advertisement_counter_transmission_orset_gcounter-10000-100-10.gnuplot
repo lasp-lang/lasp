@@ -29,7 +29,7 @@ set style line 2 lt rgb "#00A000" lw 2 pt 6
 set style line 3 lt rgb "#5060D0" lw 2 pt 2
 set style line 4 lt rgb "#F25900" lw 2 pt 9
 
-set output "advertisement_counter_transmission_orset_gcounter.pdf"
+set output "advertisement_counter_transmission_orset_gcounter-10000-100-10.pdf"
 set xlabel "Time in Seconds"
 set ylabel "MB/client Transmitted"
 
@@ -52,6 +52,10 @@ set yrange [0.1:16]
 set datafile separator ","
 
 # plot "/tmp/lasp_transmission_instrumentation-lasp_orset.csv" using 1:2 title 'OR-Set' with linespoints
-plot "/tmp/lasp_transmission_instrumentation-lasp_orset-lasp_gcounter-10000-100-10.csv" using 1:3 title "10000 events, 100 clients, 10 second sync" with linespoints, \
-     "/tmp/lasp_transmission_instrumentation-lasp_orset-lasp_gcounter-10000-500-10.csv" using 1:3 title "10000 events, 500 clients, 10 second sync" with linespoints, \
-     "/tmp/lasp_transmission_instrumentation-lasp_orset-lasp_gcounter-10000-1000-10.csv" using 1:3 title "10000 events, 1000 clients, 10 second sync" with linespoints
+#
+# plot "/tmp/lasp_transmission_instrumentation-lasp_orset-lasp_gcounter-10000-100-10.csv" using 1:3 title "10000 events, 100 clients, 10 second sync" with linespoints, \
+#      "/tmp/lasp_transmission_instrumentation-lasp_orset-lasp_gcounter-10000-500-10.csv" using 1:3 title "10000 events, 500 clients, 10 second sync" with linespoints, \
+#      "/tmp/lasp_transmission_instrumentation-lasp_orset-lasp_gcounter-10000-1000-10.csv" using 1:3 title "10000 events, 1000 clients, 10 second sync" with linespoints
+#
+plot "../apps/lasp/priv/lasp_transmission_instrumentation-client-lasp_orset-lasp_gcounter-10000-100-10.csv" using 1:3 title "Client-to-Server" with linespoints, \
+     "../apps/lasp/priv/lasp_transmission_instrumentation-client-lasp_orset-lasp_gcounter-10000-100-10.csv" using 1:3 title "Server-to-Server" with linespoints

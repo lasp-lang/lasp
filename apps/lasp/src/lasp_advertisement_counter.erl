@@ -24,7 +24,7 @@
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -export([run/1,
-         client/8,
+         client/9,
          server/2]).
 
 -behaviour(lasp_simulation).
@@ -138,6 +138,7 @@ clients(#state{runner=Runner, num_clients=NumClients, set_type=SetType,
                                             Id,
                                             AdsWithContracts,
                                             undefined,
+                                            dict:new(),
                                             dict:new()])
                                 end, lists:seq(1, NumClients)),
     {ok, State#state{client_list=Clients}}.
@@ -209,31 +210,41 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
     {ok, _} = lasp:update(Ads, {remove, Ad}, Ad).
 
 %% @doc Client process; standard recurisve looping server.
-client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0) ->
+client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
     receive
         terminate ->
             ok;
         view_ad ->
-            Counters = case dict:size(Counters0) of
+            {Counters, CountersDelta} = case dict:size(Counters0) of
                 0 ->
-                    Counters0;
+                    {Counters0, CountersDelta0};
                 _ ->
                     %% Select a random advertisement from the list of
                     %% active advertisements.
                     Random = random:uniform(dict:size(Counters0)),
                     {Ad, Counter0} = lists:nth(Random, dict:to_list(Counters0)),
-                    {ok, Counter} = CounterType:update(increment, Id, Counter0),
-                    dict:store(Ad, Counter, Counters0)
+                    Counter1 = case dict:find(Ad, CountersDelta0) of
+                                   {ok, CounterDelta0} ->
+                                       CounterType:merge(Counter0, CounterDelta0);
+                                   error ->
+                                       Counter0
+                               end,
+                    {ok, {delta, CounterDelta}} = CounterType:update_delta(increment, Id, Counter1),
+                    {dict:store(Ad, Counter1, Counters0), dict:store(Ad, CounterDelta, CountersDelta0)}
             end,
 
             %% Notify the harness that an event has been processed.
             Runner ! view_ad,
 
-            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters)
+            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters, CountersDelta)
     after
         SyncInterval ->
-            {ok, AdsWithContracts, Counters} = synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0),
-            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts, Counters)
+            %% Update dictionary.
+            Counters1 = dict:merge(fun(_Ad, OldCounter, CounterDelta) ->
+                                           CounterType:merge(OldCounter, CounterDelta)
+                                   end, Counters0, CountersDelta0),
+            {ok, AdsWithContracts, Counters} = synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters1),
+            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts, Counters, dict:new())
     end.
 
 %% @doc Generate advertisements and advertisement contracts.
@@ -261,7 +272,7 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
                 end, AdIds).
 
 %% @doc Periodically synchronize state with the server.
-synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0) ->
+synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0) ->  
     %% Get latest list of advertisements from the server.
     Term1 = {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
     log_transmission(Term1),

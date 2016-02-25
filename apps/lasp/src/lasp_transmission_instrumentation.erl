@@ -81,9 +81,9 @@ init([Type]) ->
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({log, Term, Node}, _From, #state{type=Type, size=Size0}=State) ->
+handle_call({log, Term, _Node}, _From, #state{type=_Type, size=Size0}=State) ->
     Size = termsize(Term),
-    lager:info("Instrumentation: type ~p received ~p bytes from node ~p", [Type, Size, Node]),
+    %% lager:info("Instrumentation: type ~p received ~p bytes from node ~p", [Type, Size, Node]),
     {reply, ok, State#state{size=Size0 + Size}};
 
 handle_call({start, Filename, Clients}, _From, State) ->

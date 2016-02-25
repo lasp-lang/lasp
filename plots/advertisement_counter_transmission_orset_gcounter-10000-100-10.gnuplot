@@ -46,7 +46,7 @@ set logscale y 2
 set mytics 10
 
 # set xrange [0:60]
-set yrange [0.1:16]
+set yrange [0.5:64]
 
 # Input file contains comma-separated values fields
 set datafile separator ","

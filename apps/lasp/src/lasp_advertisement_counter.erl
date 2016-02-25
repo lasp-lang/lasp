@@ -29,6 +29,8 @@
 
 -behaviour(lasp_simulation).
 
+-include("lasp.hrl").
+
 %% lasp_simulation callbacks
 -export([init/1,
          clients/1,
@@ -103,8 +105,16 @@ init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
     %% Launch server processes.
     servers(SetType, Ads, AdsWithContracts),
 
-    %% Initialize transmission instrumentation.
-    lasp_transmission_instrumentation:start(
+    %% Initialize client transmission instrumentation.
+    lasp_transmission_instrumentation:start(client,
+      atom_to_list(SetType) ++ "-" ++
+      atom_to_list(CounterType) ++ "-" ++
+      integer_to_list(NumEvents) ++ "-" ++
+      integer_to_list(NumClients) ++ "-" ++
+      integer_to_list(SyncInterval), NumClients),
+
+    %% Initialize server transmission instrumentation.
+    lasp_transmission_instrumentation:start(server,
       atom_to_list(SetType) ++ "-" ++
       atom_to_list(CounterType) ++ "-" ++
       integer_to_list(NumEvents) ++ "-" ++
@@ -325,4 +335,9 @@ servers(SetType, Ads, AdsWithContracts) ->
 
 %% @private
 log_transmission(Term) ->
-    lasp_transmission_instrumentation:log(Term, node()).
+    case application:get_env(?APP, instrumentation, false) of
+        true ->
+            lasp_transmission_instrumentation:log(client, Term, node());
+        false ->
+            ok
+    end.

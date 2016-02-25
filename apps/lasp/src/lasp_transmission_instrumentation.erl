@@ -24,10 +24,9 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0,
-         start_link/1,
-         start/2,
-         log/2]).
+-export([start_link/1,
+         start/3,
+         log/3]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -40,7 +39,8 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {size=0,
+-record(state, {type,
+                size=0,
                 clients=0,
                 lines="",
                 clock=0,
@@ -53,42 +53,37 @@
 %%% API
 %%%===================================================================
 
-%% @doc Same as start_link([]).
--spec start_link() -> {ok, pid()} | ignore | {error, term()}.
-start_link() ->
-    start_link([]).
-
 %% @doc Start and link to calling process.
--spec start_link(list())-> {ok, pid()} | ignore | {error, term()}.
-start_link(Opts) ->
-    gen_server:start_link({global, ?MODULE}, ?MODULE, Opts, []).
+-spec start_link(list(term()))-> {ok, pid()} | ignore | {error, term()}.
+start_link(Type) ->
+    gen_server:start_link({global, {?MODULE, Type}}, ?MODULE, [Type], []).
 
--spec log(term(), node()) -> ok | error().
-log(Term, Node) ->
-    gen_server:call({global, ?MODULE}, {log, Term, Node}, infinity).
+-spec log(term(), term(), node()) -> ok | error().
+log(Type, Term, Node) ->
+    gen_server:call({global, {?MODULE, Type}}, {log, Term, Node}, infinity).
 
--spec start(list(), pos_integer()) -> ok | error().
-start(Filename, Clients) ->
-    gen_server:call({global, ?MODULE}, {start, Filename, Clients}, infinity).
+-spec start(term(), list(), pos_integer()) -> ok | error().
+start(Type, Filename, Clients) ->
+    gen_server:call({global, {?MODULE, Type}}, {start, Filename, Clients}, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
 %% @private
--spec init([]) -> {ok, #state{}}.
-init([]) ->
+-spec init([term()]) -> {ok, #state{}}.
+init([Type]) ->
     Line = io_lib:format("Seconds,MegaBytes,MeanMegaBytesPerClient\n", []),
     Line2 = io_lib:format("0,0,0\n", []),
-    {ok, #state{lines=Line ++ Line2}}.
+    {ok, #state{type=Type, lines=Line ++ Line2}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({log, Term, Node}, _From, #state{size=Size0}=State) ->
+handle_call({log, Term, Node}, _From, #state{type=Type, size=Size0}=State) ->
     Size = termsize(Term),
-    lager:info("Instrumentation: received ~p bytes from node ~p", [Size, Node]),
+    lager:info("Instrumentation: type ~p received ~p bytes from node ~p", [Type, Size, Node]),
     {reply, ok, State#state{size=Size0 + Size}};
 
 handle_call({start, Filename, Clients}, _From, State) ->
@@ -108,7 +103,7 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(record, #state{filename=Filename, clients=Clients,
+handle_info(record, #state{type=Type, filename=Filename, clients=Clients,
                            size=Size, clock=Clock0, status=running, lines=Lines0}=State) ->
     start_timer(),
     Clock = Clock0 + ?INTERVAL,
@@ -117,8 +112,8 @@ handle_info(record, #state{filename=Filename, clients=Clients,
                           megasize(Size),
                           megasize(Size) / Clients]),
     Lines = Lines0 ++ Line,
-    ok = file:write_file(filename(Filename), Lines),
-    lager:info("Instrumentation: wrote ~p", [Filename]),
+    ok = file:write_file(filename(Filename, Type), Lines),
+    lager:info("Instrumentation: type ~p wrote ~p", [Type, Filename]),
     {noreply, State#state{clock=Clock, size=0, lines=Lines}};
 
 handle_info(Msg, State) ->
@@ -148,8 +143,9 @@ start_timer() ->
     timer:send_after(?INTERVAL, record).
 
 %% @private
-filename(Filename) ->
-    "/tmp/lasp_transmission_instrumentation-" ++ Filename ++ ".csv".
+filename(Filename, Type) ->
+    Root = code:priv_dir(?APP),
+    Root ++ "/lasp_transmission_instrumentation-" ++ atom_to_list(Type) ++ "-" ++ Filename ++ ".csv".
 
 %% @private
 megasize(Size) ->

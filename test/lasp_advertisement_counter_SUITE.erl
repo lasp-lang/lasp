@@ -104,9 +104,7 @@ runner_node() ->
 all() ->
     [
         setup_test,
-        advertisement_counter_orset_gcounter_10000_100_10_test,
-        advertisement_counter_orset_gcounter_10000_500_10_test,
-        advertisement_counter_orset_gcounter_10000_1000_10_test
+        advertisement_counter_orset_gcounter_10000_100_10_test
     ].
 
 %% ===================================================================
@@ -121,18 +119,4 @@ advertisement_counter_orset_gcounter_10000_100_10_test(Config) ->
     [Node1 | _Nodes] = proplists:get_value(nodes, Config),
     {ok, _} = rpc:call(Node1, lasp_advertisement_counter, run,
                        [[lasp_orset, lasp_gcounter, 10000, 100, 10]]),
-    ok.
-
-advertisement_counter_orset_gcounter_10000_500_10_test(Config) ->
-    ct:pal("Executing advertisement_counter_orset_gcounter_10000_500_10_test..."),
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-    {ok, _} = rpc:call(Node1, lasp_advertisement_counter, run,
-                       [[lasp_orset, lasp_gcounter, 10000, 500, 10]]),
-    ok.
-
-advertisement_counter_orset_gcounter_10000_1000_10_test(Config) ->
-    ct:pal("Executing advertisement_counter_orset_gcounter_10000_1000_10_test..."),
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-    {ok, _} = rpc:call(Node1, lasp_advertisement_counter, run,
-                       [[lasp_orset, lasp_gcounter, 10000, 1000, 10]]),
     ok.

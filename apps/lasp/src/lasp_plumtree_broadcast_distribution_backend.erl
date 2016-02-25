@@ -157,7 +157,8 @@ broadcast_data(#broadcast{id=Id, type=Type, clock=Clock,
 %%      for the same object.
 -spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) ->
     boolean().
-merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
+merge({Id, Clock}, {Id, Type, Metadata, Value}=Payload) ->
+    log_transmission(Payload),
     case is_stale({Id, Clock}) of
         true ->
             false;
@@ -622,7 +623,8 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-broadcast({Id, Type, Metadata, Value}) ->
+broadcast({Id, Type, Metadata, Value}=Payload) ->
+    log_transmission(Payload),
     Clock = orddict:fetch(clock, Metadata),
     Broadcast = #broadcast{id=Id, clock=Clock, type=Type,
                            metadata=Metadata, value=Value},
@@ -679,3 +681,12 @@ do(Function, Args) ->
     erlang:apply(Backend, Function, Args).
 
 -endif.
+
+%% @private
+log_transmission(Term) ->
+    case application:get_env(?APP, instrumentation, false) of
+        true ->
+            lasp_transmission_instrumentation:log(server, Term, node());
+        false ->
+            ok
+    end.

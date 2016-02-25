@@ -68,7 +68,7 @@ run(Module, Args) ->
     %% Unfortunately, we have to wait for the cluster to stabilize, else
     %% some of the clients running at other node will get not_found
     %% operations.
-    timer:sleep(1000),
+    timer:sleep(2000),
 
     %% Launch client processes.
     {ok, State1} = Module:clients(State),

@@ -66,29 +66,40 @@ end_per_suite(_Config) ->
     _Config.
 
 init_per_testcase(Case, Config) ->
-    Nodes = [First|Rest] = lasp_test_utils:pmap(fun(N) -> lasp_test_utils:start_node(N, Config, Case) end, [jaguar, shadow, thorn, pyros]),
+    Nodes = lasp_test_utils:pmap(fun(N) -> lasp_test_utils:start_node(N, Config, Case) end, [jaguar, shadow, thorn, pyros]),
     ct:pal("Nodes: ~p", [Nodes]),
+
+    RunnerNode = runner_node(),
+    ct:pal("RunnerNode: ~p", [RunnerNode]),
 
     %% Attempt to join all nodes in the cluster.
     lists:foreach(fun(N) ->
-                        ct:pal("Joining node: ~p to ~p", [N, First]),
-                        ok = rpc:call(First, lasp_peer_service, join, [N])
-                  end, Rest),
+                        ct:pal("Joining node: ~p to ~p", [N, RunnerNode]),
+                        ok = rpc:call(RunnerNode, lasp_peer_service, join, [N])
+                  end, Nodes),
+
+    %% Consider the runner part of the cluster.
+    Nodes1 = [RunnerNode|Nodes],
+    ct:pal("Nodes1: ~p", [Nodes1]),
 
     %% Sleep until application is fully started.
     %% @todo: Change to a wait_until, eventually.
     timer:sleep(60),
 
     %% Wait until convergence.
-    ok = lasp_test_utils:wait_until_joined(Nodes, Nodes),
+    ok = lasp_test_utils:wait_until_joined(Nodes1, Nodes1),
     ct:pal("Cluster converged."),
 
-    {ok, _} = ct_cover:add_nodes(Nodes),
-    [{nodes, Nodes}|Config].
+    {ok, _} = ct_cover:add_nodes(Nodes1),
+    [{nodes, Nodes1}|Config].
 
 end_per_testcase(_, _Config) ->
     lasp_test_utils:pmap(fun(Node) -> ct_slave:stop(Node) end, [jaguar, shadow, thorn, pyros]),
     ok.
+
+runner_node() ->
+    {ok, Hostname} = inet:gethostname(),
+    list_to_atom("runner@"++Hostname).
 
 all() ->
     [

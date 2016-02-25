@@ -114,7 +114,7 @@ handle_info(record, #state{type=Type, filename=Filename, clients=Clients,
     Lines = Lines0 ++ Line,
     ok = file:write_file(filename(Filename, Type), Lines),
     lager:info("Instrumentation: type ~p wrote ~p", [Type, Filename]),
-    {noreply, State#state{clock=Clock, size=0, lines=Lines}};
+    {noreply, State#state{clock=Clock, lines=Lines}};
 
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),

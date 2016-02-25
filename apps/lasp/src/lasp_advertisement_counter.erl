@@ -54,6 +54,7 @@ run(Args) ->
 -record(contract, {id}).
 
 -record(state, {runner,
+                nodes,
                 ads,
                 ad_list,
                 ads_with_contracts,
@@ -69,7 +70,7 @@ run(Args) ->
 
 %% @doc Setup lists of advertisements and lists of contracts for
 %%      advertisements.
-init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
+init([Nodes, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
     %% Get the process identifier of the runner.
     Runner = self(),
 
@@ -122,6 +123,7 @@ init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
       integer_to_list(SyncInterval), NumClients),
 
     {ok, #state{runner=Runner,
+                nodes=Nodes,
                 ads=Ads,
                 ad_list=AdList,
                 ads_with_contracts=AdsWithContracts,
@@ -133,13 +135,15 @@ init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
 
 %% @doc Launch a series of client processes, each of which is responsible
 %% for displaying a particular advertisement.
-clients(#state{runner=Runner, num_clients=NumClients, set_type=SetType,
+clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetType,
                counter_type=CounterType, sync_interval=SyncInterval,
                ads_with_contracts=AdsWithContracts}=State) ->
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
-    Clients = lists:map(fun(Id) ->
-                                spawn_link(?MODULE,
+    Clients = lists:map(fun(Node) ->
+                    lists:map(fun(Id) ->
+                                spawn_link(Node,
+                                           ?MODULE,
                                            client,
                                            [SetType,
                                             CounterType,
@@ -149,8 +153,10 @@ clients(#state{runner=Runner, num_clients=NumClients, set_type=SetType,
                                             AdsWithContracts,
                                             undefined,
                                             dict:new()])
-                                end, lists:seq(1, NumClients)),
-    {ok, State#state{client_list=Clients}}.
+                                end, lists:seq(1, NumClients))
+        end, Nodes),
+    Clients1 = lists:flatten(Clients),
+    {ok, State#state{client_list=Clients1}}.
 
 
 %% @doc Terminate any running clients gracefully issuing final

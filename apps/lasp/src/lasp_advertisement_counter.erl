@@ -181,7 +181,7 @@ simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
     {ok, State}.
 
 %% @doc Summarize results.
-summarize(#state{num_clients=NumClients, ad_list=AdList}=State) ->
+summarize(#state{num_clients=_NumClients, ad_list=AdList}=State) ->
     %% Wait until all advertisements have been exhausted before stopping
     %% execution of the test.
     Overcounts = lists:map(fun(#ad{counter=CounterId}) ->
@@ -192,13 +192,7 @@ summarize(#state{num_clients=NumClients, ad_list=AdList}=State) ->
     Sum = fun(X, Acc) ->
             X + Acc
     end,
-    TotalOvercount = lists:foldl(Sum, 0, Overcounts),
-    io:format("----------------------------------------"),
-    io:format("Total overcount: ~p~n", [TotalOvercount]),
-    io:format("Mean overcount per client: ~p~n",
-              [TotalOvercount / NumClients]),
-    io:format("----------------------------------------"),
-
+    _TotalOvercount = lists:foldl(Sum, 0, Overcounts),
     {ok, State}.
 
 %% @doc Wait for all events to be delivered in the system.

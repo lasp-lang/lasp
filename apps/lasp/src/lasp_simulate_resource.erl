@@ -67,7 +67,7 @@ to_json(ReqData, State) ->
 
 %% @private
 input_file(Type) ->
-    "/lasp_transmission_instrumentation-" ++ Type ++ "-" ++
+    "/lasp_transmission_instrumentation-" ++ atom_to_list(Type) ++ "-" ++
     atom_to_list(?ORSET) ++ "-" ++ atom_to_list(?COUNTER) ++ "-" ++
     integer_to_list(?NUM_EVENTS) ++ "-" ++ integer_to_list(?NUM_CLIENTS)
     ++ "-" ++ integer_to_list(?SYNC_INTERVAL) ++ ".csv".

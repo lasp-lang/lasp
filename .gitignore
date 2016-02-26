@@ -25,3 +25,4 @@ data/
 log/
 _checkouts/
 apps/lasp/priv/logs/*.csv
+apps/lasp/priv/plots/*.pdf

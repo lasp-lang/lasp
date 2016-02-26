@@ -173,7 +173,6 @@ terminate(#state{client_list=ClientList}=State) ->
             end
     end,
     lists:foreach(TerminateFun, ClientList),
-    lager:info("All clients terminated!"),
     {ok, State}.
 
 %% @doc Simulate clients viewing advertisements.
@@ -333,22 +332,12 @@ servers(SetType, Ads, AdsWithContracts) ->
     {ok, {Servers, _, _, _}} = lasp:declare(SetType),
 
     %% Get the current advertisement list.
-    lager:info("Issuing read operation for AdsWithContracts..."),
     {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
     AdList = SetType:value(AdList0),
-    lager:info("Read operation returned."),
-    lager:info("Issuing read operation for AdsWithContracts again..."),
-    {ok, {_, _, _, AdList1}} = lasp:read(AdsWithContracts, {strict, undefined}),
-    AdList2 = SetType:value(AdList1),
-    lager:info("Read operation returned."),
-    lager:info("Results are equal? ~p", [AdList2 == AdList]),
-    lager:info("AdList", [AdList]),
-    lager:info("AdList2", [AdList2]),
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
     lists:map(fun(Ad) ->
-                lager:info("Calling server with ~p ~p", [Ad, Ads]),
                 ServerPid = spawn_link(?MODULE, server, [Ad, Ads]),
                 {ok, _} = lasp:update(Servers, {add, ServerPid}, undefined),
                 ServerPid

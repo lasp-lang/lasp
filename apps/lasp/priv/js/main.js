@@ -1,4 +1,16 @@
 $(document).ready(function() {
+  $.ajax({
+      type: "GET",
+      url: "/api/logs",
+      dataType: "json",
+      success: function (data) {
+        $.each(data.logs, function(i, data) {
+          var elem = "<li><a target='_new' href='/logs/" + data + "'>"+data+"</a></option>";
+          $(elem).appendTo('#logs');
+        });
+    }
+  });
+
   $("#logo").fadeOut("slow", function() {
 
     var width = 1024,

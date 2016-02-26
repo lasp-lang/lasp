@@ -37,6 +37,8 @@
 -define(CONTENT_TYPES, [{"text/css", to_resource},
                         {"text/html", to_resource},
                         {"text/plain", to_resource},
+                        {"application/csv", to_resource},
+                        {"text/csv", to_resource},
                         {"text/javascript", to_resource}]).
 
 %% entry-point for the resource from webmachine

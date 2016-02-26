@@ -24,4 +24,4 @@ data/
 *.deb
 log/
 _checkouts/
-apps/lasp/priv/*.csv
+apps/lasp/priv/logs/*.csv

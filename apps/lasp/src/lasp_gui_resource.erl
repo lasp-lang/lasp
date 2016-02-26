@@ -38,6 +38,7 @@
                         {"text/html", to_resource},
                         {"text/plain", to_resource},
                         {"application/csv", to_resource},
+                        {"application/pdf", to_resource},
                         {"text/csv", to_resource},
                         {"text/javascript", to_resource}]).
 

@@ -37,8 +37,7 @@ content_types_provided(Req, Ctx) ->
     {[{"application/json", to_json}], Req, Ctx}.
 
 to_json(ReqData, State) ->
-    Directory = code:priv_dir(?APP) ++ "/logs/",
-    {ok, Filenames} = file:list_dir(Directory),
+    Filenames = filelib:wildcard("*.pdf", code:priv_dir(?APP) ++ "/plots"),
     Filenames1 = [list_to_binary(Filename) || Filename <- Filenames],
     Encoded = jsx:encode(#{logs => Filenames1}),
     {Encoded, ReqData, State}.

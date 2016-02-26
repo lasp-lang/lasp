@@ -25,6 +25,7 @@
          content_types_provided/2,
          to_json/2]).
 
+-include("lasp.hrl").
 -include_lib("webmachine/include/webmachine.hrl").
 
 -spec init(list()) -> {ok, term()}.
@@ -40,4 +41,13 @@ to_json(ReqData, State) ->
     {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
                                   [Nodes, lasp_orset, lasp_gcounter, 10000, 100, 10]),
     Encoded = jsx:encode(#{status => ok, nodes => Nodes}),
+    PlotDir = code:priv_dir(?APP) ++ "/plots",
+    LogDir = code:priv_dir(?APP) ++ "/logs",
+    InputFile1 = LogDir ++ "/lasp_transmission_instrumentation-client-lasp_orset-lasp_gcounter-10000-100-10.csv",
+    InputFile2 = LogDir ++ "/lasp_transmission_instrumentation-server-lasp_orset-lasp_gcounter-10000-100-10.csv",
+    GnuPlot = PlotDir ++ "/advertisement_counter_transmission_orset_gcounter-10000-100-10.gnuplot",
+    OutputFile = PlotDir ++ "/advertisement_counter_transmission_orset_gcounter-10000-100-10.pdf",
+    Command = "gnuplot -e \"inputfile1='" ++ InputFile1 ++ "'; inputfile2='" ++ InputFile2 ++ "'; outputname='" ++ OutputFile ++ "'\" " ++ GnuPlot,
+    Result = os:cmd(Command),
+    lager:info("Generating plot: ~p; output: ~p", [Command, Result]),
     {Encoded, ReqData, State}.

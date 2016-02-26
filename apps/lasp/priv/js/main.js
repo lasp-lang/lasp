@@ -1,6 +1,18 @@
 $(document).ready(function() {
   $.ajax({
       type: "GET",
+      url: "/api/plots",
+      dataType: "json",
+      success: function (data) {
+        $.each(data.plots, function(i, data) {
+          var elem = "<li><a target='_new' href='/plots/" + data + "'>"+data+"</a></option>";
+          $(elem).appendTo('#plots');
+        });
+    }
+  });
+
+  $.ajax({
+      type: "GET",
       url: "/api/logs",
       dataType: "json",
       success: function (data) {

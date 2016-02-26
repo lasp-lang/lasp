@@ -59,10 +59,12 @@ to_json(ReqData, State) ->
     InputFile2 = LogDir ++ input_file(server),
     GnuPlot = PlotDir ++ "/advertisement_counter-transmission.gnuplot",
     OutputFile = PlotDir ++ output_file(),
+    Filenames = [InputFile1, InputFile2, OutputFile, GnuPlot],
+    Filenames1 = [list_to_binary(Filename) || Filename <- Filenames],
     plot(InputFile1, InputFile2, OutputFile, GnuPlot),
     Encoded = jsx:encode(#{status => ok,
                            nodes => Nodes,
-                           files => [InputFile1, InputFile2, OutputFile, GnuPlot]}),
+                           files => Filenames1}),
     {Encoded, ReqData, State}.
 
 %% @private

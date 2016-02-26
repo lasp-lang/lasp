@@ -57,6 +57,14 @@
     </style>
 
     <style type="text/css">
+      .middle {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        height: 50px;
+          margin-bottom: 10px;
+      }
+
       .centered {
         position: fixed;
         top: 50%;
@@ -69,25 +77,28 @@
   </head>
   <body>
     <div class="container">
+      <div class="header" id="header">
+        <img class="middle" src="images/lasp-logo-large.png" alt="Lasp logo">
+      </div>
       <div class="row">
         <div id="topology" class="col-md-12"></div>
       </div>
-      <div class="row">
+      <div class="row" id="controls">
+        <div class="col-md-4">
+          <h3>Controls</h3>
+          <ul><li><a href="/api/simulate" target="_new">Simulate!</a></li></ul>
+        </div>
+        <div class="col-md-4">
+          <h3>Logs</h3>
+          <ul id="logs"></ul>
+        </div>
+        <div class="col-md-4">
+          <h3>Plots</h3>
+          <ul id="plots"></ul>
+        </div>
       </div>
       <div id="logo">
         <img class="centered" src="images/lasp-logo-large.png" alt="Lasp logo">
-      </div>
-      <div>
-        <h3>Controls</h3>
-        <ul><li><a href="/api/simulate" target="_new">Simulate!</a></li></ul>
-      </div>
-      <div>
-        <h3>Logs</h3>
-        <ul id="logs"></ul>
-      </div>
-      <div>
-        <h3>Plots</h3>
-        <ul id="plots"></ul>
       </div>
     </div>
     <script src="//d3js.org/d3.v3.min.js"></script>

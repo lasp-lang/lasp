@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_logs_resource).
+-module(lasp_plots_resource).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -export([init/1,
@@ -37,7 +37,7 @@ content_types_provided(Req, Ctx) ->
     {[{"application/json", to_json}], Req, Ctx}.
 
 to_json(ReqData, State) ->
-    Filenames = filelib:wildcard("*.csv", code:priv_dir(?APP) ++ "/logs"),
+    Filenames = filelib:wildcard("*.pdf", code:priv_dir(?APP) ++ "/plots"),
     Filenames1 = [list_to_binary(Filename) || Filename <- Filenames],
-    Encoded = jsx:encode(#{logs => Filenames1}),
+    Encoded = jsx:encode(#{plots => Filenames1}),
     {Encoded, ReqData, State}.

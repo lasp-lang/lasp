@@ -1,4 +1,7 @@
 $(document).ready(function() {
+  $("#header").hide();
+  $("#controls").hide();
+
   $.ajax({
       type: "GET",
       url: "/api/plots",
@@ -25,8 +28,11 @@ $(document).ready(function() {
 
   $("#logo").fadeOut("slow", function() {
 
+    $("#header").fadeIn();
+    $("#controls").fadeIn();
+
     var width = 1024,
-        height = 500;
+        height = 200;
 
     var color = d3.scale.category10();
 

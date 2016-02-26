@@ -81,6 +81,12 @@ output_file() ->
 
 %% @private
 plot(InputFile1, InputFile2, OutputFile, GnuPlot) ->
-    Command = "gnuplot -e \"inputfile1='" ++ InputFile1 ++ "'; inputfile2='" ++ InputFile2 ++ "'; outputname='" ++ OutputFile ++ "'\" " ++ GnuPlot,
+    Bin = case os:getenv("MESOS_TASK_ID", false) of
+        false ->
+            "gnuplot";
+        _ ->
+            "/usr/bin/gnuplot"
+    end,
+    Command = Bin ++ " -e \"inputfile1='" ++ InputFile1 ++ "'; inputfile2='" ++ InputFile2 ++ "'; outputname='" ++ OutputFile ++ "'\" " ++ GnuPlot,
     Result = os:cmd(Command),
     lager:info("Generating PNG plot: ~p; output: ~p", [Command, Result]).

@@ -223,14 +223,20 @@ client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWi
                     %% active advertisements.
                     Random = random:uniform(dict:size(Counters0)),
                     {Ad, Counter0} = lists:nth(Random, dict:to_list(Counters0)),
-                    Counter1 = case dict:find(Ad, CountersDelta0) of
-                                   {ok, CounterDelta0} ->
-                                       CounterType:merge(Counter0, CounterDelta0);
-                                   error ->
-                                       Counter0
-                               end,
-                    {ok, {delta, CounterDelta}} = CounterType:update_delta(increment, Id, Counter1),
-                    {dict:store(Ad, Counter1, Counters0), dict:store(Ad, CounterDelta, CountersDelta0)}
+                    case application:get_env(lasp, delta_mode, true) of
+                        true ->
+                            Counter1 = case dict:find(Ad, CountersDelta0) of
+                                           {ok, CounterDelta0} ->
+                                               CounterType:merge(Counter0, CounterDelta0);
+                                           error ->
+                                               Counter0
+                                       end,
+                            {ok, {delta, CounterDelta}} = CounterType:update_delta(increment, Id, Counter1),
+                            {dict:store(Ad, Counter1, Counters0), dict:store(Ad, CounterDelta, CountersDelta0)};
+                        false ->
+                            {ok, Counter} = CounterType:update(increment, Id, Counter0),
+                            {dict:store(Ad, Counter, Counters0), CountersDelta0}
+                    end
             end,
 
             %% Notify the harness that an event has been processed.
@@ -239,10 +245,15 @@ client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWi
             client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters, CountersDelta)
     after
         SyncInterval ->
-            %% Update dictionary.
-            Counters1 = dict:merge(fun(_Ad, OldCounter, CounterDelta) ->
-                                           CounterType:merge(OldCounter, CounterDelta)
-                                   end, Counters0, CountersDelta0),
+            Counters1 = case application:get_env(lasp, delta_mode, true) of
+                            true ->
+                                %% Update dictionary.
+                                dict:merge(fun(_Ad, OldCounter, CounterDelta) ->
+                                                   CounterType:merge(OldCounter, CounterDelta)
+                                           end, Counters0, CountersDelta0);
+                            false ->
+                                Counters0
+                        end,
             {ok, AdsWithContracts, Counters} = synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters1),
             client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts, Counters, dict:new())
     end.
@@ -272,7 +283,7 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
                 end, AdIds).
 
 %% @doc Periodically synchronize state with the server.
-synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0) ->  
+synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0) ->
     %% Get latest list of advertisements from the server.
     Term1 = {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
     log_transmission(Term1),

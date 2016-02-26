@@ -52,10 +52,14 @@ init(_Args) ->
                  permanent, 5000, worker,
                  [lasp_unique]},
 
-    Plumtree = {lasp_plumtree_broadcast_distribution_backend,
-                {lasp_plumtree_broadcast_distribution_backend, start_link, []},
-                 permanent, 5000, worker,
-                 [lasp_plumtree_broadcast_distribution_backend]},
+    PlumtreeBackend = {lasp_plumtree_broadcast_distribution_backend,
+                       {lasp_plumtree_broadcast_distribution_backend, start_link, []},
+                        permanent, 5000, worker,
+                        [lasp_plumtree_broadcast_distribution_backend]},
+
+    Plumtree = {plumtree_sup,
+                {plumtree_sup, start_link, []},
+                 permanent, infinity, supervisor, [plumtree_sup]},
 
     Web = {webmachine_mochiweb,
            {webmachine_mochiweb, start, [lasp_config:web_config()]},
@@ -67,7 +71,7 @@ init(_Args) ->
                     permanent, 5000, worker,
                     [lasp_peer_refresh_service]},
 
-    BaseSpecs = [Web, Process, Unique, Plumtree, PeerRefresh],
+    BaseSpecs = [Unique, PlumtreeBackend, Plumtree, PeerRefresh, Process],
 
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
     InstrEnabled = application:get_env(?APP, instrumentation, InstrDefault),
@@ -84,7 +88,7 @@ init(_Args) ->
                            {lasp_transmission_instrumentation, start_link, [server]},
                             permanent, 5000, worker,
                             [lasp_transmission_instrumentation]},
-            BaseSpecs ++ [ClientTrans, ServerTrans];
+            BaseSpecs ++ [ClientTrans, ServerTrans, Web];
         false ->
             ok = application:set_env(?APP, instrumentation, InstrEnabled),
             BaseSpecs

@@ -162,8 +162,18 @@ clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetT
 %% @doc Terminate any running clients gracefully issuing final
 %%      synchronization.
 terminate(#state{client_list=ClientList}=State) ->
-    TerminateFun = fun(Pid) -> Pid ! {runner, terminate} end,
-    lists:map(TerminateFun, ClientList),
+    TerminateFun = fun(Pid) ->
+            Pid ! {runner, terminate},
+            %% Message might be queued, if synchronization is in
+            %% progress, which would trigger a race with shutdown, so
+            %% wait for the client to explicitly ack the terminate call.
+            receive
+                {runner, ok} ->
+                    ok
+            end
+    end,
+    lists:foreach(TerminateFun, ClientList),
+    lager:info("All clients terminated!"),
     {ok, State}.
 
 %% @doc Simulate clients viewing advertisements.
@@ -222,6 +232,7 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
 client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0) ->
     receive
         {runner, terminate} ->
+            Runner ! {runner, ok},
             ok;
         {runner, view_ad} ->
             Counters = case dict:size(Counters0) of
@@ -322,12 +333,22 @@ servers(SetType, Ads, AdsWithContracts) ->
     {ok, {Servers, _, _, _}} = lasp:declare(SetType),
 
     %% Get the current advertisement list.
+    lager:info("Issuing read operation for AdsWithContracts..."),
     {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
     AdList = SetType:value(AdList0),
+    lager:info("Read operation returned."),
+    lager:info("Issuing read operation for AdsWithContracts again..."),
+    {ok, {_, _, _, AdList1}} = lasp:read(AdsWithContracts, {strict, undefined}),
+    AdList2 = SetType:value(AdList1),
+    lager:info("Read operation returned."),
+    lager:info("Results are equal? ~p", [AdList2 == AdList]),
+    lager:info("AdList", [AdList]),
+    lager:info("AdList2", [AdList2]),
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
     lists:map(fun(Ad) ->
+                lager:info("Calling server with ~p ~p", [Ad, Ads]),
                 ServerPid = spawn_link(?MODULE, server, [Ad, Ads]),
                 {ok, _} = lasp:update(Servers, {add, ServerPid}, undefined),
                 ServerPid

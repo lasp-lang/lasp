@@ -18,29 +18,26 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_config).
+-module(lasp_simulate_resource).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
--export([dispatch/0, web_config/0]).
+-export([init/1,
+         content_types_provided/2,
+         to_json/2]).
 
-dispatch() ->
-    lists:flatten([
-        {["api", "health"], lasp_health_check_resource, undefined},
-        {["api", "status"], lasp_status_resource,       undefined},
-        {["simulate"],      lasp_simulate_resource,     undefined},
-        {[],                lasp_gui_resource,          index},
-        {['*'],             lasp_gui_resource,          undefined}
-    ]).
+-include_lib("webmachine/include/webmachine.hrl").
 
-web_config() ->
-    {ok, App} = application:get_application(?MODULE),
-    {ok, Ip} = application:get_env(App, web_ip),
-    DefaultPort = application:get_env(App, web_port, 8080),
-    Port = list_to_integer(os:getenv("WEB_PORT", integer_to_list(DefaultPort))),
-    lager:info("Port override: ~p", [Port]),
-    [
-        {ip, Ip},
-        {port, Port},
-        {log_dir, "priv/log"},
-        {dispatch, dispatch()}
-    ].
+-spec init(list()) -> {ok, term()}.
+init(_) ->
+    {ok, undefined}.
+
+%% return the list of available content types for webmachine
+content_types_provided(Req, Ctx) ->
+    {[{"application/json", to_json}], Req, Ctx}.
+
+to_json(ReqData, State) ->
+    {ok, Nodes} = lasp_peer_service:members(),
+    {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
+                                  [Nodes, lasp_orset, lasp_gcounter, 10000, 100, 10]),
+    Encoded = jsx:encode(#{status => ok, nodes => Nodes}),
+    {Encoded, ReqData, State}.

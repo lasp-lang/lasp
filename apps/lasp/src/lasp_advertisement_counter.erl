@@ -29,6 +29,8 @@
 
 -behaviour(lasp_simulation).
 
+-include("lasp.hrl").
+
 %% lasp_simulation callbacks
 -export([init/1,
          clients/1,
@@ -52,6 +54,7 @@ run(Args) ->
 -record(contract, {id}).
 
 -record(state, {runner,
+                nodes,
                 ads,
                 ad_list,
                 ads_with_contracts,
@@ -67,7 +70,7 @@ run(Args) ->
 
 %% @doc Setup lists of advertisements and lists of contracts for
 %%      advertisements.
-init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
+init([Nodes, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
     %% Get the process identifier of the runner.
     Runner = self(),
 
@@ -103,8 +106,16 @@ init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
     %% Launch server processes.
     servers(SetType, Ads, AdsWithContracts),
 
-    %% Initialize transmission instrumentation.
-    lasp_transmission_instrumentation:start(
+    %% Initialize client transmission instrumentation.
+    lasp_transmission_instrumentation:start(client,
+      atom_to_list(SetType) ++ "-" ++
+      atom_to_list(CounterType) ++ "-" ++
+      integer_to_list(NumEvents) ++ "-" ++
+      integer_to_list(NumClients) ++ "-" ++
+      integer_to_list(SyncInterval), NumClients),
+
+    %% Initialize server transmission instrumentation.
+    lasp_transmission_instrumentation:start(server,
       atom_to_list(SetType) ++ "-" ++
       atom_to_list(CounterType) ++ "-" ++
       integer_to_list(NumEvents) ++ "-" ++
@@ -112,6 +123,7 @@ init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
       integer_to_list(SyncInterval), NumClients),
 
     {ok, #state{runner=Runner,
+                nodes=Nodes,
                 ads=Ads,
                 ad_list=AdList,
                 ads_with_contracts=AdsWithContracts,
@@ -123,13 +135,15 @@ init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
 
 %% @doc Launch a series of client processes, each of which is responsible
 %% for displaying a particular advertisement.
-clients(#state{runner=Runner, num_clients=NumClients, set_type=SetType,
+clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetType,
                counter_type=CounterType, sync_interval=SyncInterval,
                ads_with_contracts=AdsWithContracts}=State) ->
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
-    Clients = lists:map(fun(Id) ->
-                                spawn_link(?MODULE,
+    Clients = lists:map(fun(Node) ->
+                    lists:map(fun(Id) ->
+                                spawn_link(Node,
+                                           ?MODULE,
                                            client,
                                            [SetType,
                                             CounterType,
@@ -139,8 +153,10 @@ clients(#state{runner=Runner, num_clients=NumClients, set_type=SetType,
                                             AdsWithContracts,
                                             undefined,
                                             dict:new()])
-                                end, lists:seq(1, NumClients)),
-    {ok, State#state{client_list=Clients}}.
+                                end, lists:seq(1, NumClients))
+        end, Nodes),
+    Clients1 = lists:flatten(Clients),
+    {ok, State#state{client_list=Clients1}}.
 
 
 %% @doc Terminate any running clients gracefully issuing final
@@ -325,4 +341,9 @@ servers(SetType, Ads, AdsWithContracts) ->
 
 %% @private
 log_transmission(Term) ->
-    lasp_transmission_instrumentation:log(Term).
+    case application:get_env(?APP, instrumentation, false) of
+        true ->
+            lasp_transmission_instrumentation:log(client, Term, node());
+        false ->
+            ok
+    end.

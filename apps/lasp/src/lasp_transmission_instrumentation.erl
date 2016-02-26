@@ -145,7 +145,7 @@ start_timer() ->
 %% @private
 filename(Filename, Type) ->
     Root = code:priv_dir(?APP),
-    Root ++ "/lasp_transmission_instrumentation-" ++ atom_to_list(Type) ++ "-" ++ Filename ++ ".csv".
+    Root ++ "/logs/lasp_transmission_instrumentation-" ++ atom_to_list(Type) ++ "-" ++ Filename ++ ".csv".
 
 %% @private
 megasize(Size) ->

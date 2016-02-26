@@ -104,7 +104,7 @@ runner_node() ->
 all() ->
     [
         setup_test,
-        advertisement_counter_orset_gcounter_10000_100_10_test
+        minimal_test
     ].
 
 %% ===================================================================
@@ -114,9 +114,8 @@ all() ->
 setup_test(_Config) ->
     ok.
 
-advertisement_counter_orset_gcounter_10000_100_10_test(Config) ->
-    ct:pal("Executing advertisement_counter_orset_gcounter_10000_100_10_test..."),
+minimal_test(Config) ->
     Nodes = proplists:get_value(nodes, Config),
     {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
-                                  [Nodes, lasp_orset, lasp_gcounter, 10000, 100, 10]),
+                                  [Nodes, lasp_orset, lasp_gcounter, 1000, 100, 10]),
     ok.

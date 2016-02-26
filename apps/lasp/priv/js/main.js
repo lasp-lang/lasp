@@ -1,6 +1,7 @@
 $(document).ready(function() {
   $("#header").hide();
   $("#controls").hide();
+  $("#graph").hide();
 
   $.ajax({
       type: "GET",
@@ -8,7 +9,7 @@ $(document).ready(function() {
       dataType: "json",
       success: function (data) {
         $.each(data.plots, function(i, data) {
-          var elem = "<li><a target='_new' href='/plots/" + data + "'>"+data+"</a></option>";
+          var elem = "<li class='plot'><object type='application/pdf' data='/plots/" + data + "' width='100%' height='100%'><p>hi</p></object></li>";
           $(elem).appendTo('#plots');
         });
     }
@@ -20,7 +21,7 @@ $(document).ready(function() {
       dataType: "json",
       success: function (data) {
         $.each(data.logs, function(i, data) {
-          var elem = "<li><a target='_new' href='/logs/" + data + "'>"+data+"</a></option>";
+          var elem = "<li><a href='/logs/" + data + "'>"+data+"</a></li>";
           $(elem).appendTo('#logs');
         });
     }
@@ -30,6 +31,7 @@ $(document).ready(function() {
 
     $("#header").fadeIn();
     $("#controls").fadeIn();
+    $("#graph").fadeIn();
 
     var width = 1024,
         height = 200;

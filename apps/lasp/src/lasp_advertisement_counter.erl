@@ -162,7 +162,7 @@ clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetT
 %% @doc Terminate any running clients gracefully issuing final
 %%      synchronization.
 terminate(#state{client_list=ClientList}=State) ->
-    TerminateFun = fun(Pid) -> Pid ! terminate end,
+    TerminateFun = fun(Pid) -> Pid ! {runner, terminate} end,
     lists:map(TerminateFun, ClientList),
     {ok, State}.
 
@@ -175,7 +175,7 @@ simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
             timer:sleep(10),
 
             Pid = lists:nth(Random, ClientList),
-            Pid ! view_ad
+            Pid ! {runner, view_ad}
     end,
     lists:foreach(Viewer, lists:seq(1, NumEvents)),
     {ok, State}.
@@ -198,7 +198,7 @@ summarize(#state{num_clients=_NumClients, ad_list=AdList}=State) ->
 %% @doc Wait for all events to be delivered in the system.
 wait(#state{count_events=Count, num_events=NumEvents}=State) ->
     receive
-        view_ad ->
+        {runner, view_ad} ->
             case Count >= NumEvents of
                 true ->
                     {ok, State};
@@ -221,9 +221,9 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
 %% @doc Client process; standard recurisve looping server.
 client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0) ->
     receive
-        terminate ->
+        {runner, terminate} ->
             ok;
-        view_ad ->
+        {runner, view_ad} ->
             Counters = case dict:size(Counters0) of
                 0 ->
                     Counters0;
@@ -237,7 +237,7 @@ client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWi
             end,
 
             %% Notify the harness that an event has been processed.
-            Runner ! view_ad,
+            Runner ! {runner, view_ad},
 
             client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters)
     after

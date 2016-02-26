@@ -28,6 +28,13 @@
 -include("lasp.hrl").
 -include_lib("webmachine/include/webmachine.hrl").
 
+-define(NUM_EVENTS, 100).
+-define(NUM_CLIENTS, 100).
+-define(SYNC_INTERVAL, 10).
+
+-define(ORSET, lasp_orset).
+-define(COUNTER, lasp_gcounter).
+
 -spec init(list()) -> {ok, term()}.
 init(_) ->
     {ok, undefined}.
@@ -39,15 +46,41 @@ content_types_provided(Req, Ctx) ->
 to_json(ReqData, State) ->
     {ok, Nodes} = lasp_peer_service:members(),
     {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
-                                  [Nodes, lasp_orset, lasp_gcounter, 10000, 100, 10]),
-    Encoded = jsx:encode(#{status => ok, nodes => Nodes}),
-    PlotDir = code:priv_dir(?APP) ++ "/plots",
-    LogDir = code:priv_dir(?APP) ++ "/logs",
-    InputFile1 = LogDir ++ "/lasp_transmission_instrumentation-client-lasp_orset-lasp_gcounter-10000-100-10.csv",
-    InputFile2 = LogDir ++ "/lasp_transmission_instrumentation-server-lasp_orset-lasp_gcounter-10000-100-10.csv",
-    GnuPlot = PlotDir ++ "/advertisement_counter_transmission_orset_gcounter-10000-100-10.gnuplot",
-    OutputFile = PlotDir ++ "/advertisement_counter_transmission_orset_gcounter-10000-100-10.pdf",
+                                  [Nodes,
+                                   ?ORSET,
+                                   ?COUNTER,
+                                   ?NUM_EVENTS,
+                                   ?NUM_CLIENTS,
+                                   ?SYNC_INTERVAL]),
+    PrivDir = code:priv_dir(?APP),
+    LogDir = PrivDir ++ "/logs",
+    PlotDir = PrivDir ++ "/plots",
+    InputFile1 = LogDir ++ input_file(client),
+    InputFile2 = LogDir ++ input_file(server),
+    GnuPlot = PlotDir ++ "/advertisement_counter-transmission.gnuplot",
+    OutputFile = PlotDir ++ output_file(),
+    plot(InputFile1, InputFile2, OutputFile, GnuPlot),
+    Encoded = jsx:encode(#{status => ok,
+                           nodes => Nodes,
+                           files => [InputFile1, InputFile2, OutputFile, GnuPlot]}),
+    {Encoded, ReqData, State}.
+
+%% @private
+input_file(Type) ->
+    "/lasp_transmission_instrumentation-" ++ Type ++ "-" ++
+    atom_to_list(?ORSET) ++ "-" ++ atom_to_list(?COUNTER) ++ "-" ++
+    integer_to_list(?NUM_EVENTS) ++ "-" ++ integer_to_list(?NUM_CLIENTS)
+    ++ "-" ++ integer_to_list(?SYNC_INTERVAL) ++ ".csv".
+
+%% @private
+output_file() ->
+    "/lasp_transmission_instrumentation-" ++
+    atom_to_list(?ORSET) ++ "-" ++ atom_to_list(?COUNTER) ++ "-" ++
+    integer_to_list(?NUM_EVENTS) ++ "-" ++ integer_to_list(?NUM_CLIENTS)
+    ++ "-" ++ integer_to_list(?SYNC_INTERVAL) ++ ".pdf".
+
+%% @private
+plot(InputFile1, InputFile2, OutputFile, GnuPlot) ->
     Command = "gnuplot -e \"inputfile1='" ++ InputFile1 ++ "'; inputfile2='" ++ InputFile2 ++ "'; outputname='" ++ OutputFile ++ "'\" " ++ GnuPlot,
     Result = os:cmd(Command),
-    lager:info("Generating plot: ~p; output: ~p", [Command, Result]),
-    {Encoded, ReqData, State}.
+    lager:info("Generating PNG plot: ~p; output: ~p", [Command, Result]).

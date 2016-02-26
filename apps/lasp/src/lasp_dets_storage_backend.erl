@@ -94,6 +94,7 @@ init([Identifier]) ->
                                                         Config,
                                                         dets),
                                 atom_to_list(Identifier)),
+        ok = filelib:ensure_dir(File),
         case dets:open_file(Identifier, [{file, File}]) of
             {ok, Identifier} ->
                 {ok, #state{ref=Identifier}};

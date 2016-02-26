@@ -118,7 +118,7 @@ start_node(Name, Config, Case) ->
                                                        NodeDir]),
             ok = rpc:call(Node, application, set_env, [plumtree,
                                                        broadcast_exchange_timer,
-                                                       60]),
+                                                       120]),
             ok = rpc:call(Node, application, set_env, [plumtree,
                                                        broadcast_mods,
                                                        [lasp_plumtree_broadcast_distribution_backend]]),

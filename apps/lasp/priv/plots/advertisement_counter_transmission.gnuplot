@@ -52,5 +52,5 @@ set datafile missing '0'
 # Input file contains comma-separated values fields
 set datafile separator ","
 
-plot inputfile1 using 1:3 title "OR-Set, G-Counter" with linespoints #, \
+plot inputfile1 using 1:3 title "OR-Set, G-Counter" with linespoints, \
      inputfile2 using 1:3 title "OR-Set, G-Counter, Deltas" with linespoints

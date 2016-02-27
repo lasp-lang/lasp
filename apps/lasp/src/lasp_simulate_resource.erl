@@ -54,25 +54,6 @@ to_json(ReqData, State) ->
 run(Nodes) ->
     advertisement_counter_transmission_simulation(Nodes),
     ok.
-    % lager:info("Run executing!"),
-    % {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
-    %                               [Nodes,
-    %                                ?ORSET,
-    %                                ?COUNTER,
-    %                                ?NUM_EVENTS,
-    %                                ?NUM_CLIENTS,
-    %                                ?SYNC_INTERVAL]),
-    % PrivDir = code:priv_dir(?APP),
-    % LogDir = PrivDir ++ "/logs",
-    % PlotDir = PrivDir ++ "/plots",
-    % InputFile1 = LogDir ++ input_file(client),
-    % InputFile2 = LogDir ++ input_file(server),
-    % GnuPlot = PlotDir ++ "/advertisement_counter_transmission.gnuplot",
-    % OutputFile = PlotDir ++ output_file(),
-    % Filenames = [InputFile1, InputFile2, OutputFile, GnuPlot],
-    % Filenames1 = [list_to_binary(Filename) || Filename <- Filenames],
-    % plot(InputFile1, InputFile2, OutputFile, GnuPlot),
-    % #{status => ok, nodes => Nodes, files => Filenames1}.
 
 %% @private
 output_file() ->
@@ -138,7 +119,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
         "'; outputname='" ++ OutputFile ++ "'\" " ++ GnuPlot,
 
     Result = os:cmd(Command),
-    lager:info("Generating PNG plot: ~p; output: ~p", [Command, Result]),
+    lager:info("Generating plot: ~p; output: ~p", [Command, Result]),
 
     ok.
 

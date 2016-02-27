@@ -113,11 +113,23 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
     servers(SetType, Ads, AdsWithContracts),
 
     %% Initialize client transmission instrumentation.
-    ClientFilename = "client-" ++ atom_to_list(Deltas) ++ "-" ++ atom_to_list(SetType) ++ "-" ++ atom_to_list(CounterType) ++ "-" ++ integer_to_list(NumEvents) ++ "-" ++ integer_to_list(NumClients) ++ "-" ++ integer_to_list(SyncInterval) ++ ".csv",
+    ClientFilename = string:join(["client",
+                                  atom_to_list(Deltas),
+                                  atom_to_list(SetType),
+                                  atom_to_list(CounterType),
+                                  integer_to_list(NumEvents),
+                                  integer_to_list(NumClients),
+                                  integer_to_list(SyncInterval)], "-") ++ ".csv",
     ok = lasp_transmission_instrumentation:start(client, ClientFilename, NumClients),
 
     %% Initialize server transmission instrumentation.
-    ServerFilename = "server-" ++ atom_to_list(Deltas) ++ "-" ++ atom_to_list(SetType) ++ "-" ++ atom_to_list(CounterType) ++ "-" ++ integer_to_list(NumEvents) ++ "-" ++ integer_to_list(NumClients) ++ "-" ++ integer_to_list(SyncInterval) ++ ".csv",
+    ServerFilename = string:join(["server",
+                                  atom_to_list(Deltas),
+                                  atom_to_list(SetType),
+                                  atom_to_list(CounterType),
+                                  integer_to_list(NumEvents),
+                                  integer_to_list(NumClients),
+                                  integer_to_list(SyncInterval)], "-") ++ ".csv",
     ok = lasp_transmission_instrumentation:start(server, ServerFilename, NumClients),
 
     {ok, #state{runner=Runner,

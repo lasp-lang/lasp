@@ -57,10 +57,12 @@ run(Nodes) ->
 
 %% @private
 output_file() ->
-    plot_dir() ++ "/advertisement_counter_transmission-" ++
-    atom_to_list(?ORSET) ++ "-" ++ atom_to_list(?COUNTER) ++ "-" ++
-    integer_to_list(?NUM_EVENTS) ++ "-" ++ integer_to_list(?NUM_CLIENTS)
-    ++ "-" ++ integer_to_list(?SYNC_INTERVAL) ++ ".pdf".
+    string:join([plot_dir() ++  "/advertisement_counter_transmission",
+                atom_to_list(?ORSET),
+                atom_to_list(?COUNTER),
+                integer_to_list(?NUM_EVENTS),
+                integer_to_list(?NUM_CLIENTS),
+                integer_to_list(?SYNC_INTERVAL) ++ ".pdf"], "-").
 
 %% @private
 priv_dir() ->

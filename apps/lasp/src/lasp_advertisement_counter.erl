@@ -313,8 +313,7 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
 %% @doc Periodically synchronize state with the server.
 synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
     %% Get latest list of advertisements from the server.
-    Term1 = {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
-    log_transmission(Term1),
+    {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
     AdList = SetType:value(AdsWithContracts),
     Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
@@ -326,8 +325,7 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
     RefreshFun = fun({#ad{counter=Ad}, _}, Acc) ->
                       case dict:is_key(Ad, Acc) of
                           false ->
-                              Term2 = {ok, {_, _, _, Counter}} = lasp:read(Ad, undefined),
-                              log_transmission(Term2),
+                              {ok, {_, _, _, Counter}} = lasp:read(Ad, undefined),
                               dict:store(Ad, Counter, Acc);
                           true ->
                               Acc
@@ -342,8 +340,14 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
     %% 3.) Server returns the merged value to the client.
     %%
     SyncFun = fun(Ad, Counter0, Acc) ->
-                    Term3 = {ok, {_, _, _, Counter}} = lasp:bind(Ad, Counter0),
-                    log_transmission(Term3),
+                    %% Log transmission of the local delta (or state).
+                    log_transmission(Counter0),
+
+                    {ok, {_, _, _, Counter}} = lasp:bind(Ad, Counter0),
+
+                    %% Log receipt of information from the server.
+                    log_transmission(Counter),
+
                     case lists:member(Ad, Identifiers) of
                         true ->
                             dict:store(Ad, Counter, Acc);
@@ -423,7 +427,6 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
 
             %% Generate delta for current operation from new state.
             {ok, {delta, Delta}} = CounterType:update_delta(increment, Id, MergedCounter),
-
             %% Merge new delta with old delta and store in interval
             %% dictionary for next synchronization interval.
             CounterDelta = CounterType:merge(Delta, CounterDelta0),

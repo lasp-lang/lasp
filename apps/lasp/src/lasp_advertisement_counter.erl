@@ -253,7 +253,7 @@ client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWi
                     %% active advertisements.
                     Random = random:uniform(dict:size(Counters0)),
                     {Ad, Counter0} = lists:nth(Random, dict:to_list(Counters0)),
-                    case application:get_env(lasp, delta_mode, false) of
+                    case application:get_env(?APP, delta_mode, false) of
                         true ->
                             Counter1 = case dict:find(Ad, CountersDelta0) of
                                            {ok, CounterDelta0} ->
@@ -275,7 +275,7 @@ client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWi
             client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters, CountersDelta)
     after
         SyncInterval ->
-            Counters1 = case application:get_env(lasp, delta_mode, false) of
+            Counters1 = case application:get_env(?APP, delta_mode, false) of
                             true ->
                                 %% Update dictionary.
                                 dict:merge(fun(_Ad, OldCounter, CounterDelta) ->

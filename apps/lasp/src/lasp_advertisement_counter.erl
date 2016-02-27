@@ -246,6 +246,7 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
 client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
     receive
         {runner, terminate} ->
+            Runner ! {runner, terminate_done},
             ok;
         {runner, view_ad} ->
             {Counters, CountersDelta} = case dict:size(Counters0) of

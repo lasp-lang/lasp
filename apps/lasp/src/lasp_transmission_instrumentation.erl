@@ -95,7 +95,9 @@ handle_call({log, Term, _Node}, _From, #state{type=_Type, size=Size0}=State) ->
 handle_call({start, Filename, Clients}, _From, #state{type=Type}=State) ->
     {ok, TRef} = start_timer(),
     lager:info("Instrumentation timer for ~p enabled!", [Type]),
-    {reply, ok, State#state{tref=TRef, clock=0, clients=Clients, filename=Filename, status=running}};
+    {reply, ok, State#state{tref=TRef, clock=0, clients=Clients,
+                            filename=Filename, status=running, size=0,
+                            lines = []}};
 
 handle_call(stop, _From, #state{type=Type, lines=Lines, clock=Clock,
                                 clients=Clients, size=Size,

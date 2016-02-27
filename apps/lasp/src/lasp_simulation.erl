@@ -89,6 +89,7 @@ run(Module, Args) ->
     {ok, State4} = Module:terminate(State3),
 
     %% Finish and summarize.
+    lager:info("Summarizing results!"),
     {ok, State5} = Module:summarize(State4),
 
     {ok, State5}.

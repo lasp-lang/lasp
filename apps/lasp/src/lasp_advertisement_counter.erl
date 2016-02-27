@@ -47,6 +47,9 @@ run(Args) ->
 %% The maximum number of impressions for each advertisement to display.
 -define(MAX_IMPRESSIONS, 100).
 
+%% Log frequency.
+-define(FREQ, 10000).
+
 %% Record definitions.
 
 -record(ad, {id, image, counter}).
@@ -200,7 +203,13 @@ simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
                                     timer:sleep(MSeconds),
                                     Pid = lists:nth(Random, ClientList),
                                     Pid ! {runner, view_ad},
-                                    lager:info("Event ~p dispatched for ~p milliseconds!", [EventId, MSeconds])
+                                    case EventId rem ?FREQ == 0 of
+                                        true ->
+                                            lager:info("Event ~p dispatched for ~p milliseconds!",
+                                                       [EventId, MSeconds]);
+                                        false ->
+                                            ok
+                                    end
                               end)
                 end,
                 lists:foreach(Viewer, lists:seq(1, NumEvents)),
@@ -232,7 +241,13 @@ wait(#state{count_events=Count, num_events=NumEvents}=State) ->
                     lager:info("Events all processed!"),
                     {ok, State};
                 false ->
-                    lager:info("Event ~p of ~p processed", [Count, NumEvents]),
+                    case Count rem ?FREQ == 0 of
+                        true ->
+                            lager:info("Event ~p of ~p processed",
+                                       [Count, NumEvents]);
+                        false ->
+                            ok
+                    end,
                     wait(State#state{count_events=Count + 1})
             end
     end.

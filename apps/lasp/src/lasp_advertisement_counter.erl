@@ -265,16 +265,11 @@ client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWi
             client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters, CountersDelta)
     after
         SyncInterval ->
-            Counters1 = case application:get_env(?APP, delta_mode, false) of
-                            true ->
-                                %% Update dictionary.
-                                dict:merge(fun(_Ad, OldCounter, CounterDelta) ->
-                                                   CounterType:merge(OldCounter, CounterDelta)
-                                           end, Counters0, CountersDelta0);
-                            false ->
-                                Counters0
-                        end,
-            {ok, AdsWithContracts, Counters} = synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters1),
+            {ok, AdsWithContracts, Counters} = synchronize(SetType,
+                                                           AdsWithContractsId,
+                                                           AdsWithContracts0,
+                                                           Counters0,
+                                                           CountersDelta0),
             client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts, Counters, dict:new())
     end.
 
@@ -303,7 +298,7 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
                 end, AdIds).
 
 %% @doc Periodically synchronize state with the server.
-synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0) ->
+synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
     %% Get latest list of advertisements from the server.
     Term1 = {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
     log_transmission(Term1),
@@ -343,7 +338,13 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0) ->
                             Acc
                     end
               end,
-    Counters1 = dict:fold(SyncFun, dict:new(), Counters),
+    Dictionary = case application:get_env(?APP, delta_mode, false) of
+        true ->
+            CountersDelta0;
+        false ->
+            Counters
+    end,
+    Counters1 = dict:fold(SyncFun, dict:new(), Dictionary),
 
     {ok, AdsWithContracts, Counters1}.
 

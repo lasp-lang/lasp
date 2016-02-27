@@ -29,6 +29,8 @@
 
 -behaviour(lasp_simulation).
 
+-include("lasp.hrl").
+
 %% lasp_simulation callbacks
 -export([init/1,
          clients/1,
@@ -52,6 +54,7 @@ run(Args) ->
 -record(contract, {id}).
 
 -record(state, {runner,
+                nodes,
                 ads,
                 ad_list,
                 ads_with_contracts,
@@ -67,7 +70,9 @@ run(Args) ->
 
 %% @doc Setup lists of advertisements and lists of contracts for
 %%      advertisements.
-init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
+init([Nodes, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
+    lager:info("Advertisement counter example executing!"),
+
     %% Get the process identifier of the runner.
     Runner = self(),
 
@@ -103,8 +108,16 @@ init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
     %% Launch server processes.
     servers(SetType, Ads, AdsWithContracts),
 
-    %% Initialize transmission instrumentation.
-    lasp_transmission_instrumentation:start(
+    %% Initialize client transmission instrumentation.
+    lasp_transmission_instrumentation:start(client,
+      atom_to_list(SetType) ++ "-" ++
+      atom_to_list(CounterType) ++ "-" ++
+      integer_to_list(NumEvents) ++ "-" ++
+      integer_to_list(NumClients) ++ "-" ++
+      integer_to_list(SyncInterval), NumClients),
+
+    %% Initialize server transmission instrumentation.
+    lasp_transmission_instrumentation:start(server,
       atom_to_list(SetType) ++ "-" ++
       atom_to_list(CounterType) ++ "-" ++
       integer_to_list(NumEvents) ++ "-" ++
@@ -112,6 +125,7 @@ init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
       integer_to_list(SyncInterval), NumClients),
 
     {ok, #state{runner=Runner,
+                nodes=Nodes,
                 ads=Ads,
                 ad_list=AdList,
                 ads_with_contracts=AdsWithContracts,
@@ -123,13 +137,15 @@ init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
 
 %% @doc Launch a series of client processes, each of which is responsible
 %% for displaying a particular advertisement.
-clients(#state{runner=Runner, num_clients=NumClients, set_type=SetType,
+clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetType,
                counter_type=CounterType, sync_interval=SyncInterval,
                ads_with_contracts=AdsWithContracts}=State) ->
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
-    Clients = lists:map(fun(Id) ->
-                                spawn_link(?MODULE,
+    Clients = lists:map(fun(Node) ->
+                    lists:map(fun(Id) ->
+                                spawn_link(Node,
+                                           ?MODULE,
                                            client,
                                            [SetType,
                                             CounterType,
@@ -140,33 +156,54 @@ clients(#state{runner=Runner, num_clients=NumClients, set_type=SetType,
                                             undefined,
                                             dict:new(),
                                             dict:new()])
-                                end, lists:seq(1, NumClients)),
-    {ok, State#state{client_list=Clients}}.
+                                end, lists:seq(1, NumClients))
+        end, Nodes),
+    Clients1 = lists:flatten(Clients),
+    {ok, State#state{client_list=Clients1}}.
 
 
 %% @doc Terminate any running clients gracefully issuing final
 %%      synchronization.
 terminate(#state{client_list=ClientList}=State) ->
-    TerminateFun = fun(Pid) -> Pid ! terminate end,
-    lists:map(TerminateFun, ClientList),
+    TerminateFun = fun(Pid) ->
+            Pid ! {runner, terminate},
+            %% Message might be queued, if synchronization is in
+            %% progress, which would trigger a race with shutdown, so
+            %% wait for the client to explicitly ack the terminate call.
+            receive
+                {runner, terminate_done} ->
+                    ok
+            end
+    end,
+    lists:foreach(TerminateFun, ClientList),
+    lasp_transmission_instrumentation:stop(client),
+    lasp_transmission_instrumentation:stop(server),
     {ok, State}.
 
 %% @doc Simulate clients viewing advertisements.
 simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
     %% Start the simulation.
-    Viewer = fun(_) ->
-            Random = random:uniform(length(ClientList)),
-
-            timer:sleep(10),
-
-            Pid = lists:nth(Random, ClientList),
-            Pid ! view_ad
-    end,
-    lists:foreach(Viewer, lists:seq(1, NumEvents)),
+    spawn(fun() ->
+                Viewer = fun(EventId) ->
+                        spawn(fun() ->
+                                   random:seed(erlang:phash2([node()]),
+                                               erlang:monotonic_time(),
+                                               erlang:unique_integer()),
+                                    Random = random:uniform(length(ClientList)),
+                                    MSeconds = random:uniform(10),
+                                    timer:sleep(MSeconds),
+                                    Pid = lists:nth(Random, ClientList),
+                                    Pid ! {runner, view_ad},
+                                    lager:info("Event ~p dispatched for ~p milliseconds!", [EventId, MSeconds])
+                              end)
+                end,
+                lists:foreach(Viewer, lists:seq(1, NumEvents)),
+                lager:info("Simulation event generation complete!")
+          end),
     {ok, State}.
 
 %% @doc Summarize results.
-summarize(#state{num_clients=NumClients, ad_list=AdList}=State) ->
+summarize(#state{ad_list=AdList}=State) ->
     %% Wait until all advertisements have been exhausted before stopping
     %% execution of the test.
     Overcounts = lists:map(fun(#ad{counter=CounterId}) ->
@@ -177,23 +214,19 @@ summarize(#state{num_clients=NumClients, ad_list=AdList}=State) ->
     Sum = fun(X, Acc) ->
             X + Acc
     end,
-    TotalOvercount = lists:foldl(Sum, 0, Overcounts),
-    io:format("----------------------------------------"),
-    io:format("Total overcount: ~p~n", [TotalOvercount]),
-    io:format("Mean overcount per client: ~p~n",
-              [TotalOvercount / NumClients]),
-    io:format("----------------------------------------"),
-
+    _TotalOvercount = lists:foldl(Sum, 0, Overcounts),
     {ok, State}.
 
 %% @doc Wait for all events to be delivered in the system.
 wait(#state{count_events=Count, num_events=NumEvents}=State) ->
     receive
-        view_ad ->
+        {runner, view_ad_complete} ->
             case Count >= NumEvents of
                 true ->
+                    lager:info("Events all processed!"),
                     {ok, State};
                 false ->
+                    lager:info("Event ~p of ~p processed", [Count, NumEvents]),
                     wait(State#state{count_events=Count + 1})
             end
     end.
@@ -212,9 +245,9 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
 %% @doc Client process; standard recurisve looping server.
 client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
     receive
-        terminate ->
+        {runner, terminate} ->
             ok;
-        view_ad ->
+        {runner, view_ad} ->
             {Counters, CountersDelta} = case dict:size(Counters0) of
                 0 ->
                     {Counters0, CountersDelta0};
@@ -240,7 +273,7 @@ client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWi
             end,
 
             %% Notify the harness that an event has been processed.
-            Runner ! view_ad,
+            Runner ! {runner, view_ad_complete},
 
             client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters, CountersDelta)
     after
@@ -347,4 +380,9 @@ servers(SetType, Ads, AdsWithContracts) ->
 
 %% @private
 log_transmission(Term) ->
-    lasp_transmission_instrumentation:log(Term).
+    case application:get_env(?APP, instrumentation, false) of
+        true ->
+            lasp_transmission_instrumentation:log(client, Term, node());
+        false ->
+            ok
+    end.

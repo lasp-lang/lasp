@@ -79,9 +79,6 @@ cut:
 publish:
 	${REBAR} as package hex publish
 
-plots:
-	cd plots; ${MAKE}
-
 shell:
 	${REBAR} shell --apps lasp
 

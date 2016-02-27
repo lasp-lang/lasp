@@ -850,7 +850,13 @@ write(Type, Value, Key, Store) ->
     ok = do(put, [Store, Key, V1]),
     ok.
 
--ifndef(EQC).
+-ifdef(TEST).
+
+do(Function, Args) ->
+    Backend = lasp_ets_storage_backend,
+    erlang:apply(Backend, Function, Args).
+
+-else.
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
@@ -859,10 +865,5 @@ do(Function, Args) ->
                                   lasp_dets_storage_backend),
     erlang:apply(Backend, Function, Args).
 
--else.
-
-do(Function, Args) ->
-    Backend = lasp_ets_storage_backend,
-    erlang:apply(Backend, Function, Args).
 
 -endif.

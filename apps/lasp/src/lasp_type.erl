@@ -36,14 +36,14 @@ new(Type) ->
 update(Type, Operation, Actor, Value) ->
     case Type of
         {T, _Args} ->
-            case application:get_env(lasp, delta_mode, true) of
+            case application:get_env(lasp, delta_mode, false) of
                 true ->
                     T:update_delta(Operation, Actor, Value);
                 false ->
                     T:update(Operation, Actor, Value)
             end;
         T ->
-            case application:get_env(lasp, delta_mode, true) of
+            case application:get_env(lasp, delta_mode, false) of
                 true ->
                     T:update_delta(Operation, Actor, Value);
                 false ->

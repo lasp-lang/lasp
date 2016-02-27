@@ -71,6 +71,8 @@ run(Args) ->
 %% @doc Setup lists of advertisements and lists of contracts for
 %%      advertisements.
 init([Nodes, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
+    lager:info("Advertisement counter example executing!"),
+
     %% Get the process identifier of the runner.
     Runner = self(),
 
@@ -168,7 +170,7 @@ terminate(#state{client_list=ClientList}=State) ->
             %% progress, which would trigger a race with shutdown, so
             %% wait for the client to explicitly ack the terminate call.
             receive
-                {runner, ok} ->
+                {runner, terminate_done} ->
                     ok
             end
     end,
@@ -180,19 +182,27 @@ terminate(#state{client_list=ClientList}=State) ->
 %% @doc Simulate clients viewing advertisements.
 simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
     %% Start the simulation.
-    Viewer = fun(_) ->
-            Random = random:uniform(length(ClientList)),
-
-            timer:sleep(10),
-
-            Pid = lists:nth(Random, ClientList),
-            Pid ! {runner, view_ad}
-    end,
-    lists:foreach(Viewer, lists:seq(1, NumEvents)),
+    spawn(fun() ->
+                Viewer = fun(EventId) ->
+                        spawn(fun() ->
+                                   random:seed(erlang:phash2([node()]),
+                                               erlang:monotonic_time(),
+                                               erlang:unique_integer()),
+                                    Random = random:uniform(length(ClientList)),
+                                    MSeconds = random:uniform(10),
+                                    timer:sleep(MSeconds),
+                                    Pid = lists:nth(Random, ClientList),
+                                    Pid ! {runner, view_ad},
+                                    lager:info("Event ~p dispatched for ~p milliseconds!", [EventId, MSeconds])
+                              end)
+                end,
+                lists:foreach(Viewer, lists:seq(1, NumEvents)),
+                lager:info("Simulation event generation complete!")
+          end),
     {ok, State}.
 
 %% @doc Summarize results.
-summarize(#state{num_clients=_NumClients, ad_list=AdList}=State) ->
+summarize(#state{ad_list=AdList}=State) ->
     %% Wait until all advertisements have been exhausted before stopping
     %% execution of the test.
     Overcounts = lists:map(fun(#ad{counter=CounterId}) ->
@@ -209,11 +219,13 @@ summarize(#state{num_clients=_NumClients, ad_list=AdList}=State) ->
 %% @doc Wait for all events to be delivered in the system.
 wait(#state{count_events=Count, num_events=NumEvents}=State) ->
     receive
-        {runner, view_ad} ->
+        {runner, view_ad_complete} ->
             case Count >= NumEvents of
                 true ->
+                    lager:info("Events all processed!"),
                     {ok, State};
                 false ->
+                    lager:info("Event ~p of ~p processed", [Count, NumEvents]),
                     wait(State#state{count_events=Count + 1})
             end
     end.
@@ -232,9 +244,6 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
 %% @doc Client process; standard recurisve looping server.
 client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0) ->
     receive
-        {runner, terminate} ->
-            Runner ! {runner, ok},
-            ok;
         {runner, view_ad} ->
             Counters = case dict:size(Counters0) of
                 0 ->
@@ -249,9 +258,12 @@ client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWi
             end,
 
             %% Notify the harness that an event has been processed.
-            Runner ! {runner, view_ad},
+            Runner ! {runner, view_ad_complete},
 
-            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters)
+            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters);
+        {runner, terminate} ->
+            Runner ! {runner, terminate_done},
+            ok
     after
         SyncInterval ->
             {ok, AdsWithContracts, Counters} = synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0),

@@ -30,7 +30,7 @@
 -include("lasp.hrl").
 -include_lib("webmachine/include/webmachine.hrl").
 
--define(NUM_EVENTS, 100000).
+-define(NUM_EVENTS, 50000).
 -define(NUM_CLIENTS, 100).
 -define(SYNC_INTERVAL, 10000). %% 10 seconds.
 
@@ -41,60 +41,108 @@
 init(_) ->
     {ok, undefined}.
 
-%% return the list of available content types for webmachine
 content_types_provided(Req, Ctx) ->
     {[{"application/json", to_json}], Req, Ctx}.
 
 to_json(ReqData, State) ->
     {ok, Nodes} = lasp_peer_service:members(),
-    lager:info("Nodes: ~p", [Nodes]),
-    Encoded = jsx:encode(run(Nodes)),
+    run(Nodes),
+    Encoded = jsx:encode(#{status => ok}),
     {Encoded, ReqData, State}.
 
 %% @private
 run(Nodes) ->
-    lager:info("Run executing!"),
-    {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
-                                  [Nodes,
-                                   ?ORSET,
-                                   ?COUNTER,
-                                   ?NUM_EVENTS,
-                                   ?NUM_CLIENTS,
-                                   ?SYNC_INTERVAL]),
-    PrivDir = code:priv_dir(?APP),
-    LogDir = PrivDir ++ "/logs",
-    PlotDir = PrivDir ++ "/plots",
-    InputFile1 = LogDir ++ input_file(client),
-    InputFile2 = LogDir ++ input_file(server),
-    GnuPlot = PlotDir ++ "/advertisement_counter-transmission.gnuplot",
-    OutputFile = PlotDir ++ output_file(),
-    Filenames = [InputFile1, InputFile2, OutputFile, GnuPlot],
-    Filenames1 = [list_to_binary(Filename) || Filename <- Filenames],
-    plot(InputFile1, InputFile2, OutputFile, GnuPlot),
-    #{status => ok, nodes => Nodes, files => Filenames1}.
-
-%% @private
-input_file(Type) ->
-    "/lasp_transmission_instrumentation-" ++ atom_to_list(Type) ++ "-" ++
-    atom_to_list(?ORSET) ++ "-" ++ atom_to_list(?COUNTER) ++ "-" ++
-    integer_to_list(?NUM_EVENTS) ++ "-" ++ integer_to_list(?NUM_CLIENTS)
-    ++ "-" ++ integer_to_list(?SYNC_INTERVAL) ++ ".csv".
+    advertisement_counter_transmission_simulation(Nodes),
+    ok.
+    % lager:info("Run executing!"),
+    % {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
+    %                               [Nodes,
+    %                                ?ORSET,
+    %                                ?COUNTER,
+    %                                ?NUM_EVENTS,
+    %                                ?NUM_CLIENTS,
+    %                                ?SYNC_INTERVAL]),
+    % PrivDir = code:priv_dir(?APP),
+    % LogDir = PrivDir ++ "/logs",
+    % PlotDir = PrivDir ++ "/plots",
+    % InputFile1 = LogDir ++ input_file(client),
+    % InputFile2 = LogDir ++ input_file(server),
+    % GnuPlot = PlotDir ++ "/advertisement_counter_transmission.gnuplot",
+    % OutputFile = PlotDir ++ output_file(),
+    % Filenames = [InputFile1, InputFile2, OutputFile, GnuPlot],
+    % Filenames1 = [list_to_binary(Filename) || Filename <- Filenames],
+    % plot(InputFile1, InputFile2, OutputFile, GnuPlot),
+    % #{status => ok, nodes => Nodes, files => Filenames1}.
 
 %% @private
 output_file() ->
-    "/lasp_transmission_instrumentation-" ++
+    plot_dir() ++ "/advertisement_counter_transmission-" ++
     atom_to_list(?ORSET) ++ "-" ++ atom_to_list(?COUNTER) ++ "-" ++
     integer_to_list(?NUM_EVENTS) ++ "-" ++ integer_to_list(?NUM_CLIENTS)
     ++ "-" ++ integer_to_list(?SYNC_INTERVAL) ++ ".pdf".
 
 %% @private
-plot(InputFile1, InputFile2, OutputFile, GnuPlot) ->
+priv_dir() ->
+    code:priv_dir(?APP).
+
+%% @private
+plot_dir() ->
+    priv_dir() ++ "/plots".
+
+%% @private
+log_dir() ->
+    priv_dir() ++ "/logs".
+
+%% @private
+log_dir(Log) ->
+    log_dir() ++ "/" ++ Log.
+
+%% @private
+advertisement_counter_transmission_simulation(Nodes) ->
+
+    %% Run the simulation with the orset, gcounter, no deltas.
+    {ok, [ClientFilename1|_]} = lasp_simulation:run(lasp_advertisement_counter,
+                                                    [Nodes,
+                                                     false,
+                                                     ?ORSET,
+                                                     ?COUNTER,
+                                                     ?NUM_EVENTS,
+                                                     ?NUM_CLIENTS,
+                                                     ?SYNC_INTERVAL]),
+
+    %% Run the simulation with the orset, gcounter, deltas enabled.
+    {ok, [ClientFilename2|_]} = lasp_simulation:run(lasp_advertisement_counter,
+                                                    [Nodes,
+                                                     true,
+                                                     ?ORSET,
+                                                     ?COUNTER,
+                                                     ?NUM_EVENTS,
+                                                     ?NUM_CLIENTS,
+                                                     ?SYNC_INTERVAL]),
+
+    %% Plot both graphs.
     Bin = case os:getenv("MESOS_TASK_ID", "false") of
         "false" ->
             "gnuplot";
         _ ->
             "/usr/bin/gnuplot"
     end,
-    Command = Bin ++ " -e \"inputfile1='" ++ InputFile1 ++ "'; inputfile2='" ++ InputFile2 ++ "'; outputname='" ++ OutputFile ++ "'\" " ++ GnuPlot,
+
+    OutputFile = output_file(),
+
+    GnuPlot = plot_dir() ++ "/advertisement_counter_transmission.gnuplot",
+
+    Command = Bin ++
+        " -e \"inputfile1='" ++ log_dir(ClientFilename1) ++
+        "'; inputfile2='" ++ log_dir(ClientFilename2) ++
+        "'; outputname='" ++ OutputFile ++ "'\" " ++ GnuPlot,
+
     Result = os:cmd(Command),
-    lager:info("Generating PNG plot: ~p; output: ~p", [Command, Result]).
+    lager:info("Generating PNG plot: ~p; output: ~p", [Command, Result]),
+
+    ok.
+
+%%%===================================================================
+%%% Internal Functions
+%%%===================================================================
+

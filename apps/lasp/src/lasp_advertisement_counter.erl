@@ -64,14 +64,18 @@ run(Args) ->
                 counter_type,
                 num_events,
                 num_clients,
-                sync_interval}).
+                sync_interval,
+                filenames}).
 
 %% Callback functions.
 
 %% @doc Setup lists of advertisements and lists of contracts for
 %%      advertisements.
-init([Nodes, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
+init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
     lager:info("Advertisement counter example executing!"),
+
+    %% Enable or disable deltas.
+    ok = application:set_env(?APP, delta_mode, Deltas),
 
     %% Get the process identifier of the runner.
     Runner = self(),
@@ -109,20 +113,12 @@ init([Nodes, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
     servers(SetType, Ads, AdsWithContracts),
 
     %% Initialize client transmission instrumentation.
-    lasp_transmission_instrumentation:start(client,
-      atom_to_list(SetType) ++ "-" ++
-      atom_to_list(CounterType) ++ "-" ++
-      integer_to_list(NumEvents) ++ "-" ++
-      integer_to_list(NumClients) ++ "-" ++
-      integer_to_list(SyncInterval), NumClients),
+    ClientFilename = "client-" ++ atom_to_list(Deltas) ++ "-" ++ atom_to_list(SetType) ++ "-" ++ atom_to_list(CounterType) ++ "-" ++ integer_to_list(NumEvents) ++ "-" ++ integer_to_list(NumClients) ++ "-" ++ integer_to_list(SyncInterval) ++ ".csv",
+    ok = lasp_transmission_instrumentation:start(client, ClientFilename, NumClients),
 
     %% Initialize server transmission instrumentation.
-    lasp_transmission_instrumentation:start(server,
-      atom_to_list(SetType) ++ "-" ++
-      atom_to_list(CounterType) ++ "-" ++
-      integer_to_list(NumEvents) ++ "-" ++
-      integer_to_list(NumClients) ++ "-" ++
-      integer_to_list(SyncInterval), NumClients),
+    ServerFilename = "server-" ++ atom_to_list(Deltas) ++ "-" ++ atom_to_list(SetType) ++ "-" ++ atom_to_list(CounterType) ++ "-" ++ integer_to_list(NumEvents) ++ "-" ++ integer_to_list(NumClients) ++ "-" ++ integer_to_list(SyncInterval) ++ ".csv",
+    ok = lasp_transmission_instrumentation:start(server, ServerFilename, NumClients),
 
     {ok, #state{runner=Runner,
                 nodes=Nodes,
@@ -133,7 +129,8 @@ init([Nodes, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
                 counter_type=CounterType,
                 num_events=NumEvents,
                 num_clients=NumClients,
-                sync_interval=SyncInterval}}.
+                sync_interval=SyncInterval,
+                filenames=[ClientFilename, ServerFilename]}}.
 
 %% @doc Launch a series of client processes, each of which is responsible
 %% for displaying a particular advertisement.
@@ -160,7 +157,6 @@ clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetT
         end, Nodes),
     Clients1 = lists:flatten(Clients),
     {ok, State#state{client_list=Clients1}}.
-
 
 %% @doc Terminate any running clients gracefully issuing final
 %%      synchronization.
@@ -203,7 +199,7 @@ simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
     {ok, State}.
 
 %% @doc Summarize results.
-summarize(#state{ad_list=AdList}=State) ->
+summarize(#state{ad_list=AdList, filenames=Filenames}) ->
     %% Wait until all advertisements have been exhausted before stopping
     %% execution of the test.
     Overcounts = lists:map(fun(#ad{counter=CounterId}) ->
@@ -215,7 +211,7 @@ summarize(#state{ad_list=AdList}=State) ->
             X + Acc
     end,
     _TotalOvercount = lists:foldl(Sum, 0, Overcounts),
-    {ok, State}.
+    {ok, Filenames}.
 
 %% @doc Wait for all events to be delivered in the system.
 wait(#state{count_events=Count, num_events=NumEvents}=State) ->

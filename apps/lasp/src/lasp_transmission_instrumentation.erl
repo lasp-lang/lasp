@@ -101,7 +101,7 @@ handle_call(stop, _From, #state{type=Type, lines=Lines, clock=Clock,
                                 clients=Clients, size=Size,
                                 filename=Filename, tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
-    record(Clock, Size, Clients, Filename, Type, Lines),
+    record(Clock, Size, Clients, Filename, Lines),
     lager:info("Instrumentation timer for ~p disabled!", [Type]),
     {reply, ok, State#state{tref=undefined}};
 
@@ -118,11 +118,11 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(record, #state{type=Type, filename=Filename, clients=Clients,
+handle_info(record, #state{filename=Filename, clients=Clients,
                            size=Size, clock=Clock0, status=running,
                            lines=Lines0}=State) ->
     {ok, TRef} = start_timer(),
-    {ok, Clock, Lines} = record(Clock0, Size, Clients, Filename, Type, Lines0),
+    {ok, Clock, Lines} = record(Clock0, Size, Clients, Filename, Lines0),
     {noreply, State#state{tref=TRef, clock=Clock, lines=Lines}};
 
 handle_info(Msg, State) ->
@@ -152,9 +152,9 @@ start_timer() ->
     timer:send_after(?INTERVAL, record).
 
 %% @private
-filename(Filename, Type) ->
+filename(Filename) ->
     Root = code:priv_dir(?APP),
-    Root ++ "/logs/lasp_transmission_instrumentation-" ++ atom_to_list(Type) ++ "-" ++ Filename ++ ".csv".
+    Root ++ "/logs/" ++ Filename.
 
 %% @private
 megasize(Size) ->
@@ -167,13 +167,13 @@ clock(Clock) ->
     Clock / 1000.
 
 %% @private
-record(Clock0, Size, Clients, Filename, Type, Lines0) ->
+record(Clock0, Size, Clients, Filename, Lines0) ->
     Clock = Clock0 + ?INTERVAL,
     Line = io_lib:format("~w,~w,~w\n",
                          [clock(Clock),
                           megasize(Size),
                           megasize(Size) / Clients]),
     Lines = Lines0 ++ Line,
-    ok = file:write_file(filename(Filename, Type), Lines),
+    ok = file:write_file(filename(Filename), Lines),
     {ok, Clock, Lines}.
 

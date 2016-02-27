@@ -90,6 +90,6 @@ run(Module, Args) ->
 
     %% Finish and summarize.
     lager:info("Summarizing results!"),
-    {ok, State5} = Module:summarize(State4),
+    {ok, Term} = Module:summarize(State4),
 
-    {ok, State5}.
+    {ok, Term}.

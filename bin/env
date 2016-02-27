@@ -11,7 +11,7 @@ if [ ! -z "$MESOS_TASK_ID" ]; then
   # and if it resolves through the resolver; using a resolvable name
   # that's only resolvable with resolv.conf won't work for long names.
   if [ ! -z "$HOSTNAME" ]; then
-    if dig ${HOSTNAME} | grep -q 'NXDOMAIN'
+    if /usr/bin/dig ${HOSTNAME} | grep -q 'NXDOMAIN'
       export NODE_NAME=lasp-${PORT0}@${HOSTNAME}
     then
       export NODE_NAME=lasp-${PORT0}@${IP}

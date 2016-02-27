@@ -26,6 +26,7 @@
 %% API
 -export([start_link/1,
          start/3,
+         stop/1,
          log/3]).
 
 %% gen_server callbacks
@@ -40,6 +41,7 @@
 
 %% State record.
 -record(state, {type,
+                tref,
                 size=0,
                 clients=0,
                 lines="",
@@ -66,6 +68,10 @@ log(Type, Term, Node) ->
 start(Type, Filename, Clients) ->
     gen_server:call({global, {?MODULE, Type}}, {start, Filename, Clients}, infinity).
 
+-spec stop(term()) -> ok | error().
+stop(Type) ->
+    gen_server:call({global, {?MODULE, Type}}, stop, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -86,9 +92,18 @@ handle_call({log, Term, _Node}, _From, #state{type=_Type, size=Size0}=State) ->
     %% lager:info("Instrumentation: type ~p received ~p bytes from node ~p", [Type, Size, Node]),
     {reply, ok, State#state{size=Size0 + Size}};
 
-handle_call({start, Filename, Clients}, _From, State) ->
-    start_timer(),
-    {reply, ok, State#state{clock=0, clients=Clients, filename=Filename, status=running}};
+handle_call({start, Filename, Clients}, _From, #state{type=Type}=State) ->
+    {ok, TRef} = start_timer(),
+    lager:info("Instrumentation timer for ~p enabled!", [Type]),
+    {reply, ok, State#state{tref=TRef, clock=0, clients=Clients, filename=Filename, status=running}};
+
+handle_call(stop, _From, #state{type=Type, lines=Lines, clock=Clock,
+                                clients=Clients, size=Size,
+                                filename=Filename, tref=TRef}=State) ->
+    {ok, cancel} = timer:cancel(TRef),
+    record(Clock, Size, Clients, Filename, Type, Lines),
+    lager:info("Instrumentation timer for ~p disabled!", [Type]),
+    {reply, ok, State#state{tref=undefined}};
 
 %% @private
 handle_call(Msg, _From, State) ->
@@ -104,17 +119,11 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(record, #state{type=Type, filename=Filename, clients=Clients,
-                           size=Size, clock=Clock0, status=running, lines=Lines0}=State) ->
-    start_timer(),
-    Clock = Clock0 + ?INTERVAL,
-    Line = io_lib:format("~w,~w,~w\n",
-                         [clock(Clock),
-                          megasize(Size),
-                          megasize(Size) / Clients]),
-    Lines = Lines0 ++ Line,
-    ok = file:write_file(filename(Filename, Type), Lines),
-    lager:info("Instrumentation: type ~p wrote ~p", [Type, Filename]),
-    {noreply, State#state{clock=Clock, lines=Lines}};
+                           size=Size, clock=Clock0, status=running,
+                           lines=Lines0}=State) ->
+    {ok, TRef} = start_timer(),
+    {ok, Clock, Lines} = record(Clock0, Size, Clients, Filename, Type, Lines0),
+    {noreply, State#state{tref=TRef, clock=Clock, lines=Lines}};
 
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
@@ -156,3 +165,15 @@ megasize(Size) ->
 %% @private
 clock(Clock) ->
     Clock / 1000.
+
+%% @private
+record(Clock0, Size, Clients, Filename, Type, Lines0) ->
+    Clock = Clock0 + ?INTERVAL,
+    Line = io_lib:format("~w,~w,~w\n",
+                         [clock(Clock),
+                          megasize(Size),
+                          megasize(Size) / Clients]),
+    Lines = Lines0 ++ Line,
+    ok = file:write_file(filename(Filename, Type), Lines),
+    {ok, Clock, Lines}.
+

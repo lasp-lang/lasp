@@ -25,6 +25,8 @@
          content_types_provided/2,
          to_json/2]).
 
+-export([run/1]).
+
 -include("lasp.hrl").
 -include_lib("webmachine/include/webmachine.hrl").
 
@@ -45,6 +47,13 @@ content_types_provided(Req, Ctx) ->
 
 to_json(ReqData, State) ->
     {ok, Nodes} = lasp_peer_service:members(),
+    lager:info("Nodes: ~p", [Nodes]),
+    Encoded = jsx:encode(run(Nodes)),
+    {Encoded, ReqData, State}.
+
+%% @private
+run(Nodes) ->
+    lager:info("Run executing!"),
     {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
                                   [Nodes,
                                    ?ORSET,
@@ -62,10 +71,7 @@ to_json(ReqData, State) ->
     Filenames = [InputFile1, InputFile2, OutputFile, GnuPlot],
     Filenames1 = [list_to_binary(Filename) || Filename <- Filenames],
     plot(InputFile1, InputFile2, OutputFile, GnuPlot),
-    Encoded = jsx:encode(#{status => ok,
-                           nodes => Nodes,
-                           files => Filenames1}),
-    {Encoded, ReqData, State}.
+    #{status => ok, nodes => Nodes, files => Filenames1}.
 
 %% @private
 input_file(Type) ->

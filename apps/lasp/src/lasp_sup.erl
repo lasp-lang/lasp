@@ -94,4 +94,18 @@ init(_Args) ->
             BaseSpecs
     end,
 
+    SimDefault = list_to_atom(os:getenv("AD_COUNTER_SIM", "false")),
+    SimEnabled = application:get_env(?APP,
+                                     ad_counter_simulation_on_boot,
+                                     SimDefault),
+
+    %% Run local simulations if instrumentation is enabled.
+    case SimEnabled of
+        true ->
+            Nodes = [node()],
+            spawn_link(lasp_simulate_resource, run, [Nodes]);
+        false ->
+            ok
+    end,
+
     {ok, {{one_for_one, 5, 10}, Children}}.

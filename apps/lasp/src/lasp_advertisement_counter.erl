@@ -257,29 +257,7 @@ client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWi
             Runner ! {runner, terminate_done},
             ok;
         {runner, view_ad} ->
-            {Counters, CountersDelta} = case dict:size(Counters0) of
-                0 ->
-                    {Counters0, CountersDelta0};
-                _ ->
-                    %% Select a random advertisement from the list of
-                    %% active advertisements.
-                    Random = random:uniform(dict:size(Counters0)),
-                    {Ad, Counter0} = lists:nth(Random, dict:to_list(Counters0)),
-                    case application:get_env(?APP, delta_mode, false) of
-                        true ->
-                            Counter1 = case dict:find(Ad, CountersDelta0) of
-                                           {ok, CounterDelta0} ->
-                                               CounterType:merge(Counter0, CounterDelta0);
-                                           error ->
-                                               Counter0
-                                       end,
-                            {ok, {delta, CounterDelta}} = CounterType:update_delta(increment, Id, Counter1),
-                            {dict:store(Ad, Counter1, Counters0), dict:store(Ad, CounterDelta, CountersDelta0)};
-                        false ->
-                            {ok, Counter} = CounterType:update(increment, Id, Counter0),
-                            {dict:store(Ad, Counter, Counters0), CountersDelta0}
-                    end
-            end,
+            {ok, {Counters, CountersDelta}} = view_ad(CounterType, Id, Counters0, CountersDelta0),
 
             %% Notify the harness that an event has been processed.
             Runner ! {runner, view_ad_complete},
@@ -394,4 +372,60 @@ log_transmission(Term) ->
             lasp_transmission_instrumentation:log(client, Term, node());
         false ->
             ok
+    end.
+
+%% @private
+view_ad(CounterType, Id, Counters0, CountersDelta0) ->
+    case dict:size(Counters0) of
+        0 ->
+            {ok, {Counters0, CountersDelta0}};
+        _ ->
+            %% Select a random advertisement from the list of
+            %% active advertisements.
+            Random = random:uniform(dict:size(Counters0)),
+            {Ad, Counter0} = lists:nth(Random, dict:to_list(Counters0)),
+            view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0)
+    end.
+
+%% @private
+view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
+    case application:get_env(?APP, delta_mode, false) of
+        true ->
+            %% If deltas are enabled, then we maintain two pieces of
+            %% state: a.) local dictionary of state, and b.) local
+            %% dictionary of delta intervals waiting to be transmitted
+            %% to the central datacenter.
+
+            %% First, always ensure that our counter is merged up with
+            %% the delta interval before doing any work; if we don't
+            %% have a delta for the object, assume bottom.
+            CounterDelta0 = case dict:find(Ad, CountersDelta0) of
+                           {ok, PreviousDelta} ->
+                               PreviousDelta;
+                           error ->
+                               CounterType:new()
+                       end,
+            MergedCounter = CounterType:merge(CounterDelta0, Counter0),
+
+            %% Generate delta for current operation from new state.
+            {ok, {delta, Delta}} = CounterType:update_delta(increment, Id, MergedCounter),
+
+            %% Merge new delta with old delta and store in interval
+            %% dictionary for next synchronization interval.
+            CounterDelta = CounterType:merge(Delta, CounterDelta0),
+
+            %% Merge new delta into old state and store in the state
+            %% dictionary.
+            Counter = CounterType:merge(MergedCounter, CounterDelta),
+
+            %% At this point we should have a new delta interval
+            %% computed and a new state, so update dictionaries
+            %% accordingly.
+            {ok, {dict:store(Ad, Counter, Counters0),
+                  dict:store(Ad, CounterDelta, CountersDelta0)}};
+        false ->
+            %% If deltas are disabled, then just create a new copy of
+            %% the object and store it in the local nodes dictionary.
+            {ok, Counter} = CounterType:update(increment, Id, Counter0),
+            {ok, {dict:store(Ad, Counter, Counters0), CountersDelta0}}
     end.

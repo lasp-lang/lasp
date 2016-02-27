@@ -28,9 +28,9 @@
 -include("lasp.hrl").
 -include_lib("webmachine/include/webmachine.hrl").
 
--define(NUM_EVENTS, 100).
+-define(NUM_EVENTS, 100000).
 -define(NUM_CLIENTS, 100).
--define(SYNC_INTERVAL, 10).
+-define(SYNC_INTERVAL, 10000). %% 10 seconds.
 
 -define(ORSET, lasp_orset).
 -define(COUNTER, lasp_gcounter).

@@ -117,5 +117,5 @@ setup_test(_Config) ->
 minimal_test(Config) ->
     Nodes = proplists:get_value(nodes, Config),
     {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
-                                  [Nodes, lasp_orset, lasp_gcounter, 1000, 100, 10]),
+                                  [Nodes, lasp_orset, lasp_gcounter, 100, 100, 10]),
     ok.

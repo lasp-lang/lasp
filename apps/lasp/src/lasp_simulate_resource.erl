@@ -83,8 +83,8 @@ output_file() ->
 
 %% @private
 plot(InputFile1, InputFile2, OutputFile, GnuPlot) ->
-    Bin = case os:getenv("MESOS_TASK_ID", false) of
-        false ->
+    Bin = case os:getenv("MESOS_TASK_ID", "false") of
+        "false" ->
             "gnuplot";
         _ ->
             "/usr/bin/gnuplot"

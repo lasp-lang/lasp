@@ -173,6 +173,8 @@ terminate(#state{client_list=ClientList}=State) ->
             end
     end,
     lists:foreach(TerminateFun, ClientList),
+    lasp_transmission_instrumentation:stop(client),
+    lasp_transmission_instrumentation:stop(server),
     {ok, State}.
 
 %% @doc Simulate clients viewing advertisements.

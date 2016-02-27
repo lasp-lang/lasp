@@ -72,8 +72,6 @@ run(Args) ->
 %% @doc Setup lists of advertisements and lists of contracts for
 %%      advertisements.
 init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
-    lager:info("Advertisement counter example executing!"),
-
     %% Enable or disable deltas.
     ok = application:set_env(?APP, delta_mode, Deltas),
 

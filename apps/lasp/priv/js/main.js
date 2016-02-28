@@ -33,8 +33,8 @@ $(document).ready(function() {
     $("#controls").fadeIn();
     $("#graph").fadeIn();
 
-    var width = 1024,
-        height = 200;
+    var width = 300,
+        height = 250;
 
     var color = d3.scale.category10();
 

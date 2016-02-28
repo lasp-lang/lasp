@@ -1,7 +1,7 @@
 # Note you need gnuplot 4.4 for the pdfcairo terminal.
 
 # set terminal pdfcairo font "Gill Sans,9" linewidth 4 rounded fontscale 1.0
-set terminal pdfcairo font "Gill Sans,9" linewidth 2 rounded fontscale 1.0
+set terminal pdfcairo font "Gill Sans,7" linewidth 1 rounded fontscale 1.0
 
 # Line style for axes
 set style line 80 lt rgb "#808080"
@@ -34,12 +34,12 @@ set output outputname
 set xlabel "Time in Seconds"
 set ylabel "MB/client Transmitted"
 
-set key top left
+set key bottom right
 
 set datafile missing '0'
 
 # log scale on the y axis
-# set logscale y 2
+set logscale y 2
 # set format y ""
 # set ytics 1e-6, 10, 1
 # set ytics add ("1" 1, ".1" 0.1, ".01" 0.01, "10^-3" 0.001, \

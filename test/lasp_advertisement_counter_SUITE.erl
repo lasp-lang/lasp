@@ -94,8 +94,13 @@ init_per_testcase(Case, Config) ->
     [{nodes, Nodes1}|Config].
 
 end_per_testcase(_, _Config) ->
-    timer:sleep(1000), %% @todo: Travis related teardown race condition.
+    %% Multi-node race condition protection, where if we don't wait for
+    %% all nodes to stop delivering messages, one might arrive during
+    %% shutdown and trigger an exception, sigh.
+    timer:sleep(5000),
+
     lasp_test_utils:pmap(fun(Node) -> ct_slave:stop(Node) end, [jaguar, shadow, thorn, pyros]),
+
     ok.
 
 runner_node() ->

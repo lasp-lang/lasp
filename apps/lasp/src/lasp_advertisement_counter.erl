@@ -264,9 +264,10 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
     {ok, _} = lasp:update(Ads, {remove, Ad}, Ad).
 
 %% @doc Client process; standard recurisve looping server.
-client(SetType, CounterType, SyncInterval, Runner, Id,
+client(SetType, CounterType, SyncInterval0, Runner, Id,
        AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0,
        BufferedOps) ->
+    SyncInterval = random:uniform(SyncInterval0),
     receive
         {runner, terminate} ->
             %% Log flushed events before termination, if necessary.

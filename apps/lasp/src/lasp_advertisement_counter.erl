@@ -163,6 +163,7 @@ clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetT
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
     Clients = lists:map(fun(Node) ->
+                    lager:info("Launching clients on ~p:", [Node]),
                     lists:map(fun(Id) ->
                                 spawn_link(Node,
                                            ?MODULE,

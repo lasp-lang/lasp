@@ -315,6 +315,8 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
 synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
     %% Get latest list of advertisements from the server.
     {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
+    %% Log state received from the server.
+    log_transmission(AdsWithContracts),
     AdList = SetType:value(AdsWithContracts),
     Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
@@ -327,6 +329,8 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
                       case dict:is_key(Ad, Acc) of
                           false ->
                               {ok, {_, _, _, Counter}} = lasp:read(Ad, undefined),
+                              %% Log state received from the server.
+                              log_transmission(Counter),
                               dict:store(Ad, Counter, Acc);
                           true ->
                               Acc

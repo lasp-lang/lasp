@@ -45,7 +45,7 @@ content_types_provided(Req, Ctx) ->
 
 to_json(ReqData, State) ->
     {ok, Nodes} = lasp_peer_service:members(),
-    run(Nodes),
+    spawn_link(?MODULE, run, [Nodes]),
     Encoded = jsx:encode(#{status => ok}),
     {Encoded, ReqData, State}.
 

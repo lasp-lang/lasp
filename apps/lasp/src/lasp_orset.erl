@@ -120,25 +120,32 @@ update({remove_all, Elems}, _Actor, ORDict0) ->
 update({update, Ops}, Actor, ORDict) ->
     apply_ops(Ops, Actor, ORDict).
 
-update_delta({add_by_token, Token, Elem}, _Actor, _ORDict) ->
-    {ok, DeltaORDict} = add_elem(Elem, Token, orddict:new()),
-    {ok, {delta, DeltaORDict}};
-update_delta({add, Elem}, Actor, _ORDict) ->
-    Token = unique(Actor),
-    {ok, DeltaORDict} = add_elem(Elem, Token, orddict:new()),
-    {ok, {delta, DeltaORDict}};
-update_delta({add_all, Elems}, Actor, _ORDict0) ->
-    OD = lists:foldl(fun(Elem, ORDict) ->
-                {ok, ORDict1} = update({add, Elem}, Actor, ORDict),
-                ORDict1
-            end, orddict:new(), Elems),
-    {ok, {delta, OD}};
-update_delta({remove, Elem}, _Actor, ORDict) ->
-    remove_elem(Elem, ORDict, orddict:new());
+update_delta({remove, Elem}, Actor, ORDict) ->
+    case orddict:find(Elem, ORDict) of
+        {ok, Tokens} ->
+            {ok, Delta} = update({remove, Elem},
+                                 Actor,
+                                 orddict:store(Elem, Tokens, orddict:new())),
+            {ok, {delta, Delta}};
+        error ->
+            {error, {precondition, {not_present, Elem}}}
+    end;
 update_delta({remove_all, Elems}, _Actor, ORDict0) ->
-    remove_elems(Elems, ORDict0, orddict:new());
+    SmallOD = lists:foldl(fun(Elem, ORDict) ->
+                                  case orddict:find(Elem, ORDict0) of
+                                      {ok, Tokens} ->
+                                          orddict:store(Elem, Tokens, ORDict);
+                                      error ->
+                                          ORDict
+                                  end
+                          end, orddict:new(), Elems),
+    {ok, Delta} = update({remove_all, Elems}, _Actor, SmallOD),
+    {ok, {delta, Delta}};
 update_delta({update, Ops}, Actor, ORDict) ->
-    apply_ops(Ops, Actor, ORDict).
+    apply_ops(Ops, Actor, ORDict);
+update_delta(Op, Actor, _ORDict) ->
+    {ok, Delta} = update(Op, Actor, orddict:new()),
+    {ok, {delta, Delta}}.
 
 -spec update(orset_op(), actor(), orset(), riak_dt:context()) ->
                     {ok, orset()} | {error, {precondition, {not_present, member()}}}.
@@ -324,25 +331,6 @@ minimum_tokens(Tokens) ->
     orddict:filter(fun(_Token, Removed) ->
             not Removed
         end, Tokens).
-
-remove_elem(Elem, ORDict, DeltaORDict) ->
-    case orddict:find(Elem, ORDict) of
-        {ok, Tokens} ->
-            Tokens1 = orddict:fold(fun(Token, _, Tokens0) ->
-                                           orddict:store(Token, true, Tokens0)
-                                   end, orddict:new(), Tokens),
-            {ok, {delta, orddict:store(Elem, Tokens1, DeltaORDict)}};
-        error ->
-            {error, {precondition, {not_present, Elem}}}
-    end.
-
-remove_elems([], _ORDict, DeltaORDict) ->
-    {ok, {delta, DeltaORDict}};
-remove_elems([Elem|Rest], ORDict, DeltaORDict) ->
-    case remove_elem(Elem, ORDict, DeltaORDict) of
-        {ok, {delta, DeltaORDict1}} -> remove_elems(Rest, ORDict, DeltaORDict1);
-        Error         -> Error
-    end.
 
 %% ===================================================================
 %% EUnit tests

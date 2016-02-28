@@ -88,7 +88,11 @@ init(_Args) ->
                            {lasp_transmission_instrumentation, start_link, [server]},
                             permanent, 5000, worker,
                             [lasp_transmission_instrumentation]},
-            BaseSpecs ++ [ClientTrans, ServerTrans, Web];
+            DivergenceTrans = {lasp_divergence_instrumentation,
+                               {lasp_divergence_instrumentation, start_link, []},
+                                permanent, 5000, worker,
+                                [lasp_divergence_instrumentation]},
+            BaseSpecs ++ [ClientTrans, ServerTrans, DivergenceTrans, Web];
         false ->
             ok = application:set_env(?APP, instrumentation, InstrEnabled),
             BaseSpecs

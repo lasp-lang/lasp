@@ -299,26 +299,22 @@ client(SetType, CounterType, SyncInterval, Runner, Id,
                    CountersDelta, BufferedOps + 1)
     after
         RandomSyncInterval ->
-            lager:info("Syncronizing after; ~p", [RandomSyncInterval]),
-            % {ok, AdsWithContracts, Counters} = synchronize(SetType,
-            %                                                AdsWithContractsId,
-            %                                                AdsWithContracts0,
-            %                                                Counters0,
-            %                                                CountersDelta0),
+            {ok, AdsWithContracts, Counters} = synchronize(SetType,
+                                                           AdsWithContractsId,
+                                                           AdsWithContracts0,
+                                                           Counters0,
+                                                           CountersDelta0),
             %% Log flushed events.
-            % case BufferedOps of
-            %     0 ->
-            %         ok;
-            %     _ ->
-            %         log_divergence(flush, BufferedOps)
-            % end,
+            case BufferedOps of
+                0 ->
+                    ok;
+                _ ->
+                    log_divergence(flush, BufferedOps)
+            end,
 
-            % client(SetType, CounterType, SyncInterval, Runner, Id,
-            %        AdsWithContractsId, AdsWithContracts, Counters,
-            %        dict:new(), 0)
             client(SetType, CounterType, SyncInterval, Runner, Id,
-                   AdsWithContractsId, AdsWithContracts0, Counters0,
-                   dict:new(), BufferedOps)
+                   AdsWithContractsId, AdsWithContracts, Counters,
+                   dict:new(), 0)
     end.
 
 %% @doc Generate advertisements and advertisement contracts.

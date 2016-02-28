@@ -31,7 +31,7 @@
 -include_lib("webmachine/include/webmachine.hrl").
 
 -define(NUM_EVENTS, 2000000).
--define(NUM_CLIENTS, 1000).
+-define(NUM_CLIENTS, 500).
 
 -define(ORSET, lasp_orset).
 -define(COUNTER, lasp_gcounter).
@@ -89,7 +89,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
                                                      ?COUNTER,
                                                      ?NUM_EVENTS,
                                                      ?NUM_CLIENTS,
-                                                     5000]),
+                                                     30000]),
 
     % %% Run the simulation with the orset, gcounter, deltas enabled;
     % %% 500ms sync.

@@ -282,7 +282,14 @@ bind(Id, Value0) ->
             %% Ignore: this is a dynamic variable.
             ok;
         _ ->
-            {_Time, _} = timer:tc(?MODULE, broadcast, [{Id, Type, Metadata, BroadcastState}])
+            {Time, _} = timer:tc(?MODULE, broadcast, [{Id, Type, Metadata, BroadcastState}]),
+            Normalized = Time / 1000,
+            case Normalized > 0 of
+                true ->
+                    lager:info("Broadcast took: ~p", [Normalized]);
+                _ ->
+                    ok
+            end
     end,
     {ok, {Id, Type, Metadata, ReturnState}}.
 

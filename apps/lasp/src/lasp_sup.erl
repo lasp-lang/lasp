@@ -66,11 +66,6 @@ init(_Args) ->
             permanent, 5000, worker,
             [mochiweb_socket_server]},
 
-    % DnsPeerRefresh = {lasp_dns_peer_refresh_service,
-    %                   {lasp_dns_peer_refresh_service, start_link, []},
-    %                    permanent, 5000, worker,
-    %                    [lasp_dns_peer_refresh_service]},
-
     MarathonPeerRefresh = {lasp_marathon_peer_refresh_service,
                            {lasp_marathon_peer_refresh_service, start_link, []},
                             permanent, 5000, worker,

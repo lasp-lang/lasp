@@ -201,12 +201,12 @@ simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
                         Random = random:uniform(length(ClientList)),
                         Pid = lists:nth(Random, ClientList),
                         Node = node(Pid),
-                        spawn_link(Node, fun() ->
-                                   random:seed(erlang:phash2([node()]),
-                                               erlang:monotonic_time(),
-                                               erlang:unique_integer()),
-                                    MSeconds = random:uniform(10),
-                                    timer:sleep(MSeconds),
+                        spawn(Node, fun() ->
+                                   % random:seed(erlang:phash2([node()]),
+                                   %             erlang:monotonic_time(),
+                                   %             erlang:unique_integer()),
+                                   %  MSeconds = random:uniform(10),
+                                   %  timer:sleep(MSeconds),
                                     Pid ! {runner, view_ad},
                                     case EventId rem ?FREQ == 0 of
                                         true ->

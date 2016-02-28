@@ -62,6 +62,8 @@
          terminate/2,
          code_change/3]).
 
+-export([broadcast/1]).
+
 -include("lasp.hrl").
 
 %% State record.
@@ -280,7 +282,7 @@ bind(Id, Value0) ->
             %% Ignore: this is a dynamic variable.
             ok;
         _ ->
-            broadcast({Id, Type, Metadata, BroadcastState})
+            {_Time, _} = timer:tc(?MODULE, broadcast, [{Id, Type, Metadata, BroadcastState}])
     end,
     {ok, {Id, Type, Metadata, ReturnState}}.
 

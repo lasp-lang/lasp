@@ -48,7 +48,7 @@ run(Args) ->
 -define(MAX_IMPRESSIONS, 50000).
 
 %% Log frequency.
--define(FREQ, 50000).
+-define(FREQ, 1000).
 
 %% Record definitions.
 

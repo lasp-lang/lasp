@@ -3,3 +3,6 @@
 
 ## Cookie for distributed erlang
 -setcookie ${COOKIE}
+
+## Increase distribution port buffer size.
++zdbbl 32768

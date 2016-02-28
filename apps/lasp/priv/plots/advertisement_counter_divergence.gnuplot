@@ -52,5 +52,5 @@ set logscale y 2
 # Input file contains comma-separated values fields
 set datafile separator ","
 
-plot inputfile1 using 1:3 title "OR-Set, G-Counter, Per-User" with linespoints, \
-     inputfile2 using 1:3 title "OR-Set, G-Counter, Deltas, Per-User" with linespoints
+plot inputfile1 using 1:3 title "OR-Set, G-Counter, Per-User, 500ms" with linespoints, \
+     inputfile2 using 1:3 title "OR-Set, G-Counter, Per-User, 1s" with linespoints

@@ -24,7 +24,7 @@
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -export([run/1,
-         client/9,
+         client/10,
          server/2]).
 
 -behaviour(lasp_simulation).
@@ -113,8 +113,18 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
     %% Launch server processes.
     servers(SetType, Ads, AdsWithContracts),
 
+    %% Initialize divergence transmission instrumentation.
+    DivergenceFilename = string:join(["divergence",
+                                      atom_to_list(Deltas),
+                                      atom_to_list(SetType),
+                                      atom_to_list(CounterType),
+                                      integer_to_list(NumEvents),
+                                      integer_to_list(NumClients),
+                                      integer_to_list(SyncInterval)], "-") ++ ".csv",
+    ok = lasp_divergence_instrumentation:start(DivergenceFilename, NumClients),
+
     %% Initialize client transmission instrumentation.
-    ClientFilename = string:join(["client",
+    ClientFilename = string:join(["state-client",
                                   atom_to_list(Deltas),
                                   atom_to_list(SetType),
                                   atom_to_list(CounterType),
@@ -124,7 +134,7 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
     ok = lasp_transmission_instrumentation:start(client, ClientFilename, NumClients),
 
     %% Initialize server transmission instrumentation.
-    ServerFilename = string:join(["server",
+    ServerFilename = string:join(["state-server",
                                   atom_to_list(Deltas),
                                   atom_to_list(SetType),
                                   atom_to_list(CounterType),
@@ -143,7 +153,7 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
                 num_events=NumEvents,
                 num_clients=NumClients,
                 sync_interval=SyncInterval,
-                filenames=[ClientFilename, ServerFilename]}}.
+                filenames=[DivergenceFilename, ClientFilename, ServerFilename]}}.
 
 %% @doc Launch a series of client processes, each of which is responsible
 %% for displaying a particular advertisement.
@@ -165,7 +175,8 @@ clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetT
                                             AdsWithContracts,
                                             undefined,
                                             dict:new(),
-                                            dict:new()])
+                                            dict:new(),
+                                            0])
                                 end, lists:seq(1, NumClients))
         end, Nodes),
     Clients1 = lists:flatten(Clients),
@@ -175,10 +186,10 @@ clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetT
 %%      synchronization.
 terminate(#state{client_list=ClientList}=State) ->
     TerminateFun = fun(Pid) ->
-            lager:info("Terminating: ~p...", [Pid]),
             Pid ! {runner, terminate}
     end,
     lists:foreach(TerminateFun, ClientList),
+    lasp_divergence_instrumentation:stop(),
     lasp_transmission_instrumentation:stop(client),
     lasp_transmission_instrumentation:stop(server),
     {ok, State}.
@@ -247,18 +258,42 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
     {ok, _} = lasp:update(Ads, {remove, Ad}, Ad).
 
 %% @doc Client process; standard recurisve looping server.
-client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
+client(SetType, CounterType, SyncInterval, Runner, Id,
+       AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0,
+       BufferedOps) ->
     receive
         {runner, terminate} ->
+            %% Log flushed events before termination, if necessary.
+            case BufferedOps of
+                0 ->
+                    ok;
+                _ ->
+                    {ok, AdsWithContracts, Counters} = synchronize(SetType,
+                                                                   AdsWithContractsId,
+                                                                   AdsWithContracts0,
+                                                                   Counters0,
+                                                                   CountersDelta0),
+
+                    log_divergence(flush, BufferedOps)
+            end,
+
             Runner ! {runner, terminate_done},
+
             ok;
         {runner, view_ad} ->
-            {ok, {Counters, CountersDelta}} = view_ad(CounterType, Id, Counters0, CountersDelta0),
+            {ok, {Counters, CountersDelta}} = view_ad(CounterType, Id,
+                                                      Counters0,
+                                                      CountersDelta0),
 
             %% Notify the harness that an event has been processed.
             Runner ! {runner, view_ad_complete},
 
-            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters, CountersDelta)
+            %% Log buffered event.
+            log_divergence(buffer, 1),
+
+            client(SetType, CounterType, SyncInterval, Runner, Id,
+                   AdsWithContractsId, AdsWithContracts0, Counters,
+                   CountersDelta, BufferedOps + 1)
     after
         SyncInterval ->
             {ok, AdsWithContracts, Counters} = synchronize(SetType,
@@ -266,7 +301,17 @@ client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWi
                                                            AdsWithContracts0,
                                                            Counters0,
                                                            CountersDelta0),
-            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts, Counters, dict:new())
+            %% Log flushed events.
+            case BufferedOps of
+                0 ->
+                    ok;
+                _ ->
+                    log_divergence(flush, BufferedOps)
+            end,
+
+            client(SetType, CounterType, SyncInterval, Runner, Id,
+                   AdsWithContractsId, AdsWithContracts, Counters,
+                   dict:new(), 0)
     end.
 
 %% @doc Generate advertisements and advertisement contracts.
@@ -399,6 +444,22 @@ log_transmission(Term) ->
     case application:get_env(?APP, instrumentation, false) of
         true ->
             lasp_transmission_instrumentation:log(client, Term, node());
+        false ->
+            ok
+    end.
+
+%% @private
+log_divergence(buffer, Number) ->
+    case application:get_env(?APP, instrumentation, false) of
+        true ->
+            lasp_divergence_instrumentation:buffer(Number, node());
+        false ->
+            ok
+    end;
+log_divergence(flush, Number) ->
+    case application:get_env(?APP, instrumentation, false) of
+        true ->
+            lasp_divergence_instrumentation:flush(Number, node());
         false ->
             ok
     end.

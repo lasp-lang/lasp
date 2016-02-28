@@ -102,8 +102,8 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
     timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE),
 
     Nodes = case request() of
-        {ok, {{_, 200, _}, _, Body}} ->
-            Nodes1 = generate_nodes(Body),
+        {ok, Response} ->
+            Nodes1 = generate_nodes(Response),
             lager:info("Nodes in Marathon response: ~p", [Nodes1]),
             Nodes1;
         Other ->
@@ -201,5 +201,5 @@ request() ->
             {ok, jsx:decode(Body, [return_maps])};
         Other ->
             lager:info("Request failed; ~p", [Other]),
-            Other
+            {error, invalid}
     end.

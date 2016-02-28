@@ -139,8 +139,12 @@ update_delta({remove_all, Elems}, _Actor, ORDict0) ->
                                           ORDict
                                   end
                           end, orddict:new(), Elems),
-    {ok, Delta} = update({remove_all, Elems}, _Actor, SmallOD),
-    {ok, {delta, Delta}};
+    case update({remove_all, Elems}, _Actor, SmallOD) of
+        {ok, Delta} ->
+            {ok, {delta, Delta}};
+        Error ->
+            Error
+    end;
 update_delta({update, Ops}, Actor, ORDict) ->
     apply_ops(Ops, Actor, ORDict);
 update_delta(Op, Actor, _ORDict) ->

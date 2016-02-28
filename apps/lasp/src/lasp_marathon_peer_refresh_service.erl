@@ -106,7 +106,8 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
             Nodes1 = generate_nodes(Body),
             lager:info("Nodes in Marathon response: ~p", [Nodes1]),
             Nodes1;
-        _ ->
+        Other ->
+            lager:info("Invalid Marathon response: ~p", [Other]),
             SeenNodes
     end,
 

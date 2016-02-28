@@ -367,8 +367,6 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
                                       Counter0
                               end;
                           false ->
-                              %% @todo Optimize.
-
                               %% Log transmission of the local delta (or state).
                               log_transmission(Counter0),
 

@@ -18,16 +18,17 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_transmission_instrumentation).
+-module(lasp_divergence_instrumentation).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).
 
 %% API
--export([start_link/1,
-         start/3,
-         stop/1,
-         log/3]).
+-export([start_link/0,
+         start/2,
+         stop/0,
+         buffer/2,
+         flush/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -40,12 +41,13 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {type,
-                tref,
-                size=0,
-                clients=0,
+-record(state, {tref,
+                events=0,
                 lines="",
                 clock=0,
+                clients=0,
+                total=0,
+                total_dec=0,
                 status=init,
                 filename}).
 
@@ -56,21 +58,25 @@
 %%%===================================================================
 
 %% @doc Start and link to calling process.
--spec start_link(list(term()))-> {ok, pid()} | ignore | {error, term()}.
-start_link(Type) ->
-    gen_server:start_link({global, {?MODULE, Type}}, ?MODULE, [Type], []).
+-spec start_link()-> {ok, pid()} | ignore | {error, term()}.
+start_link() ->
+    gen_server:start_link({global, ?MODULE}, ?MODULE, [], []).
 
--spec log(term(), term(), node()) -> ok | error().
-log(Type, Term, Node) ->
-    gen_server:call({global, {?MODULE, Type}}, {log, Term, Node}, infinity).
+-spec buffer(integer(), node()) -> ok | error().
+buffer(Number, Node) ->
+    gen_server:call({global, ?MODULE}, {buffer, Number, Node}, infinity).
 
--spec start(term(), list(), pos_integer()) -> ok | error().
-start(Type, Filename, Clients) ->
-    gen_server:call({global, {?MODULE, Type}}, {start, Filename, Clients}, infinity).
+-spec flush(integer(), node()) -> ok | error().
+flush(Number, Node) ->
+    gen_server:call({global, ?MODULE}, {flush, Number, Node}, infinity).
 
--spec stop(term()) -> ok | error().
-stop(Type) ->
-    gen_server:call({global, {?MODULE, Type}}, stop, infinity).
+-spec start(list(), pos_integer()) -> ok | error().
+start(Filename, Clients) ->
+    gen_server:call({global, ?MODULE}, {start, Filename, Clients}, infinity).
+
+-spec stop()-> ok | error().
+stop() ->
+    gen_server:call({global, ?MODULE}, stop, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -78,33 +84,38 @@ stop(Type) ->
 
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
-init([Type]) ->
-    Line = io_lib:format("Seconds,MegaBytes,MeanMegaBytesPerClient\n", []),
+init([]) ->
+    Line = io_lib:format("Seconds,Divergence,MeanDivergencePerClient\n", []),
     Line2 = io_lib:format("0,0,0\n", []),
-    {ok, #state{type=Type, lines=Line ++ Line2}}.
+    {ok, #state{lines=Line ++ Line2}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({log, Term, _Node}, _From, #state{type=_Type, size=Size0}=State) ->
-    Size = termsize(Term),
-    %% lager:info("Instrumentation: type ~p received ~p bytes from node ~p", [Type, Size, Node]),
-    {reply, ok, State#state{size=Size0 + Size}};
+handle_call({buffer, Events, _Node}, _From, #state{events=Events0, total=Total0}=State) ->
+    % lager:info("Incremented by ~p, totals ~p ~p", [Events, Events0 + Events, Total0 + Events]),
+    {reply, ok, State#state{events=Events0 + Events, total=Total0 + Events}};
 
-handle_call({start, Filename, Clients}, _From, #state{type=Type}=State) ->
+handle_call({flush, Events, _Node}, _From, #state{events=Events0,
+                                                  total_dec=TotalDec0}=State) ->
+    % lager:info("Decrements by ~p, totals ~p ~p", [Events, Events0 - Events, TotalDec0 + Events]),
+    {reply, ok, State#state{events=Events0 - Events, total_dec=TotalDec0 + Events}};
+
+handle_call({start, Filename, Clients}, _From, State) ->
     {ok, TRef} = start_timer(),
-    lager:info("Instrumentation timer for ~p enabled!", [Type]),
-    {reply, ok, State#state{tref=TRef, clock=0, clients=Clients,
-                            filename=Filename, status=running, size=0,
+    {reply, ok, State#state{tref=TRef, clients=Clients, clock=0, total=0, total_dec=0,
+                            filename=Filename, status=running, events=0,
                             lines = []}};
 
-handle_call(stop, _From, #state{type=Type, lines=Lines, clock=Clock,
-                                clients=Clients, size=Size,
-                                filename=Filename, tref=TRef}=State) ->
+handle_call(stop, _From, #state{lines=Lines, clock=Clock, events=Events,
+                                total_dec=TotalDec, total=Total,
+                                clients=Clients, filename=Filename,
+                                tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
-    record(Clock, Size, Clients, Filename, Lines),
-    lager:info("Instrumentation timer for ~p disabled!", [Type]),
+    record(Clock, Events, Clients, Filename, Lines),
+    lager:info("Total events seen: ~p", [Total]),
+    lager:info("Total decrements seen: ~p", [TotalDec]),
     {reply, ok, State#state{tref=undefined}};
 
 %% @private
@@ -121,10 +132,10 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(record, #state{filename=Filename, clients=Clients,
-                           size=Size, clock=Clock0, status=running,
+                           events=Events, clock=Clock0, status=running,
                            lines=Lines0}=State) ->
     {ok, TRef} = start_timer(),
-    {ok, Clock, Lines} = record(Clock0, Size, Clients, Filename, Lines0),
+    {ok, Clock, Lines} = record(Clock0, Events, Clients, Filename, Lines0),
     {noreply, State#state{tref=TRef, clock=Clock, lines=Lines}};
 
 handle_info(Msg, State) ->
@@ -146,10 +157,6 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-termsize(Term) ->
-    erts_debug:flat_size(Term) * erlang:system_info(wordsize).
-
-%% @private
 start_timer() ->
     timer:send_after(?INTERVAL, record).
 
@@ -159,22 +166,14 @@ filename(Filename) ->
     Root ++ "/logs/" ++ Filename.
 
 %% @private
-megasize(Size) ->
-    KiloSize = Size / 1024,
-    MegaSize = KiloSize / 1024,
-    MegaSize.
-
-%% @private
 clock(Clock) ->
     Clock / 1000.
 
 %% @private
-record(Clock0, Size, Clients, Filename, Lines0) ->
+record(Clock0, Events, Clients, Filename, Lines0) ->
     Clock = Clock0 + ?INTERVAL,
     Line = io_lib:format("~w,~w,~w\n",
-                         [clock(Clock),
-                          megasize(Size),
-                          megasize(Size) / Clients]),
+                         [clock(Clock), Events, Events / Clients]),
     Lines = Lines0 ++ Line,
     ok = file:write_file(filename(Filename), Lines),
     {ok, Clock, Lines}.

@@ -63,21 +63,33 @@
 %%         you like some help?
 %%
 run(Module, Args) ->
+    lager:info("Initializing simulation!"),
     {ok, State} = Module:init(Args),
 
+    %% Unfortunately, we have to wait for the cluster to stabilize, else
+    %% some of the clients running at other node will get not_found
+    %% operations.
+    lager:info("Waiting for cluster to stabilize..."),
+    timer:sleep(2000),
+
     %% Launch client processes.
+    lager:info("Launching clients!"),
     {ok, State1} = Module:clients(State),
 
     %% Initialize simulation.
+    lager:info("Running simulation!"),
     {ok, State2} = Module:simulate(State1),
 
     %% Wait until we receive num events.
+    lager:info("Waiting for event generation to complete!"),
     {ok, State3} = Module:wait(State2),
 
     %% Terminate all clients.
+    lager:info("Terminating clients!"),
     {ok, State4} = Module:terminate(State3),
 
     %% Finish and summarize.
-    {ok, State5} = Module:summarize(State4),
+    lager:info("Summarizing results!"),
+    {ok, Term} = Module:summarize(State4),
 
-    {ok, State5}.
+    {ok, Term}.

@@ -157,7 +157,8 @@ broadcast_data(#broadcast{id=Id, type=Type, clock=Clock,
 %%      for the same object.
 -spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) ->
     boolean().
-merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
+merge({Id, Clock}, {Id, Type, Metadata, Value}=Payload) ->
+    log_transmission(Payload),
     case is_stale({Id, Clock}) of
         true ->
             false;
@@ -230,14 +231,26 @@ update(Id, Operation, Actor) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {update, Id, Operation, Actor},
                                                         infinity),
+    BroadcastState = case Value of
+                         {delta, DeltaState, _MergedState} ->
+                             {delta, DeltaState};
+                         _ ->
+                             Value
+                     end,
+    ReturnState = case Value of
+                      {delta, _DeltaState, MergedState} ->
+                          MergedState;
+                      _ ->
+                          Value
+                  end,
     case orddict:find(dynamic, Metadata) of
         {ok, true} ->
             %% Ignore: this is a dynamic variable.
             ok;
         _ ->
-            broadcast({Id, Type, Metadata, Value})
+            broadcast({Id, Type, Metadata, BroadcastState})
     end,
-    {ok, {Id, Type, Metadata, Value}}.
+    {ok, {Id, Type, Metadata, ReturnState}}.
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -250,14 +263,26 @@ bind(Id, Value0) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {bind, Id, Value0},
                                                         infinity),
+    BroadcastState = case Value of
+                         {delta, DeltaState, _MergedState} ->
+                             {delta, DeltaState};
+                         _ ->
+                             Value
+                     end,
+    ReturnState = case Value of
+                      {delta, _DeltaState, MergedState} ->
+                          MergedState;
+                      _ ->
+                          Value
+                  end,
     case orddict:find(dynamic, Metadata) of
         {ok, true} ->
             %% Ignore: this is a dynamic variable.
             ok;
         _ ->
-            broadcast({Id, Type, Metadata, Value})
+            broadcast({Id, Type, Metadata, BroadcastState})
     end,
-    {ok, {Id, Type, Metadata, Value}}.
+    {ok, {Id, Type, Metadata, ReturnState}}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -598,7 +623,8 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-broadcast({Id, Type, Metadata, Value}) ->
+broadcast({Id, Type, Metadata, Value}=Payload) ->
+    log_transmission(Payload),
     Clock = orddict:fetch(clock, Metadata),
     Broadcast = #broadcast{id=Id, clock=Clock, type=Type,
                            metadata=Metadata, value=Value},
@@ -655,3 +681,18 @@ do(Function, Args) ->
     erlang:apply(Backend, Function, Args).
 
 -endif.
+
+%% @private
+log_transmission(Term) ->
+    try
+        case application:get_env(?APP, instrumentation, false) of
+            true ->
+                lasp_transmission_instrumentation:log(server, Term, node());
+            false ->
+                ok
+        end
+    catch
+        _:Error ->
+            lager:info("Logging failed; couldn't send message: ~p",
+                       [Error])
+    end.

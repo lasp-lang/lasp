@@ -43,6 +43,7 @@
 
 init_per_suite(_Config) ->
     lager:start(),
+
     %% this might help, might not...
     os:cmd(os:find_executable("epmd")++" -daemon"),
     {ok, Hostname} = inet:gethostname(),
@@ -51,61 +52,83 @@ init_per_suite(_Config) ->
         {error, {already_started, _}} -> ok
     end,
     lager:info("node name ~p", [node()]),
+
+    %% Start Lasp on the runner and enable instrumentation.
+    ok = application:load(lasp),
+    ok = application:set_env(lasp, instrumentation, true),
+    {ok, _} = application:ensure_all_started(lasp),
+
     _Config.
 
 end_per_suite(_Config) ->
+    application:stop(lasp),
     application:stop(lager),
     _Config.
 
 init_per_testcase(Case, Config) ->
-    Nodes = [First|Rest] = lasp_test_utils:pmap(fun(N) -> lasp_test_utils:start_node(N, Config, Case) end, [jaguar, shadow, thorn, pyros]),
+    Nodes = lasp_test_utils:pmap(fun(N) -> lasp_test_utils:start_node(N, Config, Case) end, [jaguar, shadow, thorn, pyros]),
     ct:pal("Nodes: ~p", [Nodes]),
+
+    RunnerNode = runner_node(),
+    ct:pal("RunnerNode: ~p", [RunnerNode]),
 
     %% Attempt to join all nodes in the cluster.
     lists:foreach(fun(N) ->
-                        ct:pal("Joining node: ~p to ~p", [N, First]),
-                        ok = rpc:call(First, lasp_peer_service, join, [N])
-                  end, Rest),
+                        ct:pal("Joining node: ~p to ~p", [N, RunnerNode]),
+                        ok = rpc:call(RunnerNode, lasp_peer_service, join, [N])
+                  end, Nodes),
+
+    %% Consider the runner part of the cluster.
+    Nodes1 = [RunnerNode|Nodes],
+    ct:pal("Nodes1: ~p", [Nodes1]),
+
+    %% Sleep until application is fully started.
+    %% @todo: Change to a wait_until, eventually.
+    timer:sleep(60),
 
     %% Wait until convergence.
-    ok = lasp_test_utils:wait_until_joined(Nodes, Nodes),
+    ok = lasp_test_utils:wait_until_joined(Nodes1, Nodes1),
     ct:pal("Cluster converged."),
 
-    {ok, _} = ct_cover:add_nodes(Nodes),
-    [{nodes, Nodes}|Config].
+    {ok, _} = ct_cover:add_nodes(Nodes1),
+    [{nodes, Nodes1}|Config].
 
 end_per_testcase(_, _Config) ->
+    %% Multi-node race condition protection, where if we don't wait for
+    %% all nodes to stop delivering messages, one might arrive during
+    %% shutdown and trigger an exception, sigh.
+    timer:sleep(5000),
+
     lasp_test_utils:pmap(fun(Node) -> ct_slave:stop(Node) end, [jaguar, shadow, thorn, pyros]),
+
     ok.
+
+runner_node() ->
+    {ok, Hostname} = inet:gethostname(),
+    list_to_atom("runner@"++Hostname).
 
 all() ->
     [
-        advertisement_counter_orset_gcounter_10000_100_10_test,
-        advertisement_counter_orset_gcounter_10000_500_10_test,
-        advertisement_counter_orset_gcounter_10000_1000_10_test
+        setup_test,
+        minimal_test,
+        minimal_delta_test
     ].
 
 %% ===================================================================
 %% tests
 %% ===================================================================
 
-advertisement_counter_orset_gcounter_10000_100_10_test(Config) ->
-    ct:pal("Executing advertisement_counter_orset_gcounter_10000_100_10_test..."),
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-    {ok, _} = rpc:call(Node1, lasp_advertisement_counter, run,
-                       [[lasp_orset, lasp_gcounter, 10000, 100, 10]]),
+setup_test(_Config) ->
     ok.
 
-advertisement_counter_orset_gcounter_10000_500_10_test(Config) ->
-    ct:pal("Executing advertisement_counter_orset_gcounter_10000_500_10_test..."),
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-    {ok, _} = rpc:call(Node1, lasp_advertisement_counter, run,
-                       [[lasp_orset, lasp_gcounter, 10000, 500, 10]]),
+minimal_test(Config) ->
+    Nodes = proplists:get_value(nodes, Config),
+    {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
+                                  [Nodes, false, lasp_orset, lasp_gcounter, 100, 100, 10]),
     ok.
 
-advertisement_counter_orset_gcounter_10000_1000_10_test(Config) ->
-    ct:pal("Executing advertisement_counter_orset_gcounter_10000_1000_10_test..."),
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-    {ok, _} = rpc:call(Node1, lasp_advertisement_counter, run,
-                       [[lasp_orset, lasp_gcounter, 10000, 1000, 10]]),
+minimal_delta_test(Config) ->
+    Nodes = proplists:get_value(nodes, Config),
+    {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
+                                  [Nodes, true, lasp_orset, lasp_gcounter, 100, 100, 10]),
     ok.

@@ -40,7 +40,7 @@
 
 -module(lasp_gcounter).
 -behaviour(riak_dt).
--export([new/0, new/2, value/1, value/2, update/3, merge/2, equal/2, to_binary/1, from_binary/1, stats/1, stat/2]).
+-export([new/0, new/2, value/1, value/2, update/3, update_delta/3, merge/2, equal/2, to_binary/1, from_binary/1, stats/1, stat/2]).
 -export([update/4, parent_clock/2]).
 -export([to_binary/2]).
 -export([to_version/2]).
@@ -90,6 +90,23 @@ update(increment, Actor, GCnt) ->
     {ok, increment_by(1, Actor, GCnt)};
 update({increment, Amount}, Actor, GCnt) when is_integer(Amount), Amount > 0 ->
     {ok, increment_by(Amount, Actor, GCnt)}.
+
+update_delta(increment, Actor, GCnt) ->
+    CurValue = case orddict:find(Actor, GCnt) of
+                    {ok, Value} ->
+                        Value;
+                    error ->
+                        0
+               end,
+    {ok, {delta, increment_by(Actor, CurValue + 1, orddict:new())}};
+update_delta({increment, Amount}, Actor, GCnt) when is_integer(Amount), Amount > 0 ->
+    CurValue = case orddict:find(Actor, GCnt) of
+                    {ok, Value} ->
+                        Value;
+                    error ->
+                        0
+               end,
+    {ok, {delta, increment_by(Actor, CurValue + Amount, orddict:new())}}.
 
 -spec update(gcounter_op(), riak_dt:actor(), gcounter(), riak_dt:context()) ->
                     {ok, gcounter()}.

@@ -37,6 +37,7 @@
 -export([new/0,
          value/1,
          update/3,
+         update_delta/3,
          merge/2,
          equal/2,
          to_binary/1,
@@ -80,6 +81,10 @@ update({add, Key, Value}, _Actor, {K, Var0}) ->
     UpdateFun = fun(Value0) -> max(Value, Value0) end,
     Var = orddict:update(Key, UpdateFun, Value, Var0),
     {ok, enforce_k({K, Var})}.
+
+update_delta(Op, Actor, TopKSet) ->
+    %% update_delta() is not implemented.
+    update(Op, Actor, TopKSet).
 
 %% @doc Determine if two ordered dictionaries are equivalent.
 -spec equal(top_k_set(), top_k_set()) -> boolean().

@@ -1,8 +1,40 @@
 $(document).ready(function() {
+  $("#header").hide();
+  $("#controls").hide();
+  $("#graph").hide();
+
+  $.ajax({
+      type: "GET",
+      url: "/api/plots",
+      dataType: "json",
+      success: function (data) {
+        $.each(data.plots, function(i, data) {
+          var elem = "<li class='plot'><object type='application/pdf' data='/plots/" + data + "' width='100%' height='100%'><p>hi</p></object></li>";
+          $(elem).appendTo('#plots');
+        });
+    }
+  });
+
+  $.ajax({
+      type: "GET",
+      url: "/api/logs",
+      dataType: "json",
+      success: function (data) {
+        $.each(data.logs, function(i, data) {
+          var elem = "<li><a href='/logs/" + data + "'>"+data+"</a></li>";
+          $(elem).appendTo('#logs');
+        });
+    }
+  });
+
   $("#logo").fadeOut("slow", function() {
 
-    var width = 1024,
-        height = 500;
+    $("#header").fadeIn();
+    $("#controls").fadeIn();
+    $("#graph").fadeIn();
+
+    var width = 300,
+        height = 250;
 
     var color = d3.scale.category10();
 

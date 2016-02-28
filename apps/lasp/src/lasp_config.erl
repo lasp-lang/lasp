@@ -25,10 +25,13 @@
 
 dispatch() ->
     lists:flatten([
-        {["api", "health"], lasp_health_check_resource, undefined},
-        {["api", "status"], lasp_status_resource,       undefined},
-        {[],                lasp_gui_resource,          index},
-        {['*'],             lasp_gui_resource,          undefined}
+        {["api", "plots"],      lasp_plots_resource,        undefined},
+        {["api", "logs"],       lasp_logs_resource,         undefined},
+        {["api", "health"],     lasp_health_check_resource, undefined},
+        {["api", "status"],     lasp_status_resource,       undefined},
+        {["api", "simulate"],   lasp_simulate_resource,     undefined},
+        {[],                    lasp_gui_resource,          index},
+        {['*'],                 lasp_gui_resource,          undefined}
     ]).
 
 web_config() ->

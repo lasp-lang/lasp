@@ -41,7 +41,7 @@
 -behaviour(riak_dt).
 
 -export([new/0, new/2, value/1, value/2,
-         update/3, merge/2, equal/2, to_binary/1, from_binary/1, stats/1, stat/2]).
+         update/3, update_delta/3, merge/2, equal/2, to_binary/1, from_binary/1, stats/1, stat/2]).
 -export([to_binary/2, current_version/1, change_versions/3]).
 -export([parent_clock/2, update/4]).
 -export([to_version/2]).
@@ -122,6 +122,10 @@ update({increment, By}, Actor, PNCnt) when is_integer(By), By < 0 ->
     update({decrement, -By}, Actor, PNCnt);
 update({decrement, By}, Actor, PNCnt) when is_integer(By), By > 0 ->
     {ok, decrement_by(By, Actor, PNCnt)}.
+
+update_delta(Op, Actor, PNCnt) ->
+    %% update_delta() is not implemented.
+    update(Op, Actor, PNCnt).
 
 update(Op, Actor, Cntr, _Ctx) ->
     update(Op, Actor, Cntr).

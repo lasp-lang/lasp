@@ -337,6 +337,26 @@ bind(Id, Value, Store) ->
 
 %% @doc Define a dataflow variable to be bound a value.
 -spec bind(id(), value(), function(), store()) -> {ok, var()}.
+bind(Id, {delta, Value}, MetadataFun, Store) ->
+    Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
+                      waiting_threads=WT}=Object) ->
+            Metadata = MetadataFun(Metadata0),
+            %% Merge may throw for invalid types.
+            try
+                Merged = lasp_type:merge(Type, Value0, Value),
+                {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
+                NewObject = #dv{type=Type, metadata=Metadata, value=Merged, waiting_threads=SW},
+                %% Return value is a delta state
+                {NewObject, {ok, {Id, Type, Metadata, {delta, Value, Merged}}}}
+            catch
+                _:Reason ->
+                    %% Merge threw.
+                    lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
+                                    [Type, Reason, Value0, Value]),
+                    {Object, {ok, {Id, Type, Metadata, Value0}}}
+            end
+    end,
+    do(update, [Store, Id, Mutator]);
 bind(Id, Value, MetadataFun, Store) ->
     Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
                       waiting_threads=WT}=Object) ->
@@ -830,7 +850,13 @@ write(Type, Value, Key, Store) ->
     ok = do(put, [Store, Key, V1]),
     ok.
 
--ifndef(EQC).
+-ifdef(TEST).
+
+do(Function, Args) ->
+    Backend = lasp_ets_storage_backend,
+    erlang:apply(Backend, Function, Args).
+
+-else.
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
@@ -839,10 +865,5 @@ do(Function, Args) ->
                                   lasp_dets_storage_backend),
     erlang:apply(Backend, Function, Args).
 
--else.
-
-do(Function, Args) ->
-    Backend = lasp_ets_storage_backend,
-    erlang:apply(Backend, Function, Args).
 
 -endif.

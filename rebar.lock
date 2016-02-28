@@ -28,7 +28,7 @@
   0},
  {<<"plumtree">>,
   {git,"https://github.com/lasp-lang/plumtree",
-       {ref,"56d8e5f19b0ba103db6cba9283a476a4fbfedc44"}},
+       {ref,"472f4343c7713d619c82e823c8d5f6307034ff19"}},
   0},
  {<<"riak_dt">>,
   {git,"https://github.com/lasp-lang/riak_dt",

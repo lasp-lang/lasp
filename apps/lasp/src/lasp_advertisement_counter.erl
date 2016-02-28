@@ -206,8 +206,8 @@ simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
                                     Pid ! {runner, view_ad},
                                     case EventId rem ?FREQ == 0 of
                                         true ->
-                                            lager:info("Event ~p dispatched for ~p milliseconds!",
-                                                       [EventId, MSeconds]);
+                                            lager:info("Events dispatched: ~p",
+                                                       [EventId]);
                                         false ->
                                             ok
                                     end

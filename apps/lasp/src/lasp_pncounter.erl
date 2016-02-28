@@ -124,8 +124,13 @@ update({decrement, By}, Actor, PNCnt) when is_integer(By), By > 0 ->
     {ok, decrement_by(By, Actor, PNCnt)}.
 
 update_delta(Op, Actor, PNCnt) ->
-    %% update_delta() is not implemented.
-    update(Op, Actor, PNCnt).
+    {ok, Delta} = case lists:keytake(Actor, 1, PNCnt) of
+                      false ->
+                          update(Op, Actor, []);
+                      {value, Value, _ModPNCnt} ->
+                          update(Op, Actor, [Value])
+                  end,
+    {ok, {delta, Delta}}.
 
 update(Op, Actor, Cntr, _Ctx) ->
     update(Op, Actor, Cntr).

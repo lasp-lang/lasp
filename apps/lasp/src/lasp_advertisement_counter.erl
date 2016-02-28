@@ -276,12 +276,7 @@ client(SetType, CounterType, SyncInterval, Runner, Id,
                 0 ->
                     ok;
                 _ ->
-                    {ok, AdsWithContracts, Counters} = synchronize(SetType,
-                                                                   AdsWithContractsId,
-                                                                   AdsWithContracts0,
-                                                                   Counters0,
-                                                                   CountersDelta0),
-
+                    synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0),
                     log_divergence(flush, BufferedOps)
             end,
 
@@ -305,22 +300,25 @@ client(SetType, CounterType, SyncInterval, Runner, Id,
     after
         RandomSyncInterval ->
             lager:info("Syncronizing after; ~p", [RandomSyncInterval]),
-            {ok, AdsWithContracts, Counters} = synchronize(SetType,
-                                                           AdsWithContractsId,
-                                                           AdsWithContracts0,
-                                                           Counters0,
-                                                           CountersDelta0),
+            % {ok, AdsWithContracts, Counters} = synchronize(SetType,
+            %                                                AdsWithContractsId,
+            %                                                AdsWithContracts0,
+            %                                                Counters0,
+            %                                                CountersDelta0),
             %% Log flushed events.
-            case BufferedOps of
-                0 ->
-                    ok;
-                _ ->
-                    log_divergence(flush, BufferedOps)
-            end,
+            % case BufferedOps of
+            %     0 ->
+            %         ok;
+            %     _ ->
+            %         log_divergence(flush, BufferedOps)
+            % end,
 
+            % client(SetType, CounterType, SyncInterval, Runner, Id,
+            %        AdsWithContractsId, AdsWithContracts, Counters,
+            %        dict:new(), 0)
             client(SetType, CounterType, SyncInterval, Runner, Id,
-                   AdsWithContractsId, AdsWithContracts, Counters,
-                   dict:new(), 0)
+                   AdsWithContractsId, AdsWithContracts0, Counters0,
+                   dict:new(), BufferedOps)
     end.
 
 %% @doc Generate advertisements and advertisement contracts.

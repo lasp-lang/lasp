@@ -219,7 +219,8 @@ simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
                                         false ->
                                             ok
                                     end
-                              end)
+                              end),
+                        timer:sleep(10)
                 end,
                 lists:foreach(Viewer, lists:seq(1, NumEvents)),
                 lager:info("Simulation event generation complete!")

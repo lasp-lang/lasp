@@ -163,7 +163,6 @@ clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetT
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
     Clients = lists:map(fun(Node) ->
-                    lager:info("Launching clients on ~p:", [Node]),
                     lists:map(fun(Id) ->
                                 spawn_link(Node,
                                            ?MODULE,
@@ -199,14 +198,15 @@ simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
     %% Start the simulation.
     spawn_link(fun() ->
                 Viewer = fun(EventId) ->
-                        spawn_link(fun() ->
+                        Random = random:uniform(length(ClientList)),
+                        Pid = lists:nth(Random, ClientList),
+                        Node = node(Pid),
+                        spawn_link(Node, fun() ->
                                    random:seed(erlang:phash2([node()]),
                                                erlang:monotonic_time(),
                                                erlang:unique_integer()),
-                                    Random = random:uniform(length(ClientList)),
                                     MSeconds = random:uniform(10),
                                     timer:sleep(MSeconds),
-                                    Pid = lists:nth(Random, ClientList),
                                     Pid ! {runner, view_ad},
                                     case EventId rem ?FREQ == 0 of
                                         true ->

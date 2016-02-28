@@ -175,7 +175,8 @@ clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetT
 %%      synchronization.
 terminate(#state{client_list=ClientList}=State) ->
     TerminateFun = fun(Pid) ->
-            Pid ! {runner, terminate},
+            lager:info("Terminating: ~p...", [Pid]),
+            Pid ! {runner, terminate}
             %% Message might be queued, if synchronization is in
             %% progress, which would trigger a race with shutdown, so
             %% wait for the client to explicitly ack the terminate call.

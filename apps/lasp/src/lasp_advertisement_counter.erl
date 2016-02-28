@@ -179,10 +179,11 @@ terminate(#state{client_list=ClientList}=State) ->
             %% Message might be queued, if synchronization is in
             %% progress, which would trigger a race with shutdown, so
             %% wait for the client to explicitly ack the terminate call.
-            receive
-                {runner, terminate_done} ->
-                    ok
-            end
+            % receive
+            %     {runner, terminate_done} ->
+            %         lager:info("Terminated!"),
+            %         ok
+            % end
     end,
     lists:foreach(TerminateFun, ClientList),
     lasp_transmission_instrumentation:stop(client),

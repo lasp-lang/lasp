@@ -45,7 +45,7 @@ run(Args) ->
 %% Macro definitions.
 
 %% The maximum number of impressions for each advertisement to display.
--define(MAX_IMPRESSIONS, 100).
+-define(MAX_IMPRESSIONS, 50000).
 
 %% Log frequency.
 -define(FREQ, 50000).

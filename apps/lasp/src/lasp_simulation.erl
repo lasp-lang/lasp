@@ -95,9 +95,14 @@ run(Module, Args) ->
                     lager:info("Summarizing results!"),
                     {ok, Term} = Module:summarize(State4),
 
+                    lager:info("Processes before termination: ~p",
+                               [length(processes())]),
+
                     Pid ! {ok, Term}
                end),
     receive
         {ok, Term} ->
+            lager:info("Processes after termination: ~p",
+                       [length(processes())]),
             {ok, Term}
     end.

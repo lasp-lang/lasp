@@ -283,7 +283,7 @@ bind(Id, Value0) ->
             ok;
         _ ->
             {Time, _} = timer:tc(?MODULE, broadcast, [{Id, Type, Metadata, BroadcastState}]),
-            Normalized = Time / 1000,
+            Normalized = Time / 10000,
             case Normalized > 0 of
                 true ->
                     lager:info("Broadcast took: ~p", [Normalized]);

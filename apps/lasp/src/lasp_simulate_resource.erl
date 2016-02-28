@@ -81,7 +81,7 @@ log_dir(Log) ->
 %% @private
 advertisement_counter_transmission_simulation(Nodes) ->
 
-    %% Run the simulation with the orset, gcounter, no deltas; 1s sync.
+    %% Run the simulation with the orset, gcounter, no deltas; 500ms sync.
     {ok, [DivergenceFilename1,
           ClientFilename1|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
@@ -92,8 +92,8 @@ advertisement_counter_transmission_simulation(Nodes) ->
                                                      ?NUM_CLIENTS,
                                                      500]),
 
-    %% Run the simulation with the orset, gcounter, deltas enabled; 1s
-    %% sync.
+    %% Run the simulation with the orset, gcounter, deltas enabled;
+    %% 500ms sync.
     {ok, [_,
           ClientFilename2|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
@@ -104,7 +104,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
                                                      ?NUM_CLIENTS,
                                                      500]),
 
-    %% Run the simulation with the orset, gcounter, no deltas; 5s sync.
+    %% Run the simulation with the orset, gcounter, no deltas; 1s sync.
     {ok, [DivergenceFilename2
           |_]} = lasp_simulation:run(lasp_advertisement_counter,
                                     [Nodes,

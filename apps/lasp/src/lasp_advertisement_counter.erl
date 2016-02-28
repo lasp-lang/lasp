@@ -311,6 +311,13 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
                 end, AdIds).
 
 %% @doc Periodically synchronize state with the server.
+%%
+%%      Periodic synchronization serves as the anti-entropy process with
+%%      clients; we can't assume delta delivery for clients when they go
+%%      offline, unless we keep a global counter of the
+%%      greatest-lower-bound across all clients for delta delivery,
+%%      which assumes we understand the client topology.
+%%
 synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
     %% Get latest list of advertisements from the server.
     {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
@@ -335,33 +342,52 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
 
     %% Bind our latest values with the server process.
     %%
-    %% 1.) Send our dictionary of values to server.
-    %% 2.) Server computes a bind operation with the incoming value.
-    %% 3.) Server returns the merged value to the client.
+    %% 1.) Iterate our dictionary, and upload any state/deltas pending.
+    %%     Store returned value from the server.
+    %% 2.) If the item in our dictionary is no longer part of the server
+    %%     state, prune it by identifier.
     %%
     SyncFun = fun(Ad, Counter0, Acc) ->
-                    %% Log transmission of the local delta (or state).
-                    log_transmission(Counter0),
+                      Counter = case application:get_env(?APP, delta_mode, false) of
+                          true ->
+                              case dict:find(Ad, CountersDelta0) of
+                                  {ok, Delta} ->
+                                      %% Log transmission of the local delta.
+                                      log_transmission(Delta),
 
-                    {ok, {_, _, _, Counter}} = lasp:bind(Ad, Counter0),
+                                      {ok, {_, _, _, Counter1}} = lasp:bind(Ad, Delta),
 
-                    %% Log receipt of information from the server.
-                    log_transmission(Counter),
+                                      %% Log receipt of information from the server.
+                                      log_transmission(Counter1),
 
-                    case lists:member(Ad, Identifiers) of
-                        true ->
-                            dict:store(Ad, Counter, Acc);
-                        false ->
-                            Acc
-                    end
+                                      %% Return server value.
+                                      Counter1;
+                                  _ ->
+                                      %% Transmit nothing.
+                                      Counter0
+                              end;
+                          false ->
+                              %% @todo Optimize.
+
+                              %% Log transmission of the local delta (or state).
+                              log_transmission(Counter0),
+
+                              {ok, {_, _, _, Counter1}} = lasp:bind(Ad, Counter0),
+
+                              %% Log receipt of information from the server.
+                              log_transmission(Counter1),
+
+                              Counter1
+                      end,
+
+                      case lists:member(Ad, Identifiers) of
+                          true ->
+                              dict:store(Ad, Counter, Acc);
+                          false ->
+                              Acc
+                      end
               end,
-    Dictionary = case application:get_env(?APP, delta_mode, false) of
-        true ->
-            CountersDelta0;
-        false ->
-            Counters
-    end,
-    Counters1 = dict:fold(SyncFun, dict:new(), Dictionary),
+    Counters1 = dict:fold(SyncFun, dict:new(), Counters),
 
     {ok, AdsWithContracts, Counters1}.
 

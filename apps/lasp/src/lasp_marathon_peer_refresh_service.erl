@@ -102,8 +102,8 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
     timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE),
 
     Nodes = case request() of
-        {ok, Response} ->
-            generate_nodes(Response);
+        {ok, {{_, 200, _}, _, Body}} ->
+            generate_nodes(Body);
         _ ->
             SeenNodes
     end,

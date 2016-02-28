@@ -211,12 +211,14 @@ simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
                                     case EventId rem ?FREQ == 0 of
                                         true ->
                                             MemoryData = {_, _, {BadPid, _}} = memsup:get_memory_data(),
+                                            lager:info("-----------------------------------------------------------", []),
                                             lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
                                             lager:info("Worst: ~p", [process_info(BadPid)]),
                                             lager:info("Memory Data: ~p", [MemoryData]),
                                             lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
                                             lager:info("Local process count: ~p", [length(processes())]),
-                                            lager:info("Events dispatched: ~p", [EventId]);
+                                            lager:info("Events dispatched: ~p", [EventId]),
+                                            lager:info("-----------------------------------------------------------", []);
                                         false ->
                                             ok
                                     end

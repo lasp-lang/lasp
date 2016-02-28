@@ -103,7 +103,9 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
 
     Nodes = case request() of
         {ok, {{_, 200, _}, _, Body}} ->
-            generate_nodes(Body);
+            Nodes1 = generate_nodes(Body),
+            lager:info("Nodes in Marathon response: ~p", [Nodes1]),
+            Nodes1;
         _ ->
             SeenNodes
     end,

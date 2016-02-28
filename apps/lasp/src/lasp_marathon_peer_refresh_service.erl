@@ -188,10 +188,10 @@ request() ->
     IP = os:getenv("IP", "127.0.0.1"),
     DCOS = os:getenv("DCOS", "false"),
     Url = case DCOS of
-              "true" ->
-                "http://" ++ IP ++ "/marathon/v2/apps/lasp?embed=app.taskStats";
+              "false" ->
+                "http://" ++ IP ++ ":8080/v2/apps/lasp?embed=app.taskStats";
               _ ->
-                "http://" ++ IP ++ ":8080/v2/apps/lasp?embed=app.taskStats"
+                DCOS ++ "/marathon/v2/apps/lasp?embed=app.taskStats"
           end,
     case httpc:request(get, {Url, []}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, Body}} ->

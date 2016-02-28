@@ -103,7 +103,10 @@ init(_Args) ->
     case SimEnabled of
         true ->
             Nodes = [node()],
-            spawn_link(lasp_simulate_resource, run, [Nodes]);
+            spawn(fun() ->
+                        timer:sleep(10000),
+                        lasp_simulate_resource:run(Nodes)
+                  end);
         false ->
             ok
     end,

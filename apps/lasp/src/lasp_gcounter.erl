@@ -91,22 +91,14 @@ update(increment, Actor, GCnt) ->
 update({increment, Amount}, Actor, GCnt) when is_integer(Amount), Amount > 0 ->
     {ok, increment_by(Amount, Actor, GCnt)}.
 
-update_delta(increment, Actor, GCnt) ->
-    CurValue = case orddict:find(Actor, GCnt) of
-                    {ok, Value} ->
-                        Value;
-                    error ->
-                        0
-               end,
-    {ok, {delta, increment_by(Actor, CurValue + 1, orddict:new())}};
-update_delta({increment, Amount}, Actor, GCnt) when is_integer(Amount), Amount > 0 ->
-    CurValue = case orddict:find(Actor, GCnt) of
-                    {ok, Value} ->
-                        Value;
-                    error ->
-                        0
-               end,
-    {ok, {delta, increment_by(Actor, CurValue + Amount, orddict:new())}}.
+update_delta(Op, Actor, GCnt) ->
+    {ok, Delta} = case orddict:find(Actor, GCnt) of
+                      {ok, Value} ->
+                          update(Op, Actor, orddict:store(Actor, Value, orddict:new()));
+                      error ->
+                          update(Op, Actor, orddict:new())
+                  end,
+    {ok, {delta, Delta}}.
 
 -spec update(gcounter_op(), riak_dt:actor(), gcounter(), riak_dt:context()) ->
                     {ok, gcounter()}.

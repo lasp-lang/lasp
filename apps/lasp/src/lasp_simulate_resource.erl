@@ -55,13 +55,12 @@ run(Nodes) ->
     ok.
 
 %% @private
-output_file() ->
-    string:join([plot_dir() ++  "/advertisement_counter_transmission",
+output_file(Plot) ->
+    string:join([plot_dir() ++  "/advertisement_counter_" ++ atom_to_list(Plot),
                 atom_to_list(?ORSET),
                 atom_to_list(?COUNTER),
                 integer_to_list(?NUM_EVENTS),
-                integer_to_list(?NUM_CLIENTS),
-                integer_to_list(?SYNC_INTERVAL) ++ ".pdf"], "-").
+                integer_to_list(?NUM_CLIENTS) ++ ".pdf"], "-").
 
 %% @private
 priv_dir() ->
@@ -82,25 +81,39 @@ log_dir(Log) ->
 %% @private
 advertisement_counter_transmission_simulation(Nodes) ->
 
-    %% Run the simulation with the orset, gcounter, no deltas.
-    {ok, [ClientFilename1|_]} = lasp_simulation:run(lasp_advertisement_counter,
+    %% Run the simulation with the orset, gcounter, no deltas; 1s sync.
+    {ok, [DivergenceFilename1,
+          ClientFilename1|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
                                                      false,
                                                      ?ORSET,
                                                      ?COUNTER,
                                                      ?NUM_EVENTS,
                                                      ?NUM_CLIENTS,
-                                                     ?SYNC_INTERVAL]),
+                                                     500]),
 
-    %% Run the simulation with the orset, gcounter, deltas enabled.
-    {ok, [ClientFilename2|_]} = lasp_simulation:run(lasp_advertisement_counter,
+    %% Run the simulation with the orset, gcounter, deltas enabled; 1s
+    %% sync.
+    {ok, [_,
+          ClientFilename2|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
                                                      true,
                                                      ?ORSET,
                                                      ?COUNTER,
                                                      ?NUM_EVENTS,
                                                      ?NUM_CLIENTS,
-                                                     ?SYNC_INTERVAL]),
+                                                     500]),
+
+    %% Run the simulation with the orset, gcounter, no deltas; 5s sync.
+    {ok, [DivergenceFilename2
+          |_]} = lasp_simulation:run(lasp_advertisement_counter,
+                                    [Nodes,
+                                     false,
+                                     ?ORSET,
+                                     ?COUNTER,
+                                     ?NUM_EVENTS,
+                                     ?NUM_CLIENTS,
+                                     1000]),
 
     %% Plot both graphs.
     Bin = case os:getenv("MESOS_TASK_ID", "false") of
@@ -110,17 +123,25 @@ advertisement_counter_transmission_simulation(Nodes) ->
             "/usr/bin/gnuplot"
     end,
 
-    OutputFile = output_file(),
-
-    GnuPlot = plot_dir() ++ "/advertisement_counter_transmission.gnuplot",
-
-    Command = Bin ++
+    TransmissionOutputFile = output_file(transmission),
+    TransmissionPlot = plot_dir() ++ "/advertisement_counter_transmission.gnuplot",
+    TransmissionCommand = Bin ++
         " -e \"inputfile1='" ++ log_dir(ClientFilename1) ++
         "'; inputfile2='" ++ log_dir(ClientFilename2) ++
-        "'; outputname='" ++ OutputFile ++ "'\" " ++ GnuPlot,
+        "'; outputname='" ++ TransmissionOutputFile ++ "'\" " ++ TransmissionPlot,
+    TransmissionResult = os:cmd(TransmissionCommand),
+    lager:info("Generating transmission plot: ~p; output: ~p",
+               [TransmissionCommand, TransmissionResult]),
 
-    Result = os:cmd(Command),
-    lager:info("Generating plot: ~p; output: ~p", [Command, Result]),
+    DivergenceOutputFile = output_file(divergence),
+    DivergencePlot = plot_dir() ++ "/advertisement_counter_divergence.gnuplot",
+    DivergenceCommand = Bin ++
+        " -e \"inputfile1='" ++ log_dir(DivergenceFilename1) ++
+        "'; inputfile2='" ++ log_dir(DivergenceFilename2) ++
+        "'; outputname='" ++ DivergenceOutputFile ++ "'\" " ++ DivergencePlot,
+    DivergenceResult = os:cmd(DivergenceCommand),
+    lager:info("Generating divergence plot: ~p; output: ~p",
+               [DivergenceCommand, DivergenceResult]),
 
     ok.
 

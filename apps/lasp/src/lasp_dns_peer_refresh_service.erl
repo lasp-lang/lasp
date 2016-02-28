@@ -21,7 +21,7 @@
 %% @doc Read configuration information from Mesos DNS and auto-cluster
 %%      Erlang nodes based on this.
 
--module(lasp_peer_refresh_service).
+-module(lasp_dns_peer_refresh_service).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).

@@ -197,9 +197,9 @@ terminate(#state{client_list=ClientList}=State) ->
 %% @doc Simulate clients viewing advertisements.
 simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
     %% Start the simulation.
-    spawn(fun() ->
+    spawn_link(fun() ->
                 Viewer = fun(EventId) ->
-                        spawn(fun() ->
+                        spawn_link(fun() ->
                                    random:seed(erlang:phash2([node()]),
                                                erlang:monotonic_time(),
                                                erlang:unique_integer()),

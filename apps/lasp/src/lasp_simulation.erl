@@ -63,33 +63,41 @@
 %%         you like some help?
 %%
 run(Module, Args) ->
-    lager:info("Initializing simulation!"),
-    {ok, State} = Module:init(Args),
+    Pid = self(),
 
-    %% Unfortunately, we have to wait for the cluster to stabilize, else
-    %% some of the clients running at other node will get not_found
-    %% operations.
-    lager:info("Waiting for cluster to stabilize..."),
-    timer:sleep(2000),
+    spawn_link(fun() ->
+                    lager:info("Initializing simulation!"),
+                    {ok, State} = Module:init(Args),
 
-    %% Launch client processes.
-    lager:info("Launching clients!"),
-    {ok, State1} = Module:clients(State),
+                    %% Unfortunately, we have to wait for the cluster to stabilize, else
+                    %% some of the clients running at other node will get not_found
+                    %% operations.
+                    lager:info("Waiting for cluster to stabilize..."),
+                    timer:sleep(2000),
 
-    %% Initialize simulation.
-    lager:info("Running simulation!"),
-    {ok, State2} = Module:simulate(State1),
+                    %% Launch client processes.
+                    lager:info("Launching clients!"),
+                    {ok, State1} = Module:clients(State),
 
-    %% Wait until we receive num events.
-    lager:info("Waiting for event generation to complete!"),
-    {ok, State3} = Module:wait(State2),
+                    %% Initialize simulation.
+                    lager:info("Running simulation!"),
+                    {ok, State2} = Module:simulate(State1),
 
-    %% Terminate all clients.
-    lager:info("Terminating clients!"),
-    {ok, State4} = Module:terminate(State3),
+                    %% Wait until we receive num events.
+                    lager:info("Waiting for event generation to complete!"),
+                    {ok, State3} = Module:wait(State2),
 
-    %% Finish and summarize.
-    lager:info("Summarizing results!"),
-    {ok, Term} = Module:summarize(State4),
+                    %% Terminate all clients.
+                    lager:info("Terminating clients!"),
+                    {ok, State4} = Module:terminate(State3),
 
-    {ok, Term}.
+                    %% Finish and summarize.
+                    lager:info("Summarizing results!"),
+                    {ok, Term} = Module:summarize(State4),
+
+                    Pid ! {ok, Term}
+               end),
+    receive
+        {ok, Term} ->
+            {ok, Term}
+    end.

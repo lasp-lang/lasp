@@ -99,7 +99,7 @@ handle_call({buffer, Events, _Node}, _From, #state{events=Events0, total=Total0}
 
 handle_call({flush, Events, _Node}, _From, #state{events=Events0,
                                                   total_dec=TotalDec0}=State) ->
-    lager:info("Decrements by ~p, totals ~p ~p", [Events, Events0 - Events, TotalDec0 + Events]),
+    % lager:info("Decrements by ~p, totals ~p ~p", [Events, Events0 - Events, TotalDec0 + Events]),
     {reply, ok, State#state{events=Events0 - Events, total_dec=TotalDec0 + Events}};
 
 handle_call({start, Filename, Clients}, _From, State) ->

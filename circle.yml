@@ -1,0 +1,20 @@
+machine:
+  environment:
+    PATH: ${HOME}/extras/bin:${HOME}/extras/otp/18.1/bin:${PATH}
+dependencies:
+  pre:
+    - curl -O -L https://raw.githubusercontent.com/yrashk/kerl/master/kerl && chmod 755 kerl
+    - if [ ! -d ~/extras/otp/18.1 ]; then ./kerl build 18.1 18.1; ./kerl install 18.1 ~/extras/otp/18.1; fi
+  override:
+    - make
+
+test:
+  override:
+    - make eunit
+    - make ct
+    - make lint
+    - make dialyzer
+    - make xref
+  post:
+    - mkdir -p $CIRCLE_TEST_REPORTS/
+    - mv TEST-*.xml $CIRCLE_TEST_REPORTS

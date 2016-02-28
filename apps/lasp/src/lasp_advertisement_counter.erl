@@ -24,10 +24,12 @@
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -export([run/1,
-         client/8,
+         client/9,
          server/2]).
 
 -behaviour(lasp_simulation).
+
+-include("lasp.hrl").
 
 %% lasp_simulation callbacks
 -export([init/1,
@@ -45,6 +47,9 @@ run(Args) ->
 %% The maximum number of impressions for each advertisement to display.
 -define(MAX_IMPRESSIONS, 100).
 
+%% Log frequency.
+-define(FREQ, 50000).
+
 %% Record definitions.
 
 -record(ad, {id, image, counter}).
@@ -52,6 +57,7 @@ run(Args) ->
 -record(contract, {id}).
 
 -record(state, {runner,
+                nodes,
                 ads,
                 ad_list,
                 ads_with_contracts,
@@ -61,13 +67,17 @@ run(Args) ->
                 counter_type,
                 num_events,
                 num_clients,
-                sync_interval}).
+                sync_interval,
+                filenames}).
 
 %% Callback functions.
 
 %% @doc Setup lists of advertisements and lists of contracts for
 %%      advertisements.
-init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
+init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
+    %% Enable or disable deltas.
+    ok = application:set_env(?APP, delta_mode, Deltas),
+
     %% Get the process identifier of the runner.
     Runner = self(),
 
@@ -103,15 +113,28 @@ init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
     %% Launch server processes.
     servers(SetType, Ads, AdsWithContracts),
 
-    %% Initialize transmission instrumentation.
-    lasp_transmission_instrumentation:start(
-      atom_to_list(SetType) ++ "-" ++
-      atom_to_list(CounterType) ++ "-" ++
-      integer_to_list(NumEvents) ++ "-" ++
-      integer_to_list(NumClients) ++ "-" ++
-      integer_to_list(SyncInterval), NumClients),
+    %% Initialize client transmission instrumentation.
+    ClientFilename = string:join(["client",
+                                  atom_to_list(Deltas),
+                                  atom_to_list(SetType),
+                                  atom_to_list(CounterType),
+                                  integer_to_list(NumEvents),
+                                  integer_to_list(NumClients),
+                                  integer_to_list(SyncInterval)], "-") ++ ".csv",
+    ok = lasp_transmission_instrumentation:start(client, ClientFilename, NumClients),
+
+    %% Initialize server transmission instrumentation.
+    ServerFilename = string:join(["server",
+                                  atom_to_list(Deltas),
+                                  atom_to_list(SetType),
+                                  atom_to_list(CounterType),
+                                  integer_to_list(NumEvents),
+                                  integer_to_list(NumClients),
+                                  integer_to_list(SyncInterval)], "-") ++ ".csv",
+    ok = lasp_transmission_instrumentation:start(server, ServerFilename, NumClients),
 
     {ok, #state{runner=Runner,
+                nodes=Nodes,
                 ads=Ads,
                 ad_list=AdList,
                 ads_with_contracts=AdsWithContracts,
@@ -119,17 +142,20 @@ init([SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
                 counter_type=CounterType,
                 num_events=NumEvents,
                 num_clients=NumClients,
-                sync_interval=SyncInterval}}.
+                sync_interval=SyncInterval,
+                filenames=[ClientFilename, ServerFilename]}}.
 
 %% @doc Launch a series of client processes, each of which is responsible
 %% for displaying a particular advertisement.
-clients(#state{runner=Runner, num_clients=NumClients, set_type=SetType,
+clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetType,
                counter_type=CounterType, sync_interval=SyncInterval,
                ads_with_contracts=AdsWithContracts}=State) ->
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
-    Clients = lists:map(fun(Id) ->
-                                spawn_link(?MODULE,
+    Clients = lists:map(fun(Node) ->
+                    lists:map(fun(Id) ->
+                                spawn_link(Node,
+                                           ?MODULE,
                                            client,
                                            [SetType,
                                             CounterType,
@@ -138,34 +164,63 @@ clients(#state{runner=Runner, num_clients=NumClients, set_type=SetType,
                                             Id,
                                             AdsWithContracts,
                                             undefined,
+                                            dict:new(),
                                             dict:new()])
-                                end, lists:seq(1, NumClients)),
-    {ok, State#state{client_list=Clients}}.
-
+                                end, lists:seq(1, NumClients))
+        end, Nodes),
+    Clients1 = lists:flatten(Clients),
+    {ok, State#state{client_list=Clients1}}.
 
 %% @doc Terminate any running clients gracefully issuing final
 %%      synchronization.
 terminate(#state{client_list=ClientList}=State) ->
-    TerminateFun = fun(Pid) -> Pid ! terminate end,
-    lists:map(TerminateFun, ClientList),
+    TerminateFun = fun(Pid) ->
+            lager:info("Terminating: ~p...", [Pid]),
+            Pid ! {runner, terminate}
+            %% Message might be queued, if synchronization is in
+            %% progress, which would trigger a race with shutdown, so
+            %% wait for the client to explicitly ack the terminate call.
+            % receive
+            %     {runner, terminate_done} ->
+            %         lager:info("Terminated!"),
+            %         ok
+            % end
+    end,
+    lists:foreach(TerminateFun, ClientList),
+    lasp_transmission_instrumentation:stop(client),
+    lasp_transmission_instrumentation:stop(server),
     {ok, State}.
 
 %% @doc Simulate clients viewing advertisements.
 simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
     %% Start the simulation.
-    Viewer = fun(_) ->
-            Random = random:uniform(length(ClientList)),
-
-            timer:sleep(10),
-
-            Pid = lists:nth(Random, ClientList),
-            Pid ! view_ad
-    end,
-    lists:foreach(Viewer, lists:seq(1, NumEvents)),
+    spawn(fun() ->
+                Viewer = fun(EventId) ->
+                        spawn(fun() ->
+                                   random:seed(erlang:phash2([node()]),
+                                               erlang:monotonic_time(),
+                                               erlang:unique_integer()),
+                                    Random = random:uniform(length(ClientList)),
+                                    MSeconds = random:uniform(10),
+                                    timer:sleep(MSeconds),
+                                    Pid = lists:nth(Random, ClientList),
+                                    Pid ! {runner, view_ad},
+                                    case EventId rem ?FREQ == 0 of
+                                        true ->
+                                            lager:info("Events dispatched: ~p",
+                                                       [EventId]);
+                                        false ->
+                                            ok
+                                    end
+                              end)
+                end,
+                lists:foreach(Viewer, lists:seq(1, NumEvents)),
+                lager:info("Simulation event generation complete!")
+          end),
     {ok, State}.
 
 %% @doc Summarize results.
-summarize(#state{num_clients=NumClients, ad_list=AdList}=State) ->
+summarize(#state{ad_list=AdList, filenames=Filenames}) ->
     %% Wait until all advertisements have been exhausted before stopping
     %% execution of the test.
     Overcounts = lists:map(fun(#ad{counter=CounterId}) ->
@@ -176,23 +231,25 @@ summarize(#state{num_clients=NumClients, ad_list=AdList}=State) ->
     Sum = fun(X, Acc) ->
             X + Acc
     end,
-    TotalOvercount = lists:foldl(Sum, 0, Overcounts),
-    io:format("----------------------------------------"),
-    io:format("Total overcount: ~p~n", [TotalOvercount]),
-    io:format("Mean overcount per client: ~p~n",
-              [TotalOvercount / NumClients]),
-    io:format("----------------------------------------"),
-
-    {ok, State}.
+    _TotalOvercount = lists:foldl(Sum, 0, Overcounts),
+    {ok, Filenames}.
 
 %% @doc Wait for all events to be delivered in the system.
 wait(#state{count_events=Count, num_events=NumEvents}=State) ->
     receive
-        view_ad ->
+        {runner, view_ad_complete} ->
             case Count >= NumEvents of
                 true ->
+                    lager:info("Events all processed!"),
                     {ok, State};
                 false ->
+                    case Count rem ?FREQ == 0 of
+                        true ->
+                            lager:info("Event ~p of ~p processed",
+                                       [Count, NumEvents]);
+                        false ->
+                            ok
+                    end,
                     wait(State#state{count_events=Count + 1})
             end
     end.
@@ -209,31 +266,26 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
     {ok, _} = lasp:update(Ads, {remove, Ad}, Ad).
 
 %% @doc Client process; standard recurisve looping server.
-client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0) ->
+client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
     receive
-        terminate ->
+        {runner, terminate} ->
+            Runner ! {runner, terminate_done},
             ok;
-        view_ad ->
-            Counters = case dict:size(Counters0) of
-                0 ->
-                    Counters0;
-                _ ->
-                    %% Select a random advertisement from the list of
-                    %% active advertisements.
-                    Random = random:uniform(dict:size(Counters0)),
-                    {Ad, Counter0} = lists:nth(Random, dict:to_list(Counters0)),
-                    {ok, Counter} = CounterType:update(increment, Id, Counter0),
-                    dict:store(Ad, Counter, Counters0)
-            end,
+        {runner, view_ad} ->
+            {ok, {Counters, CountersDelta}} = view_ad(CounterType, Id, Counters0, CountersDelta0),
 
             %% Notify the harness that an event has been processed.
-            Runner ! view_ad,
+            Runner ! {runner, view_ad_complete},
 
-            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters)
+            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts0, Counters, CountersDelta)
     after
         SyncInterval ->
-            {ok, AdsWithContracts, Counters} = synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0),
-            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts, Counters)
+            {ok, AdsWithContracts, Counters} = synchronize(SetType,
+                                                           AdsWithContractsId,
+                                                           AdsWithContracts0,
+                                                           Counters0,
+                                                           CountersDelta0),
+            client(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId, AdsWithContracts, Counters, dict:new())
     end.
 
 %% @doc Generate advertisements and advertisement contracts.
@@ -261,10 +313,16 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
                 end, AdIds).
 
 %% @doc Periodically synchronize state with the server.
-synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0) ->
+%%
+%%      Periodic synchronization serves as the anti-entropy process with
+%%      clients; we can't assume delta delivery for clients when they go
+%%      offline, unless we keep a global counter of the
+%%      greatest-lower-bound across all clients for delta delivery,
+%%      which assumes we understand the client topology.
+%%
+synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
     %% Get latest list of advertisements from the server.
-    Term1 = {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
-    log_transmission(Term1),
+    {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
     AdList = SetType:value(AdsWithContracts),
     Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
@@ -276,8 +334,7 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0) ->
     RefreshFun = fun({#ad{counter=Ad}, _}, Acc) ->
                       case dict:is_key(Ad, Acc) of
                           false ->
-                              Term2 = {ok, {_, _, _, Counter}} = lasp:read(Ad, undefined),
-                              log_transmission(Term2),
+                              {ok, {_, _, _, Counter}} = lasp:read(Ad, undefined),
                               dict:store(Ad, Counter, Acc);
                           true ->
                               Acc
@@ -287,19 +344,48 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0) ->
 
     %% Bind our latest values with the server process.
     %%
-    %% 1.) Send our dictionary of values to server.
-    %% 2.) Server computes a bind operation with the incoming value.
-    %% 3.) Server returns the merged value to the client.
+    %% 1.) Iterate our dictionary, and upload any state/deltas pending.
+    %%     Store returned value from the server.
+    %% 2.) If the item in our dictionary is no longer part of the server
+    %%     state, prune it by identifier.
     %%
     SyncFun = fun(Ad, Counter0, Acc) ->
-                    Term3 = {ok, {_, _, _, Counter}} = lasp:bind(Ad, Counter0),
-                    log_transmission(Term3),
-                    case lists:member(Ad, Identifiers) of
-                        true ->
-                            dict:store(Ad, Counter, Acc);
-                        false ->
-                            Acc
-                    end
+                      Counter = case application:get_env(?APP, delta_mode, false) of
+                          true ->
+                              case dict:find(Ad, CountersDelta0) of
+                                  {ok, Delta} ->
+                                      %% Log transmission of the local delta.
+                                      log_transmission(Delta),
+
+                                      {ok, {_, _, _, Counter1}} = lasp:bind(Ad, Delta),
+
+                                      %% Log receipt of information from the server.
+                                      log_transmission(Counter1),
+
+                                      %% Return server value.
+                                      Counter1;
+                                  _ ->
+                                      %% Transmit nothing.
+                                      Counter0
+                              end;
+                          false ->
+                              %% Log transmission of the local delta (or state).
+                              log_transmission(Counter0),
+
+                              {ok, {_, _, _, Counter1}} = lasp:bind(Ad, Counter0),
+
+                              %% Log receipt of information from the server.
+                              log_transmission(Counter1),
+
+                              Counter1
+                      end,
+
+                      case lists:member(Ad, Identifiers) of
+                          true ->
+                              dict:store(Ad, Counter, Acc);
+                          false ->
+                              Acc
+                      end
               end,
     Counters1 = dict:fold(SyncFun, dict:new(), Counters),
 
@@ -325,4 +411,64 @@ servers(SetType, Ads, AdsWithContracts) ->
 
 %% @private
 log_transmission(Term) ->
-    lasp_transmission_instrumentation:log(Term).
+    case application:get_env(?APP, instrumentation, false) of
+        true ->
+            lasp_transmission_instrumentation:log(client, Term, node());
+        false ->
+            ok
+    end.
+
+%% @private
+view_ad(CounterType, Id, Counters0, CountersDelta0) ->
+    case dict:size(Counters0) of
+        0 ->
+            {ok, {Counters0, CountersDelta0}};
+        _ ->
+            %% Select a random advertisement from the list of
+            %% active advertisements.
+            Random = random:uniform(dict:size(Counters0)),
+            {Ad, Counter0} = lists:nth(Random, dict:to_list(Counters0)),
+            view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0)
+    end.
+
+%% @private
+view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
+    case application:get_env(?APP, delta_mode, false) of
+        true ->
+            %% If deltas are enabled, then we maintain two pieces of
+            %% state: a.) local dictionary of state, and b.) local
+            %% dictionary of delta intervals waiting to be transmitted
+            %% to the central datacenter.
+
+            %% First, always ensure that our counter is merged up with
+            %% the delta interval before doing any work; if we don't
+            %% have a delta for the object, assume bottom.
+            CounterDelta0 = case dict:find(Ad, CountersDelta0) of
+                           {ok, PreviousDelta} ->
+                               PreviousDelta;
+                           error ->
+                               CounterType:new()
+                       end,
+            MergedCounter = CounterType:merge(CounterDelta0, Counter0),
+
+            %% Generate delta for current operation from new state.
+            {ok, {delta, Delta}} = CounterType:update_delta(increment, Id, MergedCounter),
+            %% Merge new delta with old delta and store in interval
+            %% dictionary for next synchronization interval.
+            CounterDelta = CounterType:merge(Delta, CounterDelta0),
+
+            %% Merge new delta into old state and store in the state
+            %% dictionary.
+            Counter = CounterType:merge(MergedCounter, CounterDelta),
+
+            %% At this point we should have a new delta interval
+            %% computed and a new state, so update dictionaries
+            %% accordingly.
+            {ok, {dict:store(Ad, Counter, Counters0),
+                  dict:store(Ad, CounterDelta, CountersDelta0)}};
+        false ->
+            %% If deltas are disabled, then just create a new copy of
+            %% the object and store it in the local nodes dictionary.
+            {ok, Counter} = CounterType:update(increment, Id, Counter0),
+            {ok, {dict:store(Ad, Counter, Counters0), CountersDelta0}}
+    end.

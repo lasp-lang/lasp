@@ -29,7 +29,7 @@
 -behaviour(riak_dt).
 
 %% API
--export([new/0, value/1, update/3, merge/2, equal/2,
+-export([new/0, value/1, update/3, update_delta/3, merge/2, equal/2,
          to_binary/1, from_binary/1, value/2, precondition_context/1, stats/1, stat/2]).
 -export([update/4, parent_clock/2]).
 -export([to_binary/2]).
@@ -128,6 +128,10 @@ update({remove_all, Elems}, _Actor, ORSet0) ->
     remove_elems(Elems, ORSet0);
 update({update, Ops}, Actor, ORSet) ->
     apply_ops(Ops, Actor, ORSet).
+
+update_delta(Op, Actor, ORSet) ->
+    %% update_delta() is not implemented.
+    update(Op, Actor, ORSet).
 
 -spec update(orset_op(), actor(), orset(), riak_dt:context()) ->
     {ok, orset()} | {error, {precondition, {not_present, member()}}}.

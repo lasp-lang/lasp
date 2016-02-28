@@ -17,6 +17,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <script src="//code.jquery.com/jquery-1.12.0.min.js"></script>
     <script src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+    <script type="text/javascript" src="js/pdfobject.js"></script>
     <link rel="icon" type="image/vnd.microsoft.icon" href="/favicon.ico" />
 
     <style type="text/css">
@@ -57,6 +58,18 @@
     </style>
 
     <style type="text/css">
+      li.plot {
+          height: 250px;
+      }
+
+      .middle {
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
+        height: 50px;
+          margin-bottom: 10px;
+      }
+
       .centered {
         position: fixed;
         top: 50%;
@@ -69,10 +82,26 @@
   </head>
   <body>
     <div class="container">
-      <div class="row">
+      <div class="header" id="header">
+        <img class="middle" src="images/lasp-logo-large.png" alt="Lasp logo">
+      </div>
+      <div class="row" id="graph">
+        <h3>Topology</h3>
         <div id="topology" class="col-md-12"></div>
       </div>
-      <div class="row">
+      <div class="row" id="controls">
+        <div class="col-md-4">
+          <h3>Controls</h3>
+          <ul><li><a href="/api/simulate">Simulate!</a></li></ul>
+        </div>
+        <div class="col-md-4">
+          <h3>Logs</h3>
+          <ul id="logs"></ul>
+        </div>
+        <div class="col-md-4">
+          <h3>Plots</h3>
+          <ul id="plots"></ul>
+        </div>
       </div>
       <div id="logo">
         <img class="centered" src="images/lasp-logo-large.png" alt="Lasp logo">

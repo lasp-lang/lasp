@@ -31,6 +31,7 @@
 -export([new/0,
          value/1,
          update/3,
+         update_delta/3,
          merge/2,
          equal/2,
          to_binary/1,
@@ -86,6 +87,10 @@ update({snd, Update}, Actor, {{FstType, Fst}, {SndType, Snd}}) ->
         Error ->
             Error
     end.
+
+update_delta(Op, Actor, Pair) ->
+    %% update_delta() is not implemented.
+    update(Op, Actor, Pair).
 
 %% @doc Determine if pairs are equivalent.
 -spec equal(pair(), pair()) -> boolean().

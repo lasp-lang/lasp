@@ -29,7 +29,7 @@
 -behaviour(riak_dt).
 
 %% API
--export([new/0, value/1, update/3, merge/2, equal/2,
+-export([new/0, value/1, update/3, update_delta/3, merge/2, equal/2,
          to_binary/1, from_binary/1, value/2, precondition_context/1,
          stats/1, stat/2]).
 -export([update/4, parent_clock/2]).
@@ -100,6 +100,7 @@ value(_, ORSet) ->
     value(ORSet).
 
 -spec update(orset_op(), actor(), orset()) -> {ok, orset()} |
+                                              {ok, {delta, orset()}} |
                                               {error, {precondition, {not_present, member()}}}.
 update({add_by_token, Token, Elem}, _Actor, ORDict) ->
     add_elem(Elem, Token, ORDict);
@@ -117,6 +118,26 @@ update({remove, Elem}, _Actor, ORDict) ->
 update({remove_all, Elems}, _Actor, ORDict0) ->
     remove_elems(Elems, ORDict0);
 update({update, Ops}, Actor, ORDict) ->
+    apply_ops(Ops, Actor, ORDict).
+
+update_delta({add_by_token, Token, Elem}, _Actor, _ORDict) ->
+    {ok, DeltaORDict} = add_elem(Elem, Token, orddict:new()),
+    {ok, {delta, DeltaORDict}};
+update_delta({add, Elem}, Actor, _ORDict) ->
+    Token = unique(Actor),
+    {ok, DeltaORDict} = add_elem(Elem, Token, orddict:new()),
+    {ok, {delta, DeltaORDict}};
+update_delta({add_all, Elems}, Actor, _ORDict0) ->
+    OD = lists:foldl(fun(Elem, ORDict) ->
+                {ok, ORDict1} = update({add, Elem}, Actor, ORDict),
+                ORDict1
+            end, orddict:new(), Elems),
+    {ok, {delta, OD}};
+update_delta({remove, Elem}, _Actor, ORDict) ->
+    remove_elem(Elem, ORDict, orddict:new());
+update_delta({remove_all, Elems}, _Actor, ORDict0) ->
+    remove_elems(Elems, ORDict0, orddict:new());
+update_delta({update, Ops}, Actor, ORDict) ->
     apply_ops(Ops, Actor, ORDict).
 
 -spec update(orset_op(), actor(), orset(), riak_dt:context()) ->
@@ -303,6 +324,25 @@ minimum_tokens(Tokens) ->
     orddict:filter(fun(_Token, Removed) ->
             not Removed
         end, Tokens).
+
+remove_elem(Elem, ORDict, DeltaORDict) ->
+    case orddict:find(Elem, ORDict) of
+        {ok, Tokens} ->
+            Tokens1 = orddict:fold(fun(Token, _, Tokens0) ->
+                                           orddict:store(Token, true, Tokens0)
+                                   end, orddict:new(), Tokens),
+            {ok, {delta, orddict:store(Elem, Tokens1, DeltaORDict)}};
+        error ->
+            {error, {precondition, {not_present, Elem}}}
+    end.
+
+remove_elems([], _ORDict, DeltaORDict) ->
+    {ok, {delta, DeltaORDict}};
+remove_elems([Elem|Rest], ORDict, DeltaORDict) ->
+    case remove_elem(Elem, ORDict, DeltaORDict) of
+        {ok, {delta, DeltaORDict1}} -> remove_elems(Rest, ORDict, DeltaORDict1);
+        Error         -> Error
+    end.
 
 %% ===================================================================
 %% EUnit tests

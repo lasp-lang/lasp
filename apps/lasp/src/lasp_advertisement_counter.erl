@@ -212,18 +212,7 @@ simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
     {ok, State}.
 
 %% @doc Summarize results.
-summarize(#state{ad_list=AdList, filenames=Filenames}) ->
-    %% Wait until all advertisements have been exhausted before stopping
-    %% execution of the test.
-    Overcounts = lists:map(fun(#ad{counter=CounterId}) ->
-                {ok, V} = lasp:query(CounterId),
-                V - ?MAX_IMPRESSIONS
-        end, AdList),
-
-    Sum = fun(X, Acc) ->
-            X + Acc
-    end,
-    _TotalOvercount = lists:foldl(Sum, 0, Overcounts),
+summarize(#state{filenames=Filenames}) ->
     {ok, Filenames}.
 
 %% @doc Wait for all events to be delivered in the system.

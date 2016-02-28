@@ -9,7 +9,7 @@
      {registered,[]},
      {applications,
          [kernel,stdlib,riak_dt,gen_flow,lager,gb_trees_ext,lasp_support,sasl,
-          time_compat,webmachine,jsx]},
+          time_compat,webmachine,jsx,os_mon]},
      {mod,{lasp_app,[]}},
      {env,
          [{data_root,"data"},

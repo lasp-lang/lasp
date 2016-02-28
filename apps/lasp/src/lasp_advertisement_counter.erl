@@ -210,6 +210,9 @@ simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
                                     Pid ! {runner, view_ad},
                                     case EventId rem ?FREQ == 0 of
                                         true ->
+                                            MemoryData = {_, _, {Pid, _}} = memsup:get_memory_data(),
+                                            lager:info("Worst: ~p", [process_info(Pid)]),
+                                            lager:info("Memory Data: ~p", [MemoryData]),
                                             lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
                                             lager:info("Local process count: ~p", [length(processes())]),
                                             lager:info("Events dispatched: ~p", [EventId]);

@@ -30,8 +30,8 @@
 -include("lasp.hrl").
 -include_lib("webmachine/include/webmachine.hrl").
 
--define(NUM_EVENTS, 2000000).
--define(NUM_CLIENTS, 500).
+-define(NUM_EVENTS, 1000000).
+-define(NUM_CLIENTS_PER_VM, 500).
 
 -define(ORSET, lasp_orset).
 -define(COUNTER, lasp_gcounter).
@@ -60,7 +60,7 @@ run(Nodes) ->
 %                 atom_to_list(?ORSET),
 %                 atom_to_list(?COUNTER),
 %                 integer_to_list(?NUM_EVENTS),
-%                 integer_to_list(?NUM_CLIENTS) ++ ".pdf"], "-").
+%                 integer_to_list(?NUM_CLIENTS_PER_VM) ++ ".pdf"], "-").
 
 % %% @private
 % priv_dir() ->
@@ -88,7 +88,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
                                                      ?ORSET,
                                                      ?COUNTER,
                                                      ?NUM_EVENTS,
-                                                     ?NUM_CLIENTS,
+                                                     ?NUM_CLIENTS_PER_VM,
                                                      30000]),
 
     % %% Run the simulation with the orset, gcounter, deltas enabled;
@@ -100,7 +100,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
     %                                                  ?ORSET,
     %                                                  ?COUNTER,
     %                                                  ?NUM_EVENTS,
-    %                                                  ?NUM_CLIENTS,
+    %                                                  ?NUM_CLIENTS_PER_VM,
     %                                                  500]),
 
     % %% Run the simulation with the orset, gcounter, no deltas; 1s sync.
@@ -111,7 +111,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
     %                                  ?ORSET,
     %                                  ?COUNTER,
     %                                  ?NUM_EVENTS,
-    %                                  ?NUM_CLIENTS,
+    %                                  ?NUM_CLIENTS_PER_VM,
     %                                  1000]),
 
     % %% Plot both graphs.

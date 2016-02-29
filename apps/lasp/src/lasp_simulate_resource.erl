@@ -30,8 +30,8 @@
 -include("lasp.hrl").
 -include_lib("webmachine/include/webmachine.hrl").
 
--define(NUM_EVENTS, 2000000).
--define(NUM_CLIENTS, 2000).
+-define(NUM_EVENTS, 1000000).
+-define(NUM_CLIENTS_PER_VM, 500).
 
 -define(ORSET, lasp_orset).
 -define(COUNTER, lasp_gcounter).
@@ -45,7 +45,7 @@ content_types_provided(Req, Ctx) ->
 
 to_json(ReqData, State) ->
     {ok, Nodes} = lasp_peer_service:members(),
-    run(Nodes),
+    spawn_link(?MODULE, run, [Nodes]),
     Encoded = jsx:encode(#{status => ok}),
     {Encoded, ReqData, State}.
 
@@ -60,7 +60,7 @@ output_file(Plot) ->
                 atom_to_list(?ORSET),
                 atom_to_list(?COUNTER),
                 integer_to_list(?NUM_EVENTS),
-                integer_to_list(?NUM_CLIENTS) ++ ".pdf"], "-").
+                integer_to_list(?NUM_CLIENTS_PER_VM) ++ ".pdf"], "-").
 
 %% @private
 priv_dir() ->
@@ -81,7 +81,14 @@ log_dir(Log) ->
 %% @private
 advertisement_counter_transmission_simulation(Nodes) ->
 
-    %% Run the simulation with the orset, gcounter, no deltas; 500ms sync.
+    DCOS = os:getenv("DCOS", "false"),
+    {FastSync, SlowSync} = case DCOS of
+        "false" ->
+            {500, 1000};
+        _ ->
+            {30000, 60000}
+    end,
+
     {ok, [DivergenceFilename1,
           ClientFilename1|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
@@ -89,8 +96,8 @@ advertisement_counter_transmission_simulation(Nodes) ->
                                                      ?ORSET,
                                                      ?COUNTER,
                                                      ?NUM_EVENTS,
-                                                     ?NUM_CLIENTS,
-                                                     500]),
+                                                     ?NUM_CLIENTS_PER_VM,
+                                                     FastSync]),
 
     %% Run the simulation with the orset, gcounter, deltas enabled;
     %% 500ms sync.
@@ -101,8 +108,8 @@ advertisement_counter_transmission_simulation(Nodes) ->
                                                      ?ORSET,
                                                      ?COUNTER,
                                                      ?NUM_EVENTS,
-                                                     ?NUM_CLIENTS,
-                                                     500]),
+                                                     ?NUM_CLIENTS_PER_VM,
+                                                     FastSync]),
 
     %% Run the simulation with the orset, gcounter, no deltas; 1s sync.
     {ok, [DivergenceFilename2
@@ -112,8 +119,8 @@ advertisement_counter_transmission_simulation(Nodes) ->
                                      ?ORSET,
                                      ?COUNTER,
                                      ?NUM_EVENTS,
-                                     ?NUM_CLIENTS,
-                                     1000]),
+                                     ?NUM_CLIENTS_PER_VM,
+                                     SlowSync]),
 
     %% Plot both graphs.
     Bin = case os:getenv("MESOS_TASK_ID", "false") of

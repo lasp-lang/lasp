@@ -62,6 +62,8 @@
          terminate/2,
          code_change/3]).
 
+-export([broadcast/1]).
+
 -include("lasp.hrl").
 
 %% State record.

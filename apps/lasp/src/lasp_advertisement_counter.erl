@@ -48,7 +48,7 @@ run(Args) ->
 -define(MAX_IMPRESSIONS, 50000).
 
 %% Log frequency.
--define(FREQ, 50000).
+-define(FREQ, 1000).
 
 %% Record definitions.
 
@@ -196,25 +196,26 @@ terminate(#state{client_list=ClientList}=State) ->
 %% @doc Simulate clients viewing advertisements.
 simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
     %% Start the simulation.
-    spawn(fun() ->
+    spawn_link(fun() ->
                 Viewer = fun(EventId) ->
-                        spawn(fun() ->
-                                   random:seed(erlang:phash2([node()]),
-                                               erlang:monotonic_time(),
-                                               erlang:unique_integer()),
-                                    Random = random:uniform(length(ClientList)),
+                        Random = random:uniform(length(ClientList)),
+                        Pid = lists:nth(Random, ClientList),
+                        Node = node(Pid),
+                        spawn(Node, fun() ->
+                                    seed(),
                                     MSeconds = random:uniform(10),
                                     timer:sleep(MSeconds),
-                                    Pid = lists:nth(Random, ClientList),
                                     Pid ! {runner, view_ad},
                                     case EventId rem ?FREQ == 0 of
                                         true ->
                                             lager:info("Events dispatched: ~p",
-                                                       [EventId]);
+                                                       [EventId]),
+                                            memory_report();
                                         false ->
                                             ok
                                     end
-                              end)
+                              end),
+                        timer:sleep(10)
                 end,
                 lists:foreach(Viewer, lists:seq(1, NumEvents)),
                 lager:info("Simulation event generation complete!")
@@ -261,6 +262,8 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
 client(SetType, CounterType, SyncInterval, Runner, Id,
        AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0,
        BufferedOps) ->
+    %% Sync at the SyncInterval + jitter.
+    RandomSyncInterval = SyncInterval + random:uniform(SyncInterval),
     receive
         {runner, terminate} ->
             %% Log flushed events before termination, if necessary.
@@ -268,12 +271,7 @@ client(SetType, CounterType, SyncInterval, Runner, Id,
                 0 ->
                     ok;
                 _ ->
-                    {ok, AdsWithContracts, Counters} = synchronize(SetType,
-                                                                   AdsWithContractsId,
-                                                                   AdsWithContracts0,
-                                                                   Counters0,
-                                                                   CountersDelta0),
-
+                    synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0),
                     log_divergence(flush, BufferedOps)
             end,
 
@@ -295,7 +293,7 @@ client(SetType, CounterType, SyncInterval, Runner, Id,
                    AdsWithContractsId, AdsWithContracts0, Counters,
                    CountersDelta, BufferedOps + 1)
     after
-        SyncInterval ->
+        RandomSyncInterval ->
             {ok, AdsWithContracts, Counters} = synchronize(SetType,
                                                            AdsWithContractsId,
                                                            AdsWithContracts0,
@@ -518,3 +516,23 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
             {ok, Counter} = CounterType:update(increment, Id, Counter0),
             {ok, {dict:store(Ad, Counter, Counters0), CountersDelta0}}
     end.
+
+%% @private
+memory_report() ->
+    MemoryData = {_, _, {BadPid, _}} = memsup:get_memory_data(),
+    lager:info(""),
+    lager:info("-----------------------------------------------------------", []),
+    lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
+    lager:info("Worst: ~p", [process_info(BadPid)]),
+    lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))]),
+    lager:info("Memory Data: ~p", [MemoryData]),
+    lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
+    lager:info("Local process count: ~p", [length(processes())]),
+    lager:info("-----------------------------------------------------------", []),
+    lager:info("").
+
+%% @private
+seed() ->
+    random:seed(erlang:phash2([node()]),
+                erlang:monotonic_time(),
+                erlang:unique_integer()).

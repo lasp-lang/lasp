@@ -66,12 +66,12 @@ init(_Args) ->
             permanent, 5000, worker,
             [mochiweb_socket_server]},
 
-    PeerRefresh = {lasp_peer_refresh_service,
-                   {lasp_peer_refresh_service, start_link, []},
-                    permanent, 5000, worker,
-                    [lasp_peer_refresh_service]},
+    MarathonPeerRefresh = {lasp_marathon_peer_refresh_service,
+                           {lasp_marathon_peer_refresh_service, start_link, []},
+                            permanent, 5000, worker,
+                            [lasp_marathon_peer_refresh_service]},
 
-    BaseSpecs = [Unique, PlumtreeBackend, Plumtree, PeerRefresh, Process],
+    BaseSpecs = [Unique, PlumtreeBackend, Plumtree, MarathonPeerRefresh, Process],
 
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
     InstrEnabled = application:get_env(?APP, instrumentation, InstrDefault),

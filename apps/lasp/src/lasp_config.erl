@@ -37,8 +37,14 @@ dispatch() ->
 web_config() ->
     {ok, App} = application:get_application(?MODULE),
     {ok, Ip} = application:get_env(App, web_ip),
-    DefaultPort = application:get_env(App, web_port, 8080),
-    Port = list_to_integer(os:getenv("WEB_PORT", integer_to_list(DefaultPort))),
+    DCOS = os:getenv("DCOS", "false"),
+    Port = case DCOS of
+              "false" ->
+                DefaultPort = application:get_env(App, web_port, 8080),
+                list_to_integer(os:getenv("WEB_PORT", integer_to_list(DefaultPort)));
+              _ ->
+                80
+          end,
     lager:info("Port override: ~p", [Port]),
     [
         {ip, Ip},

@@ -130,7 +130,7 @@ update_delta({remove, Elem}, Actor, ORDict) ->
         error ->
             {error, {precondition, {not_present, Elem}}}
     end;
-update_delta({remove_all, Elems}, _Actor, ORDict0) ->
+update_delta({remove_all, Elems}, Actor, ORDict0) ->
     SmallOD = lists:foldl(fun(Elem, ORDict) ->
                                   case orddict:find(Elem, ORDict0) of
                                       {ok, Tokens} ->
@@ -139,7 +139,7 @@ update_delta({remove_all, Elems}, _Actor, ORDict0) ->
                                           ORDict
                                   end
                           end, orddict:new(), Elems),
-    case update({remove_all, Elems}, _Actor, SmallOD) of
+    case update({remove_all, Elems}, Actor, SmallOD) of
         {ok, Delta} ->
             {ok, {delta, Delta}};
         Error ->

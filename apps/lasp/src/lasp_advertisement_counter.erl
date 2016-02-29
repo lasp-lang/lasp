@@ -524,7 +524,7 @@ memory_report() ->
     lager:info("-----------------------------------------------------------", []),
     lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
     lager:info("Worst: ~p", [process_info(BadPid)]),
-    lager:info("Worst trace: ~s", [element(2,erlang:process_info(BadPid, backtrace))]),
+    lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))]),
     lager:info("Memory Data: ~p", [MemoryData]),
     lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
     lager:info("Local process count: ~p", [length(processes())]),

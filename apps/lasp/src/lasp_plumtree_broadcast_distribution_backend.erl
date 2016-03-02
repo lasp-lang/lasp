@@ -507,7 +507,11 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
                   ({error, Error}) ->
                     {reply, {error, Error}, State}
                end,
-    ?CORE:read(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
+    {Time, Value} = timer:tc(?CORE,
+                             read,
+                             [Id, Threshold, Store, From, ReplyFun, ?BLOCKING]),
+    lasp_read_latency_instrumentation:sample(Time, node()),
+    Value;
 
 %% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->

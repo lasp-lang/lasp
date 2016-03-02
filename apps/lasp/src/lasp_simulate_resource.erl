@@ -89,7 +89,8 @@ advertisement_counter_transmission_simulation(Nodes) ->
             {30000, 60000}
     end,
 
-    {ok, [DivergenceFilename1,
+    {ok, [ReadLatencyFilename1,
+          DivergenceFilename1,
           ClientFilename1|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
                                                      false,
@@ -101,7 +102,8 @@ advertisement_counter_transmission_simulation(Nodes) ->
 
     %% Run the simulation with the orset, gcounter, deltas enabled;
     %% 500ms sync.
-    {ok, [_,
+    {ok, [ReadLatencyFilename2,
+          _,
           ClientFilename2|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
                                                      true,
@@ -112,7 +114,8 @@ advertisement_counter_transmission_simulation(Nodes) ->
                                                      FastSync]),
 
     %% Run the simulation with the orset, gcounter, no deltas; 1s sync.
-    {ok, [DivergenceFilename2
+    {ok, [_,
+          DivergenceFilename2
           |_]} = lasp_simulation:run(lasp_advertisement_counter,
                                     [Nodes,
                                      false,
@@ -129,6 +132,16 @@ advertisement_counter_transmission_simulation(Nodes) ->
         _ ->
             "/usr/bin/gnuplot"
     end,
+
+    ReadLatencyOutputFile = output_file(read_latency),
+    ReadLatencyPlot = plot_dir() ++ "/advertisement_counter_read_latency.gnuplot",
+    ReadLatencyCommand = Bin ++
+        " -e \"inputfile1='" ++ log_dir(ReadLatencyFilename1) ++
+        "'; inputfile2='" ++ log_dir(ReadLatencyFilename2) ++
+        "'; outputname='" ++ ReadLatencyOutputFile ++ "'\" " ++ ReadLatencyPlot,
+    ReadLatencyResult = os:cmd(ReadLatencyCommand),
+    lager:info("Generating read latency plot: ~p; output: ~p",
+               [ReadLatencyCommand, ReadLatencyResult]),
 
     TransmissionOutputFile = output_file(transmission),
     TransmissionPlot = plot_dir() ++ "/advertisement_counter_transmission.gnuplot",

@@ -89,7 +89,8 @@ advertisement_counter_transmission_simulation(Nodes) ->
             {30000, 60000}
     end,
 
-    {ok, [ReadLatencyFilename1,
+    {ok, [WriteLatencyFilename1,
+          ReadLatencyFilename1,
           DivergenceFilename1,
           ClientFilename1|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
@@ -102,7 +103,8 @@ advertisement_counter_transmission_simulation(Nodes) ->
 
     %% Run the simulation with the orset, gcounter, deltas enabled;
     %% 500ms sync.
-    {ok, [ReadLatencyFilename2,
+    {ok, [WriteLatencyFilename2,
+          ReadLatencyFilename2,
           _,
           ClientFilename2|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
@@ -115,6 +117,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
 
     %% Run the simulation with the orset, gcounter, no deltas; 1s sync.
     {ok, [_,
+          _,
           DivergenceFilename2
           |_]} = lasp_simulation:run(lasp_advertisement_counter,
                                     [Nodes,
@@ -126,8 +129,12 @@ advertisement_counter_transmission_simulation(Nodes) ->
                                      SlowSync]),
 
     generate_plot(divergence, DivergenceFilename1, DivergenceFilename2),
+
     generate_plot(transmission, ClientFilename1, ClientFilename2),
+
     generate_plot(read_latency, ReadLatencyFilename1, ReadLatencyFilename2),
+
+    generate_plot(write_latency, WriteLatencyFilename1, WriteLatencyFilename2),
 
     ok.
 

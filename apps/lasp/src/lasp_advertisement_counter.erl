@@ -203,7 +203,8 @@ wait(#state{count_events=Count, num_events=NumEvents}=State) ->
                     case Count rem ?FREQ == 0 of
                         true ->
                             lager:info("Event ~p of ~p processed",
-                                       [Count, NumEvents]);
+                                       [Count, NumEvents]),
+                            memory_report();
                         false ->
                             ok
                     end,
@@ -428,18 +429,22 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
     end.
 
 %% @private
-% memory_report() ->
-%     MemoryData = {_, _, {BadPid, _}} = memsup:get_memory_data(),
-%     lager:info(""),
-%     lager:info("-----------------------------------------------------------", []),
-%     lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
-%     lager:info("Worst: ~p", [process_info(BadPid)]),
-%     lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))]),
-%     lager:info("Memory Data: ~p", [MemoryData]),
-%     lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
-%     lager:info("Local process count: ~p", [length(processes())]),
-%     lager:info("-----------------------------------------------------------", []),
-%     lager:info("").
+memory_report() ->
+    MemoryData = {_, _, {BadPid, _}} = memsup:get_memory_data(),
+    lager:info(""),
+    lager:info("-----------------------------------------------------------", []),
+    lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
+    case BadPid of
+        undefined ->
+            lager:info("Worst: ~p", [process_info(BadPid)]),
+            lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))]);
+        _ ->
+            ok
+    end,
+    lager:info("Memory Data: ~p", [MemoryData]),
+    lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
+    lager:info("-----------------------------------------------------------", []),
+    lager:info("").
 
 %% @private
 launch_clients(NumClients, Nodes, SetType, CounterType, SyncInterval,

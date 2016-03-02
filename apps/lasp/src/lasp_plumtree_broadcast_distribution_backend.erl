@@ -507,7 +507,12 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
                   ({error, Error}) ->
                     {reply, {error, Error}, State}
                end,
-    ?CORE:read(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
+    {Time, Value} = timer:tc(?CORE,
+                             read,
+                             [Id, Threshold, Store, From, ReplyFun, ?BLOCKING]),
+    %% Log read latency in milliseconds.
+    log_read_latency(Time),
+    Value;
 
 %% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
@@ -690,6 +695,21 @@ log_transmission(Term) ->
         case application:get_env(?APP, instrumentation, false) of
             true ->
                 lasp_transmission_instrumentation:log(server, Term, node());
+            false ->
+                ok
+        end
+    catch
+        _:Error ->
+            lager:info("Logging failed; couldn't send message: ~p",
+                       [Error])
+    end.
+
+%% @private
+log_read_latency(Time) ->
+    try
+        case application:get_env(?APP, instrumentation, false) of
+            true ->
+                lasp_read_latency_instrumentation:sample(Time / 1000, node());
             false ->
                 ok
         end

@@ -452,12 +452,13 @@ memory_report() ->
     lager:info(""),
     lager:info("-----------------------------------------------------------", []),
     lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
-    case BadPid of
-        undefined ->
-            ok;
-        _ ->
-            lager:info("Worst: ~p", [process_info(BadPid)]),
-            lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))])
+    try
+        lager:info("Worst: ~p", [process_info(BadPid)]),
+        lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))])
+    catch
+        _:_ ->
+            %% Process might die while trying to get info.
+            ok
     end,
     lager:info("Memory Data: ~p", [MemoryData]),
     lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),

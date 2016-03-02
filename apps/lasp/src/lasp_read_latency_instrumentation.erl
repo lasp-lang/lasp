@@ -58,7 +58,7 @@
 start_link() ->
     gen_server:start_link({global, ?MODULE}, ?MODULE, [], []).
 
--spec sample(integer(), node()) -> ok | error().
+-spec sample(float(), node()) -> ok | error().
 sample(Number, Node) ->
     gen_server:call({global, ?MODULE}, {sample, Number, Node}, infinity).
 

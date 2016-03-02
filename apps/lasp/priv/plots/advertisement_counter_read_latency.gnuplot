@@ -32,7 +32,7 @@ set style line 1 lt rgb "#A00000" lw 2 pt 1
 
 set output outputname
 set xlabel "Time in Seconds"
-set ylabel "Milliseconds"
+set ylabel "Milliseconds / Read"
 
 set key top right
 

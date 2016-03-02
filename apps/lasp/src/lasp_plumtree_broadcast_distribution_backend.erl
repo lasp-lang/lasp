@@ -462,7 +462,11 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    Result = ?CORE:bind(Id, Value, ?CLOCK_INCR, Store),
+    {Time, Result} = timer:tc(?CORE,
+                              bind,
+                              [Id, Value, ?CLOCK_INCR, Store]),
+    %% Log read latency in milliseconds.
+    log_write_latency(Time),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Incoming bind operation; merge incoming clock with the remote clock.
@@ -473,7 +477,11 @@ handle_call({bind, Id, Value}, _From,
 %% this could change if the other module is later refactored.
 handle_call({bind, Id, Metadata0, Value}, _From,
             #state{store=Store, counter=Counter}=State) ->
-    Result = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
+    {Time, Result} = timer:tc(?CORE,
+                              bind,
+                              [Id, Value, ?CLOCK_MERG, Store]),
+    %% Log read latency in milliseconds.
+    log_write_latency(Time),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Bind two variables together.
@@ -710,6 +718,21 @@ log_read_latency(Time) ->
         case application:get_env(?APP, instrumentation, false) of
             true ->
                 lasp_read_latency_instrumentation:sample(Time / 1000, node());
+            false ->
+                ok
+        end
+    catch
+        _:Error ->
+            lager:info("Logging failed; couldn't send message: ~p",
+                       [Error])
+    end.
+
+%% @private
+log_write_latency(Time) ->
+    try
+        case application:get_env(?APP, instrumentation, false) of
+            true ->
+                lasp_write_latency_instrumentation:sample(Time / 1000, node());
             false ->
                 ok
         end

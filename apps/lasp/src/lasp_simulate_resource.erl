@@ -89,7 +89,8 @@ advertisement_counter_transmission_simulation(Nodes) ->
             {30000, 60000}
     end,
 
-    {ok, [ReadLatencyFilename1,
+    {ok, [WriteLatencyFilename1,
+          ReadLatencyFilename1,
           DivergenceFilename1,
           ClientFilename1|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
@@ -102,7 +103,8 @@ advertisement_counter_transmission_simulation(Nodes) ->
 
     %% Run the simulation with the orset, gcounter, deltas enabled;
     %% 500ms sync.
-    {ok, [ReadLatencyFilename2,
+    {ok, [WriteLatencyFilename2,
+          ReadLatencyFilename2,
           _,
           ClientFilename2|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
@@ -115,6 +117,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
 
     %% Run the simulation with the orset, gcounter, no deltas; 1s sync.
     {ok, [_,
+          _,
           DivergenceFilename2
           |_]} = lasp_simulation:run(lasp_advertisement_counter,
                                     [Nodes,
@@ -125,7 +128,23 @@ advertisement_counter_transmission_simulation(Nodes) ->
                                      ?NUM_CLIENTS_PER_VM,
                                      SlowSync]),
 
-    %% Plot both graphs.
+    generate_plot(divergence, DivergenceFilename1, DivergenceFilename2),
+
+    generate_plot(transmission, ClientFilename1, ClientFilename2),
+
+    generate_plot(read_latency, ReadLatencyFilename1, ReadLatencyFilename2),
+
+    generate_plot(write_latency, WriteLatencyFilename1, WriteLatencyFilename2),
+
+    ok.
+
+%%%===================================================================
+%%% Internal Functions
+%%%===================================================================
+
+%% @private
+%% @doc Generate plots.
+generate_plot(Plot, Filename1, Filename2) ->
     Bin = case os:getenv("MESOS_TASK_ID", "false") of
         "false" ->
             "gnuplot";
@@ -133,38 +152,13 @@ advertisement_counter_transmission_simulation(Nodes) ->
             "/usr/bin/gnuplot"
     end,
 
-    ReadLatencyOutputFile = output_file(read_latency),
-    ReadLatencyPlot = plot_dir() ++ "/advertisement_counter_read_latency.gnuplot",
-    ReadLatencyCommand = Bin ++
-        " -e \"inputfile1='" ++ log_dir(ReadLatencyFilename1) ++
-        "'; inputfile2='" ++ log_dir(ReadLatencyFilename2) ++
-        "'; outputname='" ++ ReadLatencyOutputFile ++ "'\" " ++ ReadLatencyPlot,
-    ReadLatencyResult = os:cmd(ReadLatencyCommand),
-    lager:info("Generating read latency plot: ~p; output: ~p",
-               [ReadLatencyCommand, ReadLatencyResult]),
-
-    TransmissionOutputFile = output_file(transmission),
-    TransmissionPlot = plot_dir() ++ "/advertisement_counter_transmission.gnuplot",
-    TransmissionCommand = Bin ++
-        " -e \"inputfile1='" ++ log_dir(ClientFilename1) ++
-        "'; inputfile2='" ++ log_dir(ClientFilename2) ++
-        "'; outputname='" ++ TransmissionOutputFile ++ "'\" " ++ TransmissionPlot,
-    TransmissionResult = os:cmd(TransmissionCommand),
-    lager:info("Generating transmission plot: ~p; output: ~p",
-               [TransmissionCommand, TransmissionResult]),
-
-    DivergenceOutputFile = output_file(divergence),
-    DivergencePlot = plot_dir() ++ "/advertisement_counter_divergence.gnuplot",
-    DivergenceCommand = Bin ++
-        " -e \"inputfile1='" ++ log_dir(DivergenceFilename1) ++
-        "'; inputfile2='" ++ log_dir(DivergenceFilename2) ++
-        "'; outputname='" ++ DivergenceOutputFile ++ "'\" " ++ DivergencePlot,
-    DivergenceResult = os:cmd(DivergenceCommand),
-    lager:info("Generating divergence plot: ~p; output: ~p",
-               [DivergenceCommand, DivergenceResult]),
-
-    ok.
-
-%%%===================================================================
-%%% Internal Functions
-%%%===================================================================
+    PlotString = atom_to_list(Plot),
+    OutputFile = output_file(Plot),
+    PlotFile = plot_dir() ++ "/advertisement_counter_" ++ PlotString ++ ".gnuplot",
+    Command = Bin ++
+        " -e \"inputfile1='" ++ log_dir(Filename1) ++
+        "'; inputfile2='" ++ log_dir(Filename2) ++
+        "'; outputname='" ++ OutputFile ++ "'\" " ++ PlotFile,
+    Result = os:cmd(Command),
+    lager:info("Generating " ++ PlotString ++ " plot: ~p; output: ~p",
+               [Command, Result]).

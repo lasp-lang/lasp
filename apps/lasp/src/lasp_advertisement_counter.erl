@@ -24,12 +24,16 @@
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -export([run/1,
-         client/10,
          server/2]).
 
 -behaviour(lasp_simulation).
 
 -include("lasp.hrl").
+
+-export([synchronize/5,
+         log_transmission/1,
+         log_divergence/2,
+         view_ad/4]).
 
 %% lasp_simulation callbacks
 -export([init/1,
@@ -162,31 +166,15 @@ clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetT
                ads_with_contracts=AdsWithContracts}=State) ->
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
-    Clients = lists:map(fun(Node) ->
-                    lists:map(fun(Id) ->
-                                spawn_link(Node,
-                                           ?MODULE,
-                                           client,
-                                           [SetType,
-                                            CounterType,
-                                            SyncInterval,
-                                            Runner,
-                                            Id,
-                                            AdsWithContracts,
-                                            undefined,
-                                            dict:new(),
-                                            dict:new(),
-                                            0])
-                                end, lists:seq(1, NumClients))
-        end, Nodes),
-    Clients1 = lists:flatten(Clients),
-    {ok, State#state{client_list=Clients1}}.
+    Clients = launch_clients(NumClients, Nodes, SetType, CounterType,
+                             SyncInterval, Runner, AdsWithContracts),
+    {ok, State#state{client_list=Clients}}.
 
 %% @doc Terminate any running clients gracefully issuing final
 %%      synchronization.
 terminate(#state{client_list=ClientList}=State) ->
     TerminateFun = fun(Pid) ->
-            Pid ! {runner, terminate}
+            Pid ! terminate
     end,
     lists:foreach(TerminateFun, ClientList),
     lasp_transmission_instrumentation:stop(client),
@@ -194,32 +182,8 @@ terminate(#state{client_list=ClientList}=State) ->
     {ok, State}.
 
 %% @doc Simulate clients viewing advertisements.
-simulate(#state{client_list=ClientList, num_events=NumEvents}=State) ->
-    %% Start the simulation.
-    spawn_link(fun() ->
-                Viewer = fun(EventId) ->
-                        Random = random:uniform(length(ClientList)),
-                        Pid = lists:nth(Random, ClientList),
-                        Node = node(Pid),
-                        spawn(Node, fun() ->
-                                    seed(),
-                                    MSeconds = random:uniform(10),
-                                    timer:sleep(MSeconds),
-                                    Pid ! {runner, view_ad},
-                                    case EventId rem ?FREQ == 0 of
-                                        true ->
-                                            lager:info("Events dispatched: ~p",
-                                                       [EventId]),
-                                            memory_report();
-                                        false ->
-                                            ok
-                                    end
-                              end),
-                        timer:sleep(10)
-                end,
-                lists:foreach(Viewer, lists:seq(1, NumEvents)),
-                lager:info("Simulation event generation complete!")
-          end),
+simulate(#state{client_list=_ClientList, num_events=_NumEvents}=State) ->
+    %% Do nothing, as clients will simulate their own events.
     {ok, State}.
 
 %% @doc Summarize results.
@@ -229,7 +193,7 @@ summarize(#state{filenames=Filenames}) ->
 %% @doc Wait for all events to be delivered in the system.
 wait(#state{count_events=Count, num_events=NumEvents}=State) ->
     receive
-        {runner, view_ad_complete} ->
+        view_ad_complete ->
             case Count >= NumEvents of
                 true ->
                     lager:info("Events all processed!"),
@@ -257,60 +221,6 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
 
     %% Remove the advertisement.
     {ok, _} = lasp:update(Ads, {remove, Ad}, Ad).
-
-%% @doc Client process; standard recurisve looping server.
-client(SetType, CounterType, SyncInterval, Runner, Id,
-       AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0,
-       BufferedOps) ->
-    %% Sync at the SyncInterval + jitter.
-    RandomSyncInterval = SyncInterval + random:uniform(SyncInterval),
-    receive
-        {runner, terminate} ->
-            %% Log flushed events before termination, if necessary.
-            case BufferedOps of
-                0 ->
-                    ok;
-                _ ->
-                    synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0),
-                    log_divergence(flush, BufferedOps)
-            end,
-
-            Runner ! {runner, terminate_done},
-
-            ok;
-        {runner, view_ad} ->
-            {ok, {Counters, CountersDelta}} = view_ad(CounterType, Id,
-                                                      Counters0,
-                                                      CountersDelta0),
-
-            %% Notify the harness that an event has been processed.
-            Runner ! {runner, view_ad_complete},
-
-            %% Log buffered event.
-            log_divergence(buffer, 1),
-
-            client(SetType, CounterType, SyncInterval, Runner, Id,
-                   AdsWithContractsId, AdsWithContracts0, Counters,
-                   CountersDelta, BufferedOps + 1)
-    after
-        RandomSyncInterval ->
-            {ok, AdsWithContracts, Counters} = synchronize(SetType,
-                                                           AdsWithContractsId,
-                                                           AdsWithContracts0,
-                                                           Counters0,
-                                                           CountersDelta0),
-            %% Log flushed events.
-            case BufferedOps of
-                0 ->
-                    ok;
-                _ ->
-                    log_divergence(flush, BufferedOps)
-            end,
-
-            client(SetType, CounterType, SyncInterval, Runner, Id,
-                   AdsWithContractsId, AdsWithContracts, Counters,
-                   dict:new(), 0)
-    end.
 
 %% @doc Generate advertisements and advertisement contracts.
 create_advertisements_and_contracts(Counter, Ads, Contracts) ->
@@ -518,21 +428,41 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
     end.
 
 %% @private
-memory_report() ->
-    MemoryData = {_, _, {BadPid, _}} = memsup:get_memory_data(),
-    lager:info(""),
-    lager:info("-----------------------------------------------------------", []),
-    lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
-    lager:info("Worst: ~p", [process_info(BadPid)]),
-    lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))]),
-    lager:info("Memory Data: ~p", [MemoryData]),
-    lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
-    lager:info("Local process count: ~p", [length(processes())]),
-    lager:info("-----------------------------------------------------------", []),
-    lager:info("").
+% memory_report() ->
+%     MemoryData = {_, _, {BadPid, _}} = memsup:get_memory_data(),
+%     lager:info(""),
+%     lager:info("-----------------------------------------------------------", []),
+%     lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
+%     lager:info("Worst: ~p", [process_info(BadPid)]),
+%     lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))]),
+%     lager:info("Memory Data: ~p", [MemoryData]),
+%     lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
+%     lager:info("Local process count: ~p", [length(processes())]),
+%     lager:info("-----------------------------------------------------------", []),
+%     lager:info("").
 
 %% @private
-seed() ->
-    random:seed(erlang:phash2([node()]),
-                erlang:monotonic_time(),
-                erlang:unique_integer()).
+launch_clients(NumClients, Nodes, SetType, CounterType, SyncInterval,
+               Runner, AdsWithContracts) ->
+    lists:flatmap(fun(Node) ->
+                        launch_clients(Node, NumClients, Nodes, SetType, CounterType, SyncInterval,
+                                       Runner, AdsWithContracts)
+                  end, Nodes).
+
+%% @private
+launch_clients(Node, NumClients, _Nodes, SetType, CounterType, SyncInterval,
+               Runner, AdsWithContracts) ->
+    lists:map(fun(Id) ->
+                      {ok, Pid} = rpc:call(Node,
+                                           lasp_advertisement_counter_client,
+                                           start_link,
+                                           [
+                                            SetType,
+                                            CounterType,
+                                            SyncInterval,
+                                            Runner,
+                                            Id,
+                                            AdsWithContracts
+                                           ]),
+                      Pid
+              end, lists:seq(1, NumClients)).

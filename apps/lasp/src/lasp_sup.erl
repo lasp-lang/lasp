@@ -101,11 +101,16 @@ init(_Args) ->
                            {lasp_read_latency_instrumentation, start_link, []},
                             permanent, 5000, worker,
                             [lasp_read_latency_instrumentation]},
+            WriteLatency = {lasp_write_latency_instrumentation,
+                            {lasp_write_latency_instrumentation, start_link, []},
+                             permanent, 5000, worker,
+                             [lasp_write_latency_instrumentation]},
 
             BaseSpecs ++ [ClientTrans,
                           ServerTrans,
                           Divergence,
                           ReadLatency,
+                          WriteLatency,
                           Web];
         false ->
             ok = application:set_env(?APP, instrumentation, InstrEnabled),

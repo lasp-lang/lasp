@@ -189,7 +189,7 @@ exchange(Peer) ->
         true ->
             %% Anti-entropy mechanism for causal consistency of delta-CRDT.
             {ok, Pid, GC_Counter} = gen_server:call(?MODULE, {exchange, Peer}, infinity),
-            MaxGCCounter = application:get_env(lasp, delta_mode_max_gc_counter, 7),
+            MaxGCCounter = mochiglobal:get(delta_mode_max_gc_counter, 7),
             case GC_Counter == MaxGCCounter of
                 true ->
                     gen_server:call(?MODULE, delta_gc, infinity);

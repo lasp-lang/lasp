@@ -55,6 +55,8 @@ init_per_suite(_Config) ->
 
     %% Start Lasp on the runner and enable instrumentation.
     ok = application:load(lasp),
+    ok = application:set_env(plumtree, broadcast_exchange_timer, 120),
+    ok = application:set_env(plumtree, broadcast_mods, [lasp_plumtree_broadcast_distribution_backend]),
     ok = application:set_env(lasp, instrumentation, true),
     {ok, _} = application:ensure_all_started(lasp),
 
@@ -129,6 +131,13 @@ minimal_test(Config) ->
 
 minimal_delta_test(Config) ->
     Nodes = proplists:get_value(nodes, Config),
+    %% Set the delta_mode to true for all nodes.
+    lists:foreach(fun(Node) ->
+                        ct:pal("Set the delta_mode: ~p", [Node]),
+                        ok = rpc:call(Node, application, set_env, [lasp,
+                                                                   delta_mode,
+                                                                   true])
+                  end, Nodes),
     {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
                                   [Nodes, true, lasp_orset, lasp_gcounter, 100, 100, 10]),
     ok.

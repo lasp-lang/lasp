@@ -353,12 +353,8 @@ bind(Id, {delta, Value}, MetadataFun, Store) ->
             try
                 Merged = lasp_type:merge(Type, Value0, Value),
                 {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
-                OldValue = lasp_type:query(Type, Value0),
-                NewValue = lasp_type:query(Type, Merged),
-                case OldValue /= NewValue of
-                %%case lasp_lattice:is_inflation(Type, Value0, Merged) of
+                case lasp_lattice:is_strict_inflation(Type, Value0, Merged) of
                     true ->
-                        %%{ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
                         DeltaMap = orddict:store(Counter0, Value, DeltaMap0),
                         NewObject = #dv{type=Type, metadata=Metadata, value=Merged,
                                         waiting_threads=SW,

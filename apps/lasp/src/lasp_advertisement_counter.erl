@@ -373,7 +373,7 @@ servers(SetType, Ads, AdsWithContracts) ->
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
     lists:map(fun(Ad) ->
-                ServerPid = spawn_link(?MODULE, server, [Ad, Ads]),
+                ServerPid = spawn(?MODULE, server, [Ad, Ads]),
                 {ok, _} = lasp:update(Servers, {add, ServerPid}, undefined),
                 ServerPid
                 end, AdList).

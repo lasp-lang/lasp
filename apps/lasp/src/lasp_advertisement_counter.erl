@@ -491,7 +491,7 @@ launch_clients(Node, NumClients, _Nodes, SetType, CounterType, SyncInterval,
     lists:map(fun(Id) ->
                       {ok, Pid} = rpc:call(Node,
                                            lasp_advertisement_counter_client,
-                                           start_link,
+                                           start,
                                            [
                                             SetType,
                                             CounterType,

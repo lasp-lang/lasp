@@ -24,7 +24,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/6]).
+-export([start_link/6,
+         start/6]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -55,7 +56,8 @@
 %%%===================================================================
 
 %% @doc Start and link to calling process.
-%% @todo -spec start_link((term()))-> {ok, pid()} | ignore | {error, term()}.
+-spec start_link(crdt(), crdt(), non_neg_integer(), pid(), id(), id()) ->
+    {ok, pid()} | ignore | {error, term()}.
 start_link(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId) ->
     gen_server:start_link(?MODULE, [SetType,
                                     CounterType,
@@ -63,6 +65,17 @@ start_link(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId) -
                                     Runner,
                                     Id,
                                     AdsWithContractsId], []).
+
+%% @doc Start and *don't* link to calling process.
+-spec start(crdt(), crdt(), non_neg_integer(), pid(), id(), id()) ->
+    {ok, pid()} | ignore | {error, term()}.
+start(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId) ->
+    gen_server:start(?MODULE, [SetType,
+                               CounterType,
+                               SyncInterval,
+                               Runner,
+                               Id,
+                               AdsWithContractsId], []).
 
 %%%===================================================================
 %%% gen_server callbacks

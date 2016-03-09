@@ -25,7 +25,7 @@
          content_types_provided/2,
          to_json/2]).
 
--export([run/1]).
+-export([run/0]).
 
 -include("lasp.hrl").
 -include_lib("webmachine/include/webmachine.hrl").
@@ -44,14 +44,18 @@ content_types_provided(Req, Ctx) ->
     {[{"application/json", to_json}], Req, Ctx}.
 
 to_json(ReqData, State) ->
-    {ok, Nodes} = lasp_peer_service:members(),
-    spawn_link(?MODULE, run, [Nodes]),
+    {ok, _Pid} = spawn_link(?MODULE, run, []),
     Encoded = jsx:encode(#{status => ok}),
     {Encoded, ReqData, State}.
 
 %% @private
-run(Nodes) ->
+run() ->
+    %% Get list of nodes from the peer service.
+    {ok, Nodes} = lasp_peer_service:members(),
+
+    %% Run the simulation.
     advertisement_counter_transmission_simulation(Nodes),
+
     ok.
 
 %% @private

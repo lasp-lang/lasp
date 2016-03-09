@@ -69,7 +69,7 @@ start_link(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId) -
 %%%===================================================================
 
 %% @private
-%% @todo -spec init([term()]) -> {ok, #state{}}.
+-spec init([term()]) -> {ok, #state{}}.
 init([SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId]) ->
     %% Seed the random number generator.
     random:seed(erlang:phash2([node()]),

@@ -27,6 +27,7 @@
 -module(lasp_orset).
 
 -behaviour(riak_dt).
+-behaviour(lasp_dt).
 
 %% API
 -export([new/0, value/1, update/3, update_delta/3, merge/2, equal/2,
@@ -36,6 +37,7 @@
 -export([to_binary/2]).
 -export([to_version/2]).
 -export([intersect/2, map/2, filter/2]).
+-export([new/1]).
 
 -ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
@@ -62,6 +64,10 @@
 
 -type actor() :: riak_dt:actor().
 -type member() :: term().
+
+-spec new([]) -> orset().
+new([]) ->
+    orddict:new().
 
 -spec new() -> orset().
 new() ->

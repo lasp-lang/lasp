@@ -30,6 +30,7 @@
 -include("lasp.hrl").
 
 -behaviour(riak_dt).
+-behaviour(lasp_dt).
 
 -export([new/0,
          value/1,
@@ -47,6 +48,7 @@
          parent_clock/2]).
 -export([to_binary/2]).
 -export([to_version/2]).
+-export([new/1]).
 
 -export_type([ivar/0, binary_ivar/0, ivar_op/0]).
 -type ivar() :: term().
@@ -67,6 +69,11 @@
 -endif.
 
 %% @doc Create a new single-assignment variable.
+-spec new([]) -> undefined.
+new([]) ->
+    undefined.
+
+%% @doc Create a new single-assignment variable.
 -spec new() -> undefined.
 new() ->
     undefined.
@@ -76,7 +83,7 @@ update({set, Value}, _Actor, undefined) ->
     {ok, Value}.
 
 update_delta(Op, Actor, IVar) ->
-    %% update_delta() is not implemented.
+    %% @todo: update_delta() is not implemented.
     update(Op, Actor, IVar).
 
 %% @doc Single assignment merge; undefined for two bound variables.

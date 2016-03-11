@@ -204,9 +204,15 @@ exchange(Peer) ->
 %%
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
-    {ok, Variable} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
-    broadcast(Variable),
-    {ok, Variable}.
+    case application:get_env(lasp, delta_mode, false) of
+        true ->
+            gen_server:call(?MODULE, {declare, Id, Type}, infinity);
+        false ->
+            {ok, Variable} = gen_server:call(?MODULE,
+                                             {declare, Id, Type}, infinity),
+            broadcast(Variable),
+            {ok, Variable}
+    end.
 
 %% @doc Declare a new dynamic variable of a given type.
 %%
@@ -215,10 +221,16 @@ declare(Id, Type) ->
 %%
 -spec declare_dynamic(id(), type()) -> {ok, var()}.
 declare_dynamic(Id, Type) ->
-    {ok, Variable} = gen_server:call(?MODULE,
-                                     {declare_dynamic, Id, Type}, infinity),
-    broadcast(Variable),
-    {ok, Variable}.
+    case application:get_env(lasp, delta_mode, false) of
+        true ->
+            gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity);
+        false ->
+            {ok, Variable} = gen_server:call(?MODULE,
+                                             {declare_dynamic, Id, Type},
+                                             infinity),
+            broadcast(Variable),
+            {ok, Variable}
+    end.
 
 %% @doc Read the current value of a CRDT.
 %%
@@ -241,7 +253,7 @@ update(Id, Operation, Actor) ->
                                                         {update, Id, Operation, Actor},
                                                         infinity),
     ReturnState = case Value of
-                      {delta, _DeltaState, MergedState} ->
+                      {delta, MergedState} ->
                           %% No broadcasting for the delta.
                           MergedState;
                       _ ->
@@ -267,25 +279,20 @@ bind(Id, Value0) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {bind, Id, Value0},
                                                         infinity),
-    BroadcastState = case Value of
-                         {delta, DeltaState, _MergedState} ->
-                             {delta, DeltaState};
-                         _ ->
-                             Value
-                     end,
     ReturnState = case Value of
-                      {delta, _DeltaState, MergedState} ->
+                      {delta, MergedState} ->
+                          %% No broadcasting for the delta.
                           MergedState;
                       _ ->
+                          case orddict:find(dynamic, Metadata) of
+                              {ok, true} ->
+                                  %% Ignore: this is a dynamic variable.
+                                  ok;
+                              _ ->
+                                  broadcast({Id, Type, Metadata, Value})
+                          end,
                           Value
                   end,
-    case orddict:find(dynamic, Metadata) of
-        {ok, true} ->
-            %% Ignore: this is a dynamic variable.
-            ok;
-        _ ->
-            broadcast({Id, Type, Metadata, BroadcastState})
-    end,
     {ok, {Id, Type, Metadata, ReturnState}}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
@@ -664,6 +671,8 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
                                           {Id, Type, _Metadata, Deltas},
                                           ?CLOCK_INCR,
                                           ?CLOCK_INIT}),
+    lager:info("Send Delta({delta_ack}): To: ~p, Counter: ~p",
+                                          [From, Counter]),
     gen_server:cast({?MODULE, From}, {delta_ack, node(), Id, Counter}),
     {noreply, State};
 

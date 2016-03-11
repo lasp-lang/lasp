@@ -71,7 +71,7 @@
 
 -spec new([]) -> orset().
 new([]) ->
-    [].
+    gb_trees:empty().
 
 -spec new() -> orset().
 new() ->

@@ -290,7 +290,7 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
     {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
     %% Log state received from the server.
     log_transmission(AdsWithContracts),
-    AdList = SetType:value(AdsWithContracts),
+    AdList = lasp_type:query(SetType, AdsWithContracts),
     Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
     %% Refresh our dictionary with any new values from the server.
@@ -368,7 +368,7 @@ servers(SetType, Ads, AdsWithContracts) ->
 
     %% Get the current advertisement list.
     {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
-    AdList = SetType:value(AdList0),
+    AdList = lasp_type:query(SetType, AdList0),
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
@@ -405,10 +405,10 @@ log_divergence(flush, Number) ->
 
 %% @private
 view_ad(CounterType, Id, Counters0, CountersDelta0) ->
-    case dict:size(Counters0) of
-        0 ->
+    case dict:is_empty(Counters0) of
+        true ->
             {ok, {Counters0, CountersDelta0}};
-        _ ->
+        false ->
             %% Select a random advertisement from the list of
             %% active advertisements.
             Random = random:uniform(dict:size(Counters0)),
@@ -460,13 +460,14 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
 
 %% @private
 memory_report() ->
-    MemoryData = {_, _, {BadPid, _}} = memsup:get_memory_data(),
+    MemoryData = {_, _, {_BadPid, _}} = memsup:get_memory_data(),
     lager:info(""),
     lager:info("-----------------------------------------------------------", []),
     lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
     try
-        lager:info("Worst: ~p", [process_info(BadPid)]),
-        lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))])
+        %% lager:info("Worst: ~p", [process_info(BadPid)])
+        %% lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))])
+        ok
     catch
         _:_ ->
             %% Process might die while trying to get info.

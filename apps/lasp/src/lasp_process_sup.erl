@@ -41,7 +41,7 @@ start_link() ->
 
 %% @doc Start a child.
 start_child(Args) ->
-    supervisor:start_child(?MODULE, Args).
+    supervisor:start_child(?MODULE, [Args]).
 
 %% @doc Stop a child immediately
 terminate_child(Supervisor, Pid) ->
@@ -53,8 +53,8 @@ terminate_child(Supervisor, Pid) ->
 
 %% @doc supervisor callback.
 init([]) ->
-    Spec = {lasp_process,
-            {lasp_process, start_link, []},
-             permanent, 5000, worker, [lasp_process]},
+    Spec = {gen_flow,
+            {gen_flow, start_link, [lasp_process]},
+             permanent, 5000, worker, [gen_flow]},
 
     {ok, {{simple_one_for_one, 10, 10}, [Spec]}}.

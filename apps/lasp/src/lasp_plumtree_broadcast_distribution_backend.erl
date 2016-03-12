@@ -252,19 +252,19 @@ update(Id, Operation, Actor) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {update, Id, Operation, Actor},
                                                         infinity),
-    ReturnState = case Value of
-                      {delta, MergedState} ->
-                          %% No broadcasting for the delta.
-                          MergedState;
+    ReturnState = case orddict:find(dynamic, Metadata) of
+                      {ok, true} ->
+                          %% Ignore: this is a dynamic variable.
+                          Value;
                       _ ->
-                          case orddict:find(dynamic, Metadata) of
-                              {ok, true} ->
-                                  %% Ignore: this is a dynamic variable.
-                                  ok;
+                          case Value of
+                              {delta, MergedState} ->
+                                  %% No broadcasting for the delta.
+                                  MergedState;
                               _ ->
-                                  broadcast({Id, Type, Metadata, Value})
-                          end,
-                          Value
+                                  broadcast({Id, Type, Metadata, Value}),
+                                  Value
+                          end
                   end,
     {ok, {Id, Type, Metadata, ReturnState}}.
 
@@ -279,19 +279,19 @@ bind(Id, Value0) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {bind, Id, Value0},
                                                         infinity),
-    ReturnState = case Value of
-                      {delta, MergedState} ->
-                          %% No broadcasting for the delta.
-                          MergedState;
+    ReturnState = case orddict:find(dynamic, Metadata) of
+                      {ok, true} ->
+                          %% Ignore: this is a dynamic variable.
+                          Value;
                       _ ->
-                          case orddict:find(dynamic, Metadata) of
-                              {ok, true} ->
-                                  %% Ignore: this is a dynamic variable.
-                                  ok;
+                          case Value of
+                              {delta, MergedState} ->
+                                  %% No broadcasting for the delta.
+                                  MergedState;
                               _ ->
-                                  broadcast({Id, Type, Metadata, Value})
-                          end,
-                          Value
+                                  broadcast({Id, Type, Metadata, Value}),
+                                  Value
+                          end
                   end,
     {ok, {Id, Type, Metadata, ReturnState}}.
 

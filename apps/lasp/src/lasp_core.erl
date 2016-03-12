@@ -365,7 +365,7 @@ bind(Id, {delta, Value}, MetadataFun, Store) ->
                         {NewObject, {ok, {Id, Type, Metadata, {delta, Merged}}}};
                     false ->
                         %% Given delta state is already merged, no delta info update.
-                        {Object#dv{metadata=Metadata, value=Merged, waiting_threads=SW},
+                        {Object#dv{waiting_threads=SW},
                          {ok, {Id, Type, Metadata, {delta, Merged}}}}
                 end
             catch
@@ -855,6 +855,12 @@ reply_to_all([From|T], StillWaiting, Result) ->
 reply_to_all([], StillWaiting, _Result) ->
     {ok, StillWaiting}.
 
+%% @doc When the delta interval is arrived, bind it with the existing object.
+%%      If the object does not exist, declare it.
+%%
+-spec receive_delta(store(), {delta_send, value(), function(), function()} |
+                             {delta_ack, id(), node(), non_neg_integer()}) ->
+    ok | error.
 receive_delta(Store, {delta_send, {Id, Type, _Metadata, Deltas},
                       MetadataFunBind, MetadataFunDeclare}) ->
     case do(get, [Store, Id]) of
@@ -864,10 +870,10 @@ receive_delta(Store, {delta_send, {Id, Type, _Metadata, Deltas},
             {ok, _Result} = declare(Id, Type, MetadataFunDeclare, Store),
             receive_delta(Store, {delta_send, {Id, Type, _Metadata, Deltas},
                                   MetadataFunBind, MetadataFunDeclare})
-            
     end,
     ok;
-
+%% @doc When the delta ack is arrived with the counter, store it in the ack map.
+%%
 receive_delta(Store, {delta_ack, Id, From, Counter}) ->
     case do(get, [Store, Id]) of
         {ok, #dv{delta_ack_map=AckMap0}=Object} ->

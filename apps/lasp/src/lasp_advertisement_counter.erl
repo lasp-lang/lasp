@@ -51,9 +51,6 @@ run(Args) ->
 %% The maximum number of impressions for each advertisement to display.
 -define(MAX_IMPRESSIONS, 50000).
 
-%% Log frequency.
--define(FREQ, 1000).
-
 %% Record definitions.
 
 -record(ad, {id, image, counter}).
@@ -117,6 +114,26 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
     %% Launch server processes.
     servers(SetType, Ads, AdsWithContracts),
 
+    %% Initialize write latency instrumentation.
+    WriteLatencyFilename = string:join(["write-latency",
+                                        atom_to_list(Deltas),
+                                        atom_to_list(SetType),
+                                        atom_to_list(CounterType),
+                                        integer_to_list(NumEvents),
+                                        integer_to_list(NumClients),
+                                        integer_to_list(SyncInterval)], "-") ++ ".csv",
+    ok = lasp_write_latency_instrumentation:start(WriteLatencyFilename, NumClients),
+
+    %% Initialize read latency instrumentation.
+    ReadLatencyFilename = string:join(["read-latency",
+                                       atom_to_list(Deltas),
+                                       atom_to_list(SetType),
+                                       atom_to_list(CounterType),
+                                       integer_to_list(NumEvents),
+                                       integer_to_list(NumClients),
+                                       integer_to_list(SyncInterval)], "-") ++ ".csv",
+    ok = lasp_read_latency_instrumentation:start(ReadLatencyFilename, NumClients),
+
     %% Initialize divergence transmission instrumentation.
     DivergenceFilename = string:join(["divergence",
                                       atom_to_list(Deltas),
@@ -157,7 +174,11 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
                 num_events=NumEvents,
                 num_clients=NumClients,
                 sync_interval=SyncInterval,
-                filenames=[DivergenceFilename, ClientFilename, ServerFilename]}}.
+                filenames=[WriteLatencyFilename,
+                           ReadLatencyFilename,
+                           DivergenceFilename,
+                           ClientFilename,
+                           ServerFilename]}}.
 
 %% @doc Launch a series of client processes, each of which is responsible
 %% for displaying a particular advertisement.
@@ -177,6 +198,8 @@ terminate(#state{client_list=ClientList}=State) ->
             Pid ! terminate
     end,
     lists:foreach(TerminateFun, ClientList),
+    lasp_write_latency_instrumentation:stop(),
+    lasp_read_latency_instrumentation:stop(),
     lasp_transmission_instrumentation:stop(client),
     lasp_transmission_instrumentation:stop(server),
     {ok, State}.
@@ -192,6 +215,13 @@ summarize(#state{filenames=Filenames}) ->
 
 %% @doc Wait for all events to be delivered in the system.
 wait(#state{count_events=Count, num_events=NumEvents}=State) ->
+    DCOS = os:getenv("DCOS", "false"),
+    ReportFrequency = case DCOS of
+        "false" ->
+            10000;
+        _ ->
+            1000
+    end,
     receive
         view_ad_complete ->
             case Count >= NumEvents of
@@ -200,10 +230,11 @@ wait(#state{count_events=Count, num_events=NumEvents}=State) ->
                     lasp_divergence_instrumentation:stop(),
                     {ok, State};
                 false ->
-                    case Count rem ?FREQ == 0 of
+                    case Count rem ReportFrequency == 0 of
                         true ->
                             lager:info("Event ~p of ~p processed",
-                                       [Count, NumEvents]);
+                                       [Count, NumEvents]),
+                            memory_report();
                         false ->
                             ok
                     end,
@@ -259,7 +290,7 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
     {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
     %% Log state received from the server.
     log_transmission(AdsWithContracts),
-    AdList = SetType:value(AdsWithContracts),
+    AdList = lasp_type:query(SetType, AdsWithContracts),
     Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
     %% Refresh our dictionary with any new values from the server.
@@ -337,12 +368,12 @@ servers(SetType, Ads, AdsWithContracts) ->
 
     %% Get the current advertisement list.
     {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
-    AdList = SetType:value(AdList0),
+    AdList = lasp_type:query(SetType, AdList0),
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
     lists:map(fun(Ad) ->
-                ServerPid = spawn_link(?MODULE, server, [Ad, Ads]),
+                ServerPid = spawn(?MODULE, server, [Ad, Ads]),
                 {ok, _} = lasp:update(Servers, {add, ServerPid}, undefined),
                 ServerPid
                 end, AdList).
@@ -374,10 +405,10 @@ log_divergence(flush, Number) ->
 
 %% @private
 view_ad(CounterType, Id, Counters0, CountersDelta0) ->
-    case dict:size(Counters0) of
-        0 ->
+    case dict:is_empty(Counters0) of
+        true ->
             {ok, {Counters0, CountersDelta0}};
-        _ ->
+        false ->
             %% Select a random advertisement from the list of
             %% active advertisements.
             Random = random:uniform(dict:size(Counters0)),
@@ -428,18 +459,24 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
     end.
 
 %% @private
-% memory_report() ->
-%     MemoryData = {_, _, {BadPid, _}} = memsup:get_memory_data(),
-%     lager:info(""),
-%     lager:info("-----------------------------------------------------------", []),
-%     lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
-%     lager:info("Worst: ~p", [process_info(BadPid)]),
-%     lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))]),
-%     lager:info("Memory Data: ~p", [MemoryData]),
-%     lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
-%     lager:info("Local process count: ~p", [length(processes())]),
-%     lager:info("-----------------------------------------------------------", []),
-%     lager:info("").
+memory_report() ->
+    MemoryData = {_, _, {_BadPid, _}} = memsup:get_memory_data(),
+    lager:info(""),
+    lager:info("-----------------------------------------------------------", []),
+    lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
+    try
+        %% lager:info("Worst: ~p", [process_info(BadPid)])
+        %% lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))])
+        ok
+    catch
+        _:_ ->
+            %% Process might die while trying to get info.
+            ok
+    end,
+    lager:info("Memory Data: ~p", [MemoryData]),
+    lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
+    lager:info("-----------------------------------------------------------", []),
+    lager:info("").
 
 %% @private
 launch_clients(NumClients, Nodes, SetType, CounterType, SyncInterval,
@@ -455,7 +492,7 @@ launch_clients(Node, NumClients, _Nodes, SetType, CounterType, SyncInterval,
     lists:map(fun(Id) ->
                       {ok, Pid} = rpc:call(Node,
                                            lasp_advertisement_counter_client,
-                                           start_link,
+                                           start,
                                            [
                                             SetType,
                                             CounterType,

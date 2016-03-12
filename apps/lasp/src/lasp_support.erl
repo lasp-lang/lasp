@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_test_utils).
+-module(lasp_support).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -export([get_cluster_members/1,
@@ -46,7 +46,7 @@ pmap(F, L) ->
                     end),
                 N+1
         end, 0, L),
-    L2 = [receive {pmap, N, R} -> {N,R} end || _ <- L],
+    L2 = [receive {pmap, N, R} -> {N, R} end || _ <- L],
     {_, L3} = lists:unzip(lists:keysort(1, L2)),
     L3.
 
@@ -110,6 +110,9 @@ start_node(Name, Config, Case) ->
             ok = rpc:call(Node, application, load, [plumtree]),
             ok = rpc:call(Node, application, load, [lager]),
             ok = rpc:call(Node, application, load, [lasp]),
+            ok = rpc:call(Node, application, set_env, [lasp,
+                                                       instrumentation,
+                                                       false]),
             ok = rpc:call(Node, application, set_env, [lager,
                                                        log_root,
                                                        NodeDir]),

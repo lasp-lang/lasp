@@ -66,7 +66,7 @@ end_per_suite(_Config) ->
     _Config.
 
 init_per_testcase(Case, Config) ->
-    Nodes = lasp_test_utils:pmap(fun(N) -> lasp_test_utils:start_node(N, Config, Case) end, [jaguar, shadow, thorn, pyros]),
+    Nodes = lasp_support:pmap(fun(N) -> lasp_support:start_node(N, Config, Case) end, [jaguar, shadow, thorn, pyros]),
     ct:pal("Nodes: ~p", [Nodes]),
 
     RunnerNode = runner_node(),
@@ -87,7 +87,7 @@ init_per_testcase(Case, Config) ->
     timer:sleep(60),
 
     %% Wait until convergence.
-    ok = lasp_test_utils:wait_until_joined(Nodes1, Nodes1),
+    ok = lasp_support:wait_until_joined(Nodes1, Nodes1),
     ct:pal("Cluster converged."),
 
     {ok, _} = ct_cover:add_nodes(Nodes1),
@@ -99,7 +99,7 @@ end_per_testcase(_, _Config) ->
     %% shutdown and trigger an exception, sigh.
     timer:sleep(5000),
 
-    lasp_test_utils:pmap(fun(Node) -> ct_slave:stop(Node) end, [jaguar, shadow, thorn, pyros]),
+    lasp_support:pmap(fun(Node) -> ct_slave:stop(Node) end, [jaguar, shadow, thorn, pyros]),
 
     ok.
 

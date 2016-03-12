@@ -89,10 +89,9 @@ fold(Ref, Function, Acc) ->
 %% @private
 init([Identifier]) ->
     try
-        Identifier = ets:new(Identifier, [set,
+        Identifier = ets:new(Identifier, [ordered_set,
                                           named_table,
-                                          public,
-                                          {write_concurrency, true}]),
+                                          public]),
         {ok, #state{ref=Identifier}}
     catch
         _:Reason ->

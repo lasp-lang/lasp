@@ -82,21 +82,6 @@ threshold_met(lasp_orset, Value, {strict, Threshold}) ->
 threshold_met(lasp_orset, Value, Threshold) ->
     is_inflation(lasp_orset, Threshold, Value);
 
-threshold_met(lasp_orswot, Value, {strict, Threshold}) ->
-    is_strict_inflation(lasp_orswot, Threshold, Value);
-threshold_met(lasp_orswot, Value, Threshold) ->
-    is_inflation(lasp_orswot, Threshold, Value);
-
-threshold_met(riak_dt_orswot, Value, {strict, Threshold}) ->
-    is_strict_inflation(riak_dt_orswot, Threshold, Value);
-threshold_met(riak_dt_orswot, Value, Threshold) ->
-    is_inflation(riak_dt_orswot, Threshold, Value);
-
-threshold_met(riak_dt_map, Value, {strict, Threshold}) ->
-    is_strict_inflation(riak_dt_map, Threshold, Value);
-threshold_met(riak_dt_map, Value, Threshold) ->
-    is_inflation(riak_dt_map, Threshold, Value);
-
 threshold_met(lasp_gcounter, Value, {value, {strict, Threshold}}) ->
     Threshold < lasp_gcounter:value(Value);
 threshold_met(lasp_gcounter, Value, {value, Threshold}) ->
@@ -176,9 +161,6 @@ is_lattice_inflation(lasp_pncounter, Previous, Current) ->
             end
             end, true, Previous);
 
-is_lattice_inflation(lasp_orswot, {Previous, _, _}, {Current, _, _}) ->
-    riak_dt_vclock:descends(Current, Previous);
-
 is_lattice_inflation(lasp_top_k_set, {K, Previous}, {K, Current}) ->
     orddict:fold(fun(Key, Value, Acc) ->
                         case orddict:find(Key, Current) of
@@ -209,12 +191,6 @@ is_lattice_inflation(lasp_orset, Previous, Current) ->
                                 Acc andalso ids_inflated(lasp_orset, Ids, Ids1)
                         end
                 end, true, Previous);
-
-is_lattice_inflation(riak_dt_orswot, {Previous, _, _}, {Current, _, _}) ->
-    riak_dt_vclock:descends(Current, Previous);
-
-is_lattice_inflation(riak_dt_map, {Previous, _, _}, {Current, _, _}) ->
-    riak_dt_vclock:descends(Current, Previous);
 
 is_lattice_inflation(lasp_gcounter, Previous, Current) ->
     PreviousList = orddict:to_list(Previous),
@@ -278,9 +254,6 @@ is_lattice_strict_inflation(lasp_pncounter, [], []) ->
 is_lattice_strict_inflation(lasp_pncounter, [], _Current) ->
     true;
 
-is_lattice_strict_inflation(lasp_orswot, {Previous, _, _}, {Current, _, _}) ->
-    riak_dt_vclock:dominates(Current, Previous);
-
 is_lattice_strict_inflation(lasp_orset_gbtree, Previous, Current) ->
     %% We already know that `Previous' is fully covered in `Current', so
     %% we just need to look for a change -- removal (false -> true), or
@@ -318,30 +291,6 @@ is_lattice_strict_inflation(lasp_orset, Previous, Current) ->
                     end, false, Previous),
     NewElements = length(Previous) < length(Current),
     IsLatticeInflation andalso (DeletedElements orelse NewElements);
-
-is_lattice_strict_inflation(riak_dt_orswot,
-                            {PV, PE, _}=Previous,
-                            {CV, CE, _}=Current) ->
-    IsLatticeInflation = is_lattice_inflation(riak_dt_orswot, Previous,
-                                              Current),
-    DeletedElements = dict:size(PE) > dict:size(CE),
-    DominatedClock = riak_dt_vclock:dominates(CV, PV),
-    EqualClocks = riak_dt_vclock:equal(CV, PV),
-    IsLatticeInflation andalso (
-        (EqualClocks andalso DeletedElements) orelse
-        DominatedClock);
-
-is_lattice_strict_inflation(riak_dt_map,
-                            {PV, PE, _}=Previous,
-                            {CV, CE, _}=Current) ->
-    IsLatticeInflation = is_lattice_inflation(riak_dt_orswot, Previous,
-                                              Current),
-    DeletedElements = dict:size(PE) > dict:size(CE),
-    DominatedClock = riak_dt_vclock:dominates(CV, PV),
-    EqualClocks = riak_dt_vclock:equal(CV, PV),
-    IsLatticeInflation andalso (
-        (EqualClocks andalso DeletedElements) orelse
-        DominatedClock);
 
 is_lattice_strict_inflation(lasp_gcounter, Previous, Current) ->
     %% Massive shortcut here -- get the value and see if it's different.
@@ -507,102 +456,6 @@ riak_dt_gcounter_strict_inflation_test() ->
     %% A3 is after A2.
     ?assertEqual(true,
                  is_lattice_strict_inflation(riak_dt_gcounter, A2, A3)).
-
-%% riak_dt_orswot tests.
-
-riak_dt_orswot_inflation_test() ->
-    A1 = riak_dt_orswot:new(),
-    B1 = riak_dt_orswot:new(),
-
-    {ok, A2} = riak_dt_orswot:update({add, 1}, a, A1),
-    {ok, B2} = riak_dt_orswot:update({add, 2}, b, B1),
-    {ok, A3} = riak_dt_orswot:update({remove, 1}, a, A2),
-
-    %% A1 and B1 are equivalent.
-    ?assertEqual(true, is_lattice_inflation(riak_dt_orswot, A1, B1)),
-
-    %% A2 after A1.
-    ?assertEqual(true, is_lattice_inflation(riak_dt_orswot, A1, A2)),
-
-    %% Concurrent
-    ?assertEqual(false, is_lattice_inflation(riak_dt_orswot, A2, B2)),
-
-    %% A3 after A2.
-    ?assertEqual(true, is_lattice_inflation(riak_dt_orswot, A2, A3)).
-
-riak_dt_orswot_strict_inflation_test() ->
-    A1 = riak_dt_orswot:new(),
-    B1 = riak_dt_orswot:new(),
-
-    {ok, A2} = riak_dt_orswot:update({add, 1}, a, A1),
-    {ok, B2} = riak_dt_orswot:update({add, 2}, b, B1),
-    {ok, A3} = riak_dt_orswot:update({remove, 1}, a, A2),
-
-    %% A1 and B1 are equivalent.
-    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_orswot, A1, B1)),
-
-    %% A2 after A1.
-    ?assertEqual(true, is_lattice_strict_inflation(riak_dt_orswot, A1, A2)),
-
-    %% Concurrent
-    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_orswot, A2, B2)),
-
-    %% A3 after A2.
-    ?assertEqual(true, is_lattice_strict_inflation(riak_dt_orswot, A2, A3)).
-
-%% riak_dt_map tests.
-
-riak_dt_map_inflation_test() ->
-    A1 = riak_dt_map:new(),
-    B1 = riak_dt_map:new(),
-
-    {ok, A2} = riak_dt_map:update({update, [{update,
-                                             {'X', riak_dt_orset},
-                                              {add, 1}}]}, a, A1),
-    {ok, B2} = riak_dt_map:update({update, [{update,
-                                             {'X', riak_dt_orset},
-                                              {add, 2}}]}, b, B1),
-    {ok, A3} = riak_dt_map:update({update, [{update,
-                                             {'X', riak_dt_orset},
-                                              {remove, 1}}]}, a, A2),
-
-    %% A1 and B1 are equivalent.
-    ?assertEqual(true, is_lattice_inflation(riak_dt_map, A1, B1)),
-
-    %% A2 after A1.
-    ?assertEqual(true, is_lattice_inflation(riak_dt_map, A1, A2)),
-
-    %% Concurrent
-    ?assertEqual(false, is_lattice_inflation(riak_dt_map, A2, B2)),
-
-    %% A3 after A2.
-    ?assertEqual(true, is_lattice_inflation(riak_dt_map, A2, A3)).
-
-riak_dt_map_strict_inflation_test() ->
-    A1 = riak_dt_map:new(),
-    B1 = riak_dt_map:new(),
-
-    {ok, A2} = riak_dt_map:update({update, [{update,
-                                             {'X', riak_dt_orset},
-                                              {add, 1}}]}, a, A1),
-    {ok, B2} = riak_dt_map:update({update, [{update,
-                                             {'X', riak_dt_orset},
-                                              {add, 2}}]}, b, B1),
-    {ok, A3} = riak_dt_map:update({update, [{update,
-                                             {'X', riak_dt_orset},
-                                              {remove, 1}}]}, a, A2),
-
-    %% A1 and B1 are equivalent.
-    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_map, A1, B1)),
-
-    %% A2 after A1.
-    ?assertEqual(true, is_lattice_strict_inflation(riak_dt_map, A1, A2)),
-
-    %% Concurrent
-    ?assertEqual(false, is_lattice_strict_inflation(riak_dt_map, A2, B2)),
-
-    %% A3 after A2.
-    ?assertEqual(true, is_lattice_strict_inflation(riak_dt_map, A2, A3)).
 
 %% lasp_orset tests.
 

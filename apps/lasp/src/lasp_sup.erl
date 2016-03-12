@@ -71,7 +71,11 @@ init(_Args) ->
                             permanent, 5000, worker,
                             [lasp_marathon_peer_refresh_service]},
 
-    BaseSpecs = [Unique, PlumtreeBackend, Plumtree, MarathonPeerRefresh, Process],
+    BaseSpecs = [Unique,
+                 PlumtreeBackend,
+                 Plumtree,
+                 MarathonPeerRefresh,
+                 Process],
 
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
     InstrEnabled = application:get_env(?APP, instrumentation, InstrDefault),
@@ -80,6 +84,7 @@ init(_Args) ->
         true ->
             ok = application:set_env(?APP, instrumentation, InstrEnabled),
             lager:info("Instrumentation: ~p", [InstrEnabled]),
+
             ClientTrans = {lasp_client_transmission_instrumentation,
                            {lasp_transmission_instrumentation, start_link, [client]},
                             permanent, 5000, worker,
@@ -88,11 +93,25 @@ init(_Args) ->
                            {lasp_transmission_instrumentation, start_link, [server]},
                             permanent, 5000, worker,
                             [lasp_transmission_instrumentation]},
-            DivergenceTrans = {lasp_divergence_instrumentation,
-                               {lasp_divergence_instrumentation, start_link, []},
-                                permanent, 5000, worker,
-                                [lasp_divergence_instrumentation]},
-            BaseSpecs ++ [ClientTrans, ServerTrans, DivergenceTrans, Web];
+            Divergence = {lasp_divergence_instrumentation,
+                          {lasp_divergence_instrumentation, start_link, []},
+                           permanent, 5000, worker,
+                           [lasp_divergence_instrumentation]},
+            ReadLatency = {lasp_read_latency_instrumentation,
+                           {lasp_read_latency_instrumentation, start_link, []},
+                            permanent, 5000, worker,
+                            [lasp_read_latency_instrumentation]},
+            WriteLatency = {lasp_write_latency_instrumentation,
+                            {lasp_write_latency_instrumentation, start_link, []},
+                             permanent, 5000, worker,
+                             [lasp_write_latency_instrumentation]},
+
+            BaseSpecs ++ [ClientTrans,
+                          ServerTrans,
+                          Divergence,
+                          ReadLatency,
+                          WriteLatency,
+                          Web];
         false ->
             ok = application:set_env(?APP, instrumentation, InstrEnabled),
             BaseSpecs
@@ -106,10 +125,9 @@ init(_Args) ->
     %% Run local simulations if instrumentation is enabled.
     case SimEnabled of
         true ->
-            Nodes = [node()],
             spawn(fun() ->
                         timer:sleep(10000),
-                        lasp_simulate_resource:run(Nodes)
+                        lasp_simulate_resource:run()
                   end);
         false ->
             ok

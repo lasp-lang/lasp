@@ -25,3 +25,7 @@
 
 %% Unified interface for allowing parameterized CRDTs.
 -callback new([term()]) -> term().
+
+%% Callback for delta update.
+-callback update_delta(term(), actor(), crdt()) ->
+    {ok, crdt()} | {error, atom()}.

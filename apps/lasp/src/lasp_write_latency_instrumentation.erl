@@ -47,7 +47,7 @@
                 status=init,
                 filename}).
 
--define(INTERVAL, 10000). %% 10 seconds.
+-define(INTERVAL, 1000). %% 10 seconds.
 
 %%%===================================================================
 %%% API

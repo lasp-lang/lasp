@@ -195,9 +195,7 @@ handle_info(sync, #state{set_type=SetType,
     CountersDelta = dict:new(),
 
     %% Reschedule sychronization.
-    Jitter = random:uniform(SyncInterval),
-    NextSyncInterval = SyncInterval + Jitter,
-    erlang:send_after(NextSyncInterval, self(), sync),
+    erlang:send_after(SyncInterval, self(), sync),
 
     {noreply, State#state{ads_with_contracts=AdsWithContracts,
                           counters=Counters,

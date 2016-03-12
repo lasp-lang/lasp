@@ -326,7 +326,7 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
                                       %% Log transmission of the local delta.
                                       log_transmission(Delta),
 
-                                      {ok, {_, _, _, Counter1}} = lasp:bind(Ad, Delta),
+                                      {ok, {_, _, _, Counter1}} = lasp:bind(Ad, {delta, Delta}),
 
                                       %% Log receipt of information from the server.
                                       log_transmission(Counter1),

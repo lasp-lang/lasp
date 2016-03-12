@@ -25,12 +25,13 @@
          content_types_provided/2,
          to_json/2]).
 
--export([run/0]).
+-export([run/0,
+         advertisement_counter_transmission_simulation/1]).
 
 -include("lasp.hrl").
 -include_lib("webmachine/include/webmachine.hrl").
 
--define(NUM_EVENTS, 1000000).
+-define(NUM_EVENTS, 100000).
 -define(NUM_CLIENTS_PER_VM, 500).
 
 -define(ORSET, lasp_orset).
@@ -44,7 +45,7 @@ content_types_provided(Req, Ctx) ->
     {[{"application/json", to_json}], Req, Ctx}.
 
 to_json(ReqData, State) ->
-    {ok, _Pid} = spawn_link(?MODULE, run, []),
+    spawn_link(?MODULE, run, []),
     Encoded = jsx:encode(#{status => ok}),
     {Encoded, ReqData, State}.
 
@@ -54,7 +55,20 @@ run() ->
     {ok, Nodes} = lasp_peer_service:members(),
 
     %% Run the simulation.
-    advertisement_counter_transmission_simulation(Nodes),
+    Profile = application:get_env(?APP, profile, true),
+    case Profile of
+        true ->
+            lager:info("Applying and profiling function..."),
+            eprof:profile([self()],
+                          ?MODULE,
+                          advertisement_counter_transmission_simulation,
+                          [Nodes]),
+
+            lager:info("Analyzing..."),
+            eprof:analyze(total, [{sort, time}]);
+        false ->
+            advertisement_counter_transmission_simulation(Nodes)
+    end,
 
     ok.
 

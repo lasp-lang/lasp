@@ -43,6 +43,7 @@
          parent_clock/2]).
 -export([to_binary/2]).
 -export([to_version/2]).
+-export([update_delta/3]).
 
 -export_type([bounded_lww_set/0,
               binary_bounded_lww_set/0,
@@ -70,10 +71,20 @@ new() ->
 new([K]) ->
     {K, orddict:new()}.
 
-% %% @doc Update the CRDT with a given key/value pair.
+%% @doc Update the CRDT with a given key/value pair.
 -spec update(bounded_lww_set_op(), actor(), bounded_lww_set()) ->
     {ok, bounded_lww_set()}.
 update({add, Value}, _Actor, {K, Set0}) ->
+    Key = timestamp(erlang:timestamp()),
+    UpdateFun = fun(_) -> Value end,
+    Set = orddict:update({Key, Value}, UpdateFun, false, Set0),
+    {ok, enforce_k({K, Set})}.
+
+%% @todo: Optimize.
+%% @doc Update the CRDT with a given key/value pair.
+-spec update_delta(bounded_lww_set_op(), actor(), bounded_lww_set()) ->
+    {ok, bounded_lww_set()}.
+update_delta({add, Value}, _Actor, {K, Set0}) ->
     Key = timestamp(erlang:timestamp()),
     UpdateFun = fun(_) -> Value end,
     Set = orddict:update({Key, Value}, UpdateFun, false, Set0),

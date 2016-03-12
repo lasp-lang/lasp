@@ -23,7 +23,10 @@
              waiting_threads = [] :: list(pending_threshold()),
              lazy_threads = [] :: list(pending_threshold()),
              type :: type(),
-             metadata :: metadata()}).
+             metadata :: metadata(),
+             delta_counter :: non_neg_integer(),
+             delta_map :: orddict:orddict(),
+             delta_ack_map :: orddict:orddict()}).
 
 -type variable() :: #dv{}.
 

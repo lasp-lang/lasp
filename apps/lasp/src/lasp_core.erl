@@ -50,7 +50,8 @@
          wait_needed/2,
          wait_needed/3,
          reply_to_all/2,
-         reply_to_all/3]).
+         reply_to_all/3,
+         receive_delta/2]).
 
 %% Exported functions for vnode integration, where callback behavior is
 %% dynamic.
@@ -233,9 +234,16 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
         _ ->
             Value = lasp_type:new(Type),
             Metadata = MetadataFun(MetadataNew),
+            Counter0 = 0,
+            DeltaMap0 = orddict:new(),
+            AckMap = orddict:new(),
+            DeltaMap = orddict:store(Counter0, Value, DeltaMap0),
             ok = do(put, [Store, Id, #dv{value=Value,
                                          type=Type,
-                                         metadata=Metadata}]),
+                                         metadata=Metadata,
+                                         delta_counter=increment_counter(Counter0),
+                                         delta_map=DeltaMap,
+                                         delta_ack_map=AckMap}]),
             {ok, {Id, Type, Metadata, Value}}
     end.
 
@@ -339,15 +347,27 @@ bind(Id, Value, Store) ->
 -spec bind(id(), value(), function(), store()) -> {ok, var()}.
 bind(Id, {delta, Value}, MetadataFun, Store) ->
     Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
-                      waiting_threads=WT}=Object) ->
+                      waiting_threads=WT, delta_counter=Counter0,
+                      delta_map=DeltaMap0, delta_ack_map=AckMap}=Object) ->
             Metadata = MetadataFun(Metadata0),
             %% Merge may throw for invalid types.
             try
                 Merged = lasp_type:merge(Type, Value0, Value),
                 {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
-                NewObject = #dv{type=Type, metadata=Metadata, value=Merged, waiting_threads=SW},
-                %% Return value is a delta state
-                {NewObject, {ok, {Id, Type, Metadata, {delta, Value, Merged}}}}
+                case lasp_lattice:is_strict_inflation(Type, Value0, Merged) of
+                    true ->
+                        DeltaMap = orddict:store(Counter0, Value, DeltaMap0),
+                        NewObject = #dv{type=Type, metadata=Metadata, value=Merged,
+                                        waiting_threads=SW,
+                                        delta_counter=increment_counter(Counter0),
+                                        delta_map=DeltaMap, delta_ack_map=AckMap},
+                        %% Return value is a delta state.
+                        {NewObject, {ok, {Id, Type, Metadata, {delta, Merged}}}};
+                    false ->
+                        %% Given delta state is already merged, no delta info update.
+                        {Object#dv{waiting_threads=SW},
+                         {ok, {Id, Type, Metadata, {delta, Merged}}}}
+                end
             catch
                 _:Reason ->
                     %% Merge threw.
@@ -359,7 +379,8 @@ bind(Id, {delta, Value}, MetadataFun, Store) ->
     do(update, [Store, Id, Mutator]);
 bind(Id, Value, MetadataFun, Store) ->
     Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
-                      waiting_threads=WT}=Object) ->
+                      waiting_threads=WT, delta_counter=Counter,
+                      delta_map=DeltaMap, delta_ack_map=AckMap}=Object) ->
             Metadata = MetadataFun(Metadata0),
             case Value0 of
                 Value ->
@@ -372,7 +393,11 @@ bind(Id, Value, MetadataFun, Store) ->
                         case lasp_lattice:is_inflation(Type, Value0, Merged) of
                             true ->
                                 {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
-                                NewObject = #dv{type=Type, metadata=Metadata, value=Merged, waiting_threads=SW},
+                                NewObject = #dv{type=Type, metadata=Metadata,
+                                                value=Merged, waiting_threads=SW,
+                                                delta_counter=Counter,
+                                                delta_map=DeltaMap,
+                                                delta_ack_map=AckMap},
                                 {NewObject, {ok, {Id, Type, Metadata, Merged}}};
                             false ->
                                 %% Value is old.
@@ -830,6 +855,40 @@ reply_to_all([From|T], StillWaiting, Result) ->
 reply_to_all([], StillWaiting, _Result) ->
     {ok, StillWaiting}.
 
+%% @doc When the delta interval is arrived, bind it with the existing object.
+%%      If the object does not exist, declare it.
+%%
+-spec receive_delta(store(), {delta_send, value(), function(), function()} |
+                             {delta_ack, id(), node(), non_neg_integer()}) ->
+    ok | error.
+receive_delta(Store, {delta_send, {Id, Type, _Metadata, Deltas},
+                      MetadataFunBind, MetadataFunDeclare}) ->
+    case do(get, [Store, Id]) of
+        {ok, _Object} ->
+            {ok, _Result} = bind(Id, Deltas, MetadataFunBind, Store);
+        {error, not_found} ->
+            {ok, _Result} = declare(Id, Type, MetadataFunDeclare, Store),
+            receive_delta(Store, {delta_send, {Id, Type, _Metadata, Deltas},
+                                  MetadataFunBind, MetadataFunDeclare})
+    end,
+    ok;
+%% @doc When the delta ack is arrived with the counter, store it in the ack map.
+%%
+receive_delta(Store, {delta_ack, Id, From, Counter}) ->
+    case do(get, [Store, Id]) of
+        {ok, #dv{delta_ack_map=AckMap0}=Object} ->
+            OldAck = case orddict:find(From, AckMap0) of
+                         {ok, Ack0} ->
+                             Ack0;
+                         error ->
+                             0
+                     end,
+            AckMap = orddict:store(From, max(OldAck, Counter), AckMap0),
+            do(put, [Store, Id, Object#dv{delta_ack_map=AckMap}]);
+        _ ->
+            error
+    end.
+
 %% Internal functions.
 
 %% @private
@@ -849,6 +908,10 @@ write(Type, Value, Key, Store) ->
     V1 = #dv{type=Type, value=Value, waiting_threads=StillWaiting},
     ok = do(put, [Store, Key, V1]),
     ok.
+
+%% @private
+increment_counter(Counter) ->
+    Counter + 1.
 
 -ifdef(TEST).
 

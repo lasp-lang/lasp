@@ -89,28 +89,20 @@ init(_Args) ->
                            {lasp_transmission_instrumentation, start_link, [client]},
                             permanent, 5000, worker,
                             [lasp_transmission_instrumentation]},
+
             ServerTrans = {lasp_server_transmission_instrumentation,
                            {lasp_transmission_instrumentation, start_link, [server]},
                             permanent, 5000, worker,
                             [lasp_transmission_instrumentation]},
+
             Divergence = {lasp_divergence_instrumentation,
                           {lasp_divergence_instrumentation, start_link, []},
                            permanent, 5000, worker,
                            [lasp_divergence_instrumentation]},
-            ReadLatency = {lasp_read_latency_instrumentation,
-                           {lasp_read_latency_instrumentation, start_link, []},
-                            permanent, 5000, worker,
-                            [lasp_read_latency_instrumentation]},
-            WriteLatency = {lasp_write_latency_instrumentation,
-                            {lasp_write_latency_instrumentation, start_link, []},
-                             permanent, 5000, worker,
-                             [lasp_write_latency_instrumentation]},
 
             BaseSpecs ++ [ClientTrans,
                           ServerTrans,
                           Divergence,
-                          ReadLatency,
-                          WriteLatency,
                           Web];
         false ->
             ok = application:set_env(?APP, instrumentation, InstrEnabled),

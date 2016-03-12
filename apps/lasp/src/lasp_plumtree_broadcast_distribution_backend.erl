@@ -471,11 +471,9 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    {Time, Result} = timer:tc(?CORE,
-                              bind,
-                              [Id, Value, ?CLOCK_INCR, Store]),
-    %% Log read latency in milliseconds.
-    log_write_latency(Time),
+    {_Time, Result} = timer:tc(?CORE,
+                               bind,
+                               [Id, Value, ?CLOCK_INCR, Store]),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Incoming bind operation; merge incoming clock with the remote clock.
@@ -486,11 +484,9 @@ handle_call({bind, Id, Value}, _From,
 %% this could change if the other module is later refactored.
 handle_call({bind, Id, Metadata0, Value}, _From,
             #state{store=Store, counter=Counter}=State) ->
-    {Time, Result} = timer:tc(?CORE,
-                              bind,
-                              [Id, Value, ?CLOCK_MERG, Store]),
-    %% Log read latency in milliseconds.
-    log_write_latency(Time),
+    {_Time, Result} = timer:tc(?CORE,
+                               bind,
+                               [Id, Value, ?CLOCK_MERG, Store]),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Bind two variables together.
@@ -524,11 +520,9 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
                   ({error, Error}) ->
                     {reply, {error, Error}, State}
                end,
-    {Time, Value} = timer:tc(?CORE,
-                             read,
-                             [Id, Threshold, Store, From, ReplyFun, ?BLOCKING]),
-    %% Log read latency in milliseconds.
-    log_read_latency(Time),
+    {_Time, Value} = timer:tc(?CORE,
+                              read,
+                              [Id, Threshold, Store, From, ReplyFun, ?BLOCKING]),
     Value;
 
 %% Spawn a process to perform a filter.
@@ -702,7 +696,8 @@ terminate(_Reason, _State) ->
     ok.
 
 %% @private
--spec code_change(term() | {down, term()}, #state{}, term()) -> {ok, #state{}}.
+-spec code_change(term() | {down, term()}, #state{}, term()) ->
+    {ok, #state{}}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
@@ -753,6 +748,7 @@ get(Id, Store) ->
 increment_counter(Counter) ->
     Counter + 1.
 
+%% @private
 collect_deltas(Type, DeltaMap, Min, Max) ->
     SmallDeltaMap = orddict:filter(fun(Counter, _Delta) ->
                                            (Counter >= Min) or (Counter < Max)
@@ -785,36 +781,6 @@ log_transmission(Term) ->
         case application:get_env(?APP, instrumentation, false) of
             true ->
                 lasp_transmission_instrumentation:log(server, Term, node());
-            false ->
-                ok
-        end
-    catch
-        _:Error ->
-            lager:info("Logging failed; couldn't send message: ~p",
-                       [Error])
-    end.
-
-%% @private
-log_read_latency(Time) ->
-    try
-        case application:get_env(?APP, instrumentation, false) of
-            true ->
-                lasp_read_latency_instrumentation:sample(Time / 1000, node());
-            false ->
-                ok
-        end
-    catch
-        _:Error ->
-            lager:info("Logging failed; couldn't send message: ~p",
-                       [Error])
-    end.
-
-%% @private
-log_write_latency(Time) ->
-    try
-        case application:get_env(?APP, instrumentation, false) of
-            true ->
-                lasp_write_latency_instrumentation:sample(Time / 1000, node());
             false ->
                 ok
         end

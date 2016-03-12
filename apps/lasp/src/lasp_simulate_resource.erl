@@ -31,8 +31,8 @@
 -include("lasp.hrl").
 -include_lib("webmachine/include/webmachine.hrl").
 
--define(NUM_EVENTS, 100000).
--define(NUM_CLIENTS_PER_VM, 500).
+-define(NUM_EVENTS, 200000).
+-define(NUM_CLIENTS_PER_VM, 100).
 
 -define(ORSET, lasp_orset).
 -define(COUNTER, lasp_gcounter).
@@ -107,9 +107,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
             {30000, 60000}
     end,
 
-    {ok, [WriteLatencyFilename1,
-          ReadLatencyFilename1,
-          DivergenceFilename1,
+    {ok, [DivergenceFilename1,
           ClientFilename1|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
                                                      false,
@@ -121,9 +119,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
 
     %% Run the simulation with the orset, gcounter, deltas enabled;
     %% 500ms sync.
-    {ok, [WriteLatencyFilename2,
-          ReadLatencyFilename2,
-          _,
+    {ok, [_,
           ClientFilename2|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
                                                      true,
@@ -134,9 +130,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
                                                      FastSync]),
 
     %% Run the simulation with the orset, gcounter, no deltas; 1s sync.
-    {ok, [_,
-          _,
-          DivergenceFilename2
+    {ok, [DivergenceFilename2
           |_]} = lasp_simulation:run(lasp_advertisement_counter,
                                     [Nodes,
                                      false,
@@ -149,10 +143,6 @@ advertisement_counter_transmission_simulation(Nodes) ->
     generate_plot(divergence, DivergenceFilename1, DivergenceFilename2),
 
     generate_plot(transmission, ClientFilename1, ClientFilename2),
-
-    generate_plot(read_latency, ReadLatencyFilename1, ReadLatencyFilename2),
-
-    generate_plot(write_latency, WriteLatencyFilename1, WriteLatencyFilename2),
 
     ok.
 

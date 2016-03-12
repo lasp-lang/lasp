@@ -114,26 +114,6 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
     %% Launch server processes.
     servers(SetType, Ads, AdsWithContracts),
 
-    %% Initialize write latency instrumentation.
-    WriteLatencyFilename = string:join(["write-latency",
-                                        atom_to_list(Deltas),
-                                        atom_to_list(SetType),
-                                        atom_to_list(CounterType),
-                                        integer_to_list(NumEvents),
-                                        integer_to_list(NumClients),
-                                        integer_to_list(SyncInterval)], "-") ++ ".csv",
-    ok = lasp_write_latency_instrumentation:start(WriteLatencyFilename, NumClients),
-
-    %% Initialize read latency instrumentation.
-    ReadLatencyFilename = string:join(["read-latency",
-                                       atom_to_list(Deltas),
-                                       atom_to_list(SetType),
-                                       atom_to_list(CounterType),
-                                       integer_to_list(NumEvents),
-                                       integer_to_list(NumClients),
-                                       integer_to_list(SyncInterval)], "-") ++ ".csv",
-    ok = lasp_read_latency_instrumentation:start(ReadLatencyFilename, NumClients),
-
     %% Initialize divergence transmission instrumentation.
     DivergenceFilename = string:join(["divergence",
                                       atom_to_list(Deltas),
@@ -174,11 +154,8 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
                 num_events=NumEvents,
                 num_clients=NumClients,
                 sync_interval=SyncInterval,
-                filenames=[WriteLatencyFilename,
-                           ReadLatencyFilename,
-                           DivergenceFilename,
-                           ClientFilename,
-                           ServerFilename]}}.
+                filenames=[DivergenceFilename, ClientFilename, ServerFilename]
+               }}.
 
 %% @doc Launch a series of client processes, each of which is responsible
 %% for displaying a particular advertisement.
@@ -199,8 +176,6 @@ terminate(#state{client_list=ClientList}=State) ->
     end,
     lists:foreach(TerminateFun, ClientList),
     lasp_divergence_instrumentation:stop(),
-    lasp_write_latency_instrumentation:stop(),
-    lasp_read_latency_instrumentation:stop(),
     lasp_transmission_instrumentation:stop(client),
     lasp_transmission_instrumentation:stop(server),
     {ok, State}.

@@ -59,7 +59,7 @@ run() ->
     case Profile of
         true ->
             lager:info("Applying and profiling function..."),
-            eprof:profile([self()],
+            eprof:profile([self(), whereis(lasp_sup)],
                           ?MODULE,
                           advertisement_counter_transmission_simulation,
                           [Nodes]),

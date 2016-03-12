@@ -460,13 +460,13 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
 
 %% @private
 memory_report() ->
-    MemoryData = {_, _, {_BadPid, _}} = memsup:get_memory_data(),
+    MemoryData = {_, _, {BadPid, _}} = memsup:get_memory_data(),
     lager:info(""),
     lager:info("-----------------------------------------------------------", []),
     lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
     try
-        %% lager:info("Worst: ~p", [process_info(BadPid)])
-        %% lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))])
+        lager:info("Worst: ~p", [process_info(BadPid)]),
+        %% lager:info("Worst trace: ~s", [element(2, %% erlang:process_info(BadPid, backtrace))]),
         ok
     catch
         _:_ ->

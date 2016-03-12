@@ -190,7 +190,7 @@ handle_info(sync, #state{set_type=SetType,
     CountersDelta = dict:new(),
 
     %% Reschedule sychronization.
-    Jitter = lasp_support:puniform(trunc(SyncInterval / 2)),
+    Jitter = lasp_support:puniform(SyncInterval),
     NextSyncInterval = SyncInterval + Jitter,
     erlang:send_after(NextSyncInterval, self(), sync),
 

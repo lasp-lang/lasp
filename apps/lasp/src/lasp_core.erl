@@ -234,13 +234,14 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
         _ ->
             Value = lasp_type:new(Type),
             Metadata = MetadataFun(MetadataNew),
-            Counter = 0,
-            DeltaMap = orddict:new(),
+            Counter0 = 0,
+            DeltaMap0 = orddict:new(),
             AckMap = orddict:new(),
+            DeltaMap = orddict:store(Counter0, Value, DeltaMap0),
             ok = do(put, [Store, Id, #dv{value=Value,
                                          type=Type,
                                          metadata=Metadata,
-                                         delta_counter=Counter,
+                                         delta_counter=increment_counter(Counter0),
                                          delta_map=DeltaMap,
                                          delta_ack_map=AckMap}]),
             {ok, {Id, Type, Metadata, Value}}
@@ -361,11 +362,11 @@ bind(Id, {delta, Value}, MetadataFun, Store) ->
                                         delta_counter=increment_counter(Counter0),
                                         delta_map=DeltaMap, delta_ack_map=AckMap},
                         %% Return value is a delta state.
-                        {NewObject, {ok, {Id, Type, Metadata, {delta, Value, Merged}}}};
+                        {NewObject, {ok, {Id, Type, Metadata, {delta, Merged}}}};
                     false ->
                         %% Given delta state is already merged, no delta info update.
                         {Object#dv{metadata=Metadata, value=Merged, waiting_threads=SW},
-                         {ok, {Id, Type, Metadata, {delta, Value, Merged}}}}
+                         {ok, {Id, Type, Metadata, {delta, Merged}}}}
                 end
             catch
                 _:Reason ->

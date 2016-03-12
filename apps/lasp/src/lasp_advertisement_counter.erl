@@ -411,7 +411,7 @@ view_ad(CounterType, Id, Counters0, CountersDelta0) ->
         false ->
             %% Select a random advertisement from the list of
             %% active advertisements.
-            Random = random:uniform(dict:size(Counters0)),
+            Random = lasp_support:puniform(dict:size(Counters0)),
             {Ad, Counter0} = lists:nth(Random, dict:to_list(Counters0)),
             view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0)
     end.

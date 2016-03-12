@@ -84,11 +84,6 @@ start(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId) ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId]) ->
-    %% Seed the random number generator.
-    random:seed(erlang:phash2([node()]),
-                erlang:monotonic_time(),
-                erlang:unique_integer()),
-
     %% Schedule first synchronization interval.
     erlang:send_after(SyncInterval, self(), sync),
     erlang:send_after(?VIEW, self(), view),
@@ -195,7 +190,9 @@ handle_info(sync, #state{set_type=SetType,
     CountersDelta = dict:new(),
 
     %% Reschedule sychronization.
-    erlang:send_after(SyncInterval, self(), sync),
+    Jitter = lasp_support:puniform(trunc(SyncInterval / 2)),
+    NextSyncInterval = SyncInterval + Jitter,
+    erlang:send_after(NextSyncInterval, self(), sync),
 
     {noreply, State#state{ads_with_contracts=AdsWithContracts,
                           counters=Counters,

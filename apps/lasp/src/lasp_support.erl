@@ -30,8 +30,12 @@
          wait_until_disconnected/2,
          wait_until_connected/2,
          start_node/3,
+         puniform/1,
          partition_cluster/2,
          heal_cluster/2]).
+
+puniform(Range) ->
+    erlang:phash2(erlang:statistics(io), Range) + 1.
 
 get_cluster_members(Node) ->
     {Node, {ok, Res}} = {Node, rpc:call(Node, lasp_peer_service, members, [])},

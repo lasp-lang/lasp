@@ -861,14 +861,14 @@ reply_to_all([], StillWaiting, _Result) ->
 -spec receive_delta(store(), {delta_send, value(), function(), function()} |
                              {delta_ack, id(), node(), non_neg_integer()}) ->
     ok | error.
-receive_delta(Store, {delta_send, {Id, Type, _Metadata, Deltas},
+receive_delta(Store, {delta_send, {Id, Type, Metadata, Deltas},
                       MetadataFunBind, MetadataFunDeclare}) ->
     case do(get, [Store, Id]) of
         {ok, _Object} ->
             {ok, _Result} = bind(Id, Deltas, MetadataFunBind, Store);
         {error, not_found} ->
             {ok, _Result} = declare(Id, Type, MetadataFunDeclare, Store),
-            receive_delta(Store, {delta_send, {Id, Type, _Metadata, Deltas},
+            receive_delta(Store, {delta_send, {Id, Type, Metadata, Deltas},
                                   MetadataFunBind, MetadataFunDeclare})
     end,
     ok;

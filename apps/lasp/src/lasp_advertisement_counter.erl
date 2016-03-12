@@ -198,6 +198,7 @@ terminate(#state{client_list=ClientList}=State) ->
             Pid ! terminate
     end,
     lists:foreach(TerminateFun, ClientList),
+    lasp_divergence_instrumentation:stop(),
     lasp_write_latency_instrumentation:stop(),
     lasp_read_latency_instrumentation:stop(),
     lasp_transmission_instrumentation:stop(client),
@@ -227,7 +228,6 @@ wait(#state{count_events=Count, num_events=NumEvents}=State) ->
             case Count >= NumEvents of
                 true ->
                     lager:info("Events all processed!"),
-                    lasp_divergence_instrumentation:stop(),
                     {ok, State};
                 false ->
                     case Count rem ReportFrequency == 0 of

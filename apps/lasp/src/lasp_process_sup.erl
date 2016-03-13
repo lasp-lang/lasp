@@ -26,6 +26,7 @@
 %% API
 -export([start_link/0,
          start_child/1,
+         terminate/0,
          terminate_child/2]).
 
 %% Supervisor callbacks
@@ -38,6 +39,13 @@
 %% @doc API for starting the supervisor.
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
+%% @doc Terminate all children.
+terminate() ->
+    Children = supervisor:which_children(?MODULE),
+    lager:info("Terminating: ~p", [Children]),
+    [terminate_child(?MODULE, Child)
+     || {_Id, Child, _Type, _Modules} <- Children].
 
 %% @doc Start a child.
 start_child(Args) ->

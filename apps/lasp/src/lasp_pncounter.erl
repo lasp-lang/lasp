@@ -39,12 +39,14 @@
 
 -module(lasp_pncounter).
 -behaviour(riak_dt).
+-behaviour(lasp_dt).
 
 -export([new/0, new/2, value/1, value/2,
          update/3, update_delta/3, merge/2, equal/2, to_binary/1, from_binary/1, stats/1, stat/2]).
 -export([to_binary/2, current_version/1, change_versions/3]).
 -export([parent_clock/2, update/4]).
 -export([to_version/2]).
+-export([new/1]).
 
 %% EQC API
 -ifdef(EQC).
@@ -66,6 +68,10 @@
 -type v1_pncounter() :: {riak_dt_gcounter:gcounter(), riak_dt_gcounter:gcounter()}.
 -type version()      :: integer().
 -type any_pncounter() :: pncounter() | v1_pncounter().
+
+-spec new([]) -> pncounter().
+new([]) ->
+    [].
 
 %% @doc Create a new, empty `pncounter()'
 -spec new() -> pncounter().

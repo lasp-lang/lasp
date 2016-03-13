@@ -32,14 +32,14 @@ set style line 1 lt rgb "#A00000" lw 2 pt 1
 
 set output outputname
 set xlabel "Time in Seconds"
-set ylabel "Divergence in # of Events"
+set ylabel "Milliseconds / Write"
 
 set key top right
 
 set datafile missing '0'
 
 # log scale on the y axis
-set logscale y 2
+# set logscale y 2
 # set format y ""
 # set ytics 1e-6, 10, 1
 # set ytics add ("1" 1, ".1" 0.1, ".01" 0.01, "10^-3" 0.001, \
@@ -52,5 +52,5 @@ set logscale y 2
 # Input file contains comma-separated values fields
 set datafile separator ","
 
-plot inputfile1 using 1:3 title "OR-Set, G-Counter, Per-User, 500ms" with linespoints, \
-     inputfile2 using 1:3 title "OR-Set, G-Counter, Per-User, 1s" with linespoints
+plot inputfile1 using 1:2 title "OR-Set, G-Counter, 500ms" with dots, \
+     inputfile2 using 1:2 title "OR-Set, G-Counter, 1s" with dots

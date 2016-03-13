@@ -21,6 +21,8 @@
 -module(lasp_type).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
+-include("lasp.hrl").
+
 -export([new/1, update/4, merge/3, query/2]).
 
 %% @doc Initialize a new variable for a given type.
@@ -36,14 +38,14 @@ new(Type) ->
 update(Type, Operation, Actor, Value) ->
     case Type of
         {T, _Args} ->
-            case application:get_env(lasp, delta_mode, false) of
+            case mochiglobal:get(delta_mode, false) of
                 true ->
                     T:update_delta(Operation, Actor, Value);
                 false ->
                     T:update(Operation, Actor, Value)
             end;
         T ->
-            case application:get_env(lasp, delta_mode, false) of
+            case mochiglobal:get(delta_mode, false) of
                 true ->
                     T:update_delta(Operation, Actor, Value);
                 false ->

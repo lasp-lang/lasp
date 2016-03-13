@@ -30,9 +30,9 @@
 
 -include("lasp.hrl").
 
--export([synchronize/5,
-         log_transmission/1,
-         log_divergence/2,
+-export([synchronize/6,
+         log_transmission/2,
+         log_divergence/3,
          view_ad/4]).
 
 %% lasp_simulation callbacks
@@ -51,9 +51,6 @@ run(Args) ->
 %% The maximum number of impressions for each advertisement to display.
 -define(MAX_IMPRESSIONS, 50000).
 
-%% Log frequency.
--define(FREQ, 1000).
-
 %% Record definitions.
 
 -record(ad, {id, image, counter}).
@@ -71,6 +68,7 @@ run(Args) ->
                 counter_type,
                 num_events,
                 num_clients,
+                instrumentation,
                 sync_interval,
                 filenames}).
 
@@ -81,6 +79,7 @@ run(Args) ->
 init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
     %% Enable or disable deltas.
     ok = application:set_env(?APP, delta_mode, Deltas),
+    ok = mochiglobal:put(delta_mode, Deltas),
 
     %% Get the process identifier of the runner.
     Runner = self(),
@@ -147,7 +146,10 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
                                   integer_to_list(SyncInterval)], "-") ++ ".csv",
     ok = lasp_transmission_instrumentation:start(server, ServerFilename, NumClients),
 
-    {ok, #state{runner=Runner,
+    Instrumentation = mochiglobal:get(instrumentation, false),
+
+    {ok, #state{instrumentation=Instrumentation,
+                runner=Runner,
                 nodes=Nodes,
                 ads=Ads,
                 ad_list=AdList,
@@ -157,16 +159,18 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
                 num_events=NumEvents,
                 num_clients=NumClients,
                 sync_interval=SyncInterval,
-                filenames=[DivergenceFilename, ClientFilename, ServerFilename]}}.
+                filenames=[DivergenceFilename, ClientFilename, ServerFilename]
+               }}.
 
 %% @doc Launch a series of client processes, each of which is responsible
 %% for displaying a particular advertisement.
-clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetType,
+clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients,
+               instrumentation=Instrumentation, set_type=SetType,
                counter_type=CounterType, sync_interval=SyncInterval,
                ads_with_contracts=AdsWithContracts}=State) ->
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
-    Clients = launch_clients(NumClients, Nodes, SetType, CounterType,
+    Clients = launch_clients(NumClients, Nodes, Instrumentation, SetType, CounterType,
                              SyncInterval, Runner, AdsWithContracts),
     {ok, State#state{client_list=Clients}}.
 
@@ -176,7 +180,9 @@ terminate(#state{client_list=ClientList}=State) ->
     TerminateFun = fun(Pid) ->
             Pid ! terminate
     end,
+    lasp_process_sup:terminate(),
     lists:foreach(TerminateFun, ClientList),
+    lasp_divergence_instrumentation:stop(),
     lasp_transmission_instrumentation:stop(client),
     lasp_transmission_instrumentation:stop(server),
     {ok, State}.
@@ -192,18 +198,25 @@ summarize(#state{filenames=Filenames}) ->
 
 %% @doc Wait for all events to be delivered in the system.
 wait(#state{count_events=Count, num_events=NumEvents}=State) ->
+    DCOS = os:getenv("DCOS", "false"),
+    ReportFrequency = case DCOS of
+        "false" ->
+            10000;
+        _ ->
+            1000
+    end,
     receive
         view_ad_complete ->
             case Count >= NumEvents of
                 true ->
                     lager:info("Events all processed!"),
-                    lasp_divergence_instrumentation:stop(),
                     {ok, State};
                 false ->
-                    case Count rem ?FREQ == 0 of
+                    case Count rem ReportFrequency == 0 of
                         true ->
                             lager:info("Event ~p of ~p processed",
-                                       [Count, NumEvents]);
+                                       [Count, NumEvents]),
+                            memory_report();
                         false ->
                             ok
                     end,
@@ -254,12 +267,12 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
 %%      greatest-lower-bound across all clients for delta delivery,
 %%      which assumes we understand the client topology.
 %%
-synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
+synchronize(Instrumentation, SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
     %% Get latest list of advertisements from the server.
     {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
     %% Log state received from the server.
-    log_transmission(AdsWithContracts),
-    AdList = SetType:value(AdsWithContracts),
+    log_transmission(Instrumentation, AdsWithContracts),
+    AdList = lasp_type:query(SetType, AdsWithContracts),
     Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
     %% Refresh our dictionary with any new values from the server.
@@ -272,7 +285,7 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
                           false ->
                               {ok, {_, _, _, Counter}} = lasp:read(Ad, undefined),
                               %% Log state received from the server.
-                              log_transmission(Counter),
+                              log_transmission(Instrumentation, Counter),
                               dict:store(Ad, Counter, Acc);
                           true ->
                               Acc
@@ -288,17 +301,17 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
     %%     state, prune it by identifier.
     %%
     SyncFun = fun(Ad, Counter0, Acc) ->
-                      Counter = case application:get_env(?APP, delta_mode, false) of
+                      Counter = case mochiglobal:get(delta_mode, false) of
                           true ->
                               case dict:find(Ad, CountersDelta0) of
                                   {ok, Delta} ->
                                       %% Log transmission of the local delta.
-                                      log_transmission(Delta),
+                                      log_transmission(Instrumentation, Delta),
 
-                                      {ok, {_, _, _, Counter1}} = lasp:bind(Ad, Delta),
+                                      {ok, {_, _, _, Counter1}} = lasp:bind(Ad, {delta, Delta}),
 
                                       %% Log receipt of information from the server.
-                                      log_transmission(Counter1),
+                                      log_transmission(Instrumentation, Counter1),
 
                                       %% Return server value.
                                       Counter1;
@@ -308,12 +321,12 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
                               end;
                           false ->
                               %% Log transmission of the local delta (or state).
-                              log_transmission(Counter0),
+                              log_transmission(Instrumentation, Counter0),
 
                               {ok, {_, _, _, Counter1}} = lasp:bind(Ad, Counter0),
 
                               %% Log receipt of information from the server.
-                              log_transmission(Counter1),
+                              log_transmission(Instrumentation, Counter1),
 
                               Counter1
                       end,
@@ -337,19 +350,19 @@ servers(SetType, Ads, AdsWithContracts) ->
 
     %% Get the current advertisement list.
     {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
-    AdList = SetType:value(AdList0),
+    AdList = lasp_type:query(SetType, AdList0),
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
     lists:map(fun(Ad) ->
-                ServerPid = spawn_link(?MODULE, server, [Ad, Ads]),
+                ServerPid = spawn(?MODULE, server, [Ad, Ads]),
                 {ok, _} = lasp:update(Servers, {add, ServerPid}, undefined),
                 ServerPid
                 end, AdList).
 
 %% @private
-log_transmission(Term) ->
-    case application:get_env(?APP, instrumentation, false) of
+log_transmission(Instrumentation, Term) ->
+    case Instrumentation of
         true ->
             lasp_transmission_instrumentation:log(client, Term, node());
         false ->
@@ -357,15 +370,15 @@ log_transmission(Term) ->
     end.
 
 %% @private
-log_divergence(buffer, Number) ->
-    case application:get_env(?APP, instrumentation, false) of
+log_divergence(Instrumentation, buffer, Number) ->
+    case Instrumentation of
         true ->
             lasp_divergence_instrumentation:buffer(Number, node());
         false ->
             ok
     end;
-log_divergence(flush, Number) ->
-    case application:get_env(?APP, instrumentation, false) of
+log_divergence(Instrumentation, flush, Number) ->
+    case Instrumentation of
         true ->
             lasp_divergence_instrumentation:flush(Number, node());
         false ->
@@ -374,13 +387,13 @@ log_divergence(flush, Number) ->
 
 %% @private
 view_ad(CounterType, Id, Counters0, CountersDelta0) ->
-    case dict:size(Counters0) of
-        0 ->
+    case dict:is_empty(Counters0) of
+        true ->
             {ok, {Counters0, CountersDelta0}};
-        _ ->
+        false ->
             %% Select a random advertisement from the list of
             %% active advertisements.
-            Random = random:uniform(dict:size(Counters0)),
+            Random = lasp_support:puniform(dict:size(Counters0)),
             {Ad, Counter0} = lists:nth(Random, dict:to_list(Counters0)),
             view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0)
     end.
@@ -428,35 +441,43 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
     end.
 
 %% @private
-% memory_report() ->
-%     MemoryData = {_, _, {BadPid, _}} = memsup:get_memory_data(),
-%     lager:info(""),
-%     lager:info("-----------------------------------------------------------", []),
-%     lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
-%     lager:info("Worst: ~p", [process_info(BadPid)]),
-%     lager:info("Worst trace: ~s", [element(2, erlang:process_info(BadPid, backtrace))]),
-%     lager:info("Memory Data: ~p", [MemoryData]),
-%     lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
-%     lager:info("Local process count: ~p", [length(processes())]),
-%     lager:info("-----------------------------------------------------------", []),
-%     lager:info("").
+memory_report() ->
+    MemoryData = {_, _, {BadPid, _}} = memsup:get_memory_data(),
+    lager:info(""),
+    lager:info("-----------------------------------------------------------", []),
+    lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
+    try
+        lager:info("Worst: ~p", [process_info(BadPid)]),
+        %% lager:info("Worst trace: ~s", [element(2, %% erlang:process_info(BadPid, backtrace))]),
+        ok
+    catch
+        _:_ ->
+            %% Process might die while trying to get info.
+            ok
+    end,
+    lager:info("Memory Data: ~p", [MemoryData]),
+    lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
+    lager:info("-----------------------------------------------------------", []),
+    lager:info("").
 
 %% @private
-launch_clients(NumClients, Nodes, SetType, CounterType, SyncInterval,
+launch_clients(NumClients, Nodes, Instrumentation, SetType, CounterType, SyncInterval,
                Runner, AdsWithContracts) ->
     lists:flatmap(fun(Node) ->
-                        launch_clients(Node, NumClients, Nodes, SetType, CounterType, SyncInterval,
+                        launch_clients(Node, NumClients, Nodes,
+                                       Instrumentation, SetType, CounterType, SyncInterval,
                                        Runner, AdsWithContracts)
                   end, Nodes).
 
 %% @private
-launch_clients(Node, NumClients, _Nodes, SetType, CounterType, SyncInterval,
+launch_clients(Node, NumClients, _Nodes, Instrumentation, SetType, CounterType, SyncInterval,
                Runner, AdsWithContracts) ->
     lists:map(fun(Id) ->
                       {ok, Pid} = rpc:call(Node,
                                            lasp_advertisement_counter_client,
-                                           start_link,
+                                           start,
                                            [
+                                            Instrumentation,
                                             SetType,
                                             CounterType,
                                             SyncInterval,

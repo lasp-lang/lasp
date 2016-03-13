@@ -234,10 +234,6 @@ wait_needed(Id, Threshold) ->
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
-    Backend = distribution_backend(),
+    Backend = mochiglobal:get(distribution_backend,
+                              lasp_plumtree_broadcast_distribution_backend),
     erlang:apply(Backend, Function, Args).
-
-distribution_backend() ->
-    application:get_env(?APP,
-                        distribution_backend,
-                        lasp_plumtree_broadcast_distribution_backend).

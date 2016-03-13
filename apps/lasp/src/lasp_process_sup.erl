@@ -26,6 +26,7 @@
 %% API
 -export([start_link/0,
          start_child/1,
+         terminate/0,
          terminate_child/2]).
 
 %% Supervisor callbacks
@@ -39,9 +40,16 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
+%% @doc Terminate all children.
+terminate() ->
+    Children = supervisor:which_children(?MODULE),
+    lager:info("Terminating: ~p", [Children]),
+    [terminate_child(?MODULE, Child)
+     || {_Id, Child, _Type, _Modules} <- Children].
+
 %% @doc Start a child.
 start_child(Args) ->
-    supervisor:start_child(?MODULE, Args).
+    supervisor:start_child(?MODULE, [Args]).
 
 %% @doc Stop a child immediately
 terminate_child(Supervisor, Pid) ->
@@ -53,8 +61,8 @@ terminate_child(Supervisor, Pid) ->
 
 %% @doc supervisor callback.
 init([]) ->
-    Spec = {lasp_process,
-            {lasp_process, start_link, []},
-             permanent, 5000, worker, [lasp_process]},
+    Spec = {gen_flow,
+            {gen_flow, start_link, [lasp_process]},
+             permanent, 5000, worker, [gen_flow]},
 
     {ok, {{simple_one_for_one, 10, 10}, [Spec]}}.

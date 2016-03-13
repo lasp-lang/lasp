@@ -181,10 +181,17 @@ is_stale({Id, Clock}) ->
 graft({Id, Clock}) ->
     gen_server:call(?MODULE, {graft, Id, Clock}, infinity).
 
-%% @doc Naive anti-entropy mechanism; re-broadcast all messages.
+%% @doc Anti-entropy mechanism.
 -spec exchange(node()) -> {ok, pid()}.
-exchange(_Peer) ->
-    gen_server:call(?MODULE, exchange, infinity).
+exchange(Peer) ->
+    case mochiglobal:get(delta_mode, false) of
+        true ->
+            %% Anti-entropy mechanism for causal consistency of delta-CRDT.
+            gen_server:call(?MODULE, {exchange, Peer}, infinity);
+        false ->
+            %% Naive anti-entropy mechanism; re-broadcast all messages.
+            gen_server:call(?MODULE, exchange, infinity)
+    end.
 
 %%%===================================================================
 %%% lasp_distribution_backend callbacks
@@ -197,9 +204,15 @@ exchange(_Peer) ->
 %%
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
-    {ok, Variable} = gen_server:call(?MODULE, {declare, Id, Type}, infinity),
-    broadcast(Variable),
-    {ok, Variable}.
+    case mochiglobal:get(delta_mode, false) of
+        true ->
+            gen_server:call(?MODULE, {declare, Id, Type}, infinity);
+        false ->
+            {ok, Variable} = gen_server:call(?MODULE,
+                                             {declare, Id, Type}, infinity),
+            broadcast(Variable),
+            {ok, Variable}
+    end.
 
 %% @doc Declare a new dynamic variable of a given type.
 %%
@@ -208,10 +221,16 @@ declare(Id, Type) ->
 %%
 -spec declare_dynamic(id(), type()) -> {ok, var()}.
 declare_dynamic(Id, Type) ->
-    {ok, Variable} = gen_server:call(?MODULE,
-                                     {declare_dynamic, Id, Type}, infinity),
-    broadcast(Variable),
-    {ok, Variable}.
+    case mochiglobal:get(delta_mode, false) of
+        true ->
+            gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity);
+        false ->
+            {ok, Variable} = gen_server:call(?MODULE,
+                                             {declare_dynamic, Id, Type},
+                                             infinity),
+            broadcast(Variable),
+            {ok, Variable}
+    end.
 
 %% @doc Read the current value of a CRDT.
 %%
@@ -233,25 +252,20 @@ update(Id, Operation, Actor) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {update, Id, Operation, Actor},
                                                         infinity),
-    BroadcastState = case Value of
-                         {delta, DeltaState, _MergedState} ->
-                             {delta, DeltaState};
-                         _ ->
-                             Value
-                     end,
-    ReturnState = case Value of
-                      {delta, _DeltaState, MergedState} ->
-                          MergedState;
+    ReturnState = case orddict:find(dynamic, Metadata) of
+                      {ok, true} ->
+                          %% Ignore: this is a dynamic variable.
+                          Value;
                       _ ->
-                          Value
+                          case Value of
+                              {delta, MergedState} ->
+                                  %% No broadcasting for the delta.
+                                  MergedState;
+                              _ ->
+                                  broadcast({Id, Type, Metadata, Value}),
+                                  Value
+                          end
                   end,
-    case orddict:find(dynamic, Metadata) of
-        {ok, true} ->
-            %% Ignore: this is a dynamic variable.
-            ok;
-        _ ->
-            broadcast({Id, Type, Metadata, BroadcastState})
-    end,
     {ok, {Id, Type, Metadata, ReturnState}}.
 
 %% @doc Bind a dataflow variable to a value.
@@ -265,25 +279,20 @@ bind(Id, Value0) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {bind, Id, Value0},
                                                         infinity),
-    BroadcastState = case Value of
-                         {delta, DeltaState, _MergedState} ->
-                             {delta, DeltaState};
-                         _ ->
-                             Value
-                     end,
-    ReturnState = case Value of
-                      {delta, _DeltaState, MergedState} ->
-                          MergedState;
+    ReturnState = case orddict:find(dynamic, Metadata) of
+                      {ok, true} ->
+                          %% Ignore: this is a dynamic variable.
+                          Value;
                       _ ->
-                          Value
+                          case Value of
+                              {delta, MergedState} ->
+                                  %% No broadcasting for the delta.
+                                  MergedState;
+                              _ ->
+                                  broadcast({Id, Type, Metadata, Value}),
+                                  Value
+                          end
                   end,
-    case orddict:find(dynamic, Metadata) of
-        {ok, true} ->
-            %% Ignore: this is a dynamic variable.
-            ok;
-        _ ->
-            broadcast({Id, Type, Metadata, BroadcastState})
-    end,
     {ok, {Id, Type, Metadata, ReturnState}}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
@@ -462,7 +471,9 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    Result = ?CORE:bind(Id, Value, ?CLOCK_INCR, Store),
+    {_Time, Result} = timer:tc(?CORE,
+                               bind,
+                               [Id, Value, ?CLOCK_INCR, Store]),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Incoming bind operation; merge incoming clock with the remote clock.
@@ -473,7 +484,9 @@ handle_call({bind, Id, Value}, _From,
 %% this could change if the other module is later refactored.
 handle_call({bind, Id, Metadata0, Value}, _From,
             #state{store=Store, counter=Counter}=State) ->
-    Result = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
+    {_Time, Result} = timer:tc(?CORE,
+                               bind,
+                               [Id, Value, ?CLOCK_MERG, Store]),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Bind two variables together.
@@ -507,7 +520,10 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
                   ({error, Error}) ->
                     {reply, {error, Error}, State}
                end,
-    ?CORE:read(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
+    {_Time, Value} = timer:tc(?CORE,
+                              read,
+                              [Id, Threshold, Store, From, ReplyFun, ?BLOCKING]),
+    Value;
 
 %% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
@@ -578,6 +594,48 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
     end,
     {reply, Result, State};
 
+%% Anti-entropy mechanism for causal consistency of delta-CRDT;
+%% periodically ship delta-interval or entire state.
+handle_call({exchange, Peer}, _From, #state{store=Store}=State) ->
+    Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
+                            delta_counter=Counter, delta_map=DeltaMap,
+                            delta_ack_map=AckMap}},
+                   Acc0) ->
+                       Ack = case orddict:find(Peer, AckMap) of
+                                 {ok, Ack0} ->
+                                     Ack0;
+                                 error ->
+                                     0
+                             end,
+                       Causality = case orddict:fetch_keys(DeltaMap) of
+                                       [] ->
+                                           0 > Ack;
+                                       Keys ->
+                                           lists:min(Keys) > Ack
+                                   end,
+                       Deltas = case orddict:is_empty(DeltaMap) or Causality of
+                                    true ->
+                                        Value;
+                                    false ->
+                                        collect_deltas(Type, DeltaMap, Ack, Counter)
+                                end,
+                       case Ack < Counter of
+                           true ->
+                               lager:info("Send Delta({delta_send}): To: ~p, Counter: ~p",
+                                          [Peer, Counter]),
+                               gen_server:cast({?MODULE, Peer},
+                                               {delta_send,
+                                                node(),
+                                                {Id, Type, Metadata, Deltas},
+                                                Counter}),
+                               [{ok, Id}|Acc0];
+                           false ->
+                               [Acc0]
+                       end
+               end,
+    Pid = spawn(fun() -> do(fold, [Store, Function, []]) end),
+    {reply, {ok, Pid}, State};
+
 %% Naive anti-entropy mechanism; periodically re-broadcast all messages.
 handle_call(exchange, _From, #state{store=Store}=State) ->
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
@@ -598,8 +656,30 @@ handle_call(Msg, _From, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
 
-%% @private
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
+handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
+            #state{store=Store, actor=Actor}=State) ->
+    lager:info("Receive Delta({delta_send}): From: ~p, Counter: ~p",
+               [From, Counter]),
+    _Result = ?CORE:receive_delta(Store, {delta_send,
+                                          {Id, Type, _Metadata, Deltas},
+                                          ?CLOCK_INCR,
+                                          ?CLOCK_INIT}),
+    lager:info("Send Delta({delta_ack}): To: ~p, Counter: ~p",
+                                          [From, Counter]),
+    gen_server:cast({?MODULE, From}, {delta_ack, node(), Id, Counter}),
+    {noreply, State};
+
+handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
+    lager:info("Receive Delta({delta_ack}): From: ~p, Counter: ~p",
+               [From, Counter]),
+    _Result = ?CORE:receive_delta(Store, {delta_ack,
+                                          Id,
+                                          From,
+                                          Counter}),
+    {noreply, State};
+
+%% @private
 handle_cast(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
@@ -616,7 +696,8 @@ terminate(_Reason, _State) ->
     ok.
 
 %% @private
--spec code_change(term() | {down, term()}, #state{}, term()) -> {ok, #state{}}.
+-spec code_change(term() | {down, term()}, #state{}, term()) ->
+    {ok, #state{}}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
@@ -667,6 +748,16 @@ get(Id, Store) ->
 increment_counter(Counter) ->
     Counter + 1.
 
+%% @private
+collect_deltas(Type, DeltaMap, Min, Max) ->
+    SmallDeltaMap = orddict:filter(fun(Counter, _Delta) ->
+                                           (Counter >= Min) or (Counter < Max)
+                                   end, DeltaMap),
+    Deltas = orddict:fold(fun(_Counter, Delta, Deltas0) ->
+                                  Type:merge(Deltas0, Delta)
+                          end, Type:new(), SmallDeltaMap),
+    {delta, Deltas}.
+
 -ifdef(TEST).
 
 do(Function, Args) ->
@@ -677,9 +768,7 @@ do(Function, Args) ->
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
-    Backend = application:get_env(?APP,
-                                  storage_backend,
-                                  lasp_dets_storage_backend),
+    Backend = mochiglobal:get(storage_backend, lasp_ets_storage_backend),
     erlang:apply(Backend, Function, Args).
 
 -endif.
@@ -687,7 +776,7 @@ do(Function, Args) ->
 %% @private
 log_transmission(Term) ->
     try
-        case application:get_env(?APP, instrumentation, false) of
+        case mochiglobal:get(instrumentation, false) of
             true ->
                 lasp_transmission_instrumentation:log(server, Term, node());
             false ->

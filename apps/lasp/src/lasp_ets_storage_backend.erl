@@ -52,13 +52,12 @@
 %%%===================================================================
 
 %% @doc Start and link to calling process.
--spec start(atom())-> {ok, atom()}.
+-spec start(atom())-> {ok, pid()}.
 start(Identifier) ->
-    {ok, _Pid} = gen_server:start_link({local, Identifier},
-                                       ?MODULE,
-                                       [Identifier],
-                                       []),
-    {ok, Identifier}.
+    gen_server:start_link({local, ?MODULE},
+                          ?MODULE,
+                          [Identifier],
+                          []).
 
 %% @doc Write a record to the backend.
 -spec put(ref(), id(), variable()) -> ok | {error, atom()}.
@@ -89,10 +88,9 @@ fold(Ref, Function, Acc) ->
 %% @private
 init([Identifier]) ->
     try
-        Identifier = ets:new(Identifier, [set,
+        Identifier = ets:new(Identifier, [ordered_set,
                                           named_table,
-                                          public,
-                                          {write_concurrency, true}]),
+                                          public]),
         {ok, #state{ref=Identifier}}
     catch
         _:Reason ->

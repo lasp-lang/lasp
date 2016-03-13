@@ -71,7 +71,11 @@ init(_Args) ->
                             permanent, 5000, worker,
                             [lasp_marathon_peer_refresh_service]},
 
-    BaseSpecs = [Unique, PlumtreeBackend, Plumtree, MarathonPeerRefresh, Process],
+    BaseSpecs = [Unique,
+                 PlumtreeBackend,
+                 Plumtree,
+                 MarathonPeerRefresh,
+                 Process],
 
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
     InstrEnabled = application:get_env(?APP, instrumentation, InstrDefault),
@@ -80,19 +84,26 @@ init(_Args) ->
         true ->
             ok = application:set_env(?APP, instrumentation, InstrEnabled),
             lager:info("Instrumentation: ~p", [InstrEnabled]),
+
             ClientTrans = {lasp_client_transmission_instrumentation,
                            {lasp_transmission_instrumentation, start_link, [client]},
                             permanent, 5000, worker,
                             [lasp_transmission_instrumentation]},
+
             ServerTrans = {lasp_server_transmission_instrumentation,
                            {lasp_transmission_instrumentation, start_link, [server]},
                             permanent, 5000, worker,
                             [lasp_transmission_instrumentation]},
-            DivergenceTrans = {lasp_divergence_instrumentation,
-                               {lasp_divergence_instrumentation, start_link, []},
-                                permanent, 5000, worker,
-                                [lasp_divergence_instrumentation]},
-            BaseSpecs ++ [ClientTrans, ServerTrans, DivergenceTrans, Web];
+
+            Divergence = {lasp_divergence_instrumentation,
+                          {lasp_divergence_instrumentation, start_link, []},
+                           permanent, 5000, worker,
+                           [lasp_divergence_instrumentation]},
+
+            BaseSpecs ++ [ClientTrans,
+                          ServerTrans,
+                          Divergence,
+                          Web];
         false ->
             ok = application:set_env(?APP, instrumentation, InstrEnabled),
             BaseSpecs
@@ -106,13 +117,30 @@ init(_Args) ->
     %% Run local simulations if instrumentation is enabled.
     case SimEnabled of
         true ->
-            Nodes = [node()],
             spawn(fun() ->
                         timer:sleep(10000),
-                        lasp_simulate_resource:run(Nodes)
+                        lasp_simulate_resource:run()
                   end);
         false ->
             ok
     end,
+
+    %% Cache values with mochiglobal to help out on the performance.
+    Delta = application:get_env(?APP, delta_mode, false),
+    mochiglobal:put(delta_mode, Delta),
+
+    StorageBackend = application:get_env(
+                       ?APP,
+                       storage_backend,
+                       lasp_ets_storage_backend),
+    mochiglobal:put(storage_backend, StorageBackend),
+
+    DistributionBackend = application:get_env(
+                            ?APP,
+                            distribution_backend,
+                            lasp_plumtree_broadcast_distribution_backend),
+    mochiglobal:put(distribution_backend, DistributionBackend),
+
+    mochiglobal:put(instrumentation, InstrEnabled),
 
     {ok, {{one_for_one, 5, 10}, Children}}.

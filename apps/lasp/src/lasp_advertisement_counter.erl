@@ -30,9 +30,9 @@
 
 -include("lasp.hrl").
 
--export([synchronize/5,
-         log_transmission/1,
-         log_divergence/2,
+-export([synchronize/6,
+         log_transmission/2,
+         log_divergence/3,
          view_ad/4]).
 
 %% lasp_simulation callbacks
@@ -68,6 +68,7 @@ run(Args) ->
                 counter_type,
                 num_events,
                 num_clients,
+                instrumentation,
                 sync_interval,
                 filenames}).
 
@@ -145,7 +146,10 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
                                   integer_to_list(SyncInterval)], "-") ++ ".csv",
     ok = lasp_transmission_instrumentation:start(server, ServerFilename, NumClients),
 
-    {ok, #state{runner=Runner,
+    Instrumentation = mochiglobal:get(instrumentation, false),
+
+    {ok, #state{instrumentation=Instrumentation,
+                runner=Runner,
                 nodes=Nodes,
                 ads=Ads,
                 ad_list=AdList,
@@ -160,12 +164,13 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
 
 %% @doc Launch a series of client processes, each of which is responsible
 %% for displaying a particular advertisement.
-clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients, set_type=SetType,
+clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients,
+               instrumentation=Instrumentation, set_type=SetType,
                counter_type=CounterType, sync_interval=SyncInterval,
                ads_with_contracts=AdsWithContracts}=State) ->
     %% Each client takes the full list of ads when it starts, and reads
     %% from the variable store.
-    Clients = launch_clients(NumClients, Nodes, SetType, CounterType,
+    Clients = launch_clients(NumClients, Nodes, Instrumentation, SetType, CounterType,
                              SyncInterval, Runner, AdsWithContracts),
     {ok, State#state{client_list=Clients}}.
 
@@ -175,6 +180,7 @@ terminate(#state{client_list=ClientList}=State) ->
     TerminateFun = fun(Pid) ->
             Pid ! terminate
     end,
+    lasp_process_sup:terminate(),
     lists:foreach(TerminateFun, ClientList),
     lasp_divergence_instrumentation:stop(),
     lasp_transmission_instrumentation:stop(client),
@@ -261,11 +267,11 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
 %%      greatest-lower-bound across all clients for delta delivery,
 %%      which assumes we understand the client topology.
 %%
-synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
+synchronize(Instrumentation, SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
     %% Get latest list of advertisements from the server.
     {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
     %% Log state received from the server.
-    log_transmission(AdsWithContracts),
+    log_transmission(Instrumentation, AdsWithContracts),
     AdList = lasp_type:query(SetType, AdsWithContracts),
     Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
@@ -279,7 +285,7 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
                           false ->
                               {ok, {_, _, _, Counter}} = lasp:read(Ad, undefined),
                               %% Log state received from the server.
-                              log_transmission(Counter),
+                              log_transmission(Instrumentation, Counter),
                               dict:store(Ad, Counter, Acc);
                           true ->
                               Acc
@@ -300,12 +306,12 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
                               case dict:find(Ad, CountersDelta0) of
                                   {ok, Delta} ->
                                       %% Log transmission of the local delta.
-                                      log_transmission(Delta),
+                                      log_transmission(Instrumentation, Delta),
 
                                       {ok, {_, _, _, Counter1}} = lasp:bind(Ad, {delta, Delta}),
 
                                       %% Log receipt of information from the server.
-                                      log_transmission(Counter1),
+                                      log_transmission(Instrumentation, Counter1),
 
                                       %% Return server value.
                                       Counter1;
@@ -315,12 +321,12 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
                               end;
                           false ->
                               %% Log transmission of the local delta (or state).
-                              log_transmission(Counter0),
+                              log_transmission(Instrumentation, Counter0),
 
                               {ok, {_, _, _, Counter1}} = lasp:bind(Ad, Counter0),
 
                               %% Log receipt of information from the server.
-                              log_transmission(Counter1),
+                              log_transmission(Instrumentation, Counter1),
 
                               Counter1
                       end,
@@ -355,8 +361,8 @@ servers(SetType, Ads, AdsWithContracts) ->
                 end, AdList).
 
 %% @private
-log_transmission(Term) ->
-    case mochiglobal:get(instrumentation, false) of
+log_transmission(Instrumentation, Term) ->
+    case Instrumentation of
         true ->
             lasp_transmission_instrumentation:log(client, Term, node());
         false ->
@@ -364,15 +370,15 @@ log_transmission(Term) ->
     end.
 
 %% @private
-log_divergence(buffer, Number) ->
-    case mochiglobal:get(instrumentation, false) of
+log_divergence(Instrumentation, buffer, Number) ->
+    case Instrumentation of
         true ->
             lasp_divergence_instrumentation:buffer(Number, node());
         false ->
             ok
     end;
-log_divergence(flush, Number) ->
-    case mochiglobal:get(instrumentation, false) of
+log_divergence(Instrumentation, flush, Number) ->
+    case Instrumentation of
         true ->
             lasp_divergence_instrumentation:flush(Number, node());
         false ->
@@ -455,21 +461,23 @@ memory_report() ->
     lager:info("").
 
 %% @private
-launch_clients(NumClients, Nodes, SetType, CounterType, SyncInterval,
+launch_clients(NumClients, Nodes, Instrumentation, SetType, CounterType, SyncInterval,
                Runner, AdsWithContracts) ->
     lists:flatmap(fun(Node) ->
-                        launch_clients(Node, NumClients, Nodes, SetType, CounterType, SyncInterval,
+                        launch_clients(Node, NumClients, Nodes,
+                                       Instrumentation, SetType, CounterType, SyncInterval,
                                        Runner, AdsWithContracts)
                   end, Nodes).
 
 %% @private
-launch_clients(Node, NumClients, _Nodes, SetType, CounterType, SyncInterval,
+launch_clients(Node, NumClients, _Nodes, Instrumentation, SetType, CounterType, SyncInterval,
                Runner, AdsWithContracts) ->
     lists:map(fun(Id) ->
                       {ok, Pid} = rpc:call(Node,
                                            lasp_advertisement_counter_client,
                                            start,
                                            [
+                                            Instrumentation,
                                             SetType,
                                             CounterType,
                                             SyncInterval,

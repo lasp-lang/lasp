@@ -24,8 +24,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/6,
-         start/6]).
+-export([start_link/7,
+         start/7]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -38,7 +38,8 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {set_type,
+-record(state, {instrumentation,
+                set_type,
                 counter_type,
                 sync_interval,
                 runner,
@@ -56,10 +57,11 @@
 %%%===================================================================
 
 %% @doc Start and link to calling process.
--spec start_link(crdt(), crdt(), non_neg_integer(), pid(), id(), id()) ->
+-spec start_link(boolean(), crdt(), crdt(), non_neg_integer(), pid(), id(), id()) ->
     {ok, pid()} | ignore | {error, term()}.
-start_link(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId) ->
-    gen_server:start_link(?MODULE, [SetType,
+start_link(Instrumentation, SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId) ->
+    gen_server:start_link(?MODULE, [Instrumentation,
+                                    SetType,
                                     CounterType,
                                     SyncInterval,
                                     Runner,
@@ -67,10 +69,11 @@ start_link(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId) -
                                     AdsWithContractsId], []).
 
 %% @doc Start and *don't* link to calling process.
--spec start(crdt(), crdt(), non_neg_integer(), pid(), id(), id()) ->
+-spec start(boolean(), crdt(), crdt(), non_neg_integer(), pid(), id(), id()) ->
     {ok, pid()} | ignore | {error, term()}.
-start(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId) ->
-    gen_server:start(?MODULE, [SetType,
+start(Instrumentation, SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId) ->
+    gen_server:start(?MODULE, [Instrumentation,
+                               SetType,
                                CounterType,
                                SyncInterval,
                                Runner,
@@ -83,12 +86,13 @@ start(SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId) ->
 
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
-init([SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId]) ->
+init([Instrumentation, SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId]) ->
     %% Schedule first synchronization interval.
     erlang:send_after(SyncInterval, self(), sync),
     erlang:send_after(?VIEW, self(), view),
 
-    {ok, #state{set_type=SetType,
+    {ok, #state{instrumentation=Instrumentation,
+                set_type=SetType,
                 counter_type=CounterType,
                 sync_interval=SyncInterval,
                 runner=Runner,
@@ -104,7 +108,8 @@ init([SetType, CounterType, SyncInterval, Runner, Id, AdsWithContractsId]) ->
     {reply, term(), #state{}}.
 
 %% @private
-handle_call(terminate, _From, #state{set_type=SetType,
+handle_call(terminate, _From, #state{instrumentation=Instrumentation,
+                                     set_type=SetType,
                                      runner=Runner,
                                      ads_with_contracts_id=AdsWithContractsId,
                                      ads_with_contracts=AdsWithContracts0,
@@ -116,12 +121,14 @@ handle_call(terminate, _From, #state{set_type=SetType,
         0 ->
             ok;
         _ ->
-            lasp_advertisement_counter:synchronize(SetType,
+            lasp_advertisement_counter:synchronize(Instrumentation,
+                                                   SetType,
                                                    AdsWithContractsId,
                                                    AdsWithContracts0,
                                                    Counters0,
                                                    CountersDelta0),
-            lasp_advertisement_counter:log_divergence(flush,
+            lasp_advertisement_counter:log_divergence(Instrumentation,
+                                                      flush,
                                                       BufferedOps)
     end,
 
@@ -140,7 +147,8 @@ handle_cast(Msg, State) ->
     {noreply, State}.
 
 %% @private
-handle_info(view, #state{counter_type=CounterType,
+handle_info(view, #state{instrumentation=Instrumentation,
+                         counter_type=CounterType,
                          id=Id,
                          runner=Runner,
                          counters=Counters0,
@@ -159,12 +167,13 @@ handle_info(view, #state{counter_type=CounterType,
     Runner ! view_ad_complete,
 
     %% Log buffered event.
-    lasp_advertisement_counter:log_divergence(buffer, 1),
+    lasp_advertisement_counter:log_divergence(Instrumentation, buffer, 1),
 
     {noreply, State#state{counters=Counters,
                           counters_delta=CountersDelta,
                           buffered_ops=BufferedOps0 + 1}};
-handle_info(sync, #state{set_type=SetType,
+handle_info(sync, #state{instrumentation=Instrumentation,
+                         set_type=SetType,
                          sync_interval=SyncInterval,
                          ads_with_contracts_id=AdsWithContractsId,
                          ads_with_contracts=AdsWithContracts0,
@@ -172,7 +181,8 @@ handle_info(sync, #state{set_type=SetType,
                          counters_delta=CountersDelta0,
                          buffered_ops=BufferedOps0}=State) ->
     {ok, AdsWithContracts,
-         Counters} = lasp_advertisement_counter:synchronize(SetType,
+         Counters} = lasp_advertisement_counter:synchronize(Instrumentation,
+                                                            SetType,
                                                             AdsWithContractsId,
                                                             AdsWithContracts0,
                                                             Counters0,
@@ -182,7 +192,9 @@ handle_info(sync, #state{set_type=SetType,
         0 ->
             ok;
         _ ->
-            lasp_advertisement_counter:log_divergence(flush, BufferedOps0)
+            lasp_advertisement_counter:log_divergence(Instrumentation,
+                                                      flush,
+                                                      BufferedOps0)
     end,
     BufferedOps = 0,
 
@@ -198,7 +210,8 @@ handle_info(sync, #state{set_type=SetType,
                           counters=Counters,
                           counters_delta=CountersDelta,
                           buffered_ops=BufferedOps}};
-handle_info(terminate, #state{set_type=SetType,
+handle_info(terminate, #state{instrumentation=Instrumentation,
+                              set_type=SetType,
                               runner=Runner,
                               ads_with_contracts_id=AdsWithContractsId,
                               ads_with_contracts=AdsWithContracts0,
@@ -210,12 +223,14 @@ handle_info(terminate, #state{set_type=SetType,
         0 ->
             ok;
         _ ->
-            lasp_advertisement_counter:synchronize(SetType,
+            lasp_advertisement_counter:synchronize(Instrumentation,
+                                                   SetType,
                                                    AdsWithContractsId,
                                                    AdsWithContracts0,
                                                    Counters0,
                                                    CountersDelta0),
-            lasp_advertisement_counter:log_divergence(flush,
+            lasp_advertisement_counter:log_divergence(Instrumentation,
+                                                      flush,
                                                       BufferedOps)
     end,
 

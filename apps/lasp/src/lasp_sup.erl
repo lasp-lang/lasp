@@ -125,6 +125,12 @@ init(_Args) ->
             ok
     end,
 
+    ProfileDefault = list_to_atom(os:getenv("PROFILE", "false")),
+    ProfileEnabled = application:get_env(?APP,
+                                         profile,
+                                         ProfileDefault),
+    mochiglobal:put(profile, ProfileEnabled),
+
     %% Cache values with mochiglobal to help out on the performance.
     Delta = application:get_env(?APP, delta_mode, false),
     mochiglobal:put(delta_mode, Delta),

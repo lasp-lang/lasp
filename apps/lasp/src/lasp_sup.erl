@@ -125,4 +125,22 @@ init(_Args) ->
             ok
     end,
 
+    %% Cache values with mochiglobal to help out on the performance.
+    Delta = application:get_env(?APP, delta_mode, false),
+    mochiglobal:put(delta_mode, Delta),
+
+    StorageBackend = application:get_env(
+                       ?APP,
+                       storage_backend,
+                       lasp_ets_storage_backend),
+    mochiglobal:put(storage_backend, StorageBackend),
+
+    DistributionBackend = application:get_env(
+                            ?APP,
+                            distribution_backend,
+                            lasp_plumtree_broadcast_distribution_backend),
+    mochiglobal:put(distribution_backend, DistributionBackend),
+
+    mochiglobal:put(instrumentation, InstrEnabled),
+
     {ok, {{one_for_one, 5, 10}, Children}}.

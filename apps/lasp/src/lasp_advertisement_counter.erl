@@ -78,6 +78,7 @@ run(Args) ->
 init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
     %% Enable or disable deltas.
     ok = application:set_env(?APP, delta_mode, Deltas),
+    ok = mochiglobal:put(delta_mode, Deltas),
 
     %% Get the process identifier of the runner.
     Runner = self(),
@@ -294,7 +295,7 @@ synchronize(SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersD
     %%     state, prune it by identifier.
     %%
     SyncFun = fun(Ad, Counter0, Acc) ->
-                      Counter = case application:get_env(?APP, delta_mode, false) of
+                      Counter = case mochiglobal:get(delta_mode, false) of
                           true ->
                               case dict:find(Ad, CountersDelta0) of
                                   {ok, Delta} ->
@@ -355,7 +356,7 @@ servers(SetType, Ads, AdsWithContracts) ->
 
 %% @private
 log_transmission(Term) ->
-    case application:get_env(?APP, instrumentation, false) of
+    case mochiglobal:get(instrumentation, false) of
         true ->
             lasp_transmission_instrumentation:log(client, Term, node());
         false ->
@@ -364,14 +365,14 @@ log_transmission(Term) ->
 
 %% @private
 log_divergence(buffer, Number) ->
-    case application:get_env(?APP, instrumentation, false) of
+    case mochiglobal:get(instrumentation, false) of
         true ->
             lasp_divergence_instrumentation:buffer(Number, node());
         false ->
             ok
     end;
 log_divergence(flush, Number) ->
-    case application:get_env(?APP, instrumentation, false) of
+    case mochiglobal:get(instrumentation, false) of
         true ->
             lasp_divergence_instrumentation:flush(Number, node());
         false ->

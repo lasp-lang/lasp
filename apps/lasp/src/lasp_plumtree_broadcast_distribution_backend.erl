@@ -184,7 +184,7 @@ graft({Id, Clock}) ->
 %% @doc Anti-entropy mechanism.
 -spec exchange(node()) -> {ok, pid()}.
 exchange(Peer) ->
-    case application:get_env(lasp, delta_mode, false) of
+    case mochiglobal:get(delta_mode, false) of
         true ->
             %% Anti-entropy mechanism for causal consistency of delta-CRDT.
             gen_server:call(?MODULE, {exchange, Peer}, infinity);
@@ -204,7 +204,7 @@ exchange(Peer) ->
 %%
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
-    case application:get_env(lasp, delta_mode, false) of
+    case mochiglobal:get(delta_mode, false) of
         true ->
             gen_server:call(?MODULE, {declare, Id, Type}, infinity);
         false ->
@@ -221,7 +221,7 @@ declare(Id, Type) ->
 %%
 -spec declare_dynamic(id(), type()) -> {ok, var()}.
 declare_dynamic(Id, Type) ->
-    case application:get_env(lasp, delta_mode, false) of
+    case mochiglobal:get(delta_mode, false) of
         true ->
             gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity);
         false ->
@@ -768,9 +768,7 @@ do(Function, Args) ->
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
-    Backend = application:get_env(?APP,
-                                  storage_backend,
-                                  lasp_dets_storage_backend),
+    Backend = mochiglobal:get(storage_backend, lasp_ets_storage_backend),
     erlang:apply(Backend, Function, Args).
 
 -endif.
@@ -778,7 +776,7 @@ do(Function, Args) ->
 %% @private
 log_transmission(Term) ->
     try
-        case application:get_env(?APP, instrumentation, false) of
+        case mochiglobal:get(instrumentation, false) of
             true ->
                 lasp_transmission_instrumentation:log(server, Term, node());
             false ->

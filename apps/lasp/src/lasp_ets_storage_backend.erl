@@ -52,13 +52,12 @@
 %%%===================================================================
 
 %% @doc Start and link to calling process.
--spec start(atom())-> {ok, atom()}.
+-spec start(atom())-> {ok, pid()}.
 start(Identifier) ->
-    {ok, _Pid} = gen_server:start_link({local, Identifier},
-                                       ?MODULE,
-                                       [Identifier],
-                                       []),
-    {ok, Identifier}.
+    gen_server:start_link({local, ?MODULE},
+                          ?MODULE,
+                          [Identifier],
+                          []).
 
 %% @doc Write a record to the backend.
 -spec put(ref(), id(), variable()) -> ok | {error, atom()}.

@@ -3,6 +3,7 @@ otp_release:
   - 18.1
 install:
   - make
+  - ./rebar3 update
 script:
   - make test
   - make xref

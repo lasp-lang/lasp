@@ -914,7 +914,7 @@ increment_counter(Counter) ->
 
 %% @private
 store_delta(Type, Counter, Delta, DeltaMap0) ->
-    MaxDeltaSlots = application:get_env(lasp, delta_mode_max_slots, 10),
+    MaxDeltaSlots = mochiglobal:get(delta_mode_max_slots, 10),
     %% Check the space of the DeltaMap
     case orddict:size(DeltaMap0) < MaxDeltaSlots of
         true ->

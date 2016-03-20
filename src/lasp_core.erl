@@ -260,7 +260,7 @@ declare_dynamic(Id, Type, MetadataFun0, Store) ->
 -spec query(id(), store()) -> {ok, term()}.
 query(Id, Store) ->
     {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
-    Value = lasp_type:query(Type, Value0),
+    Value = lasp_type:value(Type, Value0),
     {ok, Value}.
 
 %% @doc Define a dataflow variable to be bound to another dataflow

@@ -27,3 +27,5 @@ _checkouts/
 apps/lasp/priv/logs/*.csv
 apps/lasp/priv/plots/*.pdf
 fprof.trace
+apps/lasp/src/ensemble_lexer.erl
+apps/lasp/src/ensemble_parser.erl

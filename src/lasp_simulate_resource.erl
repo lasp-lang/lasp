@@ -55,7 +55,7 @@ run() ->
     {ok, Nodes} = lasp_peer_service:members(),
 
     %% Run the simulation.
-    Profile = application:get_env(?APP, profile, true),
+    Profile = mochiglobal:get(profile, false),
     case Profile of
         true ->
             lager:info("Applying and profiling function..."),

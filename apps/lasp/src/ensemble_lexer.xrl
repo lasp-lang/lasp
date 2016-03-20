@@ -10,7 +10,7 @@ Rules.
 
 <-                   : {token,{list_to_atom(TokenChars),TokenLine}}.
 \+                   : {token,{list_to_atom(TokenChars),TokenLine}}.
-\/                   : {token,{over,TokenLine,list_to_atom(TokenChars)}}.
+\/                   : {token,{list_to_atom(TokenChars),TokenLine}}.
 {L}+                 : {token,{var,TokenLine,list_to_atom(TokenChars)}}.
 {D}+                 : {token,{integer,TokenLine,list_to_integer(TokenChars)}}.
 [(),]                : {token,{list_to_atom(TokenChars),TokenLine}}.

@@ -44,14 +44,17 @@ map_test() ->
     LexerExpected = [{var,1,'A'},{'+',1},{integer,1,1}],
     ?assertMatch(LexerExpected, Tokens),
     {ok, ParseTree} = ?PARSER:parse(Tokens),
-    ParserExpected = [{map,{var,1,'A'},{'+',1},{integer,1,1}}],
+    ParserExpected = [{map,{var,1,'A'},{function,{'+',1}},{integer,1,1}}],
     ?assertMatch(ParserExpected, ParseTree).
 
-% %% @doc Ensure we can parse over operations.
-% over_test() ->
-%     {ok, Tokens, _EndLine} = ensemble_lexer:string("+/A"),
-%     Expected = {ok,[{function,1,plus},{over,1,over},{variable,1,"A"}],1},
-%     ?assertMatch(Expected, Output).
+%% @doc Ensure we can parse over operations.
+over_test() ->
+    {ok, Tokens, _EndLine} = ensemble_lexer:string("+/A"),
+    LexerExpected = [{'+',1},{'/',1},{var,1,'A'}],
+    ?assertMatch(LexerExpected, Tokens),
+    {ok, ParseTree} = ?PARSER:parse(Tokens),
+    ParserExpected = [{foldr,{function,{'+',1}},{query,{var,1,'A'}}}],
+    ?assertMatch(ParserExpected, ParseTree).
 
 % parse_assignment_test() ->
 %     {ok, Tokens, _Endline} = ensemble_lexer:string("A <- 1 2 3 4"),

@@ -38,14 +38,14 @@ print_test() ->
     ParserExpected = [{query,{var,1,'A'}}],
     ?assertMatch(ParserExpected, ParseTree).
 
-% %% @doc Ensure we can parse map operations.
-% map_test() ->
-%     {ok, Tokens, _EndLine} = ?LEXER:string("A+1"),
-%     LexerExpected = [{var,1,'A'},{function,1,'+'},{integer,1,1}],
-%     ?assertMatch(LexerExpected, Tokens),
-%     {ok, ParseTree} = ?PARSER:parse(Tokens),
-%     ParserExpected = [{query,{var,1,'A'}}],
-%     ?assertMatch(ParserExpected, ParseTree).
+%% @doc Ensure we can parse map operations.
+map_test() ->
+    {ok, Tokens, _EndLine} = ?LEXER:string("A+1"),
+    LexerExpected = [{var,1,'A'},{'+',1},{integer,1,1}],
+    ?assertMatch(LexerExpected, Tokens),
+    {ok, ParseTree} = ?PARSER:parse(Tokens),
+    ParserExpected = [{map,{var,1,'A'},{'+',1},{integer,1,1}}],
+    ?assertMatch(ParserExpected, ParseTree).
 
 % %% @doc Ensure we can parse over operations.
 % over_test() ->
@@ -65,21 +65,6 @@ file_test() ->
     {ok, Binary} = file:read_file(Filename),
     List = binary_to_list(Binary),
     {ok, Tokens, _EndLine} = ?LEXER:string(List),
-    LexerExpected = [{var,1,'A'},
-                     {'<-',1},
-                     {integer,1,1},
-                     {integer,1,2},
-                     {integer,1,3},
-                     {integer,1,4},
-                     {nl,1},
-                     {var,2,'A'},
-                     {nl,2}],
-    ?assertMatch(LexerExpected, Tokens),
-    {ok, ParseTree} = ?PARSER:parse(Tokens),
-    ParserExpected = [{update,{var,1,'A'},[{integer,1,1},
-                                           {integer,1,2},
-                                           {integer,1,3},
-                                           {integer,1,4}]},{query,{var,2,'A'}}],
-    ?assertMatch(ParserExpected, ParseTree).
+    ?assertMatch({ok, _ParseTree}, ?PARSER:parse(Tokens)).
 
 -endif.

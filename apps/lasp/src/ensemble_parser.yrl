@@ -14,6 +14,7 @@ statements -> statements nl : '$1'.
 statement -> var '<-' expression : {update, '$1', '$3'}.
 statement -> expression : '$1'.
 
+expression -> var '+' expression : {map, '$1', '$2', '$3'}.
 expression -> var : {query, '$1'}.
 expression -> int_list : '$1'.
 expression -> integer : '$1'.

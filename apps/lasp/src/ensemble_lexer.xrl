@@ -9,7 +9,7 @@ WS  = ([\000-\s]|%.*)
 Rules.
 
 <-                   : {token,{list_to_atom(TokenChars),TokenLine}}.
-\+                   : {token,{function,TokenLine,list_to_atom(TokenChars)}}.
+\+                   : {token,{list_to_atom(TokenChars),TokenLine}}.
 \/                   : {token,{over,TokenLine,list_to_atom(TokenChars)}}.
 {L}+                 : {token,{var,TokenLine,list_to_atom(TokenChars)}}.
 {D}+                 : {token,{integer,TokenLine,list_to_integer(TokenChars)}}.

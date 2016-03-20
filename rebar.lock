@@ -44,5 +44,5 @@
   0},
  {<<"webmachine">>,
   {git,"https://github.com/webmachine/webmachine.git",
-       {ref,"03d243937d16bf8cbd7feddfe0ad830808494732"}},
+       {ref,"f690bfb109c7ce625d5cb22750af695a0ff2df9f"}},
   0}].

@@ -23,6 +23,8 @@
 
 -include("lasp.hrl").
 
+-export([reset/0]).
+
 -export([bind/4,
          declare/1,
          declare_dynamic/1]).
@@ -227,6 +229,10 @@ thread(Module, Function, Args) ->
 -spec wait_needed(id(), threshold()) -> ok | {error, timeout}.
 wait_needed(Id, Threshold) ->
     do(wait_needed, [Id, Threshold]).
+
+%% @doc Reset state.
+reset() ->
+    do(reset, []).
 
 %%%===================================================================
 %%% Internal Functions

@@ -136,7 +136,7 @@ handle_call({fold, Function, Acc0}, _From, #state{ref=Ref}=State) ->
     Acc1 = dets:foldl(Function, Acc0, Ref),
     {reply, {ok, Acc1}, State};
 handle_call(reset, _From, #state{ref=Ref}=State) ->
-    true = dets:delete_all_objects(Ref),
+    ok = dets:delete_all_objects(Ref),
     {reply, ok, State};
 handle_call(Msg, _From, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),

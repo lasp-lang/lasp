@@ -34,3 +34,5 @@
     {ok, any()} | error | {error, atom()}.
 
 -callback fold(store(), function(), term()) -> {ok, term()}.
+
+-callback reset(store()) -> ok.

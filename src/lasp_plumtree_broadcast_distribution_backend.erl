@@ -25,6 +25,9 @@
 -behaviour(lasp_distribution_backend).
 -behaviour(plumtree_broadcast_handler).
 
+%% Administrative controls.
+-export([reset/0]).
+
 %% API
 -export([start_link/0,
          start_link/1]).
@@ -409,6 +412,15 @@ wait_needed(Id, Threshold) ->
     gen_server:call(?MODULE, {wait_needed, Id, Threshold}, infinity).
 
 %%%===================================================================
+%%% Administrative controls
+%%%===================================================================
+
+%% @doc Reset all Lasp application state.
+-spec reset() -> ok.
+reset() ->
+    gen_server:call(?MODULE, reset, infinity).
+
+%%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
@@ -432,6 +444,16 @@ init([]) ->
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
+
+%% Reset all Lasp application state.
+handle_call(reset, _From, #state{store=Store}=State) ->
+    %% Terminate all Lasp processes.
+    lasp_process_sup:terminate(),
+
+    %% Reset storage backend.
+    ?CORE:storage_backend_reset(Store),
+
+    {reply, ok, State};
 
 %% Local declare operation, which will need to initialize metadata and
 %% broadcast the value to the remote nodes.

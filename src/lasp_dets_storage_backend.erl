@@ -31,6 +31,7 @@
          put/3,
          update/3,
          get/2,
+         reset/1,
          fold/3]).
 
 %% gen_server callbacks
@@ -82,6 +83,11 @@ get(Ref, Id) ->
 fold(Ref, Function, Acc) ->
     gen_server:call(Ref, {fold, Function, Acc}, infinity).
 
+%% @doc Reset all application state.
+-spec reset(store()) -> ok.
+reset(Ref) ->
+    gen_server:call(Ref, reset, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -129,6 +135,9 @@ handle_call({update, Id, Function}, _From, #state{ref=Ref}=State) ->
 handle_call({fold, Function, Acc0}, _From, #state{ref=Ref}=State) ->
     Acc1 = dets:foldl(Function, Acc0, Ref),
     {reply, {ok, Acc1}, State};
+handle_call(reset, _From, #state{ref=Ref}=State) ->
+    true = dets:delete_all_objects(Ref),
+    {reply, ok, State};
 handle_call(Msg, _From, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.

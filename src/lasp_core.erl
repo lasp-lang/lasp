@@ -67,6 +67,9 @@
          intersection/7,
          fold/6]).
 
+%% Administrative controls.
+-export([storage_backend_reset/1]).
+
 %% Definitions for the bind/read fun abstraction.
 -define(BIND, fun(_AccId, AccValue, _Store) ->
                 ?MODULE:bind(_AccId, AccValue, _Store)
@@ -909,6 +912,10 @@ write(Type, Value, Key, Store) ->
     ok.
 
 %% @private
+storage_backend_reset(Store) ->
+    do(reset, [Store]).
+
+%% @private
 increment_counter(Counter) ->
     Counter + 1.
 
@@ -924,7 +931,7 @@ do(Function, Args) ->
 do(Function, Args) ->
     Backend = application:get_env(?APP,
                                   storage_backend,
-                                  lasp_dets_storage_backend),
+                                  lasp_ets_storage_backend),
     erlang:apply(Backend, Function, Args).
 
 

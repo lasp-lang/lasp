@@ -1,8 +1,8 @@
 Nonterminals
-statements statement expression elements.
+statements statement expression int_list.
 
 Terminals
-'(' ')' ',' '<-' '+' var integer nl.
+'<-' '+' var integer nl.
 
 Rootsymbol
 statements.
@@ -15,7 +15,8 @@ statement -> var '<-' expression : {update, '$1', '$3'}.
 statement -> expression : '$1'.
 
 expression -> var : {query, '$1'}.
-expression -> elements : '$1'.
+expression -> int_list : '$1'.
+expression -> integer : '$1'.
 
-elements -> integer : ['$1'].
-elements -> integer elements : ['$1'] ++ '$2'.
+int_list -> integer integer : ['$1', '$2'].
+int_list -> integer int_list : ['$1'] ++ '$2'.

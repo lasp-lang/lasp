@@ -147,6 +147,12 @@ init(_Args) ->
                             lasp_plumtree_broadcast_distribution_backend),
     mochiglobal:put(distribution_backend, DistributionBackend),
 
+    MaxDeltaSlots = application:get_env(?APP, delta_mode_max_slots, 10),
+    mochiglobal:put(delta_mode_max_slots, MaxDeltaSlots),
+
+    MaxGCCounter = application:get_env(?APP, delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
+    mochiglobal:put(delta_mode_max_gc_counter, MaxGCCounter),
+
     mochiglobal:put(instrumentation, InstrEnabled),
 
     {ok, {{one_for_one, 5, 10}, Children}}.

@@ -359,7 +359,7 @@ bind(Id, {delta, Value}, MetadataFun, Store) ->
                 {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
                 case lasp_lattice:is_strict_inflation(Type, Value0, Merged) of
                     true ->
-                        DeltaMap = orddict:store(Counter0, Value, DeltaMap0),
+                        DeltaMap = store_delta(Type, Counter0, Value, DeltaMap0),
                         NewObject = #dv{type=Type, metadata=Metadata, value=Merged,
                                         waiting_threads=SW,
                                         delta_counter=increment_counter(Counter0),
@@ -880,12 +880,12 @@ receive_delta(Store, {delta_ack, Id, From, Counter}) ->
     case do(get, [Store, Id]) of
         {ok, #dv{delta_ack_map=AckMap0}=Object} ->
             OldAck = case orddict:find(From, AckMap0) of
-                         {ok, Ack0} ->
+                         {ok, {Ack0, _GCed}} ->
                              Ack0;
                          error ->
                              0
                      end,
-            AckMap = orddict:store(From, max(OldAck, Counter), AckMap0),
+            AckMap = orddict:store(From, {max(OldAck, Counter), false}, AckMap0),
             do(put, [Store, Id, Object#dv{delta_ack_map=AckMap}]);
         _ ->
             error
@@ -918,6 +918,30 @@ storage_backend_reset(Store) ->
 %% @private
 increment_counter(Counter) ->
     Counter + 1.
+
+%% @private
+store_delta(Type, Counter, Delta, DeltaMap0) ->
+    MaxDeltaSlots = mochiglobal:get(delta_mode_max_slots, 10),
+    %% Check the space of the DeltaMap
+    case orddict:size(DeltaMap0) < MaxDeltaSlots of
+        true ->
+            %% Store a new delta.
+            orddict:store(Counter, Delta, DeltaMap0);
+        false ->
+            %% Find the minimum and 2nd minimum counters & those deltas.
+            [{MinCounter0, MinCounterDelta0}, {MinCounter1, MinCounterDelta1} | _Rest] =
+                orddict:to_list(DeltaMap0),
+            %% Merge them.
+            Merged = lasp_type:merge(Type,
+                                     MinCounterDelta0,
+                                     MinCounterDelta1),
+            %% Store the merged delta (minimum + 2nd minimum).
+            DeltaMap1 = orddict:store(MinCounter0, Merged, DeltaMap0),
+            %% Remove the 2nd minimum delta.
+            DeltaMap2 = orddict:erase(MinCounter1, DeltaMap1),
+            %% Store a new delta.
+            orddict:store(Counter, Delta, DeltaMap2)
+    end.
 
 -ifdef(TEST).
 

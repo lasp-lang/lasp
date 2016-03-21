@@ -73,9 +73,10 @@ value(Type, Value) ->
 
 %% @doc Return the current value of a CRDT.
 query(Type, Id) ->
+    {ok, {_, _, _, Value}} = lasp:read(Id, undefined),
     case Type of
         {T, _Args} ->
-            T:query(Id);
+            T:value(Value);
         T ->
-            T:query(Id)
+            T:value(Value)
     end.

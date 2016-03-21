@@ -150,7 +150,7 @@ init(_Args) ->
     MaxDeltaSlots = application:get_env(?APP, delta_mode_max_slots, 10),
     mochiglobal:put(delta_mode_max_slots, MaxDeltaSlots),
 
-    MaxGCCounter = application:get_env(?APP, delta_mode_max_gc_counter, 7),
+    MaxGCCounter = application:get_env(?APP, delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
     mochiglobal:put(delta_mode_max_gc_counter, MaxGCCounter),
 
     mochiglobal:put(instrumentation, InstrEnabled),

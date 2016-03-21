@@ -270,8 +270,8 @@ query(Id, Store) ->
 %%      variable.
 %%
 -spec bind_to(id(), id(), store()) -> {ok, pid()}.
-bind_to(Id, TheirId, Store) ->
-    bind_to(Id, TheirId, Store, ?BIND, ?READ).
+bind_to(AccId, Id, Store) ->
+    bind_to(AccId, Id, Store, ?BIND, ?READ).
 
 %% @doc Spawn a function.
 %%

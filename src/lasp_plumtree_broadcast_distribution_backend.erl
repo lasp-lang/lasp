@@ -188,10 +188,11 @@ exchange(Peer) ->
     case mochiglobal:get(delta_mode, false) of
         true ->
             %% Anti-entropy mechanism for causal consistency of delta-CRDT.
-            {ok, Pid, GC_Counter} = gen_server:call(?MODULE, {exchange, Peer}, infinity),
-            MaxGCCounter = mochiglobal:get(delta_mode_max_gc_counter, 7),
-            case GC_Counter == MaxGCCounter of
+            {ok, Pid, GCCounter} = gen_server:call(?MODULE, {exchange, Peer}, infinity),
+            MaxGCCounter = mochiglobal:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
+            case GCCounter == MaxGCCounter of
                 true ->
+                    lager:info("Garbage collection: GCCounter: ~p", [GCCounter]),
                     gen_server:call(?MODULE, delta_gc, infinity);
                 false ->
                     {ok, Pid}
@@ -425,7 +426,7 @@ wait_needed(Id, Threshold) ->
 init([]) ->
     {ok, Actor} = lasp_unique:unique(),
     Counter = 0,
-    GC_Counter = 0,
+    GCCounter = 0,
     Identifier = node(),
     {ok, Store} = case ?CORE:start(Identifier) of
         {ok, Pid} ->
@@ -436,7 +437,7 @@ init([]) ->
             lager:error("Failed to initialize backend: ~p", [Reason]),
             {error, Reason}
     end,
-    {ok, #state{actor=Actor, counter=Counter, store=Store, gc_counter=GC_Counter}}.
+    {ok, #state{actor=Actor, counter=Counter, store=Store, gc_counter=GCCounter}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -605,7 +606,7 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
 
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
-handle_call({exchange, Peer}, _From, #state{store=Store, gc_counter=GC_Counter}=State) ->
+handle_call({exchange, Peer}, _From, #state{store=Store, gc_counter=GCCounter}=State) ->
     Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
                             delta_counter=Counter, delta_map=DeltaMap,
                             delta_ack_map=AckMap}},
@@ -641,7 +642,7 @@ handle_call({exchange, Peer}, _From, #state{store=Store, gc_counter=GC_Counter}=
                        end
                end,
     Pid = spawn(fun() -> do(fold, [Store, Function, []]) end),
-    {reply, {ok, Pid, GC_Counter}, State#state{gc_counter=increment_counter(GC_Counter)}};
+    {reply, {ok, Pid, GCCounter}, State#state{gc_counter=increment_counter(GCCounter)}};
 
 %% Naive anti-entropy mechanism; periodically re-broadcast all messages.
 handle_call(exchange, _From, #state{store=Store}=State) ->
@@ -671,7 +672,7 @@ handle_call(delta_gc, _From, #state{store=Store}=State) ->
                         %% disconnected or slow: seen the previous GC & no change
                         RemovedAckMap0 =
                             orddict:filter(fun(_Node, {Ack, GCed}) ->
-                                                   (GCed == false) or (Ack == Counter)
+                                                   (GCed == false) orelse (Ack == Counter)
                                            end, AckMap0),
                         case orddict:size(RemovedAckMap0) of
                             0 ->
@@ -695,7 +696,7 @@ handle_call(delta_gc, _From, #state{store=Store}=State) ->
                                         _ ->
                                             Counters = orddict:fetch_keys(DeltaMap0),
                                             NotCollectable =
-                                                (MinAck > lists:nth(1, Counters)) and
+                                                (MinAck > lists:nth(1, Counters)) andalso
                                                     (MinAck < lists:nth(2, Counters)),
                                             case NotCollectable of
                                                 true ->

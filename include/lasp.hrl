@@ -48,6 +48,10 @@
             {error, timeout}
         end).
 
+%% @doc Garbage collection will happen after the certain number
+%%      (MAX_GC_COUNTER) of times of exchanges.
+-define(MAX_GC_COUNTER, 7).
+
 %% General types.
 -type file() :: iolist().
 -type registration() :: preflist | global.

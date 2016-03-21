@@ -921,13 +921,9 @@ store_delta(Type, Counter, Delta, DeltaMap0) ->
             %% Store a new delta.
             orddict:store(Counter, Delta, DeltaMap0);
         false ->
-            DeltaCounterList = orddict:fetch_keys(DeltaMap0),
-            %% Find the minimum counter & its delta.
-            MinCounter0 = lists:nth(1, DeltaCounterList),
-            MinCounterDelta0 = orddict:fetch(MinCounter0, DeltaMap0),
-            %% Find the 2nd minimum counter & its delta.
-            MinCounter1 = lists:nth(2, DeltaCounterList),
-            MinCounterDelta1 = orddict:fetch(MinCounter1, DeltaMap0),
+            %% Find the minimum and 2nd minimum counters & those deltas.
+            [{MinCounter0, MinCounterDelta0}, {MinCounter1, MinCounterDelta1} | _Rest] =
+                orddict:to_list(DeltaMap0),
             %% Merge them.
             Merged = lasp_type:merge(Type,
                                      MinCounterDelta0,

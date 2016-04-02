@@ -159,7 +159,13 @@ code_change(_OldVsn, State, _Extra) ->
 -spec do_get(ref(), id()) -> {ok, variable()} | {error, not_found} |
                              {error, atom()}.
 do_get(Ref, Id) ->
-    case ets:lookup(Ref, Id) of
+    StorageId = case Id of
+                    {BinaryId, _Type} ->
+                        BinaryId;
+                    _ ->
+                        Id
+                end,
+    case ets:lookup(Ref, StorageId) of
         [{_Key, Record}] ->
             {ok, Record};
         [] ->
@@ -169,5 +175,11 @@ do_get(Ref, Id) ->
 %% @doc Write a record to the backend.
 -spec do_put(ref(), id(), variable()) -> ok.
 do_put(Ref, Id, Record) ->
-    true = ets:insert(Ref, {Id, Record}),
+    StorageId = case Id of
+                    {BinaryId, _Type} ->
+                        BinaryId;
+                    _ ->
+                        Id
+                end,
+    true = ets:insert(Ref, {StorageId, Record}),
     ok.

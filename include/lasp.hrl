@@ -55,7 +55,7 @@
 %% General types.
 -type file() :: iolist().
 -type registration() :: preflist | global.
--type id() :: binary().
+-type id() :: binary() | {binary(), type()}.
 -type idx() :: term().
 -type result() :: term().
 -type type() :: lasp_ivar

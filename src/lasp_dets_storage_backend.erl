@@ -42,7 +42,7 @@
          terminate/2,
          code_change/3]).
 
-%% reference tpe
+%% reference type
 -type ref() :: atom().
 
 %% State record

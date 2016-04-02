@@ -233,7 +233,7 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
     case do(get, [Store, Id]) of
         {ok, #dv{value=Value, metadata=Metadata}} ->
             %% Do nothing; make declare idempotent at each replica.
-            {ok, {Id, Type, Metadata, Value}};
+            {ok, {{Id, Type}, Type, Metadata, Value}};
         _ ->
             Value = lasp_type:new(Type),
             Metadata = MetadataFun(MetadataNew),
@@ -247,7 +247,7 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
                                          delta_counter=increment_counter(Counter0),
                                          delta_map=DeltaMap,
                                          delta_ack_map=AckMap}]),
-            {ok, {Id, Type, Metadata, Value}}
+            {ok, {{Id, Type}, Type, Metadata, Value}}
     end.
 
 %% @doc Declare a dynamic variable in a provided by identifer.

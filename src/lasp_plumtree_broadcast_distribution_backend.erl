@@ -261,24 +261,35 @@ query(Id) ->
 %%
 -spec update(id(), operation(), actor()) -> {ok, var()} | error().
 update(Id, Operation, Actor) ->
-    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
-                                                        {update, Id, Operation, Actor},
-                                                        infinity),
-    ReturnState = case orddict:find(dynamic, Metadata) of
-                      {ok, true} ->
-                          %% Ignore: this is a dynamic variable.
-                          Value;
-                      _ ->
-                          case Value of
-                              {delta, MergedState} ->
-                                  %% No broadcasting for the delta.
-                                  MergedState;
+    case gen_server:call(?MODULE, {update, Id, Operation, Actor}, infinity) of
+        {ok, {Id, Type, Metadata, Value}} ->
+            ReturnState = case orddict:find(dynamic, Metadata) of
+                              {ok, true} ->
+                                  %% Ignore: this is a dynamic variable.
+                                  Value;
                               _ ->
-                                  broadcast({Id, Type, Metadata, Value}),
-                                  Value
-                          end
-                  end,
-    {ok, {Id, Type, Metadata, ReturnState}}.
+                                  case Value of
+                                      {delta, MergedState} ->
+                                          %% No broadcasting for the delta.
+                                          MergedState;
+                                      _ ->
+                                          broadcast({Id, Type, Metadata, Value}),
+                                          Value
+                                  end
+                          end,
+            {ok, {Id, Type, Metadata, ReturnState}};
+        {error, not_found} ->
+            case Id of
+                {StorageId, TypeId} ->
+                    declare(StorageId, TypeId),
+                    gen_server:call(?MODULE, {update, Id, Operation, Actor}, infinity);
+                _ ->
+                    %% Forwarding the error.
+                    {error, not_found}
+            end;
+        X ->
+            X
+    end.
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -288,24 +299,35 @@ update(Id, Operation, Actor) ->
 %%
 -spec bind(id(), value()) -> {ok, var()}.
 bind(Id, Value0) ->
-    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
-                                                        {bind, Id, Value0},
-                                                        infinity),
-    ReturnState = case orddict:find(dynamic, Metadata) of
-                      {ok, true} ->
-                          %% Ignore: this is a dynamic variable.
-                          Value;
-                      _ ->
-                          case Value of
-                              {delta, MergedState} ->
-                                  %% No broadcasting for the delta.
-                                  MergedState;
+    case gen_server:call(?MODULE, {bind, Id, Value0}, infinity) of
+        {ok, {Id, Type, Metadata, Value}} ->
+            ReturnState = case orddict:find(dynamic, Metadata) of
+                              {ok, true} ->
+                                  %% Ignore: this is a dynamic variable.
+                                  Value;
                               _ ->
-                                  broadcast({Id, Type, Metadata, Value}),
-                                  Value
-                          end
-                  end,
-    {ok, {Id, Type, Metadata, ReturnState}}.
+                                  case Value of
+                                      {delta, MergedState} ->
+                                          %% No broadcasting for the delta.
+                                          MergedState;
+                                      _ ->
+                                          broadcast({Id, Type, Metadata, Value}),
+                                          Value
+                                  end
+                          end,
+            {ok, {Id, Type, Metadata, ReturnState}};
+        {error, not_found} ->
+            case Id of
+                {StorageId, TypeId} ->
+                    declare(StorageId, TypeId),
+                    gen_server:call(?MODULE, {bind, Id, Value0}, infinity);
+                _ ->
+                    %% Forwarding the error.
+                    {error, not_found}
+            end;
+        X ->
+            X
+    end.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -325,7 +347,19 @@ bind_to(Id, TheirId) ->
 %%
 -spec read(id(), threshold()) -> {ok, var()} | error().
 read(Id, Threshold) ->
-    gen_server:call(?MODULE, {read, Id, Threshold}, infinity).
+    case gen_server:call(?MODULE, {read, Id, Threshold}, infinity) of
+        {error, not_found} ->
+            case Id of
+                {StorageId, TypeId} ->
+                    declare(StorageId, TypeId),
+                    gen_server:call(?MODULE, {read, Id, Threshold}, infinity);
+                _ ->
+                    %% Forwarding the error.
+                    {error, not_found}
+            end;
+        X ->
+            X
+    end.
 
 %% @doc Blocking monotonic read operation for a list of given dataflow
 %%      variables.

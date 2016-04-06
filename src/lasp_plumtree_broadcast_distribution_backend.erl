@@ -503,29 +503,20 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    {_Time, Result} = timer:tc(?CORE,
-                               bind,
-                               [Id, Value, ?CLOCK_INCR, Store]),
-    Result1 = case Result of
-                  {error, not_found} ->
-                      case Id of
-                          {StorageId, TypeId} ->
-                              {ok, {Id, _, _, _}} = ?CORE:declare(StorageId,
-                                                                  TypeId,
-                                                                  ?CLOCK_INIT,
-                                                                  Store),
-                              {_Time0, Result0} = timer:tc(?CORE,
-                                                           bind,
-                                                           [Id, Value,
-                                                            ?CLOCK_INCR, Store]),
-                              Result0;
-                          _ ->
-                              {error, not_found}
-                      end;
-                  X ->
-                      X
-              end,
-    {reply, Result1, State#state{counter=increment_counter(Counter)}};
+    {_Time, Result0} = timer:tc(?CORE,
+                                bind,
+                                [Id, Value, ?CLOCK_INCR, Store]),
+    Result1 = not_found_handling(Result0, Id, State, timer, tc,
+                                 [?CORE, bind, [Id, Value, ?CLOCK_INCR, Store]]),
+    Result = case Result1 of
+                 {error, not_found} ->
+                     {error, not_found};
+                 {found, Result2} ->
+                     Result2;
+                 {_NewTime, Result2} ->
+                     Result2
+             end,
+    {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Incoming bind operation; merge incoming clock with the remote clock.
 %%
@@ -534,30 +525,21 @@ handle_call({bind, Id, Value}, _From,
 %% clock to be incremented again and a subsequent broadcast.  However,
 %% this could change if the other module is later refactored.
 handle_call({bind, Id, Metadata0, Value}, _From,
-            #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    {_Time, Result} = timer:tc(?CORE,
-                               bind,
-                               [Id, Value, ?CLOCK_MERG, Store]),
-    Result1 = case Result of
-                  {error, not_found} ->
-                      case Id of
-                          {StorageId, TypeId} ->
-                              {ok, {Id, _, _, _}} = ?CORE:declare(StorageId,
-                                                                  TypeId,
-                                                                  ?CLOCK_INIT,
-                                                                  Store),
-                              {_Time0, Result0} = timer:tc(?CORE,
-                                                           bind,
-                                                           [Id, Value,
-                                                            ?CLOCK_MERG, Store]),
-                              Result0;
-                          _ ->
-                              {error, not_found}
-                      end;
-                  X ->
-                      X
-              end,
-    {reply, Result1, State#state{counter=increment_counter(Counter)}};
+            #state{store=Store, counter=Counter}=State) ->
+    {_Time, Result0} = timer:tc(?CORE,
+                                bind,
+                                [Id, Value, ?CLOCK_MERG, Store]),
+    Result1 = not_found_handling(Result0, Id, State, timer, tc,
+                                 [?CORE, bind, [Id, Value, ?CLOCK_MERG, Store]]),
+    Result = case Result1 of
+                 {error, not_found} ->
+                     {error, not_found};
+                 {found, Result2} ->
+                     Result2;
+                 {_NewTime, Result2} ->
+                     Result2
+             end,
+    {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Bind two variables together.
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
@@ -568,19 +550,14 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 %% perform the update.
 handle_call({update, Id, Operation, Actor}, _From,
             #state{store=Store, counter=Counter}=State) ->
-    {ok, Result} = case ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR, Store) of
-                       {error, not_found} ->
-                           case Id of
-                               {StorageId, TypeId} ->
-                                   {ok, {Id, _, _, _}} = ?CORE:declare(StorageId,
-                                                                       TypeId,
-                                                                       ?CLOCK_INIT,
-                                                                       Store),
-                                   ?CORE:update(Id, Operation, Actor,
-                                                ?CLOCK_INCR, Store)
-                           end;
-                       X ->
-                           X
+    Result0 = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR, Store),
+    Result1 = not_found_handling(Result0, Id, State, ?CORE, update,
+                                 [Id, Operation, Actor, ?CLOCK_INCR, Store]),
+    {ok, Result} = case Result1 of
+                       {found, Result2} ->
+                           Result2;
+                       _ ->
+                           Result1
                    end,
     {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};
 
@@ -597,7 +574,7 @@ handle_call({wait_needed, Id, Threshold}, From, #state{store=Store}=State) ->
     ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
 
 %% Attempt to read a value.
-handle_call({read, Id, Threshold}, From, #state{store=Store, actor=Actor}=State) ->
+handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
     ReplyFun = fun({_Id, Type, Metadata, Value}) ->
                     {reply, {ok, {_Id, Type, Metadata, Value}}, State};
                   ({error, Error}) ->
@@ -606,21 +583,16 @@ handle_call({read, Id, Threshold}, From, #state{store=Store, actor=Actor}=State)
     {_Time, Value} = timer:tc(?CORE,
                               read,
                               [Id, Threshold, Store, From, ReplyFun, ?BLOCKING]),
-    case Value of
+    Result0 = not_found_handling(Value, Id, State, timer, tc,
+                                 [?CORE, read, [Id, Threshold, Store, From,
+                                                ReplyFun, ?BLOCKING]]),
+    case Result0 of
         {error, not_found} ->
-            case Id of
-                {StorageId, TypeId} ->
-                    {ok, {Id, _, _, _}} = ?CORE:declare(StorageId, TypeId,
-                                                        ?CLOCK_INIT, Store),
-                    {_NewTime, NewValue} = timer:tc(?CORE, read,
-                                              [Id, Threshold, Store, From,
-                                               ReplyFun, ?BLOCKING]),
-                    NewValue;
-                _ ->
-                    {reply, {error, not_found}, State}
-            end;
-        X ->
-            X
+            {reply, {error, not_found}, State};
+        {found, Result} ->
+            Result;
+        {_NewTime, Result} ->
+            Result
     end;
 
 %% Spawn a process to perform a filter.
@@ -926,6 +898,20 @@ collect_deltas(Type, DeltaMap, Min0, Max) ->
                                   lasp_type:merge(Type, Deltas0, Delta)
                           end, lasp_type:new(Type), SmallDeltaMap),
     {delta, Deltas}.
+
+%% @private
+not_found_handling({error, not_found}, Id, #state{store=Store, actor=Actor}=_State,
+                   Module, Function, Args) ->
+    case Id of
+        {StorageId, TypeId} ->
+            {ok, {Id, _, _, _}} = ?CORE:declare(StorageId, TypeId,
+                                                ?CLOCK_INIT, Store),
+            erlang:apply(Module, Function, Args);
+        _ ->
+            {error, not_found}
+    end;
+not_found_handling(Result, _Id, _State, _Module, _Function, _Args) ->
+    {found, Result}.
 
 -ifdef(TEST).
 

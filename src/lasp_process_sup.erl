@@ -63,6 +63,6 @@ terminate_child(Supervisor, Pid) ->
 init([]) ->
     Spec = {gen_flow,
             {gen_flow, start_link, [lasp_process]},
-             permanent, 5000, worker, [gen_flow]},
+             transient, 5000, worker, [gen_flow]},
 
     {ok, {{simple_one_for_one, 10, 10}, [Spec]}}.

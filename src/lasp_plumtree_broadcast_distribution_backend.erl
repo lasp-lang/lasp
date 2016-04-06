@@ -261,35 +261,24 @@ query(Id) ->
 %%
 -spec update(id(), operation(), actor()) -> {ok, var()} | error().
 update(Id, Operation, Actor) ->
-    case gen_server:call(?MODULE, {update, Id, Operation, Actor}, infinity) of
-        {ok, {Id, Type, Metadata, Value}} ->
-            ReturnState = case orddict:find(dynamic, Metadata) of
-                              {ok, true} ->
-                                  %% Ignore: this is a dynamic variable.
-                                  Value;
+    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
+                                                        {update, Id, Operation, Actor},
+                                                        infinity),
+    ReturnState = case orddict:find(dynamic, Metadata) of
+                      {ok, true} ->
+                          %% Ignore: this is a dynamic variable.
+                          Value;
+                      _ ->
+                          case Value of
+                              {delta, MergedState} ->
+                                  %% No broadcasting for the delta.
+                                  MergedState;
                               _ ->
-                                  case Value of
-                                      {delta, MergedState} ->
-                                          %% No broadcasting for the delta.
-                                          MergedState;
-                                      _ ->
-                                          broadcast({Id, Type, Metadata, Value}),
-                                          Value
-                                  end
-                          end,
-            {ok, {Id, Type, Metadata, ReturnState}};
-        {error, not_found} ->
-            case Id of
-                {StorageId, TypeId} ->
-                    declare(StorageId, TypeId),
-                    gen_server:call(?MODULE, {update, Id, Operation, Actor}, infinity);
-                _ ->
-                    %% Forwarding the error.
-                    {error, not_found}
-            end;
-        X ->
-            X
-    end.
+                                  broadcast({Id, Type, Metadata, Value}),
+                                  Value
+                          end
+                  end,
+    {ok, {Id, Type, Metadata, ReturnState}}.
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -299,35 +288,24 @@ update(Id, Operation, Actor) ->
 %%
 -spec bind(id(), value()) -> {ok, var()}.
 bind(Id, Value0) ->
-    case gen_server:call(?MODULE, {bind, Id, Value0}, infinity) of
-        {ok, {Id, Type, Metadata, Value}} ->
-            ReturnState = case orddict:find(dynamic, Metadata) of
-                              {ok, true} ->
-                                  %% Ignore: this is a dynamic variable.
-                                  Value;
+    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
+                                                        {bind, Id, Value0},
+                                                        infinity),
+    ReturnState = case orddict:find(dynamic, Metadata) of
+                      {ok, true} ->
+                          %% Ignore: this is a dynamic variable.
+                          Value;
+                      _ ->
+                          case Value of
+                              {delta, MergedState} ->
+                                  %% No broadcasting for the delta.
+                                  MergedState;
                               _ ->
-                                  case Value of
-                                      {delta, MergedState} ->
-                                          %% No broadcasting for the delta.
-                                          MergedState;
-                                      _ ->
-                                          broadcast({Id, Type, Metadata, Value}),
-                                          Value
-                                  end
-                          end,
-            {ok, {Id, Type, Metadata, ReturnState}};
-        {error, not_found} ->
-            case Id of
-                {StorageId, TypeId} ->
-                    declare(StorageId, TypeId),
-                    gen_server:call(?MODULE, {bind, Id, Value0}, infinity);
-                _ ->
-                    %% Forwarding the error.
-                    {error, not_found}
-            end;
-        X ->
-            X
-    end.
+                                  broadcast({Id, Type, Metadata, Value}),
+                                  Value
+                          end
+                  end,
+    {ok, {Id, Type, Metadata, ReturnState}}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -347,19 +325,7 @@ bind_to(Id, TheirId) ->
 %%
 -spec read(id(), threshold()) -> {ok, var()} | error().
 read(Id, Threshold) ->
-    case gen_server:call(?MODULE, {read, Id, Threshold}, infinity) of
-        {error, not_found} ->
-            case Id of
-                {StorageId, TypeId} ->
-                    declare(StorageId, TypeId),
-                    gen_server:call(?MODULE, {read, Id, Threshold}, infinity);
-                _ ->
-                    %% Forwarding the error.
-                    {error, not_found}
-            end;
-        X ->
-            X
-    end.
+    gen_server:call(?MODULE, {read, Id, Threshold}, infinity).
 
 %% @doc Blocking monotonic read operation for a list of given dataflow
 %%      variables.
@@ -540,7 +506,26 @@ handle_call({bind, Id, Value}, _From,
     {_Time, Result} = timer:tc(?CORE,
                                bind,
                                [Id, Value, ?CLOCK_INCR, Store]),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    Result1 = case Result of
+                  {error, not_found} ->
+                      case Id of
+                          {StorageId, TypeId} ->
+                              {ok, {Id, _, _, _}} = ?CORE:declare(StorageId,
+                                                                  TypeId,
+                                                                  ?CLOCK_INIT,
+                                                                  Store),
+                              {_Time0, Result0} = timer:tc(?CORE,
+                                                           bind,
+                                                           [Id, Value,
+                                                            ?CLOCK_INCR, Store]),
+                              Result0;
+                          _ ->
+                              {error, not_found}
+                      end;
+                  X ->
+                      X
+              end,
+    {reply, Result1, State#state{counter=increment_counter(Counter)}};
 
 %% Incoming bind operation; merge incoming clock with the remote clock.
 %%
@@ -549,11 +534,30 @@ handle_call({bind, Id, Value}, _From,
 %% clock to be incremented again and a subsequent broadcast.  However,
 %% this could change if the other module is later refactored.
 handle_call({bind, Id, Metadata0, Value}, _From,
-            #state{store=Store, counter=Counter}=State) ->
+            #state{store=Store, actor=Actor, counter=Counter}=State) ->
     {_Time, Result} = timer:tc(?CORE,
                                bind,
                                [Id, Value, ?CLOCK_MERG, Store]),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    Result1 = case Result of
+                  {error, not_found} ->
+                      case Id of
+                          {StorageId, TypeId} ->
+                              {ok, {Id, _, _, _}} = ?CORE:declare(StorageId,
+                                                                  TypeId,
+                                                                  ?CLOCK_INIT,
+                                                                  Store),
+                              {_Time0, Result0} = timer:tc(?CORE,
+                                                           bind,
+                                                           [Id, Value,
+                                                            ?CLOCK_MERG, Store]),
+                              Result0;
+                          _ ->
+                              {error, not_found}
+                      end;
+                  X ->
+                      X
+              end,
+    {reply, Result1, State#state{counter=increment_counter(Counter)}};
 
 %% Bind two variables together.
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
@@ -564,7 +568,20 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 %% perform the update.
 handle_call({update, Id, Operation, Actor}, _From,
             #state{store=Store, counter=Counter}=State) ->
-    {ok, Result} = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR, Store),
+    {ok, Result} = case ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR, Store) of
+                       {error, not_found} ->
+                           case Id of
+                               {StorageId, TypeId} ->
+                                   {ok, {Id, _, _, _}} = ?CORE:declare(StorageId,
+                                                                       TypeId,
+                                                                       ?CLOCK_INIT,
+                                                                       Store),
+                                   ?CORE:update(Id, Operation, Actor,
+                                                ?CLOCK_INCR, Store)
+                           end;
+                       X ->
+                           X
+                   end,
     {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};
 
 %% Spawn a function.
@@ -580,7 +597,7 @@ handle_call({wait_needed, Id, Threshold}, From, #state{store=Store}=State) ->
     ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
 
 %% Attempt to read a value.
-handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
+handle_call({read, Id, Threshold}, From, #state{store=Store, actor=Actor}=State) ->
     ReplyFun = fun({_Id, Type, Metadata, Value}) ->
                     {reply, {ok, {_Id, Type, Metadata, Value}}, State};
                   ({error, Error}) ->
@@ -589,7 +606,22 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
     {_Time, Value} = timer:tc(?CORE,
                               read,
                               [Id, Threshold, Store, From, ReplyFun, ?BLOCKING]),
-    Value;
+    case Value of
+        {error, not_found} ->
+            case Id of
+                {StorageId, TypeId} ->
+                    {ok, {Id, _, _, _}} = ?CORE:declare(StorageId, TypeId,
+                                                        ?CLOCK_INIT, Store),
+                    {_NewTime, NewValue} = timer:tc(?CORE, read,
+                                              [Id, Threshold, Store, From,
+                                               ReplyFun, ?BLOCKING]),
+                    NewValue;
+                _ ->
+                    {reply, {error, not_found}, State}
+            end;
+        X ->
+            X
+    end;
 
 %% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->

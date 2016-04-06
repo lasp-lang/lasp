@@ -466,6 +466,9 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
         {error, threshold_not_met} ->
             %% Not valid for threshold; wait.
             BlockingFun();
+        {error, not_found} ->
+            %% not_found error will be handled by the caller.
+            {error, not_found};
         {error, Error} ->
             %% Error from the backend.
             ReplyFun({error, Error})

@@ -168,8 +168,7 @@ code_change(_OldVsn, State, _Extra) ->
 -spec do_get(ref(), id()) -> {ok, variable()} | {error, not_found} |
                              {error, atom()}.
 do_get(Ref, Id) ->
-    StorageId = storage_id(Id),
-    case dets:lookup(Ref, StorageId) of
+    case dets:lookup(Ref, Id) of
         [{_Key, Record}] ->
             {ok, Record};
         [] ->
@@ -179,10 +178,5 @@ do_get(Ref, Id) ->
 %% @doc Write a record to the backend.
 -spec do_put(ref(), id(), variable()) -> ok.
 do_put(Ref, Id, Record) ->
-    StorageId = storage_id(Id),
-    ok = dets:insert(Ref, {StorageId, Record}),
+    ok = dets:insert(Ref, {Id, Record}),
     ok.
-
--spec storage_id(id()) -> binary().
-storage_id({BinaryId, _Type}) -> BinaryId;
-storage_id(Id)                -> Id.

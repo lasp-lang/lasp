@@ -68,7 +68,7 @@ end_per_suite(_Config) ->
     _Config.
 
 init_per_testcase(Case, Config) ->
-    Nodes = lasp_support:pmap(fun(N) -> lasp_support:start_node(N, Config, Case) end, [jaguar, shadow, thorn, pyros]),
+    Nodes = lasp_support:pmap(fun(N) -> lasp_support:start_node(N, Config, Case) end, lasp_support:nodelist()),
     ct:pal("Nodes: ~p", [Nodes]),
 
     RunnerNode = runner_node(),
@@ -101,7 +101,7 @@ end_per_testcase(_, _Config) ->
     %% shutdown and trigger an exception, sigh.
     timer:sleep(5000),
 
-    lasp_support:pmap(fun(Node) -> ct_slave:stop(Node) end, [jaguar, shadow, thorn, pyros]),
+    lasp_support:pmap(fun(Node) -> ct_slave:stop(Node) end, lasp_support:nodelist()),
 
     ok.
 

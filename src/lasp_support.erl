@@ -29,6 +29,7 @@
          wait_until_offline/1,
          wait_until_disconnected/2,
          wait_until_connected/2,
+         nodelist/0,
          start_node/3,
          puniform/1,
          partition_cluster/2,
@@ -169,3 +170,6 @@ heal_cluster(ANodes, BNodes) ->
 
 web_port(_) ->
     random:uniform(5000) + 1024.
+
+nodelist() ->
+    [jaguar, shadow, thorn, pyros].

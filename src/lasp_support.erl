@@ -21,6 +21,8 @@
 -module(lasp_support).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
+-include("lasp.hrl").
+
 -export([get_cluster_members/1,
          pmap/2,
          wait_until/3,
@@ -174,4 +176,4 @@ web_port(_) ->
 nodelist() ->
     lists:map(fun(X) ->
                       list_to_atom("node-" ++ integer_to_list(X))
-              end, lists:seq(1, 10)).
+              end, lists:seq(1, ?NUM_NODES)).

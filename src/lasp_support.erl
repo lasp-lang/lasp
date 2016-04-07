@@ -172,4 +172,6 @@ web_port(_) ->
     random:uniform(5000) + 1024.
 
 nodelist() ->
-    [jaguar, shadow, thorn, pyros].
+    lists:map(fun(X) ->
+                      list_to_atom("node-" ++ integer_to_list(X))
+              end, lists:seq(1, 10)).

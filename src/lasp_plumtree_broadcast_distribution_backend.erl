@@ -900,7 +900,7 @@ collect_deltas(Type, DeltaMap, Min0, Max) ->
     {delta, Deltas}.
 
 %% @private
-not_found_handling({error, not_found}, Id, #state{store=Store, actor=Actor}=_State,
+not_found_handling({error, not_found}, Id, #state{store=Store, actor=Actor},
                    Module, Function, Args) ->
     case Id of
         {StorageId, TypeId} ->

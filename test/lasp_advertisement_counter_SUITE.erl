@@ -96,7 +96,7 @@ minimal_delta_test(Config) ->
     %% Set the delta_mode to true for all nodes.
     lists:foreach(fun(Node) ->
                         ct:pal("Set the delta_mode: ~p", [Node]),
-                        ok = rpc:call(Node, lasp, config, [delta_mode, true])
+                        ok = rpc:call(Node, lasp_config, set, [delta_mode, true])
                   end, Nodes),
     {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
                                   [Nodes, true, lasp_orset, lasp_gcounter, 100, 100, 10]),

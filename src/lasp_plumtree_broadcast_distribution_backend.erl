@@ -503,19 +503,9 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    {_Time, Result0} = timer:tc(?CORE,
-                                bind,
-                                [Id, Value, ?CLOCK_INCR, Store]),
-    Result1 = not_found_handling(Result0, Id, State, timer, tc,
-                                 [?CORE, bind, [Id, Value, ?CLOCK_INCR, Store]]),
-    Result = case Result1 of
-                 {error, not_found} ->
-                     {error, not_found};
-                 {found, Result2} ->
-                     Result2;
-                 {_NewTime, Result2} ->
-                     Result2
-             end,
+    Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR, Store),
+    Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
+                                  [Id, Value, ?CLOCK_INCR, Store]),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Incoming bind operation; merge incoming clock with the remote clock.
@@ -526,19 +516,9 @@ handle_call({bind, Id, Value}, _From,
 %% this could change if the other module is later refactored.
 handle_call({bind, Id, Metadata0, Value}, _From,
             #state{store=Store, counter=Counter}=State) ->
-    {_Time, Result0} = timer:tc(?CORE,
-                                bind,
-                                [Id, Value, ?CLOCK_MERG, Store]),
-    Result1 = not_found_handling(Result0, Id, State, timer, tc,
-                                 [?CORE, bind, [Id, Value, ?CLOCK_MERG, Store]]),
-    Result = case Result1 of
-                 {error, not_found} ->
-                     {error, not_found};
-                 {found, Result2} ->
-                     Result2;
-                 {_NewTime, Result2} ->
-                     Result2
-             end,
+    Result0 = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
+    Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
+                                  [Id, Value, ?CLOCK_MERG, Store]),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Bind two variables together.
@@ -551,14 +531,8 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 handle_call({update, Id, Operation, Actor}, _From,
             #state{store=Store, counter=Counter}=State) ->
     Result0 = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR, Store),
-    Result1 = not_found_handling(Result0, Id, State, ?CORE, update,
-                                 [Id, Operation, Actor, ?CLOCK_INCR, Store]),
-    {ok, Result} = case Result1 of
-                       {found, Result2} ->
-                           Result2;
-                       _ ->
-                           Result1
-                   end,
+    {ok, Result} = declare_if_not_found(Result0, Id, State, ?CORE, update,
+                                        [Id, Operation, Actor, ?CLOCK_INCR, Store]),
     {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};
 
 %% Spawn a function.
@@ -580,20 +554,9 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
                   ({error, Error}) ->
                     {reply, {error, Error}, State}
                end,
-    {_Time, Value} = timer:tc(?CORE,
-                              read,
-                              [Id, Threshold, Store, From, ReplyFun, ?BLOCKING]),
-    Result0 = not_found_handling(Value, Id, State, timer, tc,
-                                 [?CORE, read, [Id, Threshold, Store, From,
-                                                ReplyFun, ?BLOCKING]]),
-    case Result0 of
-        {error, not_found} ->
-            {reply, {error, not_found}, State};
-        {found, Result} ->
-            Result;
-        {_NewTime, Result} ->
-            Result
-    end;
+    Value0 = ?CORE:read(Id, Threshold, Store, From, ReplyFun, ?BLOCKING),
+    declare_if_not_found(Value0, Id, State, ?CORE, read,
+                         [Id, Threshold, Store, From, ReplyFun, ?BLOCKING]);
 
 %% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
@@ -900,18 +863,13 @@ collect_deltas(Type, DeltaMap, Min0, Max) ->
     {delta, Deltas}.
 
 %% @private
-not_found_handling({error, not_found}, Id, #state{store=Store, actor=Actor},
-                   Module, Function, Args) ->
-    case Id of
-        {StorageId, TypeId} ->
-            {ok, {Id, _, _, _}} = ?CORE:declare(StorageId, TypeId,
-                                                ?CLOCK_INIT, Store),
-            erlang:apply(Module, Function, Args);
-        _ ->
-            {error, not_found}
-    end;
-not_found_handling(Result, _Id, _State, _Module, _Function, _Args) ->
-    {found, Result}.
+declare_if_not_found({error, not_found}, {StorageId, TypeId},
+                     #state{store=Store, actor=Actor}, Module, Function, Args) ->
+    {ok, {{StorageId, TypeId}, _, _, _}} = ?CORE:declare(StorageId, TypeId,
+                                                         ?CLOCK_INIT, Store),
+    erlang:apply(Module, Function, Args);
+declare_if_not_found(Result, _Id, _State, _Module, _Function, _Args) ->
+    Result.
 
 -ifdef(TEST).
 

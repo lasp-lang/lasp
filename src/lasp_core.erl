@@ -241,12 +241,12 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
             DeltaMap0 = orddict:new(),
             AckMap = orddict:new(),
             DeltaMap = orddict:store(Counter0, Value, DeltaMap0),
-            ok = do(put, [Store, Id, #dv{value=Value,
-                                         type=Type,
-                                         metadata=Metadata,
-                                         delta_counter=increment_counter(Counter0),
-                                         delta_map=DeltaMap,
-                                         delta_ack_map=AckMap}]),
+            ok = do(put, [Store, {Id, Type}, #dv{value=Value,
+                                                 type=Type,
+                                                 metadata=Metadata,
+                                                 delta_counter=increment_counter(Counter0),
+                                                 delta_map=DeltaMap,
+                                                 delta_ack_map=AckMap}]),
             {ok, {{Id, Type}, Type, Metadata, Value}}
     end.
 

@@ -233,7 +233,7 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
     {ok, _} = lasp:read(Counter, {value, ?MAX_IMPRESSIONS}),
 
     %% Remove the advertisement.
-    {ok, _} = lasp:update(Ads, {remove, Ad}, Ad).
+    {ok, _} = lasp:update(Ads, {remove, Ad}, node()).
 
 %% @doc Generate advertisements and advertisement contracts.
 create_advertisements_and_contracts(Counter, Ads, Contracts) ->
@@ -244,7 +244,7 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
     lists:map(fun(Id) ->
                 {ok, _} = lasp:update(Contracts,
                                       {add, #contract{id=Id}},
-                                      undefined)
+                                      node())
                 end, AdIds),
     lists:map(fun(Id) ->
                 %% Generate a G-Counter.
@@ -253,7 +253,7 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
                 Ad = #ad{id=Id, counter=CounterId},
 
                 %% Add it to the advertisement set.
-                {ok, _} = lasp:update(Ads, {add, Ad}, undefined),
+                {ok, _} = lasp:update(Ads, {add, Ad}, node()),
 
                 Ad
 
@@ -356,7 +356,7 @@ servers(SetType, Ads, AdsWithContracts) ->
     %% impressions and wait to disable.
     lists:map(fun(Ad) ->
                 ServerPid = spawn(?MODULE, server, [Ad, Ads]),
-                {ok, _} = lasp:update(Servers, {add, ServerPid}, undefined),
+                {ok, _} = lasp:update(Servers, {add, ServerPid}, node()),
                 ServerPid
                 end, AdList).
 

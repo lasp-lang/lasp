@@ -62,20 +62,24 @@ init_per_suite(_Config) ->
         {error, {already_started, _}} -> ok
     end,
     lager:info("node name ~p", [node()]),
+
+    %% Start Lasp on the runner and enable instrumentation.
+    lasp_support:start_runner(),
+
     _Config.
 
 end_per_suite(_Config) ->
-    application:stop(lager),
+    %% Stop Lasp on the runner.
+    lasp_support:stop_runner(),
+
     _Config.
 
 init_per_testcase(Case, Config) ->
-    Nodes = lasp_support:pmap(fun(N) -> lasp_support:start_node(N, Config, Case) end, lasp_support:nodelist()),
-    {ok, _} = ct_cover:add_nodes(Nodes),
+    Nodes = lasp_support:start_nodes(Case, Config),
     [{nodes, Nodes}|Config].
 
-end_per_testcase(_, _Config) ->
-    lasp_support:pmap(fun(Node) -> ct_slave:stop(Node) end, lasp_support:nodelist()),
-    ok.
+end_per_testcase(Case, Config) ->
+    lasp_support:stop_nodes(Case, Config).
 
 all() ->
     [

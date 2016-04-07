@@ -33,6 +33,10 @@
          wait_until_connected/2,
          nodelist/0,
          start_node/3,
+         start_nodes/2,
+         stop_nodes/2,
+         stop_runner/0,
+         start_runner/0,
          puniform/1,
          partition_cluster/2,
          heal_cluster/2]).
@@ -177,3 +181,66 @@ nodelist() ->
     lists:map(fun(X) ->
                       list_to_atom("node-" ++ integer_to_list(X))
               end, lists:seq(1, ?NUM_NODES)).
+
+start_nodes(Case, Config) ->
+    Nodes = lasp_support:pmap(fun(N) -> lasp_support:start_node(N, Config, Case) end, lasp_support:nodelist()),
+    ct:pal("Nodes: ~p", [Nodes]),
+
+    RunnerNode = runner_node(),
+    ct:pal("RunnerNode: ~p", [RunnerNode]),
+
+    %% Attempt to join all nodes in the cluster.
+    lists:foreach(fun(N) ->
+                        ct:pal("Joining node: ~p to ~p", [N, RunnerNode]),
+                        ok = rpc:call(RunnerNode, lasp_peer_service, join, [N])
+                  end, Nodes),
+
+    %% Consider the runner part of the cluster.
+    Nodes1 = [RunnerNode|Nodes],
+    ct:pal("Nodes1: ~p", [Nodes1]),
+
+    %% Sleep until application is fully started.
+    %% @todo: Change to a wait_until, eventually.
+    timer:sleep(60),
+
+    %% Wait until convergence.
+    ok = lasp_support:wait_until_joined(Nodes1, Nodes1),
+    ct:pal("Cluster converged."),
+
+    {ok, _} = ct_cover:add_nodes(Nodes1),
+
+    Nodes1.
+
+runner_node() ->
+    {ok, Hostname} = inet:gethostname(),
+    list_to_atom("runner@"++Hostname).
+
+stop_nodes(_Case, _Config) ->
+    %% Multi-node race condition protection, where if we don't wait for
+    %% all nodes to stop delivering messages, one might arrive during
+    %% shutdown and trigger an exception, sigh.
+    timer:sleep(5000),
+
+    lasp_support:pmap(fun(Node) -> ct_slave:stop(Node) end, lasp_support:nodelist()),
+
+    ok.
+
+start_runner() ->
+    case application:load(lasp) of
+        {error, {already_loaded, lasp}} ->
+            ok;
+        ok ->
+            ok;
+        Reason ->
+            lager:info("Received unexpected error: ~p", [Reason]),
+            exit(Reason)
+    end,
+    ok = application:set_env(plumtree, broadcast_exchange_timer, 120),
+    ok = application:set_env(plumtree, broadcast_mods, [lasp_plumtree_broadcast_distribution_backend]),
+    ok = application:set_env(lasp, instrumentation, true),
+    {ok, _} = application:ensure_all_started(lasp),
+    ok.
+
+stop_runner() ->
+    application:stop(lasp),
+    application:stop(lager).

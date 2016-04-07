@@ -105,120 +105,114 @@ all() ->
 -define(COUNTER, lasp_pncounter).
 -define(ID, <<"myidentifier">>).
 
-ivar_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-
+%% @doc Single-assignment variable test.
+ivar_test(_Config) ->
     %% Single-assignment variables.
-    {ok, {I1, _, _, _}} = rpc:call(Node1, lasp, declare, [lasp_ivar]),
-    {ok, {I2, _, _, _}} = rpc:call(Node1, lasp, declare, [lasp_ivar]),
-    {ok, {I3, _, _, _}} = rpc:call(Node1, lasp, declare, [lasp_ivar]),
+    {ok, {I1, _, _, _}} = lasp:declare(lasp_ivar),
+    {ok, {I2, _, _, _}} = lasp:declare(lasp_ivar),
+    {ok, {I3, _, _, _}} = lasp:declare(lasp_ivar),
 
     V1 = 1,
 
     %% Attempt pre, and post- dataflow variable bind operations.
-    ?assertMatch(ok, rpc:call(Node1, lasp, bind_to, [I2, I1])),
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, bind, [I1, V1])),
-    ?assertMatch(ok, rpc:call(Node1, lasp, bind_to, [I3, I1])),
+    ?assertMatch(ok, lasp:bind_to(I2, I1)),
+    ?assertMatch({ok, _}, lasp:bind(I1, V1)),
+    ?assertMatch(ok, lasp:bind_to(I3, I1)),
 
     %% Perform invalid bind; won't return error, just will have no
     %% effect.
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, bind, [I1, 2])),
+    ?assertMatch({ok, _}, lasp:bind(I1, 2)),
 
     %% Verify the same value is contained by all.
-    ?assertMatch({ok, {_, _, _, V1}}, rpc:call(Node1, lasp, read, [I3, {strict, undefined}])),
-    ?assertMatch({ok, {_, _, _, V1}}, rpc:call(Node1, lasp, read, [I2, {strict, undefined}])),
-    ?assertMatch({ok, {_, _, _, V1}}, rpc:call(Node1, lasp, read, [I1, {strict, undefined}])),
-
-    io:format("*woekjfoewf~n"),
+    ?assertMatch({ok, {_, _, _, V1}}, lasp:read(I3, {strict, undefined})),
+    ?assertMatch({ok, {_, _, _, V1}}, lasp:read(I2, {strict, undefined})),
+    ?assertMatch({ok, {_, _, _, V1}}, lasp:read(I1, {strict, undefined})),
 
     ok.
 
-map_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-
+%% @doc Map operation test.
+map_test(_Config) ->
     %% Create initial set.
-    {ok, {S1, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {S1, _, _, _}} = lasp:declare(?SET),
 
     %% Add elements to initial set and update.
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S1, {add_all, [1,2,3]}, a])),
+    ?assertMatch({ok, _}, lasp:update(S1, {add_all, [1,2,3]}, a)),
 
     %% Create second set.
-    {ok, {S2, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {S2, _, _, _}} = lasp:declare(?SET),
 
     %% Apply map.
-    ?assertMatch(ok, rpc:call(Node1, lasp, map, [S1, fun(X) -> X * 2 end, S2])),
+    ?assertMatch(ok, lasp:map(S1, fun(X) -> X * 2 end, S2)),
 
     %% Wait.
     timer:sleep(4000),
 
     %% Bind again.
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S1, {add_all, [4,5,6]}, a])),
+    ?assertMatch({ok, _}, lasp:update(S1, {add_all, [4,5,6]}, a)),
 
     %% Wait.
     timer:sleep(4000),
 
     %% Read resulting value.
-    {ok, {_, _, _, S1V4}} = rpc:call(Node1, lasp, read, [S1, {strict, undefined}]),
+    {ok, {_, _, _, S1V4}} = lasp:read(S1, {strict, undefined}),
 
     %% Read resulting value.
-    {ok, {_, _, _, S2V1}} = rpc:call(Node1, lasp, read, [S2, {strict, undefined}]),
+    {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
 
     ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6,8,10,12]},
                  {ok, ?SET:value(S1V4), ?SET:value(S2V1)}),
 
     ok.
 
-filter_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-
+%% @doc Filter operation test.
+filter_test(_Config) ->
     %% Create initial set.
-    {ok, {S1, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {S1, _, _, _}} = lasp:declare(?SET),
 
     %% Add elements to initial set and update.
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S1, {add_all, [1,2,3]}, a])),
+    ?assertMatch({ok, _}, lasp:update(S1, {add_all, [1,2,3]}, a)),
 
     %% Create second set.
-    {ok, {S2, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {S2, _, _, _}} = lasp:declare(?SET),
 
     %% Apply filter.
-    ?assertMatch(ok, rpc:call(Node1, lasp, filter, [S1, fun(X) -> X rem 2 == 0 end, S2])),
+    ?assertMatch(ok, lasp:filter(S1, fun(X) -> X rem 2 == 0 end, S2)),
 
     %% Wait.
     timer:sleep(4000),
 
     %% Bind again.
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S1, {add_all, [4,5,6]}, a])),
+    ?assertMatch({ok, _}, lasp:update(S1, {add_all, [4,5,6]}, a)),
 
     %% Wait.
     timer:sleep(4000),
 
     %% Read resulting value.
-    {ok, {_, _, _, S1V4}} = rpc:call(Node1, lasp, read, [S1, {strict, undefined}]),
+    {ok, {_, _, _, S1V4}} = lasp:read(S1, {strict, undefined}),
 
     %% Read resulting value.
-    {ok, {_, _, _, S2V1}} = rpc:call(Node1, lasp, read, [S2, {strict, undefined}]),
+    {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
 
     ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6]},
                  {ok, ?SET:value(S1V4), ?SET:value(S2V1)}),
 
     ok.
 
-fold_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-
+%% @doc Fold operation test.
+fold_test(_Config) ->
     %% Create initial set.
-    {ok, {S1, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {S1, _, _, _}} = lasp:declare(?SET),
 
     %% Perform some operations.
     ?assertMatch({ok, _},
-                 rpc:call(Node1, lasp, update, [S1, {add_all, [1,2,3]}, a])),
+                 lasp:update(S1, {add_all, [1,2,3]}, a)),
     ?assertMatch({ok, _},
-                 rpc:call(Node1, lasp, update, [S1, {remove_all, [2,3]}, b])),
+                 lasp:update(S1, {remove_all, [2,3]}, b)),
     ?assertMatch({ok, _},
-                 rpc:call(Node1, lasp, update, [S1, {add, 2}, c])),
+                 lasp:update(S1, {add, 2}, c)),
 
     %% Create second set.
-    {ok, {S2, _, _, _}} = rpc:call(Node1, lasp, declare, [?COUNTER]),
+    {ok, {S2, _, _, _}} = lasp:declare(?COUNTER),
 
     %% Define the fold function.
     FoldFun = fun(X, _Acc) ->
@@ -231,44 +225,43 @@ fold_test(Config) ->
               end,
 
     %% Apply fold.
-    ?assertMatch(ok, rpc:call(Node1, lasp, fold, [S1, FoldFun, S2])),
+    ?assertMatch(ok, lasp:fold(S1, FoldFun, S2)),
 
     %% Wait.
     timer:sleep(4000),
 
     %% Read resulting value.
-    {ok, {_, _, _, S1V4}} = rpc:call(Node1, lasp, read, [S1, {strict, undefined}]),
+    {ok, {_, _, _, S1V4}} = lasp:read(S1, {strict, undefined}),
 
     %% Read resulting value.
-    {ok, {_, _, _, S2V1}} = rpc:call(Node1, lasp, read, [S2, {strict, undefined}]),
+    {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
 
     ?assertEqual({ok, [1,2], 1},
                  {ok, ?SET:value(S1V4), ?COUNTER:value(S2V1)}),
 
     ok.
 
-union_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-
+%% @doc Union operation test.
+union_test(_Config) ->
     %% Create initial sets.
-    {ok, {S1, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
-    {ok, {S2, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {S1, _, _, _}} = lasp:declare(?SET),
+    {ok, {S2, _, _, _}} = lasp:declare(?SET),
 
     %% Create output set.
-    {ok, {S3, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {S3, _, _, _}} = lasp:declare(?SET),
 
     %% Populate initial sets.
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S1, {add_all, [1,2,3]}, a])),
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S2, {add_all, [a,b,c]}, a])),
+    ?assertMatch({ok, _}, lasp:update(S1, {add_all, [1,2,3]}, a)),
+    ?assertMatch({ok, _}, lasp:update(S2, {add_all, [a,b,c]}, a)),
 
     %% Apply union.
-    ?assertMatch(ok, rpc:call(Node1, lasp, union, [S1, S2, S3])),
+    ?assertMatch(ok, lasp:union(S1, S2, S3)),
 
     %% Sleep.
     timer:sleep(400),
 
     %% Read union.
-    {ok, {_, _, _, Union0}} = rpc:call(Node1, lasp, read, [S3, undefined]),
+    {ok, {_, _, _, Union0}} = lasp:read(S3, undefined),
 
     %% Read union value.
     Union = ?SET:value(Union0),
@@ -277,28 +270,27 @@ union_test(Config) ->
 
     ok.
 
-intersection_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-
+%% @doc Intersection test.
+intersection_test(_Config) ->
     %% Create initial sets.
-    {ok, {S1, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
-    {ok, {S2, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {S1, _, _, _}} = lasp:declare(?SET),
+    {ok, {S2, _, _, _}} = lasp:declare(?SET),
 
     %% Create output set.
-    {ok, {S3, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {S3, _, _, _}} = lasp:declare(?SET),
 
     %% Populate initial sets.
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S1, {add_all, [1,2,3]}, a])),
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S2, {add_all, [a,b,3]}, a])),
+    ?assertMatch({ok, _}, lasp:update(S1, {add_all, [1,2,3]}, a)),
+    ?assertMatch({ok, _}, lasp:update(S2, {add_all, [a,b,3]}, a)),
 
     %% Apply intersection.
-    ?assertMatch(ok, rpc:call(Node1, lasp, intersection, [S1, S2, S3])),
+    ?assertMatch(ok, lasp:intersection(S1, S2, S3)),
 
     %% Sleep.
     timer:sleep(400),
 
     %% Read intersection.
-    {ok, {_, _, _, Intersection0}} = rpc:call(Node1, lasp, read, [S3, undefined]),
+    {ok, {_, _, _, Intersection0}} = lasp:read(S3, undefined),
 
     %% Read intersection value.
     Intersection = ?SET:value(Intersection0),
@@ -307,28 +299,27 @@ intersection_test(Config) ->
 
     ok.
 
-product_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-
+%% @doc Cartesian product test.
+product_test(_Config) ->
     %% Create initial sets.
-    {ok, {S1, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
-    {ok, {S2, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {S1, _, _, _}} = lasp:declare(?SET),
+    {ok, {S2, _, _, _}} = lasp:declare(?SET),
 
     %% Create output set.
-    {ok, {S3, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {S3, _, _, _}} = lasp:declare(?SET),
 
     %% Populate initial sets.
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S1, {add_all, [1,2,3]}, a])),
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [S2, {add_all, [a,b,3]}, a])),
+    ?assertMatch({ok, _}, lasp:update(S1, {add_all, [1,2,3]}, a)),
+    ?assertMatch({ok, _}, lasp:update(S2, {add_all, [a,b,3]}, a)),
 
     %% Apply product.
-    ?assertMatch(ok, rpc:call(Node1, lasp, product, [S1, S2, S3])),
+    ?assertMatch(ok, lasp:product(S1, S2, S3)),
 
     %% Sleep.
     timer:sleep(400),
 
     %% Read product.
-    {ok, {_, _, _, Product0}} = rpc:call(Node1, lasp, read, [S3, undefined]),
+    {ok, {_, _, _, Product0}} = lasp:read(S3, undefined),
 
     %% Read product value.
     Product = ?SET:value(Product0),
@@ -337,29 +328,27 @@ product_test(Config) ->
 
     ok.
 
-monotonic_read_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-
+%% @doc Monotonic read.
+monotonic_read_test(_Config) ->
     %% Create new set-based CRDT.
-    {ok, {SetId, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {SetId, _, _, _}} = lasp:declare(?SET),
 
     %% Determine my pid.
     Me = self(),
 
     %% Perform 4 binds, each an inflation.
     ?assertMatch({ok, _},
-                 rpc:call(Node1, lasp, update, [SetId, {add_all, [1]}, actor])),
+                 lasp:update(SetId, {add_all, [1]}, actor)),
 
-    {ok, {_, _, _, V0}} =
-                 rpc:call(Node1, lasp, update, [SetId, {add_all, [2]}, actor]),
+    {ok, {_, _, _, V0}} = lasp:update(SetId, {add_all, [2]}, actor),
 
     ?assertMatch({ok, {_, _, _, _}},
-                 rpc:call(Node1, lasp, update, [SetId, {add_all, [3]}, actor])),
+                 lasp:update(SetId, {add_all, [3]}, actor)),
 
     %% Spawn fun which should block until lattice is strict inflation of
     %% V0.
     I1 = first_read,
-    spawn(Node1, fun() -> Me ! {I1, lasp:read(SetId, {strict, V0})} end),
+    spawn(fun() -> Me ! {I1, lasp:read(SetId, {strict, V0})} end),
 
     %% Ensure we receive [1, 2, 3].
     Set1 = receive
@@ -368,16 +357,14 @@ monotonic_read_test(Config) ->
     end,
 
     %% Perform more inflations.
-    {ok, {_, _, _, V1}} =
-                 rpc:call(Node1, lasp, update, [SetId, {add_all, [4]}, actor]),
+    {ok, {_, _, _, V1}} = lasp:update(SetId, {add_all, [4]}, actor),
 
-    ?assertMatch({ok, _},
-                 rpc:call(Node1, lasp, update, [SetId, {add_all, [5]}, actor])),
+    ?assertMatch({ok, _}, lasp:update(SetId, {add_all, [5]}, actor)),
 
     %% Spawn fun which should block until lattice is a strict inflation
     %% of V1.
     I2 = second_read,
-    spawn(Node1, fun() -> Me ! {I2, lasp:read(SetId, {strict, V1})} end),
+    spawn(fun() -> Me ! {I2, lasp:read(SetId, {strict, V1})} end),
 
     %% Ensure we receive [1, 2, 3, 4].
     Set2 = receive
@@ -389,6 +376,7 @@ monotonic_read_test(Config) ->
 
     ok.
 
+%% @doc Dynamic variable test.
 dynamic_ivar_test(Config) ->
     [Node1, Node2 | _Nodes] = proplists:get_value(nodes, Config),
 
@@ -414,6 +402,8 @@ dynamic_ivar_test(Config) ->
 
     ok.
 
+%% @doc Dynamic fold test; incomplete.
+%% @todo
 dynamic_fold_test(Config) ->
     [Node1 | _Nodes] = proplists:get_value(nodes, Config),
 
@@ -450,46 +440,45 @@ dynamic_fold_test(Config) ->
 %                         fun sum_pairs/2, 
 %                         GlobalAverage)
 
-orset_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-
-    {ok, {L1, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
-    {ok, {L2, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
-    {ok, {L3, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+%% @doc Test of the lasp_orset.
+orset_test(_Config) ->
+    {ok, {L1, _, _, _}} = lasp:declare(?SET),
+    {ok, {L2, _, _, _}} = lasp:declare(?SET),
+    {ok, {L3, _, _, _}} = lasp:declare(?SET),
 
     %% Attempt pre, and post- dataflow variable bind operations.
-    ?assertMatch(ok, rpc:call(Node1, lasp, bind_to, [L2, L1])),
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [L1, {add, 1}, a])),
-    ?assertMatch(ok, rpc:call(Node1, lasp, bind_to, [L3, L1])),
+    ?assertMatch(ok, lasp:bind_to(L2, L1)),
+    ?assertMatch({ok, _}, lasp:update(L1, {add, 1}, a)),
+    ?assertMatch(ok, lasp:bind_to(L3, L1)),
 
     timer:sleep(4000),
 
     %% Verify the same value is contained by all.
-    {ok, {_, _, _, S1}} = rpc:call(Node1, lasp, read, [L3, {strict, undefined}]),
-    {ok, {_, _, _, S1}} = rpc:call(Node1, lasp, read, [L2, {strict, undefined}]),
-    {ok, {_, _, _, S1}} = rpc:call(Node1, lasp, read, [L1, {strict, undefined}]),
+    {ok, {_, _, _, S1}} = lasp:read(L3, {strict, undefined}),
+    {ok, {_, _, _, S1}} = lasp:read(L2, {strict, undefined}),
+    {ok, {_, _, _, S1}} = lasp:read(L1, {strict, undefined}),
 
     %% Test inflations.
     {ok, S2} = ?SET:update({add, 2}, a, S1),
 
     Self = self(),
 
-    spawn_link(Node1, fun() ->
+    spawn_link(fun() ->
                   {ok, _} = lasp:wait_needed(L1, {strict, S1}),
                   Self ! threshold_met
                end),
 
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, bind, [L1, S2])),
+    ?assertMatch({ok, _}, lasp:bind(L1, S2)),
 
     timer:sleep(4000),
 
     %% Verify the same value is contained by all.
-    ?assertMatch({ok, {_, _, _, S2}}, rpc:call(Node1, lasp, read, [L3, {strict, undefined}])),
-    ?assertMatch({ok, {_, _, _, S2}}, rpc:call(Node1, lasp, read, [L2, {strict, undefined}])),
-    ?assertMatch({ok, {_, _, _, S2}}, rpc:call(Node1, lasp, read, [L1, {strict, undefined}])),
+    ?assertMatch({ok, {_, _, _, S2}}, lasp:read(L3, {strict, undefined})),
+    ?assertMatch({ok, {_, _, _, S2}}, lasp:read(L2, {strict, undefined})),
+    ?assertMatch({ok, {_, _, _, S2}}, lasp:read(L1, {strict, undefined})),
 
     %% Read at the S2 threshold level.
-    {ok, {_, _, _, S2}} = rpc:call(Node1, lasp, read, [L1, S2]),
+    {ok, {_, _, _, S2}} = lasp:read(L1, S2),
 
     %% Wait for wait_needed to unblock.
     receive
@@ -497,15 +486,15 @@ orset_test(Config) ->
             ok
     end,
 
-    {ok, {L5, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
-    {ok, {L6, _, _, _}} = rpc:call(Node1, lasp, declare, [?SET]),
+    {ok, {L5, _, _, _}} = lasp:declare(?SET),
+    {ok, {L6, _, _, _}} = lasp:declare(?SET),
 
-    spawn_link(Node1, fun() ->
+    spawn_link(fun() ->
                 {ok, _} = lasp:read_any([{L5, {strict, undefined}}, {L6, {strict, undefined}}]),
                 Self ! read_any
         end),
 
-    ?assertMatch({ok, _}, rpc:call(Node1, lasp, update, [L5, {add, 1}, a])),
+    {ok, _} = lasp:update(L5, {add, 1}, a),
 
     receive
         read_any ->
@@ -514,7 +503,6 @@ orset_test(Config) ->
 
     ok.
 
-leaderboard_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-    rpc:call(Node1, lasp_leaderboard, run, []),
-    ok.
+%% @doc Run the leaderboard simulation.
+leaderboard_test(_Config) ->
+    lasp_leaderboard:run([]).

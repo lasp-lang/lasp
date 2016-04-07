@@ -38,14 +38,14 @@ new(Type) ->
 update(Type, Operation, Actor, Value) ->
     case Type of
         {T, _Args} ->
-            case mochiglobal:get(delta_mode, false) of
+            case lasp_config:get(delta_mode, false) of
                 true ->
                     T:update_delta(Operation, Actor, Value);
                 false ->
                     T:update(Operation, Actor, Value)
             end;
         T ->
-            case mochiglobal:get(delta_mode, false) of
+            case lasp_config:get(delta_mode, false) of
                 true ->
                     T:update_delta(Operation, Actor, Value);
                 false ->

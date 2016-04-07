@@ -240,6 +240,6 @@ reset() ->
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
-    Backend = mochiglobal:get(distribution_backend,
+    Backend = lasp_config:get(distribution_backend,
                               lasp_plumtree_broadcast_distribution_backend),
     erlang:apply(Backend, Function, Args).

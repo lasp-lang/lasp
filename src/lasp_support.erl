@@ -167,11 +167,5 @@ heal_cluster(ANodes, BNodes) ->
          [{Node1, Node2} || Node1 <- ANodes, Node2 <- BNodes]),
     ok.
 
-web_port(jaguar) ->
-    8000;
-web_port(shadow) ->
-    8001;
-web_port(thorn) ->
-    8002;
-web_port(pyros) ->
-    8003.
+web_port(_) ->
+    random:uniform(5000) + 1024.

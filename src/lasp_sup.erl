@@ -129,24 +129,30 @@ init(_Args) ->
     ProfileEnabled = application:get_env(?APP,
                                          profile,
                                          ProfileDefault),
-    mochiglobal:put(profile, ProfileEnabled),
+    lasp_config:set(profile, ProfileEnabled),
 
-    %% Cache values with mochiglobal to help out on the performance.
+    %% Cache values with lasp_config to help out on the performance.
     Delta = application:get_env(?APP, delta_mode, false),
-    mochiglobal:put(delta_mode, Delta),
+    lasp_config:set(delta_mode, Delta),
 
     StorageBackend = application:get_env(
                        ?APP,
                        storage_backend,
                        lasp_ets_storage_backend),
-    mochiglobal:put(storage_backend, StorageBackend),
+    lasp_config:set(storage_backend, StorageBackend),
 
     DistributionBackend = application:get_env(
                             ?APP,
                             distribution_backend,
                             lasp_plumtree_broadcast_distribution_backend),
-    mochiglobal:put(distribution_backend, DistributionBackend),
+    lasp_config:set(distribution_backend, DistributionBackend),
 
-    mochiglobal:put(instrumentation, InstrEnabled),
+    MaxDeltaSlots = application:get_env(?APP, delta_mode_max_slots, 10),
+    lasp_config:set(delta_mode_max_slots, MaxDeltaSlots),
+
+    MaxGCCounter = application:get_env(?APP, delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
+    lasp_config:set(delta_mode_max_gc_counter, MaxGCCounter),
+
+    lasp_config:set(instrumentation, InstrEnabled),
 
     {ok, {{one_for_one, 5, 10}, Children}}.

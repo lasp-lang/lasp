@@ -21,7 +21,19 @@
 -module(lasp_config).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
--export([dispatch/0, web_config/0]).
+-include("lasp.hrl").
+
+-export([dispatch/0,
+         set/2,
+         get/2,
+         web_config/0]).
+
+get(Key, Default) ->
+    mochiglobal:get(Key, Default).
+
+set(Key, Value) ->
+    application:set_env(?APP, Key, Value),
+    mochiglobal:put(Key, Value).
 
 dispatch() ->
     lists:flatten([

@@ -31,6 +31,7 @@
          put/3,
          update/3,
          get/2,
+         reset/1,
          fold/3]).
 
 %% gen_server callbacks
@@ -81,6 +82,11 @@ get(Ref, Id) ->
 fold(Ref, Function, Acc) ->
     gen_server:call(Ref, {fold, Function, Acc}, infinity).
 
+%% @doc Reset all application state.
+-spec reset(store()) -> ok.
+reset(Ref) ->
+    gen_server:call(Ref, reset, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -120,6 +126,9 @@ handle_call({update, Id, Function}, _From, #state{ref=Ref}=State) ->
 handle_call({fold, Function, Acc0}, _From, #state{ref=Ref}=State) ->
     Acc1 = ets:foldl(Function, Acc0, Ref),
     {reply, {ok, Acc1}, State};
+handle_call(reset, _From, #state{ref=Ref}=State) ->
+    true = ets:delete_all_objects(Ref),
+    {reply, ok, State};
 handle_call(Msg, _From, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
@@ -150,7 +159,8 @@ code_change(_OldVsn, State, _Extra) ->
 -spec do_get(ref(), id()) -> {ok, variable()} | {error, not_found} |
                              {error, atom()}.
 do_get(Ref, Id) ->
-    case ets:lookup(Ref, Id) of
+    StorageId = storage_id(Id),
+    case ets:lookup(Ref, StorageId) of
         [{_Key, Record}] ->
             {ok, Record};
         [] ->
@@ -160,5 +170,10 @@ do_get(Ref, Id) ->
 %% @doc Write a record to the backend.
 -spec do_put(ref(), id(), variable()) -> ok.
 do_put(Ref, Id, Record) ->
-    true = ets:insert(Ref, {Id, Record}),
+    StorageId = storage_id(Id),
+    true = ets:insert(Ref, {StorageId, Record}),
     ok.
+
+-spec storage_id(id()) -> binary().
+storage_id({BinaryId, _Type}) -> BinaryId;
+storage_id(Id)                -> Id.

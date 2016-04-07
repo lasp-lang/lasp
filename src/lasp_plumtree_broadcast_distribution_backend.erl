@@ -25,6 +25,9 @@
 -behaviour(lasp_distribution_backend).
 -behaviour(plumtree_broadcast_handler).
 
+%% Administrative controls.
+-export([reset/0]).
+
 %% API
 -export([start_link/0,
          start_link/1]).
@@ -69,7 +72,8 @@
 %% State record.
 -record(state, {store :: store(),
                 actor :: binary(),
-                counter :: non_neg_integer()}).
+                counter :: non_neg_integer(),
+                gc_counter :: non_neg_integer()}).
 
 %% Broadcast record.
 -record(broadcast, {id :: id(),
@@ -184,10 +188,18 @@ graft({Id, Clock}) ->
 %% @doc Anti-entropy mechanism.
 -spec exchange(node()) -> {ok, pid()}.
 exchange(Peer) ->
-    case mochiglobal:get(delta_mode, false) of
+    case lasp_config:get(delta_mode, false) of
         true ->
             %% Anti-entropy mechanism for causal consistency of delta-CRDT.
-            gen_server:call(?MODULE, {exchange, Peer}, infinity);
+            {ok, Pid, GCCounter} = gen_server:call(?MODULE, {exchange, Peer}, infinity),
+            MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
+            case GCCounter == MaxGCCounter of
+                true ->
+                    lager:info("Garbage collection: GCCounter: ~p", [GCCounter]),
+                    gen_server:call(?MODULE, delta_gc, infinity);
+                false ->
+                    {ok, Pid}
+            end;
         false ->
             %% Naive anti-entropy mechanism; re-broadcast all messages.
             gen_server:call(?MODULE, exchange, infinity)
@@ -204,7 +216,7 @@ exchange(Peer) ->
 %%
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
-    case mochiglobal:get(delta_mode, false) of
+    case lasp_config:get(delta_mode, false) of
         true ->
             gen_server:call(?MODULE, {declare, Id, Type}, infinity);
         false ->
@@ -221,7 +233,7 @@ declare(Id, Type) ->
 %%
 -spec declare_dynamic(id(), type()) -> {ok, var()}.
 declare_dynamic(Id, Type) ->
-    case mochiglobal:get(delta_mode, false) of
+    case lasp_config:get(delta_mode, false) of
         true ->
             gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity);
         false ->
@@ -409,6 +421,15 @@ wait_needed(Id, Threshold) ->
     gen_server:call(?MODULE, {wait_needed, Id, Threshold}, infinity).
 
 %%%===================================================================
+%%% Administrative controls
+%%%===================================================================
+
+%% @doc Reset all Lasp application state.
+-spec reset() -> ok.
+reset() ->
+    gen_server:call(?MODULE, reset, infinity).
+
+%%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
@@ -417,6 +438,7 @@ wait_needed(Id, Threshold) ->
 init([]) ->
     {ok, Actor} = lasp_unique:unique(),
     Counter = 0,
+    GCCounter = 0,
     Identifier = node(),
     {ok, Store} = case ?CORE:start(Identifier) of
         {ok, Pid} ->
@@ -427,11 +449,21 @@ init([]) ->
             lager:error("Failed to initialize backend: ~p", [Reason]),
             {error, Reason}
     end,
-    {ok, #state{actor=Actor, counter=Counter, store=Store}}.
+    {ok, #state{actor=Actor, counter=Counter, store=Store, gc_counter=GCCounter}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
+
+%% Reset all Lasp application state.
+handle_call(reset, _From, #state{store=Store}=State) ->
+    %% Terminate all Lasp processes.
+    lasp_process_sup:terminate(),
+
+    %% Reset storage backend.
+    ?CORE:storage_backend_reset(Store),
+
+    {reply, ok, State};
 
 %% Local declare operation, which will need to initialize metadata and
 %% broadcast the value to the remote nodes.
@@ -596,33 +628,31 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
 
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
-handle_call({exchange, Peer}, _From, #state{store=Store}=State) ->
+handle_call({exchange, Peer}, _From, #state{store=Store, gc_counter=GCCounter}=State) ->
     Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
                             delta_counter=Counter, delta_map=DeltaMap,
                             delta_ack_map=AckMap}},
                    Acc0) ->
                        Ack = case orddict:find(Peer, AckMap) of
-                                 {ok, Ack0} ->
+                                 {ok, {Ack0, _GCed}} ->
                                      Ack0;
                                  error ->
                                      0
                              end,
-                       Causality = case orddict:fetch_keys(DeltaMap) of
-                                       [] ->
-                                           0 > Ack;
-                                       Keys ->
-                                           lists:min(Keys) > Ack
-                                   end,
-                       Deltas = case orddict:is_empty(DeltaMap) or Causality of
-                                    true ->
-                                        Value;
-                                    false ->
-                                        collect_deltas(Type, DeltaMap, Ack, Counter)
-                                end,
                        case Ack < Counter of
                            true ->
-                               lager:info("Send Delta({delta_send}): To: ~p, Counter: ~p",
-                                          [Peer, Counter]),
+                               Causality = case orddict:fetch_keys(DeltaMap) of
+                                               [] ->
+                                                   true;
+                                               Keys ->
+                                                   lists:min(Keys) > Ack
+                                           end,
+                               Deltas = case Causality of
+                                            true ->
+                                                Value;
+                                            false ->
+                                                collect_deltas(Type, DeltaMap, Ack, Counter)
+                                        end,
                                gen_server:cast({?MODULE, Peer},
                                                {delta_send,
                                                 node(),
@@ -630,11 +660,11 @@ handle_call({exchange, Peer}, _From, #state{store=Store}=State) ->
                                                 Counter}),
                                [{ok, Id}|Acc0];
                            false ->
-                               [Acc0]
+                               Acc0
                        end
                end,
     Pid = spawn(fun() -> do(fold, [Store, Function, []]) end),
-    {reply, {ok, Pid}, State};
+    {reply, {ok, Pid, GCCounter}, State#state{gc_counter=increment_counter(GCCounter)}};
 
 %% Naive anti-entropy mechanism; periodically re-broadcast all messages.
 handle_call(exchange, _From, #state{store=Store}=State) ->
@@ -651,6 +681,78 @@ handle_call(exchange, _From, #state{store=Store}=State) ->
     Pid = spawn(fun() -> do(fold, [Store, Function, []]) end),
     {reply, {ok, Pid}, State};
 
+handle_call(delta_gc, _From, #state{store=Store}=State) ->
+    Function =
+        fun({Id, #dv{delta_map=DeltaMap0, delta_ack_map=AckMap0,
+                     delta_counter=Counter}=_Object},
+            Acc0) ->
+                case orddict:is_empty(DeltaMap0) of
+                    true ->
+                        Acc0;
+                    false ->
+                        %% Remove disconnected or slow node() entries from the AckMap.
+                        %% disconnected or slow: seen the previous GC & no change
+                        RemovedAckMap0 =
+                            orddict:filter(fun(_Node, {Ack, GCed}) ->
+                                                   (GCed == false) orelse (Ack == Counter)
+                                           end, AckMap0),
+                        case orddict:size(RemovedAckMap0) of
+                            0 ->
+                                Acc0;
+                            _ ->
+                                %% Mark remained entries as seen this GC.
+                                RemovedAckMap =
+                                    orddict:fold(
+                                      fun(Node, {Ack, _GCed}, RemovedAckMap1) ->
+                                              orddict:store(Node, {Ack, true},
+                                                            RemovedAckMap1)
+                                      end, orddict:new(), RemovedAckMap0),
+                                %% Collect garbage deltas.
+                                MinAck =
+                                    lists:min([Ack || {_Node, {Ack, _GCed}} <- RemovedAckMap]),
+                                %% size() should be bigger than 0.
+                                MinAck1 =
+                                    case orddict:size(DeltaMap0) of
+                                        1 ->
+                                            MinAck;
+                                        _ ->
+                                            Counters = orddict:fetch_keys(DeltaMap0),
+                                            NotCollectable =
+                                                (MinAck > lists:nth(1, Counters)) andalso
+                                                    (MinAck < lists:nth(2, Counters)),
+                                            case NotCollectable of
+                                                true ->
+                                                    lists:nth(1, Counters);
+                                                false ->
+                                                    MinAck
+                                            end
+                                    end,
+                                DeltaMap = orddict:filter(fun(Counter0, _Delta) ->
+                                                                  Counter0 >= MinAck1
+                                                          end, DeltaMap0),
+                                [{ok, Id, DeltaMap, RemovedAckMap}|Acc0]
+                        end
+                end
+        end,
+    Pid = spawn(
+            fun() ->
+                    {ok, Results} = do(fold, [Store, Function, []]),
+                    lists:foreach(
+                      fun({ok, Id, DeltaMap, RemovedAckMap}) ->
+                              case do(get, [Store, Id]) of
+                                  {ok, Object} ->
+                                      _ = do(put,
+                                             [Store, Id,
+                                              Object#dv{delta_map=DeltaMap,
+                                                        delta_ack_map=RemovedAckMap}]),
+                                      ok;
+                                  _ ->
+                                      ok
+                              end
+                      end, Results)
+            end),
+    {reply, {ok, Pid}, State#state{gc_counter=0}};
+
 %% @private
 handle_call(Msg, _From, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
@@ -659,20 +761,14 @@ handle_call(Msg, _From, State) ->
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
             #state{store=Store, actor=Actor}=State) ->
-    lager:info("Receive Delta({delta_send}): From: ~p, Counter: ~p",
-               [From, Counter]),
     _Result = ?CORE:receive_delta(Store, {delta_send,
                                           {Id, Type, _Metadata, Deltas},
                                           ?CLOCK_INCR,
                                           ?CLOCK_INIT}),
-    lager:info("Send Delta({delta_ack}): To: ~p, Counter: ~p",
-                                          [From, Counter]),
     gen_server:cast({?MODULE, From}, {delta_ack, node(), Id, Counter}),
     {noreply, State};
 
 handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
-    lager:info("Receive Delta({delta_ack}): From: ~p, Counter: ~p",
-               [From, Counter]),
     _Result = ?CORE:receive_delta(Store, {delta_ack,
                                           Id,
                                           From,
@@ -749,13 +845,20 @@ increment_counter(Counter) ->
     Counter + 1.
 
 %% @private
-collect_deltas(Type, DeltaMap, Min, Max) ->
+collect_deltas(Type, DeltaMap, Min0, Max) ->
+    Counters = orddict:fetch_keys(DeltaMap),
+    Min1 = case lists:member(Min0, Counters) of
+               true ->
+                   Min0;
+               false ->
+                   lists:min(Counters)
+           end,
     SmallDeltaMap = orddict:filter(fun(Counter, _Delta) ->
-                                           (Counter >= Min) or (Counter < Max)
+                                           (Counter >= Min1) or (Counter < Max)
                                    end, DeltaMap),
     Deltas = orddict:fold(fun(_Counter, Delta, Deltas0) ->
-                                  Type:merge(Deltas0, Delta)
-                          end, Type:new(), SmallDeltaMap),
+                                  lasp_type:merge(Type, Deltas0, Delta)
+                          end, lasp_type:new(Type), SmallDeltaMap),
     {delta, Deltas}.
 
 -ifdef(TEST).
@@ -768,7 +871,7 @@ do(Function, Args) ->
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
-    Backend = mochiglobal:get(storage_backend, lasp_ets_storage_backend),
+    Backend = lasp_config:get(storage_backend, lasp_ets_storage_backend),
     erlang:apply(Backend, Function, Args).
 
 -endif.
@@ -776,7 +879,7 @@ do(Function, Args) ->
 %% @private
 log_transmission(Term) ->
     try
-        case mochiglobal:get(instrumentation, false) of
+        case lasp_config:get(instrumentation, false) of
             true ->
                 lasp_transmission_instrumentation:log(server, Term, node());
             false ->

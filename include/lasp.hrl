@@ -2,17 +2,14 @@
 
 -define(APP, lasp).
 
+%% Number of nodes to run for the test suite.
+-define(NUM_NODES, 5).
+
 %% Code which connects the storage backends to the implementation.
 -define(CORE, lasp_core).
 
 %% Default set implementation for Lasp internal state tracking.
--define(SET, lasp_orset_gbtree).
-
-%% What the process scope is in?
--define(SCOPE, lists).
-
--define(PROGRAM_KEY,    registered).
--define(PROGRAM_PREFIX, {lasp, programs}).
+-define(SET, lasp_orset).
 
 -record(read, {id :: id(),
                type :: type(),
@@ -48,10 +45,14 @@
             {error, timeout}
         end).
 
+%% @doc Garbage collection will happen after the certain number
+%%      (MAX_GC_COUNTER) of times of exchanges.
+-define(MAX_GC_COUNTER, 7).
+
 %% General types.
 -type file() :: iolist().
 -type registration() :: preflist | global.
--type id() :: binary().
+-type id() :: binary() | {binary(), type()}.
 -type idx() :: term().
 -type result() :: term().
 -type type() :: lasp_ivar

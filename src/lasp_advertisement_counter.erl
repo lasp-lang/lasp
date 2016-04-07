@@ -78,8 +78,7 @@ run(Args) ->
 %%      advertisements.
 init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
     %% Enable or disable deltas.
-    ok = application:set_env(?APP, delta_mode, Deltas),
-    ok = mochiglobal:put(delta_mode, Deltas),
+    ok = lasp_config:set(delta_mode, Deltas),
 
     %% Get the process identifier of the runner.
     Runner = self(),
@@ -146,7 +145,7 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
                                   integer_to_list(SyncInterval)], "-") ++ ".csv",
     ok = lasp_transmission_instrumentation:start(server, ServerFilename, NumClients),
 
-    Instrumentation = mochiglobal:get(instrumentation, false),
+    Instrumentation = lasp_config:set(instrumentation, false),
 
     {ok, #state{instrumentation=Instrumentation,
                 runner=Runner,
@@ -233,7 +232,7 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
     {ok, _} = lasp:read(Counter, {value, ?MAX_IMPRESSIONS}),
 
     %% Remove the advertisement.
-    {ok, _} = lasp:update(Ads, {remove, Ad}, Ad).
+    {ok, _} = lasp:update(Ads, {remove, Ad}, node()).
 
 %% @doc Generate advertisements and advertisement contracts.
 create_advertisements_and_contracts(Counter, Ads, Contracts) ->
@@ -244,7 +243,7 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
     lists:map(fun(Id) ->
                 {ok, _} = lasp:update(Contracts,
                                       {add, #contract{id=Id}},
-                                      undefined)
+                                      node())
                 end, AdIds),
     lists:map(fun(Id) ->
                 %% Generate a G-Counter.
@@ -253,7 +252,7 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
                 Ad = #ad{id=Id, counter=CounterId},
 
                 %% Add it to the advertisement set.
-                {ok, _} = lasp:update(Ads, {add, Ad}, undefined),
+                {ok, _} = lasp:update(Ads, {add, Ad}, node()),
 
                 Ad
 
@@ -272,7 +271,7 @@ synchronize(Instrumentation, SetType, AdsWithContractsId, AdsWithContracts0, Cou
     {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
     %% Log state received from the server.
     log_transmission(Instrumentation, AdsWithContracts),
-    AdList = lasp_type:query(SetType, AdsWithContracts),
+    AdList = lasp_type:value(SetType, AdsWithContracts),
     Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
     %% Refresh our dictionary with any new values from the server.
@@ -301,7 +300,7 @@ synchronize(Instrumentation, SetType, AdsWithContractsId, AdsWithContracts0, Cou
     %%     state, prune it by identifier.
     %%
     SyncFun = fun(Ad, Counter0, Acc) ->
-                      Counter = case mochiglobal:get(delta_mode, false) of
+                      Counter = case lasp_config:set(delta_mode, false) of
                           true ->
                               case dict:find(Ad, CountersDelta0) of
                                   {ok, Delta} ->
@@ -350,13 +349,13 @@ servers(SetType, Ads, AdsWithContracts) ->
 
     %% Get the current advertisement list.
     {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
-    AdList = lasp_type:query(SetType, AdList0),
+    AdList = lasp_type:value(SetType, AdList0),
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
     lists:map(fun(Ad) ->
                 ServerPid = spawn(?MODULE, server, [Ad, Ads]),
-                {ok, _} = lasp:update(Servers, {add, ServerPid}, undefined),
+                {ok, _} = lasp:update(Servers, {add, ServerPid}, node()),
                 ServerPid
                 end, AdList).
 

@@ -21,7 +21,7 @@
 %% @doc Single-assignment variable.
 %%
 %%      This module allows us to remove the single-assignment code path
-%%      and formailize everything as lattice variables.
+%%      and formalize everything as lattice variables.
 %%
 
 -module(lasp_ivar).

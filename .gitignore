@@ -27,3 +27,4 @@ _checkouts/
 priv/logs/*.csv
 priv/plots/*.pdf
 fprof.trace
+.rebar3/

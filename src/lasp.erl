@@ -23,6 +23,8 @@
 
 -include("lasp.hrl").
 
+-export([reset/0]).
+
 -export([bind/4,
          declare/1,
          declare_dynamic/1]).
@@ -228,12 +230,16 @@ thread(Module, Function, Args) ->
 wait_needed(Id, Threshold) ->
     do(wait_needed, [Id, Threshold]).
 
+%% @doc Reset state.
+reset() ->
+    do(reset, []).
+
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
-    Backend = mochiglobal:get(distribution_backend,
+    Backend = lasp_config:get(distribution_backend,
                               lasp_plumtree_broadcast_distribution_backend),
     erlang:apply(Backend, Function, Args).

@@ -89,7 +89,7 @@ update({snd, Update}, Actor, {{FstType, Fst}, {SndType, Snd}}) ->
     end.
 
 update_delta(Op, Actor, Pair) ->
-    %% update_delta() is not implemented.
+    %% @TODO: update_delta() is not implemented.
     update(Op, Actor, Pair).
 
 %% @doc Determine if pairs are equivalent.

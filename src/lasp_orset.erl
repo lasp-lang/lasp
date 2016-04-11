@@ -106,7 +106,6 @@ value(_, ORSet) ->
     value(ORSet).
 
 -spec update(orset_op(), actor(), orset()) -> {ok, orset()} |
-                                              {ok, {delta, orset()}} |
                                               {error, {precondition, {not_present, member()}}}.
 update({add_by_token, Token, Elem}, _Actor, ORDict) ->
     add_elem(Elem, Token, ORDict);
@@ -126,6 +125,10 @@ update({remove_all, Elems}, _Actor, ORDict0) ->
 update({update, Ops}, Actor, ORDict) ->
     apply_ops(Ops, Actor, ORDict).
 
+-spec update_delta(orset_op(), actor(), orset()) ->
+                          {ok, orset()} |
+                          {ok, {delta, orset()}} |
+                          {error, {precondition, {not_present, member()}}}.
 update_delta({remove, Elem}, Actor, ORDict) ->
     case orddict:find(Elem, ORDict) of
         {ok, Tokens} ->

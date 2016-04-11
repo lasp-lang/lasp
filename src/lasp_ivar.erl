@@ -79,11 +79,12 @@ new() ->
     undefined.
 
 %% @doc Set the value of a single-assignment variable.
+-spec update(ivar_op(), actor(), undefined) -> {ok, ivar()}.
 update({set, Value}, _Actor, undefined) ->
     {ok, Value}.
 
 update_delta(Op, Actor, IVar) ->
-    %% @todo: update_delta() is not implemented.
+    %% @TODO: update_delta() is not implemented.
     update(Op, Actor, IVar).
 
 %% @doc Single assignment merge; undefined for two bound variables.

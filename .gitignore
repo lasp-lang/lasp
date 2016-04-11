@@ -16,6 +16,7 @@ package
 deps.test/
 rt/
 .combo_dialyzer_plt
+.local_dialyzer_plt
 build
 .vagrant
 _build/

@@ -612,16 +612,6 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                     ok;
                 {_, _} ->
                     AccValue = case T of
-                        lasp_orset_gbtree ->
-                            FolderFun = fun(X, XCausality, XAcc) ->
-                                    InnerFoldFun = fun(Y, YCausality, YAcc) ->
-                                            gb_trees:enter({X, Y},
-                                                           lasp_lattice:causal_product(T, XCausality, YCausality),
-                                                           YAcc)
-                                    end,
-                                    gb_trees_ext:foldl(InnerFoldFun, XAcc, RValue)
-                            end,
-                            gb_trees_ext:foldl(FolderFun, T:new(), LValue);
                         lasp_orset ->
                             FolderFun = fun({X, XCausality}, Acc) ->
                                     Acc ++ [{{X, Y}, lasp_lattice:causal_product(T, XCausality, YCausality)} || {Y, YCausality} <- RValue]
@@ -654,8 +644,6 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                     ok;
                 {_, _} ->
                     AccValue = case T of
-                                   lasp_orset_gbtree ->
-                                       lasp_orset_gbtree:intersect(LValue, RValue);
                                    lasp_orset ->
                                        lasp_orset:intersect(LValue, RValue)
                                end,
@@ -685,8 +673,6 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                     ok;
                 {_, _} ->
                     AccValue = case T of
-                        lasp_orset_gbtree ->
-                            lasp_orset_gbtree:merge(LValue, RValue);
                         lasp_orset ->
                             lasp_orset:merge(LValue, RValue)
                     end,
@@ -711,8 +697,6 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun({_, T, _, V}) ->
                   AccValue = case T of
-                                 lasp_orset_gbtree ->
-                                     lasp_orset_gbtree:map(Function, V);
                                  lasp_orset ->
                                      lasp_orset:map(Function, V)
                              end,
@@ -735,8 +719,8 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun({_, T, _, V}) ->
             AccValue = case T of
-                lasp_orset_gbtree -> lasp_orset_gbtree:filter(Function, V);
-                lasp_orset -> lasp_orset:filter(Function, V)
+                lasp_orset ->
+                               lasp_orset:filter(Function, V)
             end,
             {ok, _} = BindFun(AccId, AccValue, Store)
     end,

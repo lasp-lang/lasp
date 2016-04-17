@@ -31,18 +31,7 @@
          all/0]).
 
 %% tests
--export([ivar_test/1,
-         orset_test/1,
-         dynamic_ivar_test/1,
-         dynamic_fold_test/1,
-         leaderboard_test/1,
-         monotonic_read_test/1,
-         map_test/1,
-         filter_test/1,
-         fold_test/1,
-         union_test/1,
-         product_test/1,
-         intersection_test/1]).
+-compile([export_all]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -83,6 +72,8 @@ end_per_testcase(Case, Config) ->
 
 all() ->
     [
+     stream_test,
+     query_test,
      ivar_test,
      orset_test,
      dynamic_ivar_test,
@@ -104,6 +95,57 @@ all() ->
 -define(SET, lasp_orset).
 -define(COUNTER, lasp_pncounter).
 -define(ID, <<"myidentifier">>).
+
+%% @doc Increment counter and test stream behaviour.
+stream_test(_Config) ->
+    %% Declare a variable.
+    {ok, {C1, _, _, _}} = lasp:declare(lasp_gcounter),
+
+    lager:info("Created identifier: ~p", [C1]),
+
+    %% Stream results.
+    Self = self(),
+    Function = fun(V) ->
+                       Self ! {ok, V}
+               end,
+    ?assertMatch(ok, lasp:stream(C1, Function)),
+
+    %% Increment.
+    ?assertMatch({ok, _}, lasp:update(C1, increment, a)),
+
+    %% Wait for message.
+    receive
+        {ok, 1} ->
+            ok
+    after
+        300 ->
+            ct:fail(missing_first_message)
+    end,
+
+    %% Increment again.
+    ?assertMatch({ok, _}, lasp:update(C1, increment, b)),
+
+    %% Wait for message.
+    receive
+        {ok, 2} ->
+            ok
+    after
+        300 ->
+            ct:fail(missing_second_message)
+    end.
+
+%% @doc Test query functionality.
+query_test(_Config) ->
+    %% Declare a variable.
+    {ok, {I1, _, _, _}} = lasp:declare(lasp_ivar),
+
+    %% Change it's value.
+    ?assertMatch({ok, _}, lasp:bind(I1, 2)),
+
+    %% Query it.
+    ?assertMatch({ok, 2}, lasp:query(I1)),
+
+    ok.
 
 %% @doc Single-assignment variable test.
 ivar_test(_Config) ->

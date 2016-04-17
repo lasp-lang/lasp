@@ -38,6 +38,7 @@
          declare/5,
          declare_dynamic/4,
          query/2,
+         stream/3,
          update/4,
          update/5,
          thread/4,
@@ -259,7 +260,7 @@ declare_dynamic(Id, Type, MetadataFun0, Store) ->
     declare(Id, Type, MetadataFun, Store).
 
 %% @doc Return the current value of a CRDT.
-%%
+%% @todo Why isn't this using the ReadFun?
 -spec query(id(), store()) -> {ok, term()}.
 query(Id, Store) ->
     {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
@@ -723,6 +724,21 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
                                lasp_orset:filter(Function, V)
             end,
             {ok, _} = BindFun(AccId, AccValue, Store)
+    end,
+    lasp_process:start_link([[{Id, ReadFun}], Fun]).
+
+%% @doc Stream values out of the Lasp system; using the values from this
+%%      stream can result in observable nondeterminism.
+%%
+stream(Id, Function, Store) ->
+    stream(Id, Function, Store, ?READ).
+
+%% @doc Stream values out of the Lasp system; using the values from this
+%%      stream can result in observable nondeterminism.
+%%
+stream(Id, Function, _Store, ReadFun) ->
+    Fun = fun({_, T, _, V}) ->
+            Function(lasp_type:value(T, V))
     end,
     lasp_process:start_link([[{Id, ReadFun}], Fun]).
 

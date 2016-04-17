@@ -35,6 +35,7 @@
 %% lasp_distribution_backend callbacks
 -export([declare/2,
          declare_dynamic/2,
+         stream/2,
          query/1,
          update/3,
          bind/2,
@@ -243,6 +244,12 @@ declare_dynamic(Id, Type) ->
             broadcast(Variable),
             {ok, Variable}
     end.
+
+%% @doc Stream values out of the Lasp system; using the values from this
+%%      stream can result in observable nondeterminism.
+%%
+stream(Id, Function) ->
+    gen_server:call(?MODULE, {stream, Id, Function}, infinity).
 
 %% @doc Read the current value of a CRDT.
 %%
@@ -492,6 +499,14 @@ handle_call({declare_dynamic, Id, Type}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
     Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
+
+%% Stream values out of the Lasp system; using the values from this
+%% stream can result in observable nondeterminism.
+%%
+handle_call({stream, Id, Function}, _From, #state{store=Store}=State) ->
+    lager:info("Core stream called with ~p", [Id]),
+    {ok, _Pid} = ?CORE:stream(Id, Function, Store),
+    {reply, ok, State};
 
 %% Local query operation.
 %% Return the value of a value in the datastore to the user.

@@ -145,7 +145,7 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
                                   integer_to_list(SyncInterval)], "-") ++ ".csv",
     ok = lasp_transmission_instrumentation:start(server, ServerFilename, NumClients),
 
-    Instrumentation = lasp_config:set(instrumentation, false),
+    Instrumentation = lasp_config:get(instrumentation, false),
 
     {ok, #state{instrumentation=Instrumentation,
                 runner=Runner,
@@ -300,7 +300,7 @@ synchronize(Instrumentation, SetType, AdsWithContractsId, AdsWithContracts0, Cou
     %%     state, prune it by identifier.
     %%
     SyncFun = fun(Ad, Counter0, Acc) ->
-                      Counter = case lasp_config:set(delta_mode, false) of
+                      Counter = case lasp_config:get(delta_mode, false) of
                           true ->
                               case dict:find(Ad, CountersDelta0) of
                                   {ok, Delta} ->

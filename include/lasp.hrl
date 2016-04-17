@@ -2,8 +2,8 @@
 
 -define(APP, lasp).
 
-%% Number of nodes to run for the test suite.
--define(NUM_NODES, 5).
+%% Number of additional nodes to run for the test suite.
+-define(NUM_NODES, 2).
 
 %% Code which connects the storage backends to the implementation.
 -define(CORE, lasp_core).

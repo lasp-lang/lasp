@@ -282,14 +282,13 @@ map(Function, V) ->
 
 -spec filter(fun((_) -> boolean()), orset()) -> orset().
 filter(Function, V) ->
-    FolderFun = fun({X, Causality0}, Acc) ->
-                        Causality = case Function(X) of
-                                        true ->
-                                            Causality0;
-                                        false ->
-                                            lasp_lattice:causal_remove(?MODULE, Causality0)
-                                    end,
-                        Acc ++ [{X, Causality}]
+    FolderFun = fun({X, Causality}, Acc) ->
+                        case Function(X) of
+                            true ->
+                                Acc ++ [{X, Causality}];
+                            false ->
+                                Acc
+                        end
                 end,
     lists:foldl(FolderFun, new(), V).
 

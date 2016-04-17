@@ -78,6 +78,10 @@ gen_read_fun(Id, ReadFun) ->
                     {_, _, _, V} ->
                         V
                 end,
-                {ok, NewValue} = ReadFun(Id, {strict, Value}),
-                NewValue
+                case ReadFun(Id, {strict, Value}) of
+                    {ok, NewValue} ->
+                        NewValue;
+                    {error, not_found} ->
+                        exit({lasp_process, not_found})
+                end
         end.

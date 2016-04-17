@@ -101,8 +101,6 @@ stream_test(_Config) ->
     %% Declare a variable.
     {ok, {C1, _, _, _}} = lasp:declare(lasp_gcounter),
 
-    lager:info("Created identifier: ~p", [C1]),
-
     %% Stream results.
     Self = self(),
     Function = fun(V) ->

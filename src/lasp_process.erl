@@ -76,7 +76,9 @@ gen_read_fun(Id, ReadFun) ->
                     undefined ->
                         undefined;
                     {_, _, _, V} ->
-                        V
+                        V;
+                    {delta, {_, _, _, V}} ->
+                        {delta, V}
                 end,
                 case ReadFun(Id, {strict, Value}) of
                     {ok, NewValue} ->

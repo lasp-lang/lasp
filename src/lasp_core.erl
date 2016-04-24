@@ -30,6 +30,7 @@
          bind_to/3,
          read/2,
          read/3,
+         read_delta/3,
          read_any/2,
          declare/1,
          declare/2,
@@ -189,6 +190,32 @@ read(Id, Threshold, Store) ->
                 end
             end,
     read(Id, Threshold, Store, Self, ReplyFun, BlockingFun).
+
+%% @doc Perform a delta read for a particular identifier.
+%%
+%%      Given an `Id', perform a blocking read until a delta is
+%%      delivered.
+%%
+%%      This operation blocks until any deltas have been delivered.
+%%
+-spec read_delta(id(), value(), store()) -> {ok, {delta, var()}}.
+read_delta(Id, Threshold, Store) ->
+    case Threshold of
+        {strict, undefined} ->
+            %% The first run uses the current value.
+            lasp:read(Id, undefined);
+        {strict, _} ->
+            %% From the second run, it always waits for a delta
+            %% (from the local or the remote).
+            Self = self(),
+            {ok, Object} = do(get, [Store, Id]),
+            WDT = lists:append(Object#dv.waiting_delta_threads, [{delta, Self}]),
+            do(put, [Store, Id, Object#dv{waiting_delta_threads=WDT}]),
+            receive
+                X ->
+                    X
+            end
+    end.
 
 %% @doc Perform a monotonic read for a series of given idenfitiers --
 %%      first response wins.
@@ -351,26 +378,30 @@ bind(Id, Value, Store) ->
 -spec bind(id(), value(), function(), store()) -> {ok, var()}.
 bind(Id, {delta, Value}, MetadataFun, Store) ->
     Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
-                      waiting_threads=WT, delta_counter=Counter0,
-                      delta_map=DeltaMap0, delta_ack_map=AckMap}=Object) ->
+                      waiting_delta_threads=WDT, waiting_threads=WT,
+                      delta_counter=Counter0, delta_map=DeltaMap0,
+                      delta_ack_map=AckMap}=Object) ->
             Metadata = MetadataFun(Metadata0),
             %% Merge may throw for invalid types.
             try
                 Merged = lasp_type:merge(Type, Value0, Value),
-                {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
                 case lasp_lattice:is_strict_inflation(Type, Value0, Merged) of
                     true ->
+                        {ok, SW} = reply_to_all(WT, [],
+                                                {ok, {Id, Type, Metadata, Merged}}),
+                        %% Notify the delta
+                        {ok, SWD} = reply_to_all(WDT, [],
+                                                 {ok, {delta, {Id, Type, Metadata, Value}}}),
                         DeltaMap = store_delta(Type, Counter0, Value, DeltaMap0),
                         NewObject = #dv{type=Type, metadata=Metadata, value=Merged,
-                                        waiting_threads=SW,
+                                        waiting_delta_threads=SWD, waiting_threads=SW,
                                         delta_counter=increment_counter(Counter0),
                                         delta_map=DeltaMap, delta_ack_map=AckMap},
                         %% Return value is a delta state.
                         {NewObject, {ok, {Id, Type, Metadata, {delta, Merged}}}};
                     false ->
                         %% Given delta state is already merged, no delta info update.
-                        {Object#dv{waiting_threads=SW},
-                         {ok, {Id, Type, Metadata, {delta, Merged}}}}
+                        {Object, {ok, {Id, Type, Metadata, {delta, Merged}}}}
                 end
             catch
                 _:Reason ->
@@ -701,7 +732,14 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
                                  lasp_orset ->
                                      lasp_orset:map(Function, V)
                              end,
-                  {ok, _} = BindFun(AccId, AccValue, Store)
+                  {ok, _} = BindFun(AccId, AccValue, Store);
+             %% A delta from the input will generate a new delta for the output
+             ({delta, {_, T, _, V}}) ->
+                  AccValue = case T of
+                                 lasp_orset ->
+                                     lasp_orset:map(Function, V)
+                             end,
+                  {ok, _} = BindFun(AccId, {delta, AccValue}, Store)
           end,
     lasp_process:start_link([[{Id, ReadFun}], Fun]).
 
@@ -844,6 +882,20 @@ reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
             StillWaiting0 ++ [H]
     end,
     reply_to_all(T, SW, Result);
+reply_to_all([{delta, From}|T], StillWaiting, {ok, {delta, Value}}=Result) ->
+    case From of
+        {server, undefined, {Address, Ref}} ->
+            gen_server:reply({Address, Ref}, {ok, {delta, Value}});
+        {fsm, undefined, Address} ->
+            gen_fsm:send_event(Address,
+                               {ok, undefined, {delta, Value}});
+        {Address, Ref} ->
+            gen_server:reply({Address, Ref}, {ok, {delta, Value}});
+        _ ->
+            From ! Result
+    end,
+    %% After notifying, no need to keep the information.
+    reply_to_all(T, StillWaiting, Result);
 reply_to_all([From|T], StillWaiting, Result) ->
     case From of
         {server, undefined, {Address, Ref}} ->

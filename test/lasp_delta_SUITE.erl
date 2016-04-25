@@ -86,16 +86,27 @@ all() ->
 %% @doc Normal map test.
 normal_map_test(Config) ->
     Nodes = proplists:get_value(nodes, Config),
-    %% Set the delta_mode to false for all nodes.
+    %% Set the delta_mode to true for all nodes.
     lists:foreach(fun(Node) ->
                         ct:pal("Set the delta_mode: ~p", [Node]),
-                        ok = rpc:call(Node, lasp_config, set, [delta_mode, false])
+                        ok = rpc:call(Node, lasp_config, set, [delta_mode, true])
+                  end, Nodes),
+    %% Set the incremental_computation_mode to false for all nodes.
+    lists:foreach(fun(Node) ->
+                        ct:pal("Set the delta_mode: ~p", [Node]),
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [incremental_computation_mode, false])
                   end, Nodes),
 
-    %% Disable deltas.
-    ok = lasp_config:set(delta_mode, false),
+    %% Enable deltas.
+    ok = lasp_config:set(delta_mode, true),
 
-    ?assertMatch(false, lasp_config:get(delta_mode, false)),
+    ?assertMatch(true, lasp_config:get(delta_mode, false)),
+
+    %% Disable incremental computation.
+    ok = lasp_config:set(incremental_computation_mode, false),
+
+    ?assertMatch(false, lasp_config:get(incremental_computation_mode, false)),
 
     %% Create initial set.
     {ok, {S1, _, _, _}} = lasp:declare(?SET),
@@ -138,11 +149,22 @@ incremental_map_test(Config) ->
                         ct:pal("Set the delta_mode: ~p", [Node]),
                         ok = rpc:call(Node, lasp_config, set, [delta_mode, true])
                   end, Nodes),
+    %% Set the incremental_computation_mode to true for all nodes.
+    lists:foreach(fun(Node) ->
+                        ct:pal("Set the delta_mode: ~p", [Node]),
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [incremental_computation_mode, true])
+                  end, Nodes),
 
     %% Enable deltas.
     ok = lasp_config:set(delta_mode, true),
 
     ?assertMatch(true, lasp_config:get(delta_mode, false)),
+
+    %% Enable incremental computation.
+    ok = lasp_config:set(incremental_computation_mode, true),
+
+    ?assertMatch(true, lasp_config:get(incremental_computation_mode, false)),
 
     %% Create initial set.
     {ok, {S1, _, _, _}} = lasp:declare(?SET),

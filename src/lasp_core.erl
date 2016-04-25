@@ -733,7 +733,8 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
                                      lasp_orset:map(Function, V)
                              end,
                   {ok, _} = BindFun(AccId, AccValue, Store);
-             %% A delta from the input will generate a new delta for the output
+             %% A delta of the input will be transformed into a delta of the output
+             %% and the delta of the output will be binded to the output.
              ({delta, {_, T, _, V}}) ->
                   AccValue = case T of
                                  lasp_orset ->

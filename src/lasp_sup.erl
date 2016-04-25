@@ -153,6 +153,12 @@ init(_Args) ->
     MaxGCCounter = application:get_env(?APP, delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
     lasp_config:set(delta_mode_max_gc_counter, MaxGCCounter),
 
+    IncrementalComputation = application:get_env(
+                               ?APP,
+                               incremental_computation_mode,
+                               false),
+    lasp_config:set(incremental_computation_mode, IncrementalComputation),
+
     lasp_config:set(instrumentation, InstrEnabled),
 
     {ok, {{one_for_one, 5, 10}, Children}}.

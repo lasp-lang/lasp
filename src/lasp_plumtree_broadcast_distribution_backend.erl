@@ -391,7 +391,7 @@ intersection(Left, Right, Intersection) ->
 %%
 -spec map(id(), function(), id()) -> ok | error().
 map(Id, Function, AccId) ->
-    case lasp_config:get(delta_mode, false) of
+    case lasp_config:get(incremental_computation_mode, false) of
         true ->
             gen_server:call(?MODULE, {map_inc, Id, Function, AccId}, infinity);
         false ->

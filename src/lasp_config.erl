@@ -68,7 +68,9 @@ web_config() ->
 
 peer_config() ->
     %% Generate a random peer port.
-    random:seed(),
+    random:seed(erlang:phash2([node()]),
+                erlang:monotonic_time(),
+                erlang:unique_integer()),
     RandomPeerPort = random:uniform(1000) + 10000,
 
     %% Choose either static port or fall back to random peer port.

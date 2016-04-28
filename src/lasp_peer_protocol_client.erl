@@ -31,5 +31,6 @@ start_link(Peer) ->
     {ok, Pid}.
 
 init(_Peer) ->
-    {ok, Socket} = gen_tcp:connect({127,0,0,1}, 10444, []),
-    gen_tcp:send(Socket, term_to_binary({hello, node()})).
+    {ok, Socket} = gen_tcp:connect({127,0,0,1}, 10444, [binary, {packet, 2}]),
+    ok = gen_tcp:send(Socket, term_to_binary({hello, node()})),
+    ok = gen_tcp:close(Socket).

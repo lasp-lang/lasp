@@ -79,6 +79,7 @@ init(_Args) ->
 
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
     InstrEnabled = application:get_env(?APP, instrumentation, InstrDefault),
+    lasp_config:set(instrumentation, InstrEnabled),
 
     Children = case InstrEnabled of
         true ->
@@ -159,6 +160,14 @@ init(_Args) ->
                                false),
     lasp_config:set(incremental_computation_mode, IncrementalComputation),
 
-    lasp_config:set(instrumentation, InstrEnabled),
+    %% Initialize the listener for the peer protocol.
+    %% @todo Shutdown.
+    PeerConfig = lasp_config:peer_config(),
+    ranch:start_listener(lasp_peer_protocol,
+                         10,
+                         ranch_tcp,
+                         PeerConfig,
+                         lasp_peer_protocol,
+                         []),
 
     {ok, {{one_for_one, 5, 10}, Children}}.

@@ -50,6 +50,10 @@ init(Peer) ->
     ok = gen_tcp:send(Socket, term_to_binary({hello, node(), peer_port()})),
     ok = gen_tcp:close(Socket).
 
+%% @private
+peer_port() ->
+    lasp_config:get(peer_port, ?PEER_PORT).
+
 -else.
 
 %% @doc Assume that under normal circumstances, we are running on the
@@ -61,7 +65,3 @@ init(Peer) ->
     ok = gen_tcp:close(Socket).
 
 -endif.
-
-%% @private
-peer_port() ->
-    lasp_config:get(peer_port, ?PEER_PORT).

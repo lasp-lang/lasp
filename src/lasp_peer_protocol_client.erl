@@ -23,36 +23,102 @@
 -module(lasp_peer_protocol_client).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
--export([start_link/1,
-         init/1]).
+-behaviour(gen_server).
+
+-export([start_link/1]).
+
+%% gen_server callbacks
+-export([init/1,
+         handle_call/3,
+         handle_cast/2,
+         handle_info/2,
+         terminate/2,
+         code_change/3]).
+
+-record(state, {socket}).
 
 -include("lasp.hrl").
 
+%%%===================================================================
+%%% API
+%%%===================================================================
+
+%% @doc Start and link to calling process.
+-spec start_link(list())-> {ok, pid()} | ignore | {error, term()}.
 start_link(Peer) ->
-    Pid = spawn_link(?MODULE, init, [Peer]),
-    {ok, Pid}.
+    gen_server:start_link({local, Peer}, ?MODULE, [Peer], []).
+
+%%%===================================================================
+%%% gen_server callbacks
+%%%===================================================================
+
+%% @private
+-spec init([iolist()]) -> {ok, #state{}}.
+init([Peer]) ->
+    {ok, Socket} = connect(Peer),
+    {ok, #state{socket=Socket}}.
+
+%% @private
+-spec handle_call(term(), {pid(), term()}, #state{}) ->
+    {reply, term(), #state{}}.
+
+%% @private
+handle_call(Msg, _From, State) ->
+    lager:warning("Unhandled messages: ~p", [Msg]),
+    {reply, ok, State}.
+
+-spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
+
+%% @private
+handle_cast(Msg, State) ->
+    lager:warning("Unhandled messages: ~p", [Msg]),
+    {noreply, State}.
+
+%% @private
+-spec handle_info(term(), #state{}) -> {noreply, #state{}}.
+
+handle_info({tcp, _Socket, Data}, State0) ->
+    handle_message(decode(Data), State0);
+handle_info({tcp_closed, _Socket}, State) ->
+    {stop, normal, State};
+handle_info(Msg, State) ->
+    lager:warning("Unhandled messages: ~p", [Msg]),
+    {noreply, State}.
+
+%% @private
+-spec terminate(term(), #state{}) -> term().
+terminate(_Reason, #state{socket=Socket}) ->
+    ok = gen_tcp:close(Socket),
+    ok.
+
+%% @private
+-spec code_change(term() | {down, term()}, #state{}, term()) ->
+    {ok, #state{}}.
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
 
 -ifdef(TEST).
 
 %% @doc If we're running a local test, we have to use the same IP
-%%      address for every bind operation, but a different port instead of the
-%%      standard port.
+%%      address for every bind operation, but a different port instead
+%%      of the standard port.
 %%
-init(Peer) ->
+connect(Peer) ->
     %% Bootstrap with disterl.
     PeerPort = rpc:call(Peer,
                         lasp_config,
                         get,
                         [peer_port, ?PEER_PORT]),
 
-    {ok, Socket} = gen_tcp:connect({127, 0, 0, 1}, PeerPort, [binary, {packet, 2}]),
+    lager:info("Peer ~p running on port ~p", [Peer, PeerPort]),
 
-    ok = gen_tcp:send(Socket, term_to_binary({hello, node(), peer_port()})),
-    ok = gen_tcp:close(Socket).
-
-%% @private
-peer_port() ->
-    lasp_config:get(peer_port, ?PEER_PORT).
+    {ok, Socket} = gen_tcp:connect({127, 0, 0, 1},
+                                   PeerPort, [binary, {packet, 2}]),
+    {ok, Socket}.
 
 -else.
 
@@ -60,8 +126,26 @@ peer_port() ->
 %%      proper ports and have been supplied an IP address of a peer to
 %%      connect to; avoid disterl.
 %%
-init(Peer) ->
-    {ok, Socket} = gen_tcp:connect(Peer, ?PEER_PORT, [binary, {packet, 2}]),
-    ok = gen_tcp:close(Socket).
+connect(Peer) ->
+    {ok, Socket} = gen_tcp:connect(Peer,
+                                   ?PEER_PORT,
+                                   [binary, {packet, 2}]),
+    {ok, Socket}.
 
 -endif.
+
+%% @private
+decode(Message) ->
+    binary_to_term(Message).
+
+%% @private
+handle_message({hello, _Node}, #state{socket=Socket}=State) ->
+    ok = gen_tcp:send(Socket, encode({hello, node()})),
+    {noreply, State};
+handle_message(Message, State) ->
+    lager:info("Invalid message: ~p", [Message]),
+    {stop, normal, State}.
+
+%% @private
+encode(Message) ->
+    term_to_binary(Message).

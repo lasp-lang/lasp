@@ -65,7 +65,7 @@ init(ListenerPid, Socket, Transport, _Options) ->
     ok = inet:setopts(Socket, [{packet, 2}, {active, true}]),
 
     %% Generate the welcome message, encode it and transmit the message.
-    send_message(Socket, Transport, {hello, node(), peer_port()}),
+    send_message(Socket, Transport, {hello, node()}),
 
     %% Enter the gen_server loop.
     gen_server:enter_loop(?MODULE,
@@ -100,8 +100,7 @@ handle_cast(Msg, State) ->
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info({tcp, _Socket, Data}, State0) ->
     handle_message(decode(Data), State0);
-handle_info({tcp_closed, Socket}, State) ->
-    lager:info("Socket closing: ~p", [Socket]),
+handle_info({tcp_closed, _Socket}, State) ->
     {stop, normal, State};
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
@@ -123,21 +122,20 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-handle_message({hello, Node, Port},
+handle_message({hello, Node},
                #state{socket=Socket, transport=Transport}=State) ->
-            %% Connect the node with Distributed Erlang, just for now for
-            %% control messaging in the test suite execution.
-            case net_adm:ping(Node) of
-                pong ->
-                    lager:info("Node ~p:~p connected via disterl.",
-                               [Node, Port]),
-                    send_message(Socket, Transport, ok),
-                    {noreply, State};
-                pang ->
-                    lager:info("Node could not be connected."),
-                    send_message(Socket, Transport, {error, pang}),
-                    {noreply, State}
-            end;
+    %% Connect the node with Distributed Erlang, just for now for
+    %% control messaging in the test suite execution.
+    case net_adm:ping(Node) of
+        pong ->
+            lager:info("Node ~p connected to ~p via disterl.",
+                       [Node, node()]),
+            {noreply, State};
+        pang ->
+            lager:info("Node could not be connected."),
+            send_message(Socket, Transport, {error, pang}),
+            {noreply, State}
+    end;
 handle_message(Message, #state{socket=Socket, transport=Transport}=State) ->
     lager:info("Invalid message: ~p", [Message]),
     send_message(Socket, Transport,
@@ -156,7 +154,3 @@ encode(Message) ->
 %% @private
 decode(Message) ->
     binary_to_term(Message).
-
-%% @private
-peer_port() ->
-    lasp_config:get(peer_port, ?PEER_PORT).

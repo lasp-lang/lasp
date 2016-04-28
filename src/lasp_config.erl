@@ -68,6 +68,7 @@ web_config() ->
 
 peer_config() ->
     %% Generate a random peer port.
+    random:seed(),
     RandomPeerPort = random:uniform(1000) + 10000,
 
     %% Choose either static port or fall back to random peer port.
@@ -80,7 +81,7 @@ peer_config() ->
     end,
 
     %% Make sure configuration has current peer port.
-    application:set_env(?APP, peer_port, PeerPort),
+    lasp_config:set(peer_port, PeerPort),
 
     Config = [{port, PeerPort}],
     lager:info("Peer Protocol Configuration: ~p", [Config]),

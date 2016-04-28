@@ -26,11 +26,42 @@
 -export([start_link/1,
          init/1]).
 
+-include("lasp.hrl").
+
 start_link(Peer) ->
     Pid = spawn_link(?MODULE, init, [Peer]),
     {ok, Pid}.
 
-init(_Peer) ->
-    {ok, Socket} = gen_tcp:connect({127,0,0,1}, 10444, [binary, {packet, 2}]),
-    ok = gen_tcp:send(Socket, term_to_binary({hello, node()})),
+-ifdef(TEST).
+
+%% @doc If we're running a local test, we have to use the same IP
+%%      address for every bind operation, but a different port instead of the
+%%      standard port.
+%%
+init(Peer) ->
+    %% Bootstrap with disterl.
+    PeerPort = rpc:call(Peer,
+                        lasp_config,
+                        get,
+                        [peer_port, ?PEER_PORT]),
+
+    {ok, Socket} = gen_tcp:connect({127, 0, 0, 1}, PeerPort, [binary, {packet, 2}]),
+
+    ok = gen_tcp:send(Socket, term_to_binary({hello, node(), peer_port()})),
     ok = gen_tcp:close(Socket).
+
+-else.
+
+%% @doc Assume that under normal circumstances, we are running on the
+%%      proper ports and have been supplied an IP address of a peer to
+%%      connect to; avoid disterl.
+%%
+init(Peer) ->
+    {ok, Socket} = gen_tcp:connect(Peer, ?PEER_PORT, [binary, {packet, 2}]),
+    ok = gen_tcp:close(Socket).
+
+-endif.
+
+%% @private
+peer_port() ->
+    lasp_config:get(peer_port, ?PEER_PORT).

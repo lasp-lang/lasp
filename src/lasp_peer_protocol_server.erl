@@ -18,10 +18,10 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @todo Once we know this works, convert it to a gen_server.
-
 -module(lasp_peer_protocol_server).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
+
+-include("lasp.hrl").
 
 -behaviour(ranch_protocol).
 -behaviour(gen_server).
@@ -37,8 +37,6 @@
          handle_info/2,
          terminate/2,
          code_change/3]).
-
--define(TIMEOUT, 10000).
 
 -record(state, {socket, transport}).
 
@@ -67,7 +65,7 @@ init(ListenerPid, Socket, Transport, _Options) ->
     ok = inet:setopts(Socket, [{packet, 2}, {active, true}]),
 
     %% Generate the welcome message, encode it and transmit the message.
-    send_message(Socket, Transport, {hello, node()}),
+    send_message(Socket, Transport, {hello, node(), peer_port()}),
 
     %% Enter the gen_server loop.
     gen_server:enter_loop(?MODULE,
@@ -125,12 +123,14 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-handle_message({hello, Node}, #state{socket=Socket, transport=Transport}=State) ->
+handle_message({hello, Node, Port},
+               #state{socket=Socket, transport=Transport}=State) ->
             %% Connect the node with Distributed Erlang, just for now for
             %% control messaging in the test suite execution.
             case net_adm:ping(Node) of
                 pong ->
-                    lager:info("Node connected via disterl."),
+                    lager:info("Node ~p:~p connected via disterl.",
+                               [Node, Port]),
                     send_message(Socket, Transport, ok),
                     {noreply, State};
                 pang ->
@@ -156,3 +156,7 @@ encode(Message) ->
 %% @private
 decode(Message) ->
     binary_to_term(Message).
+
+%% @private
+peer_port() ->
+    lasp_config:get(peer_port, ?PEER_PORT).

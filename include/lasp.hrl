@@ -2,6 +2,9 @@
 
 -define(APP, lasp).
 
+%% Peer service port.
+-define(PEER_PORT, 9000).
+
 %% Number of additional nodes to run for the test suite.
 -define(NUM_NODES, 2).
 

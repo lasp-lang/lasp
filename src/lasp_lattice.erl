@@ -64,6 +64,9 @@ threshold_met(lasp_ivar, Value, Threshold) when Value =:= Threshold ->
 threshold_met(lasp_ivar, Value, Threshold) when Value =/= Threshold ->
     false;
 
+threshold_met(lasp_pair, {{LType, LValue}, {RType, RValue}}, {{LType, LThreshold}, {RType, RThreshold}}) ->
+    is_inflation(LType, LThreshold, LValue) andalso is_inflation(RType, RThreshold, RValue);
+
 threshold_met(lasp_pncounter, Value, {strict, Threshold}) ->
     is_strict_inflation(lasp_pncounter, Threshold, Value);
 threshold_met(lasp_pncounter, Value, Threshold) ->

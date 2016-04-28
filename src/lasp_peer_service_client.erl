@@ -18,9 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
-%% @todo Once we know this works, convert it to a gen_server.
-
--module(lasp_peer_protocol_client).
+-module(lasp_peer_service_client).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).

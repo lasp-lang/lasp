@@ -164,11 +164,11 @@ init(_Args) ->
     %% Initialize the listener for the peer protocol.
     %% @todo Shutdown.
     PeerConfig = lasp_config:peer_config(),
-    ranch:start_listener(lasp_peer_protocol_server,
+    ranch:start_listener(lasp_peer_service_server,
                          10,
                          ranch_tcp,
                          PeerConfig,
-                         lasp_peer_protocol_server,
+                         lasp_peer_service_server,
                          []),
 
     {ok, {{one_for_one, 5, 10}, Children}}.

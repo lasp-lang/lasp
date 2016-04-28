@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_peer_protocol_server).
+-module(lasp_peer_service_server).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -include("lasp.hrl").

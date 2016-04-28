@@ -200,7 +200,6 @@ exchange(Peer) ->
             MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
             case GCCounter == MaxGCCounter of
                 true ->
-                    lager:info("Garbage collection: GCCounter: ~p", [GCCounter]),
                     gen_server:call(?MODULE, delta_gc, infinity);
                 false ->
                     {ok, Pid}
@@ -513,7 +512,6 @@ handle_call({declare_dynamic, Id, Type}, _From,
 %% stream can result in observable nondeterminism.
 %%
 handle_call({stream, Id, Function}, _From, #state{store=Store}=State) ->
-    lager:info("Core stream called with ~p", [Id]),
     {ok, _Pid} = ?CORE:stream(Id, Function, Store),
     {reply, ok, State};
 

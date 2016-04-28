@@ -93,6 +93,10 @@
                 ?CORE:read(_Id, _Threshold, Store)
               end).
 
+-define(READ_DELTA, fun(_Id, _Threshold) ->
+                       ?CORE:read_delta(_Id, _Threshold, Store)
+                    end).
+
 -define(BLOCKING, fun() -> {noreply, State} end).
 
 %% Metadata mutation macros.
@@ -387,7 +391,12 @@ intersection(Left, Right, Intersection) ->
 %%
 -spec map(id(), function(), id()) -> ok | error().
 map(Id, Function, AccId) ->
-    gen_server:call(?MODULE, {map, Id, Function, AccId}, infinity).
+    case lasp_config:get(incremental_computation_mode, false) of
+        true ->
+            gen_server:call(?MODULE, {map_inc, Id, Function, AccId}, infinity);
+        false ->
+            gen_server:call(?MODULE, {map, Id, Function, AccId}, infinity)
+    end.
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -598,6 +607,11 @@ handle_call({intersection, Left, Right, Intersection},
 handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?BIND, ?READ,
                              ?READ),
+    {reply, ok, State};
+
+%% Spawn a process to perform a map with incremental computation.
+handle_call({map_inc, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?BIND, ?READ_DELTA),
     {reply, ok, State};
 
 %% Spawn a process to perform a map.

@@ -75,6 +75,9 @@ stop(Reason) ->
 %%%===================================================================
 
 %% @doc Execute call to the proper backend.
+do(join, [Node|_]=Args) ->
+    {ok, _Pid} = lasp_peer_protocol_client:start_link(Node),
+    erlang:apply(?PEER_SERVICE, join, Args);
 do(Function, Args) ->
     erlang:apply(?PEER_SERVICE, Function, Args).
 

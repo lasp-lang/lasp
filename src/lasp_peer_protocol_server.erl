@@ -18,14 +18,16 @@
 %%
 %% -------------------------------------------------------------------
 
+%% @todo Once we know this works, convert it to a gen_server.
+
 -module(lasp_peer_protocol_server).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(ranch_protocol).
 
--export([start_link/4]).
-
--export([init/4]).
+%% ranch_protocol callbacks.
+-export([start_link/4,
+         init/4]).
 
 -define(TIMEOUT, 10000).
 
@@ -45,7 +47,7 @@ init(ListenerPid, Socket, Transport, _Options) ->
     ok = inet:setopts(Socket, [{packet, 2}, {active, true}]),
 
     %% Generate the welcome message, encode it and transmit the message.
-    send_message(Socket, Transport, {helo, atom_to_list(node())}),
+    send_message(Socket, Transport, {hello, node()}),
 
     %% Wait for response.
     Message = receive_message(Socket, Transport),
@@ -62,7 +64,9 @@ init(ListenerPid, Socket, Transport, _Options) ->
                     send_message(Socket, Transport, {error, pang})
             end;
         Response ->
-            send_message(Socket, Transport, {error, {invalid_response, Response}})
+            lager:info("Invalid response: ~p", [Response]),
+            send_message(Socket, Transport,
+                         {error, {invalid_response, Response}})
     end,
 
     %% Close socket.
@@ -71,11 +75,11 @@ init(ListenerPid, Socket, Transport, _Options) ->
 %% @private
 receive_message(Socket, Transport) ->
     receive
+        {tcp_closed, Socket} ->
+            Transport:close(Socket),
+            bo;
         Message ->
             decode(Message)
-    after
-        ?TIMEOUT ->
-            Transport:close(Socket)
     end.
 
 %% @private

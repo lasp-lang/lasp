@@ -134,12 +134,21 @@ update_delta(Op, Actor, PNCnt) ->
                       false ->
                           update(Op, Actor, []);
                       {value, Value, _ModPNCnt} ->
-                          update(Op, Actor, [Value])
+                          update(Op, Actor, [minimize(Op, Value)])
                   end,
     {ok, {delta, Delta}}.
 
 update(Op, Actor, Cntr, _Ctx) ->
     update(Op, Actor, Cntr).
+
+minimize(increment, {Actor, Inc, _}) ->
+    {Actor, Inc, 0};
+minimize(decrement, {Actor, _, Dec}) ->
+    {Actor, 0, Dec};
+minimize({increment, _}, Value) ->
+    minimize(increment, Value);
+minimize({decrement, _}, Value) ->
+    minimize(decrement, Value).
 
 %% @doc Merge two `pncounter()'s to a single `pncounter()'. This is the Least Upper Bound
 %% function described in the literature.
@@ -442,4 +451,27 @@ stat_test() ->
     ?assertEqual([{actor_count, 0}], stats(PN)),
     ?assertEqual(4, stat(actor_count, PN4)),
     ?assertEqual(undefined, stat(max_dot_length, PN4)).
+
+update_delta_test() ->
+    PNCnt0 = new(),
+    {ok, {delta, Delta1}} = update_delta(increment, 1, PNCnt0),
+    ?assertEqual([{1, 1, 0}], Delta1),
+    PNCnt1 = merge(PNCnt0, Delta1),
+    ?assertEqual([{1, 1, 0}], PNCnt1),
+
+    {ok, {delta, Delta2}} = update_delta(increment, 1, PNCnt1),
+    ?assertEqual([{1, 2, 0}], Delta2),
+    PNCnt2 = merge(PNCnt1, Delta2),
+    ?assertEqual([{1, 2, 0}], PNCnt2),
+
+    {ok, {delta, Delta3}} = update_delta({decrement, 2}, 1, PNCnt2),
+    ?assertEqual([{1, 0, 2}], Delta3),
+    PNCnt3 = merge(PNCnt2, Delta3),
+    ?assertEqual([{1, 2, 2}], PNCnt3),
+
+    {ok, {delta, Delta4}} = update_delta({increment, 3}, 1, PNCnt3),
+    ?assertEqual([{1, 5, 0}], Delta4),
+    PNCnt4 = merge(PNCnt3, Delta4),
+    ?assertEqual([{1, 5, 2}], PNCnt4).
+
 -endif.

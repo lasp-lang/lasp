@@ -49,9 +49,9 @@ init(_Args) ->
                 permanent, infinity, supervisor, [lasp_process_sup]},
 
     Unique = {lasp_unique,
-                {lasp_unique, start_link, []},
-                 permanent, 5000, worker,
-                 [lasp_unique]},
+              {lasp_unique, start_link, []},
+               permanent, 5000, worker,
+               [lasp_unique]},
 
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},

@@ -119,6 +119,7 @@ start_node(Name, Config, Case) ->
             NodeDir = filename:join([PrivDir, Node, Case]),
             WebPort = web_port(Name),
             ok = rpc:call(Node, application, load, [plumtree]),
+            ok = rpc:call(Node, application, load, [partisan]),
             ok = rpc:call(Node, application, load, [lager]),
             ok = rpc:call(Node, application, load, [lasp]),
             ok = rpc:call(Node, application, set_env, [lasp,
@@ -247,4 +248,6 @@ start_runner() ->
 
 stop_runner() ->
     application:stop(lasp),
+    application:stop(plumtree),
+    application:stop(partisan),
     application:stop(lager).

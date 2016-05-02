@@ -18,12 +18,14 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_peer_service).
+-module(lasp_partisan_peer_service).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -include("lasp.hrl").
 
--export([peer_service/0]).
+-behaviour(lasp_peer_service).
+
+-define(PEER_SERVICE, partisan_peer_service).
 
 -export([join/1,
          join/2,
@@ -32,33 +34,6 @@
          members/0,
          stop/0,
          stop/1]).
-
-%%%===================================================================
-%%% Callback Interface
-%%%===================================================================
-
-%% Attempt to join node.
--callback join(node()) -> ok | {error, atom()}.
-
-%% Attempt to join node with or without automatically claiming ring
-%% ownership.
--callback join(node(), boolean()) -> ok | {error, atom()}.
-
-%% Attempt to join node with or without automatically claiming ring
-%% ownership.
--callback join(node(), node(), boolean()) -> ok | {error, atom()}.
-
-%% Remove a node from the cluster.
--callback leave() -> ok.
-
-%% Return members of the cluster.
--callback members() -> {ok, [node()]}.
-
-%% Stop the peer service on a given node.
--callback stop() -> ok.
-
-%% Stop the peer service on a given node for a particular reason.
--callback stop(iolist()) -> ok.
 
 %%%===================================================================
 %%% External API
@@ -78,13 +53,13 @@ join(Node, Auto) when is_atom(Node) ->
 join(Node, Node, Auto) ->
     do(join, [Node, Node, Auto]).
 
-%% @doc Return cluster members.
-members() ->
-    do(members, []).
-
 %% @doc Leave the cluster.
 leave() ->
     do(leave, []).
+
+%% @doc Leave the cluster.
+members() ->
+    do(?PEER_SERVICE, members, []).
 
 %% @doc Stop node.
 stop() ->
@@ -99,12 +74,11 @@ stop(Reason) ->
 %%%===================================================================
 
 %% @doc Execute call to the proper backend.
+do(join, Args) ->
+    erlang:apply(?PEER_SERVICE, join, Args);
 do(Function, Args) ->
-    Backend = peer_service(),
-    erlang:apply(Backend, Function, Args).
+    erlang:apply(?PEER_SERVICE, Function, Args).
 
-%% @doc Return the currently active peer service.
-peer_service() ->
-    application:get_env(?APP,
-                        peer_service,
-                        lasp_partisan_peer_service).
+%% @doc Execute call to the proper backend.
+do(Module, Function, Args) ->
+    erlang:apply(Module, Function, Args).

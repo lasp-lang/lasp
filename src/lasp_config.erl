@@ -26,8 +26,7 @@
 -export([dispatch/0,
          set/2,
          get/2,
-         web_config/0,
-         peer_config/0]).
+         web_config/0]).
 
 get(Key, Default) ->
     mochiglobal:get(Key, Default).
@@ -65,26 +64,3 @@ web_config() ->
         {log_dir, "priv/log"},
         {dispatch, dispatch()}
     ].
-
-peer_config() ->
-    %% Generate a random peer port.
-    random:seed(erlang:phash2([node()]),
-                erlang:monotonic_time(),
-                erlang:unique_integer()),
-    RandomPeerPort = random:uniform(1000) + 10000,
-
-    %% Choose either static port or fall back to random peer port.
-    DCOS = os:getenv("DCOS", "false"),
-    PeerPort = case DCOS of
-        "false" ->
-            RandomPeerPort;
-        _ ->
-            application:get_env(?APP, peer_port, RandomPeerPort)
-    end,
-
-    %% Make sure configuration has current peer port.
-    lasp_config:set(peer_port, PeerPort),
-
-    Config = [{port, PeerPort}],
-    lager:info("Peer Protocol Configuration: ~p", [Config]),
-    Config.

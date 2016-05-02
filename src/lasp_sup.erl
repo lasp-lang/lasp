@@ -166,14 +166,4 @@ init(_Args) ->
                                false),
     lasp_config:set(incremental_computation_mode, IncrementalComputation),
 
-    %% Initialize the listener for the peer protocol.
-    %% @todo Shutdown.
-    PeerConfig = lasp_config:peer_config(),
-    ranch:start_listener(lasp_peer_service_server,
-                         10,
-                         ranch_tcp,
-                         PeerConfig,
-                         lasp_peer_service_server,
-                         []),
-
     {ok, {{one_for_one, 5, 10}, Children}}.

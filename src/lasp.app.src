@@ -3,7 +3,7 @@
          "Declarative, distributed, eventually consistent compuations."},
      {vsn,"0.0.5"},
      {maintainers,["Christopher S. Meiklejohn"]},
-     {included_applications,[plumtree]},
+     {included_applications,[plumtree,partisan]},
      {links,[{"Github","https://github.com/lasp-lang/lasp"}]},
      {licenses,["Apache"]},
      {registered,[]},
@@ -15,7 +15,6 @@
          [{data_root,"data"},
           {web_ip,"0.0.0.0"},
           {web_port,8080},
-          {peer_port,9090},
-          {peer_service,lasp_plumtree_peer_service},
+          {peer_service,lasp_partisan_peer_service},
           {distribution_backend,lasp_plumtree_broadcast_distribution_backend},
           {storage_backend,lasp_ets_storage_backend}]}]}.

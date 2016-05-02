@@ -53,6 +53,10 @@ init(_Args) ->
                  permanent, 5000, worker,
                  [lasp_unique]},
 
+    Partisan = {partisan_sup,
+                {partisan_sup, start_link, []},
+                 permanent, infinity, supervisor, [partisan_sup]},
+
     PlumtreeBackend = {lasp_plumtree_broadcast_distribution_backend,
                        {lasp_plumtree_broadcast_distribution_backend, start_link, []},
                         permanent, 5000, worker,
@@ -73,6 +77,7 @@ init(_Args) ->
                             [lasp_marathon_peer_refresh_service]},
 
     BaseSpecs = [Unique,
+                 Partisan,
                  PlumtreeBackend,
                  Plumtree,
                  MarathonPeerRefresh,

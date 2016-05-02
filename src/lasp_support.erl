@@ -131,6 +131,9 @@ start_node(Name, Config, Case) ->
                                                        plumtree_data_dir,
                                                        NodeDir]),
             ok = rpc:call(Node, application, set_env, [plumtree,
+                                                       peer_service,
+                                                       partisan_peer_service]),
+            ok = rpc:call(Node, application, set_env, [plumtree,
                                                        broadcast_exchange_timer,
                                                        120]),
             ok = rpc:call(Node, application, set_env, [plumtree,
@@ -235,6 +238,7 @@ start_runner() ->
             lager:info("Received unexpected error: ~p", [Reason]),
             exit(Reason)
     end,
+    ok = application:set_env(plumtree, peer_service, partisan_peer_service),
     ok = application:set_env(plumtree, broadcast_exchange_timer, 120),
     ok = application:set_env(plumtree, broadcast_mods, [lasp_plumtree_broadcast_distribution_backend]),
     ok = application:set_env(lasp, instrumentation, true),

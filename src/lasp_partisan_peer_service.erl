@@ -47,6 +47,8 @@ join(Node) ->
 join(NodeStr, Auto) when is_list(NodeStr) ->
     do(join, [NodeStr, Auto]);
 join(Node, Auto) when is_atom(Node) ->
+    do(join, [Node, Auto]);
+join({_Name, _IPAddress, _Port} = Node, Auto) ->
     do(join, [Node, Auto]).
 
 %% @doc Initiate join. Nodes cannot join themselves.

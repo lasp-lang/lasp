@@ -195,8 +195,17 @@ start_nodes(Case, Config) ->
 
     %% Attempt to join all nodes in the cluster.
     lists:foreach(fun(N) ->
-                        ct:pal("Joining node: ~p to ~p", [N, RunnerNode]),
-                        ok = rpc:call(RunnerNode, lasp_peer_service, join, [N])
+                        lager:info("Locating node: ~p", [N]),
+                        PeerPort = rpc:call(N,
+                                            partisan_config,
+                                            get,
+                                            [peer_port, ?PEER_PORT]),
+                        ct:pal("Joining node: ~p to ~p at port ~p",
+                               [N, RunnerNode, PeerPort]),
+                        ok = rpc:call(RunnerNode,
+                                      lasp_peer_service,
+                                      join,
+                                      [{N, {127,0,0,1}, PeerPort}])
                   end, Nodes),
 
     %% Consider the runner part of the cluster.

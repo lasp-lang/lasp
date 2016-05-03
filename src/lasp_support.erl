@@ -205,7 +205,7 @@ start_nodes(Case, Config) ->
                         ok = rpc:call(RunnerNode,
                                       lasp_peer_service,
                                       join,
-                                      [{N, {127,0,0,1}, PeerPort}])
+                                      [{N, {127, 0, 0, 1}, PeerPort}])
                   end, Nodes),
 
     %% Consider the runner part of the cluster.

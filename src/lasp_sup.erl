@@ -1,6 +1,7 @@
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
+%% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -48,9 +49,13 @@ init(_Args) ->
                 permanent, infinity, supervisor, [lasp_process_sup]},
 
     Unique = {lasp_unique,
-                {lasp_unique, start_link, []},
-                 permanent, 5000, worker,
-                 [lasp_unique]},
+              {lasp_unique, start_link, []},
+               permanent, 5000, worker,
+               [lasp_unique]},
+
+    Partisan = {partisan_sup,
+                {partisan_sup, start_link, []},
+                 permanent, infinity, supervisor, [partisan_sup]},
 
     PlumtreeBackend = {lasp_plumtree_broadcast_distribution_backend,
                        {lasp_plumtree_broadcast_distribution_backend, start_link, []},
@@ -72,6 +77,7 @@ init(_Args) ->
                             [lasp_marathon_peer_refresh_service]},
 
     BaseSpecs = [Unique,
+                 Partisan,
                  PlumtreeBackend,
                  Plumtree,
                  MarathonPeerRefresh,
@@ -79,6 +85,7 @@ init(_Args) ->
 
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
     InstrEnabled = application:get_env(?APP, instrumentation, InstrDefault),
+    lasp_config:set(instrumentation, InstrEnabled),
 
     Children = case InstrEnabled of
         true ->
@@ -153,6 +160,10 @@ init(_Args) ->
     MaxGCCounter = application:get_env(?APP, delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
     lasp_config:set(delta_mode_max_gc_counter, MaxGCCounter),
 
-    lasp_config:set(instrumentation, InstrEnabled),
+    IncrementalComputation = application:get_env(
+                               ?APP,
+                               incremental_computation_mode,
+                               false),
+    lasp_config:set(incremental_computation_mode, IncrementalComputation),
 
     {ok, {{one_for_one, 5, 10}, Children}}.

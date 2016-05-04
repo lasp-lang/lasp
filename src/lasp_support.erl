@@ -119,6 +119,7 @@ start_node(Name, Config, Case) ->
             NodeDir = filename:join([PrivDir, Node, Case]),
             WebPort = web_port(Name),
             ok = rpc:call(Node, application, load, [plumtree]),
+            ok = rpc:call(Node, application, load, [partisan]),
             ok = rpc:call(Node, application, load, [lager]),
             ok = rpc:call(Node, application, load, [lasp]),
             ok = rpc:call(Node, application, set_env, [lasp,
@@ -130,6 +131,9 @@ start_node(Name, Config, Case) ->
             ok = rpc:call(Node, application, set_env, [plumtree,
                                                        plumtree_data_dir,
                                                        NodeDir]),
+            ok = rpc:call(Node, application, set_env, [plumtree,
+                                                       peer_service,
+                                                       partisan_peer_service]),
             ok = rpc:call(Node, application, set_env, [plumtree,
                                                        broadcast_exchange_timer,
                                                        120]),
@@ -191,8 +195,17 @@ start_nodes(Case, Config) ->
 
     %% Attempt to join all nodes in the cluster.
     lists:foreach(fun(N) ->
-                        ct:pal("Joining node: ~p to ~p", [N, RunnerNode]),
-                        ok = rpc:call(RunnerNode, lasp_peer_service, join, [N])
+                        lager:info("Locating node: ~p", [N]),
+                        PeerPort = rpc:call(N,
+                                            partisan_config,
+                                            get,
+                                            [peer_port, ?PEER_PORT]),
+                        ct:pal("Joining node: ~p to ~p at port ~p",
+                               [N, RunnerNode, PeerPort]),
+                        ok = rpc:call(RunnerNode,
+                                      lasp_peer_service,
+                                      join,
+                                      [{N, {127, 0, 0, 1}, PeerPort}])
                   end, Nodes),
 
     %% Consider the runner part of the cluster.
@@ -235,6 +248,7 @@ start_runner() ->
             lager:info("Received unexpected error: ~p", [Reason]),
             exit(Reason)
     end,
+    ok = application:set_env(plumtree, peer_service, partisan_peer_service),
     ok = application:set_env(plumtree, broadcast_exchange_timer, 120),
     ok = application:set_env(plumtree, broadcast_mods, [lasp_plumtree_broadcast_distribution_backend]),
     ok = application:set_env(lasp, instrumentation, true),
@@ -243,4 +257,6 @@ start_runner() ->
 
 stop_runner() ->
     application:stop(lasp),
+    application:stop(plumtree),
+    application:stop(partisan),
     application:stop(lager).

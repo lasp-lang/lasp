@@ -43,7 +43,6 @@ start_link() ->
 %% @doc Terminate all children.
 terminate() ->
     Children = supervisor:which_children(?MODULE),
-    lager:info("Terminating: ~p", [Children]),
     [terminate_child(?MODULE, Child)
      || {_Id, Child, _Type, _Modules} <- Children].
 

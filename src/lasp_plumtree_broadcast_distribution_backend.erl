@@ -35,6 +35,7 @@
 %% lasp_distribution_backend callbacks
 -export([declare/2,
          declare_dynamic/2,
+         stream/2,
          query/1,
          update/3,
          bind/2,
@@ -91,6 +92,10 @@
 -define(READ, fun(_Id, _Threshold) ->
                 ?CORE:read(_Id, _Threshold, Store)
               end).
+
+-define(READ_DELTA, fun(_Id, _Threshold) ->
+                       ?CORE:read_delta(_Id, _Threshold, Store)
+                    end).
 
 -define(BLOCKING, fun() -> {noreply, State} end).
 
@@ -195,7 +200,6 @@ exchange(Peer) ->
             MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
             case GCCounter == MaxGCCounter of
                 true ->
-                    lager:info("Garbage collection: GCCounter: ~p", [GCCounter]),
                     gen_server:call(?MODULE, delta_gc, infinity);
                 false ->
                     {ok, Pid}
@@ -243,6 +247,12 @@ declare_dynamic(Id, Type) ->
             broadcast(Variable),
             {ok, Variable}
     end.
+
+%% @doc Stream values out of the Lasp system; using the values from this
+%%      stream can result in observable nondeterminism.
+%%
+stream(Id, Function) ->
+    gen_server:call(?MODULE, {stream, Id, Function}, infinity).
 
 %% @doc Read the current value of a CRDT.
 %%
@@ -380,7 +390,12 @@ intersection(Left, Right, Intersection) ->
 %%
 -spec map(id(), function(), id()) -> ok | error().
 map(Id, Function, AccId) ->
-    gen_server:call(?MODULE, {map, Id, Function, AccId}, infinity).
+    case lasp_config:get(incremental_computation_mode, false) of
+        true ->
+            gen_server:call(?MODULE, {map_inc, Id, Function, AccId}, infinity);
+        false ->
+            gen_server:call(?MODULE, {map, Id, Function, AccId}, infinity)
+    end.
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -493,6 +508,13 @@ handle_call({declare_dynamic, Id, Type}, _From,
     Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT, Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
+%% Stream values out of the Lasp system; using the values from this
+%% stream can result in observable nondeterminism.
+%%
+handle_call({stream, Id, Function}, _From, #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:stream(Id, Function, Store),
+    {reply, ok, State};
+
 %% Local query operation.
 %% Return the value of a value in the datastore to the user.
 handle_call({query, Id}, _From, #state{store=Store}=State) ->
@@ -583,6 +605,11 @@ handle_call({intersection, Left, Right, Intersection},
 handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?BIND, ?READ,
                              ?READ),
+    {reply, ok, State};
+
+%% Spawn a process to perform a map with incremental computation.
+handle_call({map_inc, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?BIND, ?READ_DELTA),
     {reply, ok, State};
 
 %% Spawn a process to perform a map.

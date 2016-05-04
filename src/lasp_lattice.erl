@@ -64,6 +64,9 @@ threshold_met(lasp_ivar, Value, Threshold) when Value =:= Threshold ->
 threshold_met(lasp_ivar, Value, Threshold) when Value =/= Threshold ->
     false;
 
+threshold_met(lasp_pair, {{LType, LValue}, {RType, RValue}}, {{LType, LThreshold}, {RType, RThreshold}}) ->
+    is_inflation(LType, LThreshold, LValue) andalso is_inflation(RType, RThreshold, RValue);
+
 threshold_met(lasp_pncounter, Value, {strict, Threshold}) ->
     is_strict_inflation(lasp_pncounter, Threshold, Value);
 threshold_met(lasp_pncounter, Value, Threshold) ->
@@ -71,11 +74,6 @@ threshold_met(lasp_pncounter, Value, Threshold) ->
 
 threshold_met(lasp_top_k_set, Value, Threshold) ->
     is_inflation(lasp_top_k_set, Threshold, Value);
-
-threshold_met(lasp_orset_gbtree, Value, {strict, Threshold}) ->
-    is_strict_inflation(lasp_orset_gbtree, Threshold, Value);
-threshold_met(lasp_orset_gbtree, Value, Threshold) ->
-    is_inflation(lasp_orset_gbtree, Threshold, Value);
 
 threshold_met(lasp_orset, Value, {strict, Threshold}) ->
     is_strict_inflation(lasp_orset, Threshold, Value);
@@ -171,17 +169,6 @@ is_lattice_inflation(lasp_top_k_set, {K, Previous}, {K, Current}) ->
                         end
                 end, true, Previous);
 
-is_lattice_inflation(lasp_orset_gbtree, Previous, Current) ->
-    gb_trees_ext:foldl(fun(Element, Ids, Acc) ->
-                        case gb_trees:lookup(Element, Current) of
-                            none ->
-                                Acc andalso false;
-                            {value, Ids1} ->
-                                Acc andalso ids_inflated(lasp_orset_gbtree,
-                                                         Ids, Ids1)
-                        end
-                end, true, Previous);
-
 is_lattice_inflation(lasp_orset, Previous, Current) ->
     lists:foldl(fun({Element, Ids}, Acc) ->
                         case lists:keyfind(Element, 1, Current) of
@@ -254,24 +241,6 @@ is_lattice_strict_inflation(lasp_pncounter, [], []) ->
 is_lattice_strict_inflation(lasp_pncounter, [], _Current) ->
     true;
 
-is_lattice_strict_inflation(lasp_orset_gbtree, Previous, Current) ->
-    %% We already know that `Previous' is fully covered in `Current', so
-    %% we just need to look for a change -- removal (false -> true), or
-    %% addition of a new element.
-    IsLatticeInflation = is_lattice_inflation(lasp_orset_gbtree,
-                                              Previous,
-                                              Current),
-    DeletedElements = gb_trees_ext:foldl(fun(Element, Ids, Acc) ->
-                    case gb_trees:lookup(Element, Current) of
-                        none ->
-                            Acc;
-                        {value, Ids1} ->
-                            Acc orelse Ids =/= Ids1
-                    end
-                    end, false, Previous),
-    NewElements = gb_trees:size(Previous) < gb_trees:size(Current),
-    IsLatticeInflation andalso (DeletedElements orelse NewElements);
-
 is_lattice_strict_inflation(lasp_orset, [], Current) when Current =/= [] ->
     true;
 is_lattice_strict_inflation(lasp_orset, Previous, Current) ->
@@ -308,16 +277,6 @@ ids_inflated(lasp_orset, Previous, Current) ->
                             _ ->
                                 Acc andalso true
                         end
-                end, true, Previous);
-
-ids_inflated(lasp_orset_gbtree, Previous, Current) ->
-    gb_trees_ext:foldl(fun(Id, _, Acc) ->
-                        case gb_trees:lookup(Id, Current) of
-                            none ->
-                                Acc andalso false;
-                            {value, _} ->
-                                Acc andalso true
-                        end
                 end, true, Previous).
 
 %% @doc Compute a cartesian product from causal metadata stored in the
@@ -331,34 +290,18 @@ causal_product(lasp_orset, Xs, Ys) ->
                 lists:foldl(fun({Y, YDeleted}, YAcc) ->
                             [{[X, Y], XDeleted orelse YDeleted}] ++ YAcc
                     end, [], Ys) ++ XAcc
-        end, [], Xs);
-causal_product(lasp_orset_gbtree, Xs, Ys) ->
-    gb_trees_ext:foldl(fun(X, XDeleted, XAcc) ->
-                gb_trees_ext:foldl(fun(Y, YDeleted, YAcc) ->
-                            gb_trees:enter([X, Y], XDeleted orelse YDeleted,
-                                           YAcc)
-                    end, XAcc, Ys)
-        end, gb_trees:empty(), Xs).
+        end, [], Xs).
 
 %% @doc Compute the union of causal metadata.
 causal_union(lasp_orset, Xs, Ys) ->
-    Xs ++ Ys;
-causal_union(lasp_orset_gbtree, Xs, Ys) ->
-    MergeFun = fun(X, Y) ->
-            X orelse Y
-    end,
-    gb_trees_ext:merge(Xs, Ys, MergeFun).
+    Xs ++ Ys.
 
 %% @doc Given the metadata for a given value, force that the object
 %%      appears removed by marking all of the metadata as removed.
 causal_remove(lasp_orset, Metadata) ->
     orddict:fold(fun(Key, _Value, Acc) ->
                 orddict:store(Key, true, Acc)
-        end, orddict:new(), Metadata);
-causal_remove(lasp_orset_gbtree, Metadata) ->
-    gb_trees_ext:foldl(fun(Key, _Value, Acc) ->
-                gb_trees:enter(Key, true, Acc)
-        end, gb_trees:empty(), Metadata).
+        end, orddict:new(), Metadata).
 
 -ifdef(TEST).
 
@@ -498,47 +441,5 @@ lasp_orset_strict_inflation_test() ->
 
     %% A3 after A2.
     ?assertEqual(true, is_lattice_strict_inflation(lasp_orset, A2, A3)).
-
-%% lasp_orset_gbtree tests.
-
-lasp_orset_gbtree_inflation_test() ->
-    A1 = lasp_orset_gbtree:new(),
-    B1 = lasp_orset_gbtree:new(),
-
-    {ok, A2} = lasp_orset_gbtree:update({add, 1}, a, A1),
-    {ok, B2} = lasp_orset_gbtree:update({add, 2}, b, B1),
-    {ok, A3} = lasp_orset_gbtree:update({remove, 1}, a, A2),
-
-    %% A1 and B1 are equivalent.
-    ?assertEqual(true, is_lattice_inflation(lasp_orset_gbtree, A1, B1)),
-
-    %% A2 after A1.
-    ?assertEqual(true, is_lattice_inflation(lasp_orset_gbtree, A1, A2)),
-
-    %% Concurrent
-    ?assertEqual(false, is_lattice_inflation(lasp_orset_gbtree, A2, B2)),
-
-    %% A3 after A2.
-    ?assertEqual(true, is_lattice_inflation(lasp_orset_gbtree, A2, A3)).
-
-lasp_orset_gbtree_strict_inflation_test() ->
-    A1 = lasp_orset_gbtree:new(),
-    B1 = lasp_orset_gbtree:new(),
-
-    {ok, A2} = lasp_orset_gbtree:update({add, 1}, a, A1),
-    {ok, B2} = lasp_orset_gbtree:update({add, 2}, b, B1),
-    {ok, A3} = lasp_orset_gbtree:update({remove, 1}, a, A2),
-
-    %% A1 and B1 are equivalent.
-    ?assertEqual(false, is_lattice_strict_inflation(lasp_orset_gbtree, A1, B1)),
-
-    %% A2 after A1.
-    ?assertEqual(true, is_lattice_strict_inflation(lasp_orset_gbtree, A1, A2)),
-
-    %% Concurrent
-    ?assertEqual(false, is_lattice_strict_inflation(lasp_orset_gbtree, A2, B2)),
-
-    %% A3 after A2.
-    ?assertEqual(true, is_lattice_strict_inflation(lasp_orset_gbtree, A2, A3)).
 
 -endif.

@@ -2,8 +2,11 @@
 
 -define(APP, lasp).
 
-%% Number of nodes to run for the test suite.
--define(NUM_NODES, 5).
+%% Peer service port.
+-define(PEER_PORT, 9000).
+
+%% Number of additional nodes to run for the test suite.
+-define(NUM_NODES, 2).
 
 %% Code which connects the storage backends to the implementation.
 -define(CORE, lasp_core).
@@ -17,6 +20,7 @@
                read_fun :: function()}).
 
 -record(dv, {value :: value(),
+             waiting_delta_threads = [] :: list(pending_threshold()),
              waiting_threads = [] :: list(pending_threshold()),
              lazy_threads = [] :: list(pending_threshold()),
              type :: type(),
@@ -57,7 +61,6 @@
 -type result() :: term().
 -type type() :: lasp_ivar
               | lasp_orset
-              | lasp_orset_gbtree
               | {lasp_top_k_set, [any()]}
               | {lasp_pair, [type()]}
               | riak_dt_gcounter

@@ -43,6 +43,11 @@
 %%
 -callback query(id()) -> {ok, term()} | error().
 
+%% Stream values out of the Lasp system; using the values from this
+%% stream can result in observable nondeterminism.
+%%
+-callback stream(id(), function()) -> {ok, term()} | error().
+
 %% Update a dataflow variable.
 %%
 %% Read the given `Id' and update it given the provided

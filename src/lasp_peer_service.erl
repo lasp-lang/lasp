@@ -107,4 +107,4 @@ do(Function, Args) ->
 peer_service() ->
     application:get_env(?APP,
                         peer_service,
-                        lasp_plumtree_peer_service).
+                        lasp_partisan_peer_service).

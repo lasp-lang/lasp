@@ -29,7 +29,8 @@
          declare/1,
          declare_dynamic/1]).
 
--export([query/1,
+-export([stream/2,
+         query/1,
          declare/2,
          declare_dynamic/2,
          update/3,
@@ -47,6 +48,12 @@
          thread/3]).
 
 %% Public Helpers
+
+%% @doc Stream values out of the Lasp system; using the values from this
+%%      stream can result in observable nondeterminism.
+%%
+stream(Id, Function) ->
+    do(stream, [Id, Function]).
 
 %% @doc Return the current value of a CRDT.
 %%

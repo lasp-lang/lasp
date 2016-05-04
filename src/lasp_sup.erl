@@ -1,6 +1,7 @@
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
+%% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -48,9 +49,13 @@ init(_Args) ->
                 permanent, infinity, supervisor, [lasp_process_sup]},
 
     Unique = {lasp_unique,
-                {lasp_unique, start_link, []},
-                 permanent, 5000, worker,
-                 [lasp_unique]},
+              {lasp_unique, start_link, []},
+               permanent, 5000, worker,
+               [lasp_unique]},
+
+    Partisan = {partisan_sup,
+                {partisan_sup, start_link, []},
+                 permanent, infinity, supervisor, [partisan_sup]},
 
     PlumtreeBackend = {lasp_plumtree_broadcast_distribution_backend,
                        {lasp_plumtree_broadcast_distribution_backend, start_link, []},
@@ -72,6 +77,7 @@ init(_Args) ->
                             [lasp_marathon_peer_refresh_service]},
 
     BaseSpecs = [Unique,
+                 Partisan,
                  PlumtreeBackend,
                  Plumtree,
                  MarathonPeerRefresh,
@@ -159,15 +165,5 @@ init(_Args) ->
                                incremental_computation_mode,
                                false),
     lasp_config:set(incremental_computation_mode, IncrementalComputation),
-
-    %% Initialize the listener for the peer protocol.
-    %% @todo Shutdown.
-    PeerConfig = lasp_config:peer_config(),
-    ranch:start_listener(lasp_peer_protocol_server,
-                         10,
-                         ranch_tcp,
-                         PeerConfig,
-                         lasp_peer_protocol_server,
-                         []),
 
     {ok, {{one_for_one, 5, 10}, Children}}.

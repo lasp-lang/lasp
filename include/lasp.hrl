@@ -1,12 +1,14 @@
+%% General timeout value.
 -define(TIMEOUT, 100000).
 
+%% Application information.
 -define(APP, lasp).
 
 %% Peer service port.
 -define(PEER_PORT, 9000).
 
 %% Number of additional nodes to run for the test suite.
--define(NUM_NODES, 2).
+-define(NUM_NODES, 3).
 
 %% Code which connects the storage backends to the implementation.
 -define(CORE, lasp_core).

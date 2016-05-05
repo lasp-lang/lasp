@@ -923,7 +923,6 @@ log_transmission(Term) ->
                 ok
         end
     catch
-        _:Error ->
-            lager:info("Logging failed; couldn't send message: ~p",
-                       [Error])
+        _:_ ->
+            ok
     end.

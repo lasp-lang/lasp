@@ -36,7 +36,7 @@
         end, P)).
 
 %% State record.
--record(state, {status, nodes}).
+-record(state, {status, variables, nodes}).
 
 %% Generators.
 
@@ -63,7 +63,7 @@ initial_state() ->
     lasp_support:stop_runner(),
     lasp_support:start_runner(),
 
-    #state{status=init, nodes=[]}.
+    #state{status=init, nodes=[], variables=[]}.
 
 %% Launch multiple nodes.
 
@@ -88,6 +88,8 @@ provision_next(#state{nodes=Nodes0}=S, _Res, [Name]) ->
     end,
     S#state{status=Status, nodes=Nodes}.
 
+%% Declare variables.
+
 declare(Id) ->
     Type = lasp_gcounter,
     {ok, {{Id, Type}, _, _, _}} = lasp:declare(Id, Type),
@@ -98,8 +100,12 @@ declare_args(_S) ->
 
 declare_pre(#state{status=init}, [_Id]) ->
     false;
-declare_pre(#state{status=running}, [_Id]) ->
-    true.
+declare_pre(#state{status=running, variables=Variables}, [Id]) ->
+    not lists:member(Id, Variables).
+
+declare_next(#state{variables=Variables0}=S, _Res, [Id]) ->
+    Variables = Variables0 ++ [Id],
+    S#state{variables=Variables}.
 
 %% Properties.
 

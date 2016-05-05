@@ -32,7 +32,7 @@
 -include_lib("webmachine/include/webmachine.hrl").
 
 -define(NUM_EVENTS, 200000).
--define(NUM_CLIENTS_PER_VM, 100).
+-define(NUM_CLIENTS_PER_VM, 1).
 
 -define(ORSET, lasp_orset).
 -define(COUNTER, lasp_gcounter).

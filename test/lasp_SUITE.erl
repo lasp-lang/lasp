@@ -75,6 +75,8 @@ init_per_testcase(Case, Config) ->
     [{nodes, Nodes}|Config].
 
 end_per_testcase(Case, Config) ->
+    ct:pal("Case finished: ~p", [Case]),
+
     lasp_support:stop_nodes(Case, Config),
 
     %% Runner must start and stop in between test runs as well, to

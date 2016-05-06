@@ -298,7 +298,6 @@ stop_runner() ->
     application:stop(lasp).
 
 join_to(N, RunnerNode) ->
-    lager:info("Locating node: ~p", [N]),
     PeerPort = rpc:call(N,
                         partisan_config,
                         get,

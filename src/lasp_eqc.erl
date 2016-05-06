@@ -30,6 +30,8 @@
 
 -compile(export_all).
 
+-define(NUM_TESTS, 1).
+
 -define(QC_OUT(P),
         eqc:on_output(fun(Str, Args) ->
                 io:format(user, Str, Args)
@@ -110,8 +112,7 @@ declare_next(#state{variables=Variables0}=S, _Res, [Id]) ->
 %% Properties.
 
 prop_sequential() ->
-    %% For now, just run one test.
-    eqc:quickcheck(eqc:numtests(2,
+    eqc:numtests(?NUM_TESTS,
         ?SETUP(fun() ->
                     setup(),
                     fun teardown/0
@@ -122,7 +123,7 @@ prop_sequential() ->
                         pretty_commands(?MODULE, Cmds, {H, S, Res},
                            aggregate(command_names(Cmds), Res == ok))
                     end))
-        )).
+        ).
 
 setup() ->
     {ok, _Apps} = application:ensure_all_started(lager),

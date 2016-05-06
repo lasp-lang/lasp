@@ -23,7 +23,8 @@
 
 -include("lasp.hrl").
 
--export([get_cluster_members/1,
+-export([runner_node/0,
+         get_cluster_members/1,
          pmap/2,
          wait_until/3,
          wait_until_left/2,
@@ -33,6 +34,7 @@
          wait_until_connected/2,
          nodelist/0,
          start_node/3,
+         start_and_join_node/3,
          start_nodes/2,
          stop_nodes/2,
          stop_runner/0,
@@ -106,6 +108,15 @@ wait_until_connected(Node1, Node2) ->
     wait_until(fun() ->
                 pong == rpc:call(Node1, net_adm, ping, [Node2])
         end, 60*2, 500).
+
+start_and_join_node(Name, Config, Case) ->
+    Node = start_node(Name, Config, Case),
+    RunnerNode = runner_node(),
+    {ok, Members} = partisan_peer_service:members(),
+    join_to(Node, RunnerNode),
+    Nodes = Members ++ [Node],
+    wait_until_joined(Nodes, Nodes),
+    Node.
 
 start_node(Name, Config, Case) ->
     CodePath = lists:filter(fun filelib:is_dir/1, code:get_path()),
@@ -205,17 +216,7 @@ start_nodes(Case, Config) ->
 
     %% Attempt to join all nodes in the cluster.
     lists:foreach(fun(N) ->
-                        lager:info("Locating node: ~p", [N]),
-                        PeerPort = rpc:call(N,
-                                            partisan_config,
-                                            get,
-                                            [peer_port, ?PEER_PORT]),
-                        ct:pal("Joining node: ~p to ~p at port ~p",
-                               [N, RunnerNode, PeerPort]),
-                        ok = rpc:call(RunnerNode,
-                                      lasp_peer_service,
-                                      join,
-                                      [{N, {127, 0, 0, 1}, PeerPort}])
+                        join_to(N, RunnerNode)
                   end, Nodes),
 
     %% Consider the runner part of the cluster.
@@ -295,3 +296,16 @@ start_runner() ->
 
 stop_runner() ->
     application:stop(lasp).
+
+join_to(N, RunnerNode) ->
+    lager:info("Locating node: ~p", [N]),
+    PeerPort = rpc:call(N,
+                        partisan_config,
+                        get,
+                        [peer_port, ?PEER_PORT]),
+    ct:pal("Joining node: ~p to ~p at port ~p",
+           [N, RunnerNode, PeerPort]),
+    ok = rpc:call(RunnerNode,
+                  lasp_peer_service,
+                  join,
+                  [{N, {127, 0, 0, 1}, PeerPort}]).

@@ -122,6 +122,9 @@ start_node(Name, Config, Case) ->
             ok = rpc:call(Node, application, load, [partisan]),
             ok = rpc:call(Node, application, load, [lager]),
             ok = rpc:call(Node, application, load, [lasp]),
+            ok = rpc:call(Node, application, set_env, [sasl,
+                                                       sasl_error_logger,
+                                                       false]),
             ok = rpc:call(Node, application, set_env, [lasp,
                                                        instrumentation,
                                                        false]),
@@ -239,6 +242,16 @@ stop_nodes(_Case, _Config) ->
     ok.
 
 start_runner() ->
+    %% Launch distribution for the test runner.
+    os:cmd(os:find_executable("epmd") ++ " -daemon"),
+    {ok, Hostname} = inet:gethostname(),
+    case net_kernel:start([list_to_atom("runner@" ++ Hostname), shortnames]) of
+        {ok, _} ->
+            ok;
+        {error, {already_started, _}} ->
+            ok
+    end,
+
     case application:load(lasp) of
         {error, {already_loaded, lasp}} ->
             ok;
@@ -248,11 +261,25 @@ start_runner() ->
             lager:info("Received unexpected error: ~p", [Reason]),
             exit(Reason)
     end,
-    ok = application:set_env(plumtree, peer_service, partisan_peer_service),
-    ok = application:set_env(plumtree, broadcast_exchange_timer, 120),
-    ok = application:set_env(plumtree, broadcast_mods, [lasp_plumtree_broadcast_distribution_backend]),
-    ok = application:set_env(lasp, instrumentation, true),
+
+    ok = application:set_env(sasl,
+                             sasl_error_logger,
+                             false),
+    ok = application:set_env(plumtree,
+                             peer_service,
+                             partisan_peer_service),
+    ok = application:set_env(plumtree,
+                             broadcast_exchange_timer,
+                             120),
+    ok = application:set_env(plumtree,
+                             broadcast_mods,
+                             [lasp_plumtree_broadcast_distribution_backend]),
+    ok = application:set_env(lasp,
+                             instrumentation,
+                             true),
+
     {ok, _} = application:ensure_all_started(lasp),
+
     ok.
 
 stop_runner() ->

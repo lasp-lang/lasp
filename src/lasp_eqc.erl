@@ -30,7 +30,13 @@
 
 -compile(export_all).
 
--define(NUM_TESTS, 1).
+-define(TIMEOUT, 1200).
+
+-define(TEST_TIME, 90).
+
+-define(NUM_TESTS, 2).
+
+-define(NODES, [rita, sue, bob]).
 
 -define(QC_OUT(P),
         eqc:on_output(fun(Str, Args) ->
@@ -42,25 +48,12 @@
 
 %% Generators.
 
-key() ->
-    elements([x, y, z]).
-
-value() ->
-    int().
+type() ->
+    elements([lasp_orset]).
 
 %% Initial state.
 
 initial_state() ->
-    %% Launch distribution for the test runner.
-    os:cmd(os:find_executable("epmd") ++ " -daemon"),
-    {ok, Hostname} = inet:gethostname(),
-    case net_kernel:start([list_to_atom("runner@" ++ Hostname), shortnames]) of
-        {ok, _} ->
-            ok;
-        {error, {already_started, _}} ->
-            ok
-    end,
-
     %% Stop the runner and re-initialize.
     lasp_support:stop_runner(),
     lasp_support:start_runner(),
@@ -70,19 +63,20 @@ initial_state() ->
 %% Launch multiple nodes.
 
 provision(Name) ->
-    lasp_support:start_node(Name, [], ?MODULE).
+    lasp_support:start_and_join_node(Name, [], ?MODULE).
 
 provision_args(_S) ->
-    [elements([rita, sue, bob])].
+    [elements(?NODES)].
 
 provision_pre(#state{nodes=Nodes, status=init}, [Name]) ->
-    not lists:member(Name, Nodes);
+    Members = [N || {N, _} <- Nodes],
+    not lists:member(Name, Members);
 provision_pre(#state{status=running}, [_Name]) ->
     false.
 
-provision_next(#state{nodes=Nodes0}=S, _Res, [Name]) ->
-    Nodes = Nodes0 ++ [Name],
-    Status = case length(Nodes) =:= 3 of
+provision_next(#state{nodes=Nodes0}=S, Member, [Name]) ->
+    Nodes = Nodes0 ++ [{Name, Member}],
+    Status = case length(Nodes) =:= length(?NODES) of
         true ->
             running;
         false ->
@@ -90,40 +84,43 @@ provision_next(#state{nodes=Nodes0}=S, _Res, [Name]) ->
     end,
     S#state{status=Status, nodes=Nodes}.
 
+%% Verify the node could be clustered.
+provision_post(#state{nodes=_Nodes}=_S, [_Name], Member) ->
+    RunnerNode = lasp_support:runner_node(),
+    {ok, Members} = rpc:call(RunnerNode, partisan_peer_service, members, []),
+    lists:member(Member, Members).
+
 %% Declare variables.
 
-declare(Id) ->
-    Type = lasp_gcounter,
+declare(Id, Type) ->
     {ok, {{Id, Type}, _, _, _}} = lasp:declare(Id, Type),
     Id.
 
 declare_args(_S) ->
-    [elements([a, b, c])].
+    [elements([a, b, c]), type()].
 
-declare_pre(#state{status=init}, [_Id]) ->
+declare_pre(#state{status=init}, [_Id, _Type]) ->
     false;
-declare_pre(#state{status=running, variables=Variables}, [Id]) ->
+declare_pre(#state{status=running, variables=Variables}, [Id, _Type]) ->
     not lists:member(Id, Variables).
 
-declare_next(#state{variables=Variables0}=S, _Res, [Id]) ->
+declare_next(#state{variables=Variables0}=S, _Res, [Id, _Type]) ->
     Variables = Variables0 ++ [Id],
     S#state{variables=Variables}.
 
 %% Properties.
 
 prop_sequential() ->
-    eqc:numtests(?NUM_TESTS,
-        ?SETUP(fun() ->
-                    setup(),
-                    fun teardown/0
-             end,
-            ?FORALL(Cmds, commands(?MODULE),
-                    begin
-                        {H, S, Res} = run_commands(?MODULE, Cmds),
-                        pretty_commands(?MODULE, Cmds, {H, S, Res},
-                           aggregate(command_names(Cmds), Res == ok))
-                    end))
-        ).
+    ?SETUP(fun() ->
+                setup(),
+                fun teardown/0
+         end,
+        ?FORALL(Cmds, commands(?MODULE),
+                begin
+                    {H, S, Res} = run_commands(?MODULE, Cmds),
+                    pretty_commands(?MODULE, Cmds, {H, S, Res},
+                       aggregate(command_names(Cmds), Res == ok))
+                end)).
 
 setup() ->
     {ok, _Apps} = application:ensure_all_started(lager),
@@ -131,6 +128,10 @@ setup() ->
 
 teardown() ->
     ok.
+
+sequential_test_() ->
+    {timeout, ?TIMEOUT,
+     fun() -> ?assert(eqc:quickcheck(?QC_OUT(eqc:testing_time(?TEST_TIME, prop_sequential())))) end}.
 
 -endif.
 -endif.

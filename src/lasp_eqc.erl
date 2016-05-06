@@ -50,7 +50,7 @@ value() ->
 
 initial_state() ->
     %% Launch distribution for the test runner.
-    os:cmd(os:find_executable("epmd")++" -daemon"),
+    os:cmd(os:find_executable("epmd") ++ " -daemon"),
     {ok, Hostname} = inet:gethostname(),
     case net_kernel:start([list_to_atom("runner@" ++ Hostname), shortnames]) of
         {ok, _} ->

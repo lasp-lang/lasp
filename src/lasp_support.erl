@@ -118,6 +118,13 @@ start_node(Name, Config, Case) ->
             PrivDir = proplists:get_value(priv_dir, Config),
             NodeDir = filename:join([PrivDir, Node, Case]),
             WebPort = web_port(Name),
+
+            %% Manually force sasl loading, and disable the logger.
+            ok = rpc:call(Node, application, load, [sasl]),
+            ok = rpc:call(Node, application, set_env,
+                          [sasl, sasl_error_logger, false]),
+            ok = rpc:call(Node, application, start, [sasl]),
+
             ok = rpc:call(Node, application, load, [plumtree]),
             ok = rpc:call(Node, application, load, [partisan]),
             ok = rpc:call(Node, application, load, [lager]),

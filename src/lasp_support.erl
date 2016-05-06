@@ -294,7 +294,4 @@ start_runner() ->
     ok.
 
 stop_runner() ->
-    application:stop(lasp),
-    application:stop(plumtree),
-    application:stop(partisan),
-    application:stop(lager).
+    application:stop(lasp).

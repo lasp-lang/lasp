@@ -252,6 +252,13 @@ start_runner() ->
             ok
     end,
 
+    %% Manually force sasl loading, and disable the logger.
+    application:load(sasl),
+    ok = application:set_env(sasl,
+                             sasl_error_logger,
+                             false),
+    application:start(sasl),
+
     case application:load(lasp) of
         {error, {already_loaded, lasp}} ->
             ok;
@@ -262,9 +269,6 @@ start_runner() ->
             exit(Reason)
     end,
 
-    ok = application:set_env(sasl,
-                             sasl_error_logger,
-                             false),
     ok = application:set_env(plumtree,
                              peer_service,
                              partisan_peer_service),

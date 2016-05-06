@@ -90,7 +90,6 @@ init(_Args) ->
     Children = case InstrEnabled of
         true ->
             ok = application:set_env(?APP, instrumentation, InstrEnabled),
-            lager:info("Instrumentation: ~p", [InstrEnabled]),
 
             ClientTrans = {lasp_client_transmission_instrumentation,
                            {lasp_transmission_instrumentation, start_link, [client]},

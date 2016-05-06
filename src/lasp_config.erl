@@ -57,7 +57,6 @@ web_config() ->
               _ ->
                 80
           end,
-    lager:info("Port override: ~p", [Port]),
     [
         {ip, Ip},
         {port, Port},

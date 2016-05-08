@@ -32,6 +32,7 @@
          join/3,
          leave/0,
          members/0,
+         manager/0,
          stop/0,
          stop/1]).
 
@@ -62,6 +63,10 @@ leave() ->
 %% @doc Leave the cluster.
 members() ->
     do(?PEER_SERVICE, members, []).
+
+%% @doc Leave the cluster.
+manager() ->
+    do(?PEER_SERVICE, manager, []).
 
 %% @doc Stop node.
 stop() ->

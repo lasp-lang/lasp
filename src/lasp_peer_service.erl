@@ -30,6 +30,7 @@
          join/3,
          leave/0,
          members/0,
+         manager/0,
          stop/0,
          stop/1]).
 
@@ -53,6 +54,9 @@
 
 %% Return members of the cluster.
 -callback members() -> {ok, [node()]}.
+
+%% Return manager.
+-callback manager() -> module().
 
 %% Stop the peer service on a given node.
 -callback stop() -> ok.
@@ -81,6 +85,10 @@ join(Node, Node, Auto) ->
 %% @doc Return cluster members.
 members() ->
     do(members, []).
+
+%% @doc Return manager.
+manager() ->
+    do(manager, []).
 
 %% @doc Leave the cluster.
 leave() ->

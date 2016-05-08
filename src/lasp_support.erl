@@ -86,13 +86,36 @@ wait_until_left(Nodes, LeavingNode) ->
         end, 60*2, 500).
 
 wait_until_joined(Nodes, ExpectedCluster) ->
-    wait_until(fun() ->
-                lists:all(fun(X) -> X == true end,
-                          pmap(fun(Node) ->
-                                lists:sort(ExpectedCluster) ==
-                                lists:sort(get_cluster_members(Node))
-                        end, Nodes))
-        end, 60*2, 500).
+    Manager = lasp_peer_service:manager(),
+    case Manager of
+        %% Naively wait until the active views across all nodes sum to
+        %% the complete set of nodes; note: this is *good enough* for
+        %% the test and doesn't guarantee that the cluster is fully
+        %% connected.
+        %%
+        partisan_hyparview_peer_service_manager ->
+            wait_until(fun() ->
+                        lists:sort(ExpectedCluster) ==
+                        lists:usort(lists:flatten(pmap(fun(Node) ->
+                                                lager:info("node ~p has ~p",
+                                                           [Node,
+                                                            get_cluster_members(Node)]),
+                                        get_cluster_members(Node)
+                                end, Nodes)))
+                end, 60*2, 500);
+        _ ->
+            wait_until(fun() ->
+                        lists:all(fun(X) -> X == true end,
+                                  pmap(fun(Node) ->
+                                                lager:info("node ~p has ~p",
+                                                           [Node,
+                                                            get_cluster_members(Node)]),
+                                        lists:sort(ExpectedCluster) ==
+                                        lists:sort(get_cluster_members(Node))
+                                end, Nodes))
+                end, 60*2, 500)
+    end,
+    ok.
 
 wait_until_offline(Node) ->
     wait_until(fun() ->
@@ -112,7 +135,7 @@ wait_until_connected(Node1, Node2) ->
 start_and_join_node(Name, Config, Case) ->
     Node = start_node(Name, Config, Case),
     RunnerNode = runner_node(),
-    {ok, Members} = partisan_peer_service:members(),
+    {ok, Members} = lasp_peer_service:members(),
     join_to(Node, RunnerNode),
     Nodes = Members ++ [Node],
     wait_until_joined(Nodes, Nodes),

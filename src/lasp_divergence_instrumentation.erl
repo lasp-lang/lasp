@@ -106,15 +106,15 @@ handle_call({start, Filename, Clients}, _From, State) ->
                             filename=Filename, status=running, events=0,
                             lines = []}};
 
-handle_call(stop, _From, #state{lines=Lines, clock=Clock, events=Events,
+handle_call(stop, _From, #state{lines=Lines0, clock=Clock0, events=Events,
                                 total_dec=TotalDec, total=Total,
                                 clients=Clients, filename=Filename,
                                 tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
-    record(Clock, Events, Clients, Filename, Lines),
+    {ok, Clock, Lines} = record(Clock0, Events, Clients, Filename, Lines0),
     _ = lager:info("Total events seen: ~p", [Total]),
     _ = lager:info("Total decrements seen: ~p", [TotalDec]),
-    {reply, ok, State#state{tref=undefined}};
+    {reply, ok, State#state{tref=undefined, clock=Clock, lines=Lines}};
 
 %% @private
 handle_call(Msg, _From, State) ->

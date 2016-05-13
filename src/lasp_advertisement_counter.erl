@@ -208,13 +208,12 @@ wait(#state{count_events=Count, num_events=NumEvents}=State) ->
         view_ad_complete ->
             case Count >= NumEvents of
                 true ->
-                    lager:info("Events all processed!"),
+                    _ = lager:info("Events all processed!"),
                     {ok, State};
                 false ->
                     case Count rem ReportFrequency == 0 of
                         true ->
-                            lager:info("Event ~p of ~p processed",
-                                       [Count, NumEvents]),
+                            _ = lager:info("Event ~p of ~p processed", [Count, NumEvents]),
                             memory_report();
                         false ->
                             ok
@@ -442,22 +441,21 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
 %% @private
 memory_report() ->
     MemoryData = {_, _, {BadPid, _}} = memsup:get_memory_data(),
-    lager:info(""),
-    lager:info("-----------------------------------------------------------", []),
-    lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
+    _ = lager:info(""),
+    _ = lager:info("-----------------------------------------------------------", []),
+    _ = lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
     try
-        lager:info("Worst: ~p", [process_info(BadPid)]),
-        %% lager:info("Worst trace: ~s", [element(2, %% erlang:process_info(BadPid, backtrace))]),
+        _ = lager:info("Worst: ~p", [process_info(BadPid)]),
         ok
     catch
         _:_ ->
             %% Process might die while trying to get info.
             ok
     end,
-    lager:info("Memory Data: ~p", [MemoryData]),
-    lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
-    lager:info("-----------------------------------------------------------", []),
-    lager:info("").
+    _ = lager:info("Memory Data: ~p", [MemoryData]),
+    _ = lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
+    _ = lager:info("-----------------------------------------------------------", []),
+    _ = lager:info("").
 
 %% @private
 launch_clients(NumClients, Nodes, Instrumentation, SetType, CounterType, SyncInterval,

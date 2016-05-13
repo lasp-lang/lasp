@@ -461,7 +461,7 @@ init([]) ->
         {error, {already_started, Pid}} ->
             {ok, Pid};
         {error, Reason} ->
-            lager:error("Failed to initialize backend: ~p", [Reason]),
+            _ = lager:error("Failed to initialize backend: ~p", [Reason]),
             {error, Reason}
     end,
     {ok, #state{actor=Actor, counter=Counter, store=Store, gc_counter=GCCounter}}.
@@ -783,7 +783,7 @@ handle_call(delta_gc, _From, #state{store=Store}=State) ->
 
 %% @private
 handle_call(Msg, _From, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
 
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
@@ -805,13 +805,13 @@ handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
 
 %% @private
 handle_cast(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private

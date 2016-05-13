@@ -76,7 +76,7 @@ summarize(#state{leaderboard_id=LeaderboardId}=State) ->
     %% Read the result and print it.
     {ok, FinalLeaderboard} = lasp:query(LeaderboardId),
     Final = orddict:to_list(FinalLeaderboard),
-    lager:info("Final Leaderboard: ~p", [Final]),
+    _ = lager:info("Final Leaderboard: ~p", [Final]),
     {ok, State}.
 
 %% @doc Terminate any running clients gracefully issuing final

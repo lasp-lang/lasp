@@ -89,12 +89,11 @@ init([Type]) ->
 
 handle_call({log, Term, _Node}, _From, #state{type=_Type, size=Size0}=State) ->
     Size = termsize(Term),
-    %% lager:info("Instrumentation: type ~p received ~p bytes from node ~p", [Type, Size, Node]),
     {reply, ok, State#state{size=Size0 + Size}};
 
 handle_call({start, Filename, Clients}, _From, #state{type=Type}=State) ->
     {ok, TRef} = start_timer(),
-    lager:info("Instrumentation timer for ~p enabled!", [Type]),
+    _ = lager:info("Instrumentation timer for ~p enabled!", [Type]),
     {reply, ok, State#state{tref=TRef, clock=0, clients=Clients,
                             filename=Filename, status=running, size=0,
                             lines = []}};
@@ -104,18 +103,18 @@ handle_call(stop, _From, #state{type=Type, lines=Lines, clock=Clock,
                                 filename=Filename, tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
     record(Clock, Size, Clients, Filename, Lines),
-    lager:info("Instrumentation timer for ~p disabled!", [Type]),
+    _ = lager:info("Instrumentation timer for ~p disabled!", [Type]),
     {reply, ok, State#state{tref=undefined}};
 
 %% @private
 handle_call(Msg, _From, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
 
 %% @private
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 handle_cast(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
@@ -128,7 +127,7 @@ handle_info(record, #state{filename=Filename, clients=Clients,
     {noreply, State#state{tref=TRef, clock=Clock, lines=Lines}};
 
 handle_info(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private

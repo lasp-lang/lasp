@@ -112,19 +112,19 @@ handle_call(stop, _From, #state{lines=Lines, clock=Clock, events=Events,
                                 tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
     record(Clock, Events, Clients, Filename, Lines),
-    lager:info("Total events seen: ~p", [Total]),
-    lager:info("Total decrements seen: ~p", [TotalDec]),
+    _ = lager:info("Total events seen: ~p", [Total]),
+    _ = lager:info("Total decrements seen: ~p", [TotalDec]),
     {reply, ok, State#state{tref=undefined}};
 
 %% @private
 handle_call(Msg, _From, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
 
 %% @private
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 handle_cast(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
@@ -137,7 +137,7 @@ handle_info(record, #state{filename=Filename, clients=Clients,
     {noreply, State#state{tref=TRef, clock=Clock, lines=Lines}};
 
 handle_info(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private

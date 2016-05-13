@@ -123,10 +123,11 @@ init(_Args) ->
     %% Run local simulations if instrumentation is enabled.
     case SimEnabled of
         true ->
-            spawn(fun() ->
+            {ok, _} = spawn(fun() ->
                         timer:sleep(10000),
                         lasp_simulate_resource:run()
-                  end);
+                  end),
+            ok;
         false ->
             ok
     end,

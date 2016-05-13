@@ -58,13 +58,13 @@ run() ->
     Profile = lasp_config:get(profile, false),
     case Profile of
         true ->
-            lager:info("Applying and profiling function..."),
+            _ = lager:info("Applying and profiling function..."),
             eprof:profile([self(), whereis(lasp_sup)],
                           ?MODULE,
                           advertisement_counter_transmission_simulation,
                           [Nodes]),
 
-            lager:info("Analyzing..."),
+            _ = lager:info("Analyzing..."),
             eprof:analyze(total, [{sort, time}]);
         false ->
             advertisement_counter_transmission_simulation(Nodes)
@@ -168,5 +168,5 @@ generate_plot(Plot, Filename1, Filename2) ->
         "'; inputfile2='" ++ log_dir(Filename2) ++
         "'; outputname='" ++ OutputFile ++ "'\" " ++ PlotFile,
     Result = os:cmd(Command),
-    lager:info("Generating " ++ PlotString ++ " plot: ~p; output: ~p",
-               [Command, Result]).
+    _ = lager:info("Generating " ++ PlotString ++ " plot: ~p; output: ~p", [Command, Result]),
+    ok.

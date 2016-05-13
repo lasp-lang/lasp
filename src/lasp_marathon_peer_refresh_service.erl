@@ -166,7 +166,8 @@ maybe_connect(Nodes, SeenNodes) ->
         [] ->
             ok;
         _ ->
-            _ = lager:info("Attempted to connect: ~p", [Attempted])
+            _ = lager:info("Attempted to connect: ~p", [Attempted]),
+            ok
     end,
 
     %% Return list of connected nodes.

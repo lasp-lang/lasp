@@ -918,7 +918,8 @@ log_transmission(Term) ->
     try
         case lasp_config:get(instrumentation, false) of
             true ->
-                lasp_transmission_instrumentation:log(server, Term, node());
+                ok = lasp_transmission_instrumentation:log(server, Term, node()),
+                ok;
             false ->
                 ok
         end

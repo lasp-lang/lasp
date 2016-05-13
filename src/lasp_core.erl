@@ -406,8 +406,8 @@ bind(Id, {delta, Value}, MetadataFun, Store) ->
             catch
                 _:Reason ->
                     %% Merge threw.
-                    lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
-                                    [Type, Reason, Value0, Value]),
+                    _ = lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
+                                      [Type, Reason, Value0, Value]),
                     {Object, {ok, {Id, Type, Metadata, Value0}}}
             end
     end,
@@ -441,8 +441,8 @@ bind(Id, Value, MetadataFun, Store) ->
                     catch
                         _:Reason ->
                             %% Merge threw.
-                            lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
-                                          [Type, Reason, Value0, Value]),
+                            _ = lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
+                                              [Type, Reason, Value0, Value]),
                             {Object, {ok, {Id, Type, Metadata, Value0}}}
                     end
             end
@@ -906,7 +906,6 @@ reply_to_all([From|T], StillWaiting, Result) ->
         {Address, Ref} ->
             gen_server:reply({Address, Ref}, Result);
         _ ->
-            lager:info("Result: ~p", [Result]),
             From ! Result
     end,
     reply_to_all(T, StillWaiting, Result);

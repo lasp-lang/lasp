@@ -87,13 +87,13 @@ init([]) ->
 
 %% @private
 handle_call(Msg, _From, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
 
 %% @private
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 handle_cast(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
@@ -105,8 +105,7 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
         {ok, DnsMsg} ->
             lists:usort(generate_nodes(DnsMsg));
         Error ->
-            lager:info("Failed to receive information from DNS: ~p",
-                       [Error]),
+            _ = lager:info("Failed to receive information from DNS: ~p", [Error]),
             SeenNodes
     end,
 
@@ -116,13 +115,11 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
     {noreply, State#state{nodes=ConnectedNodes}};
 handle_info(?NODES_MESSAGE, State) ->
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
-    lager:info("Currently connected nodes via distributed erlang: ~p",
-               [nodes()]),
-    lager:info("Currently connected nodes via Lasp peer service: ~p",
-               [lasp_peer_service:members()]),
+    _ = lager:info("Currently connected nodes via distributed erlang: ~p", [nodes()]),
+    _ = lager:info("Currently connected nodes via Lasp peer service: ~p", [lasp_peer_service:members()]),
     {noreply, State};
 handle_info(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
@@ -184,7 +181,7 @@ maybe_connect(Nodes, SeenNodes) ->
         [] ->
             ok;
         _ ->
-            lager:info("Attempted to connect: ~p", [Attempted])
+            _ = lager:info("Attempted to connect: ~p", [Attempted])
     end,
 
     %% Return list of connected nodes.

@@ -83,7 +83,7 @@ summarize(#state{leaderboard_id=LeaderboardId}=State) ->
 %%      synchronization.
 terminate(#state{client_list=ClientList}=State) ->
     TerminateFun = fun(Pid) -> Pid ! terminate end,
-    lists:map(TerminateFun, ClientList),
+    lists:foreach(TerminateFun, ClientList),
     {ok, State}.
 
 %% @doc Launch a series of client processes.

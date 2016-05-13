@@ -98,13 +98,13 @@ handle_call({start, Filename, Clients}, _From, #state{type=Type}=State) ->
                             filename=Filename, status=running, size=0,
                             lines = []}};
 
-handle_call(stop, _From, #state{type=Type, lines=Lines, clock=Clock,
+handle_call(stop, _From, #state{type=Type, lines=Lines0, clock=Clock0,
                                 clients=Clients, size=Size,
                                 filename=Filename, tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
-    record(Clock, Size, Clients, Filename, Lines),
+    {ok, Clock, Lines} = record(Clock0, Size, Clients, Filename, Lines0),
     _ = lager:info("Instrumentation timer for ~p disabled!", [Type]),
-    {reply, ok, State#state{tref=undefined}};
+    {reply, ok, State#state{tref=undefined, clock=Clock, lines=Lines}};
 
 %% @private
 handle_call(Msg, _From, State) ->

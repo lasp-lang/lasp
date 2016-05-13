@@ -473,7 +473,7 @@ init([]) ->
 %% Reset all Lasp application state.
 handle_call(reset, _From, #state{store=Store}=State) ->
     %% Terminate all Lasp processes.
-    lasp_process_sup:terminate(),
+    _ = lasp_process_sup:terminate(),
 
     %% Reset storage backend.
     ?CORE:storage_backend_reset(Store),

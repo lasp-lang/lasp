@@ -357,25 +357,27 @@ wait_needed(Id, Threshold, Store) ->
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation(), actor(), store()) -> {ok, var()}.
+-spec update(id(), operation(), actor(), store()) ->
+    {ok, var()} | not_found().
 update(Id, Operation, Actor, Store) ->
     MetadataFun = fun(X) -> X end,
     update(Id, Operation, Actor, MetadataFun, Store).
 
--spec update(id(), operation(), actor(), function(), store()) -> {ok, var()}.
+-spec update(id(), operation(), actor(), function(), store()) ->
+    {ok, var()} | not_found().
 update(Id, Operation, Actor, MetadataFun, Store) ->
     {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
     {ok, Value} = lasp_type:update(Type, Operation, Actor, Value0),
     bind(Id, Value, MetadataFun, Store).
 
 %% @doc Define a dataflow variable to be bound a value.
--spec bind(id(), value(), store()) -> {ok, var()}.
+-spec bind(id(), value(), store()) -> {ok, var()} | not_found().
 bind(Id, Value, Store) ->
     MetadataFun = fun(X) -> X end,
     bind(Id, Value, MetadataFun, Store).
 
 %% @doc Define a dataflow variable to be bound a value.
--spec bind(id(), value(), function(), store()) -> {ok, var()}.
+-spec bind(id(), value(), function(), store()) -> {ok, var()} | not_found().
 bind(Id, {delta, Value}, MetadataFun, Store) ->
     Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
                       waiting_delta_threads=WDT, waiting_threads=WT,
@@ -465,7 +467,7 @@ bind(Id, Value, MetadataFun, Store) ->
 %%      variable is unbound or has not met the threshold yet.
 %%
 -spec read(id(), value(), store(), pid(), function(), function()) ->
-    {ok, var()}.
+    {ok, var()} | not_found().
 read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
     Mutator = fun(#dv{type=Type, value=Value, metadata=Metadata, lazy_threads=LT}=Object) ->
             %% When no threshold is specified, use the bottom value for the

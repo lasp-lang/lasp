@@ -4,7 +4,7 @@
   0},
  {<<"gen_flow">>,
   {git,"https://github.com/lasp-lang/gen_flow.git",
-       {ref,"44699c3cfb33f72a9cc3d3f1427664c12a7d6a62"}},
+       {ref,"5cc610b8211c8b638a91fe56ba39eebd16157191"}},
   0},
  {<<"goldrush">>,
   {git,"git://github.com/DeadZen/goldrush.git",

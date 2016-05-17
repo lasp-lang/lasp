@@ -95,13 +95,14 @@ all() ->
 %% ===================================================================
 
 -define(SET, lasp_orset).
--define(COUNTER, lasp_pncounter).
+-define(COUNTER, pncounter).
+
 -define(ID, <<"myidentifier">>).
 
 %% @doc Increment counter and test stream behaviour.
 stream_test(_Config) ->
     %% Declare a variable.
-    {ok, {C1, _, _, _}} = lasp:declare(lasp_gcounter),
+    {ok, {C1, _, _, _}} = lasp:declare(?COUNTER),
 
     %% Stream results.
     Self = self(),

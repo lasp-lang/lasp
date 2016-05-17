@@ -8,7 +8,7 @@
      {licenses,["Apache"]},
      {registered,[]},
      {applications,
-         [kernel,stdlib,riak_dt,gen_flow,lager,gb_trees_ext,sasl,time_compat,
+         [kernel,stdlib,types,gen_flow,lager,gb_trees_ext,sasl,time_compat,
           webmachine,jsx,os_mon,lasp_support]},
      {mod,{lasp_app,[]}},
      {env,

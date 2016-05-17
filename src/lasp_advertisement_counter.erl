@@ -417,14 +417,15 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
             MergedCounter = CounterType:merge(CounterDelta0, Counter0),
 
             %% Generate delta for current operation from new state.
-            {ok, {delta, Delta}} = CounterType:update_delta(increment, Id, MergedCounter),
+            {ok, {delta, Delta}} = lasp_type:update(CounterType, increment, Id, MergedCounter),
+
             %% Merge new delta with old delta and store in interval
             %% dictionary for next synchronization interval.
-            CounterDelta = CounterType:merge(Delta, CounterDelta0),
+            CounterDelta = lasp_type:merge(CounterType, Delta, CounterDelta0),
 
             %% Merge new delta into old state and store in the state
             %% dictionary.
-            Counter = CounterType:merge(MergedCounter, CounterDelta),
+            Counter = lasp_type:merge(CounterType, MergedCounter, CounterDelta),
 
             %% At this point we should have a new delta interval
             %% computed and a new state, so update dictionaries
@@ -434,7 +435,7 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
         false ->
             %% If deltas are disabled, then just create a new copy of
             %% the object and store it in the local nodes dictionary.
-            {ok, Counter} = CounterType:update(increment, Id, Counter0),
+            {ok, Counter} = lasp_type:update(CounterType, increment, Id, Counter0),
             {ok, {dict:store(Ad, Counter, Counters0), CountersDelta0}}
     end.
 

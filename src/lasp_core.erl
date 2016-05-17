@@ -613,11 +613,11 @@ fold_internal(orset, Value, Function, AccType, AccValue) ->
 
                             %% Apply all operations to the accumulator.
                             lists:foldl(fun(Op, Acc) ->
-                                                {ok, A} = AccType:update(Op, Actor, Acc),
+                                                {ok, A} = lasp_type:update(AccType, Op, Actor, Acc),
                                                 case Deleted of
                                                     true ->
                                                         InverseOp = lasp_operations:inverse(AccType, Op),
-                                                        {ok, B} = AccType:update(InverseOp, Actor, A),
+                                                        {ok, B} = lasp_type:update(AccType, InverseOp, Actor, A),
                                                         B;
                                                     false ->
                                                         A

@@ -468,7 +468,7 @@ orset_test(_Config) ->
     {ok, {_, _, _, S1}} = lasp:read(L1, {strict, undefined}),
 
     %% Test inflations.
-    {ok, S2} = ?SET:update({add, 2}, a, S1),
+    {ok, S2} = lasp_type:update(?SET, {add, 2}, a, S1),
 
     Self = self(),
 

@@ -163,17 +163,15 @@ ivar_test(_Config) ->
 
     %% Attempt pre, and post- dataflow variable bind operations.
     ?assertMatch(ok, lasp:bind_to(I2, I1)),
-    ?assertMatch({ok, _}, lasp:bind(I1, V1)),
+    ?assertMatch({ok, _}, lasp:update(I1, {set, V1}, a)),
     ?assertMatch(ok, lasp:bind_to(I3, I1)),
 
-    %% Perform invalid bind; won't return error, just will have no
-    %% effect.
-    ?assertMatch({ok, _}, lasp:bind(I1, 2)),
+    timer:sleep(4000),
 
     %% Verify the same value is contained by all.
-    ?assertMatch({ok, {_, _, _, V1}}, lasp:read(I3, {strict, undefined})),
-    ?assertMatch({ok, {_, _, _, V1}}, lasp:read(I2, {strict, undefined})),
-    ?assertMatch({ok, {_, _, _, V1}}, lasp:read(I1, {strict, undefined})),
+    ?assertMatch({ok, {_, _, _, {_, V1}}}, lasp:read(I3, {strict, undefined})),
+    ?assertMatch({ok, {_, _, _, {_, V1}}}, lasp:read(I2, {strict, undefined})),
+    ?assertMatch({ok, {_, _, _, {_, V1}}}, lasp:read(I1, {strict, undefined})),
 
     ok.
 

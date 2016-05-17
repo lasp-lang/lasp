@@ -141,7 +141,7 @@ query_test(_Config) ->
     {ok, {I1, _, _, _}} = lasp:declare(ivar),
 
     %% Change it's value.
-    ?assertMatch({ok, _}, lasp:bind(I1, 2)),
+    ?assertMatch({ok, _}, lasp:update(I1, {set, 2}, a)),
 
     %% Threshold read just to create a synchronization point for the
     %% value to change.

@@ -86,7 +86,7 @@ merge(Type, Value0, Value) ->
 query(Type, Value) ->
     case Type of
         {T, _Args} ->
-            T:value(Value);
+            T:query(Value);
         T ->
-            T:value(Value)
+            T:query(Value)
     end.

@@ -203,7 +203,7 @@ map_test(_Config) ->
     {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
 
     ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6,8,10,12]},
-                 {ok, ?SET:value(S1V4), ?SET:value(S2V1)}),
+                 {ok, lasp_type:query(?SET, S1V4), lasp_type:query(?SET, S2V1)}),
 
     ok.
 
@@ -237,7 +237,7 @@ filter_test(_Config) ->
     {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
 
     ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6]},
-                 {ok, ?SET:value(S1V4), ?SET:value(S2V1)}),
+                 {ok, lasp_type:query(?SET, S1V4), lasp_type:query(?SET, S2V1)}),
 
     ok.
 
@@ -280,7 +280,7 @@ fold_test(_Config) ->
     {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
 
     ?assertEqual({ok, [1,2], 1},
-                 {ok, ?SET:value(S1V4), ?COUNTER:value(S2V1)}),
+                 {ok, lasp_type:query(?SET, S1V4), lasp_type:query(?SET, S2V1)}),
 
     ok.
 
@@ -307,7 +307,7 @@ union_test(_Config) ->
     {ok, {_, _, _, Union0}} = lasp:read(S3, undefined),
 
     %% Read union value.
-    Union = ?SET:value(Union0),
+    Union = lasp_type:query(?SET, Union0),
 
     ?assertEqual({ok, [1,2,3,a,b,c]}, {ok, Union}),
 
@@ -336,7 +336,7 @@ intersection_test(_Config) ->
     {ok, {_, _, _, Intersection0}} = lasp:read(S3, undefined),
 
     %% Read intersection value.
-    Intersection = ?SET:value(Intersection0),
+    Intersection = lasp_type:query(?SET, Intersection0),
 
     ?assertEqual({ok, [3]}, {ok, Intersection}),
 
@@ -365,7 +365,7 @@ product_test(_Config) ->
     {ok, {_, _, _, Product0}} = lasp:read(S3, undefined),
 
     %% Read product value.
-    Product = ?SET:value(Product0),
+    Product = lasp_type:query(?SET Product0),
 
     ?assertEqual({ok,[{1,3},{1,a},{1,b},{2,3},{2,a},{2,b},{3,3},{3,a},{3,b}]}, {ok, Product}),
 
@@ -396,7 +396,7 @@ monotonic_read_test(_Config) ->
     %% Ensure we receive [1, 2, 3].
     Set1 = receive
         {I1, {ok, {_, _, _, X}}} ->
-            ?SET:value(X)
+            lasp_type:query(?SET, X)
     end,
 
     %% Perform more inflations.
@@ -412,7 +412,7 @@ monotonic_read_test(_Config) ->
     %% Ensure we receive [1, 2, 3, 4].
     Set2 = receive
         {I2, {ok, {_, _, _, Y}}} ->
-            ?SET:value(Y)
+            lasp_type:query(?SET, Y)
     end,
 
     ?assertMatch({[1,2,3], [1,2,3,4,5]}, {Set1, Set2}),

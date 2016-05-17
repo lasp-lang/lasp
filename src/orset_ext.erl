@@ -34,9 +34,9 @@ intersect_folder(RValue) ->
     end.
 
 -spec map(fun(), orset:orset()) -> orset:orset().
-map(Function, V) ->
-    FolderFun = fun({X, Causality}, Acc) ->
-                        Acc ++ [{Function(X), Causality}]
+map(Function, {orset, V}) ->
+    FolderFun = fun({X, Causality}, {orset, Acc}) ->
+                        {orset, Acc ++ [{Function(X), Causality}]}
                 end,
     lists:foldl(FolderFun, new(), V).
 

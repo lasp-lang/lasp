@@ -140,12 +140,12 @@ query_test(_Config) ->
     %% Declare a variable.
     {ok, {I1, _, _, _}} = lasp:declare(ivar),
 
+    %% Change it's value.
+    ?assertMatch({ok, _}, lasp:bind(I1, 2)),
+
     %% Threshold read just to create a synchronization point for the
     %% value to change.
     {ok, _} = lasp:read(I1, {strict, undefined}),
-
-    %% Change it's value.
-    ?assertMatch({ok, _}, lasp:bind(I1, 2)),
 
     %% Query it.
     ?assertMatch({ok, 2}, lasp:query(I1)),

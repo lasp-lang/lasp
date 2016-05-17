@@ -79,7 +79,7 @@
 %% Broadcast record.
 -record(broadcast, {id :: id(),
                     type :: type(),
-                    clock :: riak_dt_vclock:vclock(),
+                    clock :: lasp_vclock:vclock(),
                     metadata :: metadata(),
                     value :: value()}).
 
@@ -102,13 +102,13 @@
 %% Metadata mutation macros.
 
 -define(CLOCK_INIT, fun(Metadata) ->
-            VClock = riak_dt_vclock:increment(Actor, riak_dt_vclock:fresh()),
+            VClock = lasp_vclock:increment(Actor, lasp_vclock:fresh()),
             orddict:store(clock, VClock, Metadata)
     end).
 
 -define(CLOCK_INCR, fun(Metadata) ->
             Clock = orddict:fetch(clock, Metadata),
-            VClock = riak_dt_vclock:increment(Actor, Clock),
+            VClock = lasp_vclock:increment(Actor, Clock),
             orddict:store(clock, VClock, Metadata)
     end).
 
@@ -123,11 +123,11 @@
                 {ok, Clock} ->
                     Clock;
                 _ ->
-                    riak_dt_vclock:fresh()
+                    lasp_vclock:fresh()
             end,
 
             %% Merge the clocks.
-            Merged = riak_dt_vclock:merge([TheirClock, OurClock]),
+            Merged = lasp_vclock:merge([TheirClock, OurClock]),
             orddict:store(clock, Merged, Metadata)
     end).
 
@@ -149,7 +149,7 @@ start_link(Opts) ->
 %%% plumtree_broadcast_handler callbacks
 %%%===================================================================
 
--type clock() :: riak_dt_vclock:vclock().
+-type clock() :: lasp_vclock:vclock().
 
 -type broadcast_message() :: #broadcast{}.
 -type broadcast_id() :: id().
@@ -631,7 +631,7 @@ handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
     Result = case get(Id, Store) of
         {ok, {Id, Type, Metadata, Value}} ->
             OurClock = orddict:fetch(clock, Metadata),
-            case riak_dt_vclock:equal(TheirClock, OurClock) of
+            case lasp_vclock:equal(TheirClock, OurClock) of
                 true ->
                     {ok, {Id, Type, Metadata, Value}};
                 false ->
@@ -648,7 +648,7 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
     Result = case get(Id, Store) of
         {ok, {_, _, Metadata, _}} ->
             OurClock = orddict:fetch(clock, Metadata),
-            riak_dt_vclock:descends(TheirClock, OurClock);
+            lasp_vclock:descends(TheirClock, OurClock);
         {error, _Error} ->
             false
     end,

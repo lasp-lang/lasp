@@ -271,10 +271,10 @@ update(Id, Operation, Actor) ->
                           %% Ignore: this is a dynamic variable.
                           Value;
                       _ ->
-                          case Value of
-                              {delta, MergedState} ->
+                          case lasp_type:is_delta(Type, Value) of
+                              true ->
                                   %% No broadcasting for the delta.
-                                  MergedState;
+                                  Value;
                               _ ->
                                   broadcast({Id, Type, Metadata, Value}),
                                   Value
@@ -298,10 +298,10 @@ bind(Id, Value0) ->
                           %% Ignore: this is a dynamic variable.
                           Value;
                       _ ->
-                          case Value of
-                              {delta, MergedState} ->
+                          case lasp_type:is_delta(Type, Value) of
+                            true ->
                                   %% No broadcasting for the delta.
-                                  MergedState;
+                                  Value;
                               _ ->
                                   broadcast({Id, Type, Metadata, Value}),
                                   Value

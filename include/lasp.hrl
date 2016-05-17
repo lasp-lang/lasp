@@ -82,7 +82,7 @@
 -type var() :: {id(), type(), metadata(), value()}.
 
 %% @doc Only CRDTs are able to be processed.
--type crdt() :: riak_dt:crdt().
+-type crdt() :: types:crdt().
 
 %% @doc Output of program must be a CRDT.
 -type output() :: crdt().

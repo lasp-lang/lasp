@@ -23,7 +23,10 @@
 
 -include("lasp.hrl").
 
--export([new/1, update/4, merge/3, query/2]).
+-export([new/1,
+         update/4,
+         merge/3,
+         query/2]).
 
 %% @doc Initialize a new variable for a given type.
 new(Type) ->
@@ -40,16 +43,16 @@ update(Type, Operation, Actor, Value) ->
         {T, _Args} ->
             case lasp_config:get(delta_mode, false) of
                 true ->
-                    T:update_delta(Operation, Actor, Value);
+                    T:delta_mutate(Operation, Actor, Value);
                 false ->
-                    T:update(Operation, Actor, Value)
+                    T:mutate(Operation, Actor, Value)
             end;
         T ->
             case lasp_config:get(delta_mode, false) of
                 true ->
-                    T:update_delta(Operation, Actor, Value);
+                    T:delta_mutate(Operation, Actor, Value);
                 false ->
-                    T:update(Operation, Actor, Value)
+                    T:mutate(Operation, Actor, Value)
             end
     end.
 

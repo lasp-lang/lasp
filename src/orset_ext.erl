@@ -41,13 +41,13 @@ map(Function, {orset, V}) ->
     lists:foldl(FolderFun, new(), V).
 
 -spec filter(fun((_) -> boolean()), orset:orset()) -> orset:orset().
-filter(Function, V) ->
-    FolderFun = fun({X, Causality}, Acc) ->
+filter(Function, {orset, V}) ->
+    FolderFun = fun({X, Causality}, {orset, Acc}) ->
                         case Function(X) of
                             true ->
-                                Acc ++ [{X, Causality}];
+                                {orset, Acc ++ [{X, Causality}]};
                             false ->
-                                Acc
+                                {orset, Acc}
                         end
                 end,
     lists:foldl(FolderFun, new(), V).

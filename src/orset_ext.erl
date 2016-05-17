@@ -11,9 +11,9 @@ union(LValue, RValue) ->
     orset:merge(LValue, RValue).
 
 -spec product(orset:orset(), orset:orset()) -> orset:orset().
-product(LValue, RValue) ->
-    FolderFun = fun({X, XCausality}, Acc) ->
-            Acc ++ [{{X, Y}, causal_product(XCausality, YCausality)} || {Y, YCausality} <- RValue]
+product({orset, LValue}, {orset, RValue}) ->
+    FolderFun = fun({X, XCausality}, {orset, Acc}) ->
+        {orset, Acc ++ [{{X, Y}, causal_product(XCausality, YCausality)} || {Y, YCausality} <- RValue]}
     end,
     lists:foldl(FolderFun, new(), LValue).
 

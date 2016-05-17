@@ -24,17 +24,9 @@
 -include("lasp.hrl").
 
 %% Declare a new dataflow variable of a given type.
-%%
-%% Valid values for `Type' are any of lattices supporting the
-%% `riak_dt' behavior.  Type is declared with the provided `Id'.
-%%
 -callback declare(id(), type()) -> {ok, var()} | error().
 
 %% Declare a new dynamic variable of a given type.
-%%
-%% Valid values for `Type' are any of lattices supporting the
-%% `riak_dt' behavior.  Type is declared with the provided `Id'.
-%%
 -callback declare_dynamic(id(), type()) -> {ok, var()} | error().
 
 %% Return the current value of a CRDT.

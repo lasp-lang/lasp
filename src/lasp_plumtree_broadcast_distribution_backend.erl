@@ -214,10 +214,6 @@ exchange(Peer) ->
 %%%===================================================================
 
 %% @doc Declare a new dataflow variable of a given type.
-%%
-%%      Valid values for `Type' are any of lattices supporting the
-%%      `riak_dt' behavior.  Type is declared with the provided `Id'.
-%%
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
     case lasp_config:get(delta_mode, false) of
@@ -231,10 +227,6 @@ declare(Id, Type) ->
     end.
 
 %% @doc Declare a new dynamic variable of a given type.
-%%
-%%      Valid values for `Type' are any of lattices supporting the
-%%      `riak_dt' behavior.  Type is declared with the provided `Id'.
-%%
 -spec declare_dynamic(id(), type()) -> {ok, var()}.
 declare_dynamic(Id, Type) ->
     case lasp_config:get(delta_mode, false) of

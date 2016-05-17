@@ -252,7 +252,7 @@ fold_test(_Config) ->
     ?assertMatch({ok, _},
                  lasp:update(S1, {add_all, [1,2,3]}, a)),
     ?assertMatch({ok, _},
-                 lasp:update(S1, {remove_all, [2,3]}, b)),
+                 lasp:update(S1, {rmv_all, [2,3]}, b)),
     ?assertMatch({ok, _},
                  lasp:update(S1, {add, 2}, c)),
 

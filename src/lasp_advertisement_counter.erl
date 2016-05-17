@@ -231,7 +231,7 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
     {ok, _} = lasp:read(Counter, {value, ?MAX_IMPRESSIONS}),
 
     %% Remove the advertisement.
-    {ok, _} = lasp:update(Ads, {remove, Ad}, node()).
+    {ok, _} = lasp:update(Ads, {rmv, Ad}, node()).
 
 %% @doc Generate advertisements and advertisement contracts.
 create_advertisements_and_contracts(Counter, Ads, Contracts) ->

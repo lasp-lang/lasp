@@ -26,10 +26,17 @@
 -export([new/1,
          update/4,
          merge/3,
+         is_delta/2,
          threshold_met/3,
          is_inflation/3,
          is_strict_inflation/3,
          query/2]).
+
+%% @doc Is this a delta?
+is_delta(_Type, {_Type, {delta, _}}) ->
+    true;
+is_delta(_, _) ->
+    false.
 
 %% @doc Is strict inflation?
 is_strict_inflation(Type, Previous, Current) ->

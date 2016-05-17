@@ -387,7 +387,7 @@ bind(Id, {delta, Value}, MetadataFun, Store) ->
             %% Merge may throw for invalid types.
             try
                 Merged = lasp_type:merge(Type, Value0, Value),
-                case lasp_lattice:is_strict_inflation(Type, Value0, Merged) of
+                case lasp_type:is_strict_inflation(Type, Value0, Merged) of
                     true ->
                         {ok, SW} = reply_to_all(WT, [],
                                                 {ok, {Id, Type, Metadata, Merged}}),
@@ -427,7 +427,7 @@ bind(Id, Value, MetadataFun, Store) ->
                     %% Merge may throw for invalid types.
                     try
                         Merged = lasp_type:merge(Type, Value0, Value),
-                        case lasp_lattice:is_inflation(Type, Value0, Merged) of
+                        case lasp_type:is_inflation(Type, Value0, Merged) of
                             true ->
                                 {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
                                 NewObject = #dv{type=Type, metadata=Metadata,
@@ -486,7 +486,7 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
             {ok, SL} = reply_to_all(LT, {ok, Threshold}),
 
             %% Satisfy read if threshold is met.
-            case lasp_lattice:threshold_met(Type, Value, Threshold) of
+            case lasp_type:threshold_met(Type, Value, Threshold) of
                 true ->
                     {Object#dv{lazy_threads=SL}, {ok, {Id, Type, Metadata, Value}}};
                 false ->
@@ -535,7 +535,7 @@ read_any(Reads, Self, Store) ->
                                     {ok, SL} = reply_to_all(LT, {ok, Threshold}),
 
                                     %% Satisfy read if threshold is met.
-                                    case lasp_lattice:threshold_met(Type, Value, Threshold) of
+                                    case lasp_type:threshold_met(Type, Value, Threshold) of
                                         true ->
                                             {Object, {ok, {Id, Type, Metadata, Value}}};
                                         false ->
@@ -801,7 +801,7 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
              type=Type,
              value=Value,
              lazy_threads=LazyThreads0}} = do(get, [Store, Id]),
-    case lasp_lattice:threshold_met(Type, Value, Threshold) of
+    case lasp_type:threshold_met(Type, Value, Threshold) of
         true ->
             ReplyFun(Threshold);
         false ->
@@ -840,7 +840,7 @@ reply_to_all(List, Result) ->
 reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, {Id, Type, Metadata, Value}}=Result) ->
-    SW = case lasp_lattice:threshold_met(Type, Value, Threshold) of
+    SW = case lasp_type:threshold_met(Type, Value, Threshold) of
         true ->
             case From of
                 {server, undefined, {Address, Ref}} ->
@@ -864,7 +864,7 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
 reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, RThreshold}=Result) ->
-    SW = case lasp_lattice:threshold_met(Type, Threshold, RThreshold) of
+    SW = case lasp_type:threshold_met(Type, Threshold, RThreshold) of
         true ->
             case From of
                 {server, undefined, {Address, Ref}} ->

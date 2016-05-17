@@ -26,7 +26,24 @@
 -export([new/1,
          update/4,
          merge/3,
+         threshold_met/3,
+         is_inflation/3,
+         is_strict_inflation/3,
          query/2]).
+
+%% @doc Is strict inflation?
+is_strict_inflation(Type, Previous, Current) ->
+    Type:is_strict_inflation(Previous, Current).
+
+%% @doc Is inflation?
+is_inflation(Type, Previous, Current) ->
+    Type:is_inflation(Previous, Current).
+
+%% @doc Determine if a threshold is met.
+threshold_met(Type, Value, {strict, Threshold}) ->
+    Type:is_strict_inflation(Threshold, Value);
+threshold_met(Type, Value, Threshold) ->
+    Type:is_inflation(Threshold, Value).
 
 %% @doc Initialize a new variable for a given type.
 new(Type) ->

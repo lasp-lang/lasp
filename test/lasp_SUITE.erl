@@ -365,7 +365,7 @@ product_test(_Config) ->
     {ok, {_, _, _, Product0}} = lasp:read(S3, undefined),
 
     %% Read product value.
-    Product = lasp_type:query(?SET Product0),
+    Product = lasp_type:query(?SET, Product0),
 
     ?assertEqual({ok,[{1,3},{1,a},{1,b},{2,3},{2,a},{2,b},{3,3},{3,a},{3,b}]}, {ok, Product}),
 

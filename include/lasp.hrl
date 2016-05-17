@@ -62,13 +62,7 @@
 -type idx() :: term().
 -type not_found() :: {error, not_found}.
 -type result() :: term().
--type type() :: lasp_ivar
-              | lasp_orset
-              | {lasp_top_k_set, [any()]}
-              | {lasp_pair, [type()]}
-              | riak_dt_gcounter
-              | lasp_pncounter
-              | lasp_gcounter.
+-type type() :: term().
 -type value() :: term().
 -type func() :: atom().
 -type args() :: list().

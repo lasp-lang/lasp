@@ -81,8 +81,6 @@ all() ->
      ivar_test,
      orset_test,
      dynamic_ivar_test,
-     dynamic_fold_test,
-     leaderboard_test,
      monotonic_read_test,
      map_test,
      filter_test,
@@ -446,44 +444,6 @@ dynamic_ivar_test(Config) ->
 
     ok.
 
-%% @doc Dynamic fold test; incomplete.
-%% @todo
-dynamic_fold_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-
-    %% Define a pair of counters to store the global average.
-    {ok, {_GA, _, _, _}} = rpc:call(Node1, lasp, declare,
-                                    [global,
-                                     {lasp_pair, [lasp_pncounter, lasp_pncounter]}]),
-
-    %% Declare a set for local samples.
-    {ok, {_S, _, _, _}} = rpc:call(Node1, lasp, declare_dynamic,
-                                   [{lasp_top_k_set, [2]}]),
-
-    %% Define a local average; this will be computed from the local samples.
-    {ok, {_LA, _, _, _}} = rpc:call(Node1, lasp, declare_dynamic,
-                                    [{lasp_pair, [lasp_pncounter, lasp_pncounter]}]),
-
-    ok.
-
-% %% Register an event handler with the sensor 
-% %% that is triggered each time an event X is 
-% %% triggered at a given timestamp T.
-% EventHandler = fun({X, T} ->
-%     lasp:update(Samples, {add, x, t}, Actor)
-% end,
-% register_event_handler(EventHandler),
-    
-% %% Fold the samples using the binary function 
-% %% `avg' into a local average.
-% lasp:fold(Samples, fun avg/2, LocalAverage)
-    
-% %% Fold the local average using the binary 
-% %% function `avg' into a global average.
-% lasp:fold_dynamic(LocalAverage, 
-%                         fun sum_pairs/2, 
-%                         GlobalAverage)
-
 %% @doc Test of the lasp_orset.
 orset_test(_Config) ->
     {ok, {L1, _, _, _}} = lasp:declare(?SET),
@@ -546,7 +506,3 @@ orset_test(_Config) ->
     end,
 
     ok.
-
-%% @doc Run the leaderboard simulation.
-leaderboard_test(_Config) ->
-    lasp_leaderboard:run([]).

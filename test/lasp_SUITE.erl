@@ -138,7 +138,7 @@ stream_test(_Config) ->
 %% @doc Test query functionality.
 query_test(_Config) ->
     %% Declare a variable.
-    {ok, {I1, _, _, _}} = lasp:declare(lasp_ivar),
+    {ok, {I1, _, _, _}} = lasp:declare(ivar),
 
     %% Change it's value.
     ?assertMatch({ok, _}, lasp:bind(I1, 2)),
@@ -151,9 +151,9 @@ query_test(_Config) ->
 %% @doc Single-assignment variable test.
 ivar_test(_Config) ->
     %% Single-assignment variables.
-    {ok, {I1, _, _, _}} = lasp:declare(lasp_ivar),
-    {ok, {I2, _, _, _}} = lasp:declare(lasp_ivar),
-    {ok, {I3, _, _, _}} = lasp:declare(lasp_ivar),
+    {ok, {I1, _, _, _}} = lasp:declare(ivar),
+    {ok, {I2, _, _, _}} = lasp:declare(ivar),
+    {ok, {I3, _, _, _}} = lasp:declare(ivar),
 
     V1 = 1,
 
@@ -424,24 +424,26 @@ dynamic_ivar_test(Config) ->
     [Node1, Node2 | _Nodes] = proplists:get_value(nodes, Config),
 
     %% Setup a dynamic variable.
-    {ok, {Id, _, _, Value}} = rpc:call(Node1, lasp, declare_dynamic, [?ID, lasp_ivar]),
+    {ok, {Id, _, _, Value}} = rpc:call(Node1, lasp, declare_dynamic,
+                                       [?ID, ivar]),
 
     %% Now, the following action should be idempotent.
-    {ok, {Id, _, _, Value}} = rpc:call(Node2, lasp, declare_dynamic, [?ID, lasp_ivar]),
+    {ok, {Id, _, _, Value}} = rpc:call(Node2, lasp, declare_dynamic,
+                                       [?ID, ivar]),
 
     %% Bind node 1's name to the value on node 1: this should not
     %% trigger a broadcast message because the variable is dynamic.
-    {ok, {Id, _, _, Node1}} = rpc:call(Node1, lasp, bind, [{?ID, lasp_ivar}, Node1]),
+    {ok, {Id, _, _, Node1}} = rpc:call(Node1, lasp, bind, [{?ID, ivar}, Node1]),
 
     %% Bind node 2's name to the value on node 2: this should not
     %% trigger a broadcast message because the variable is dynamic.
-    {ok, {Id, _, _, Node2}} = rpc:call(Node2, lasp, bind, [{?ID, lasp_ivar}, Node2]),
+    {ok, {Id, _, _, Node2}} = rpc:call(Node2, lasp, bind, [{?ID, ivar}, Node2]),
 
     %% Verify variable has the correct value.
-    {ok, Node1} = rpc:call(Node1, lasp, query, [{?ID, lasp_ivar}]),
+    {ok, Node1} = rpc:call(Node1, lasp, query, [{?ID, ivar}]),
 
     %% Verify variable has the correct value.
-    {ok, Node2} = rpc:call(Node2, lasp, query, [{?ID, lasp_ivar}]),
+    {ok, Node2} = rpc:call(Node2, lasp, query, [{?ID, ivar}]),
 
     ok.
 

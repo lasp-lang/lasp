@@ -236,7 +236,7 @@ read_any(Reads, Store) ->
 %% @doc Declare a dataflow variable in a provided by identifer.
 -spec declare(store()) -> {ok, var()}.
 declare(Store) ->
-    declare(lasp_ivar, Store).
+    declare(ivar, Store).
 
 %% @doc Declare a dataflow variable, as a given type.
 -spec declare(type(), store()) -> {ok, var()}.

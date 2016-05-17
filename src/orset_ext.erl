@@ -18,19 +18,19 @@ product(LValue, RValue) ->
     lists:foldl(FolderFun, new(), LValue).
 
 -spec intersect(orset:orset(), orset:orset()) -> orset:orset().
-intersect(LValue, RValue) ->
+intersect({orset, LValue}, RValue) ->
     lists:foldl(intersect_folder(RValue), new(), LValue).
 
 %% @private
-intersect_folder(RValue) ->
-    fun({X, XCausality}, Acc) ->
+intersect_folder({orset, RValue}) ->
+    fun({X, XCausality}, {orset, Acc}) ->
             Values = case lists:keyfind(X, 1, RValue) of
                          {_Y, YCausality} ->
                              [{X, causal_union(XCausality, YCausality)}];
                          false ->
                              []
                      end,
-            Acc ++ Values
+            {orset, Acc ++ Values}
     end.
 
 -spec map(fun(), orset:orset()) -> orset:orset().

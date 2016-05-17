@@ -34,7 +34,7 @@
 -define(NUM_EVENTS, 200000).
 -define(NUM_CLIENTS_PER_VM, 1).
 
--define(ORSET, lasp_orset).
+-define(ORSET, orset).
 -define(COUNTER, gcounter).
 
 -spec init(list()) -> {ok, term()}.

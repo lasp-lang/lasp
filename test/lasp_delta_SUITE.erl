@@ -80,7 +80,7 @@ all() ->
 %% tests
 %% ===================================================================
 
--define(SET, lasp_orset).
+-define(SET, orset).
 -define(MAX_INPUT, 10000).
 
 %% @doc Normal map test.

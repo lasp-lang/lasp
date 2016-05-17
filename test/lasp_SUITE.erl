@@ -94,7 +94,7 @@ all() ->
 %% tests
 %% ===================================================================
 
--define(SET, lasp_orset).
+-define(SET, orset).
 -define(COUNTER, pncounter).
 
 -define(ID, <<"myidentifier">>).
@@ -445,7 +445,7 @@ dynamic_ivar_test(Config) ->
 
     ok.
 
-%% @doc Test of the lasp_orset.
+%% @doc Test of the orset.
 orset_test(_Config) ->
     {ok, {L1, _, _, _}} = lasp:declare(?SET),
     {ok, {L2, _, _, _}} = lasp:declare(?SET),

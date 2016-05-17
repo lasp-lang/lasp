@@ -604,7 +604,7 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
     end,
     lasp_process:start_link([[{Id, ReadFun}], Fun]).
 
-fold_internal(lasp_orset, Value, Function, AccType, AccValue) ->
+fold_internal(orset, Value, Function, AccType, AccValue) ->
     lists:foldl(fun({X, Causality}, AccValue1) ->
         lists:foldl(fun({Actor, Deleted}, AccValue2) ->
                             %% Execute the fold function for the current
@@ -646,11 +646,8 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                     ok;
                 {_, _} ->
                     AccValue = case T of
-                        lasp_orset ->
-                            FolderFun = fun({X, XCausality}, Acc) ->
-                                    Acc ++ [{{X, Y}, lasp_lattice:causal_product(T, XCausality, YCausality)} || {Y, YCausality} <- RValue]
-                            end,
-                            lists:foldl(FolderFun, T:new(), LValue)
+                        orset ->
+                            orset_ext:product(LValue, RValue)
                     end,
                     {ok, _} = BindFun(AccId, AccValue, Store)
             end
@@ -678,8 +675,8 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                     ok;
                 {_, _} ->
                     AccValue = case T of
-                                   lasp_orset ->
-                                       lasp_orset:intersect(LValue, RValue)
+                                   orset ->
+                                       orset_ext:intersect(LValue, RValue)
                                end,
                     {ok, _} = BindFun(AccId, AccValue, Store)
             end
@@ -707,8 +704,8 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                     ok;
                 {_, _} ->
                     AccValue = case T of
-                        lasp_orset ->
-                            lasp_orset:merge(LValue, RValue)
+                        orset ->
+                            orset_ext:union(LValue, RValue)
                     end,
                     {ok, _} = BindFun(AccId, AccValue, Store)
             end
@@ -731,16 +728,16 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun({_, T, _, V}) ->
                   AccValue = case T of
-                                 lasp_orset ->
-                                     lasp_orset:map(Function, V)
+                                 orset ->
+                                     orset_ext:map(Function, V)
                              end,
                   {ok, _} = BindFun(AccId, AccValue, Store);
              %% A delta of the input will be transformed into a delta of the output
              %% and the delta of the output will be binded to the output.
              ({delta, {_, T, _, V}}) ->
                   AccValue = case T of
-                                 lasp_orset ->
-                                     lasp_orset:map(Function, V)
+                                 orset ->
+                                     orset_ext:map(Function, V)
                              end,
                   {ok, _} = BindFun(AccId, {delta, AccValue}, Store)
           end,
@@ -761,8 +758,8 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     Fun = fun({_, T, _, V}) ->
             AccValue = case T of
-                lasp_orset ->
-                               lasp_orset:filter(Function, V)
+                orset ->
+                               orset_ext:filter(Function, V)
             end,
             {ok, _} = BindFun(AccId, AccValue, Store)
     end,

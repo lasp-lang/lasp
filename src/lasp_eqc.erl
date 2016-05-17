@@ -49,7 +49,7 @@
 %% Generators.
 
 type() ->
-    elements([lasp_orset]).
+    elements([orset]).
 
 %% Initial state.
 

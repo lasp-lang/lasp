@@ -14,7 +14,7 @@
 -define(CORE, lasp_core).
 
 %% Default set implementation for Lasp internal state tracking.
--define(SET, lasp_orset).
+-define(SET, orset).
 
 -record(read, {id :: id(),
                type :: type(),

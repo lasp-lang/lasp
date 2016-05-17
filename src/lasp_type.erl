@@ -23,7 +23,7 @@
 
 -include("lasp.hrl").
 
--export([new/1, update/4, merge/3, value/2]).
+-export([new/1, update/4, merge/3, query/2]).
 
 %% @doc Initialize a new variable for a given type.
 new(Type) ->
@@ -63,7 +63,7 @@ merge(Type, Value0, Value) ->
     end.
 
 %% @doc Return the value of a CRDT.
-value(Type, Value) ->
+query(Type, Value) ->
     case Type of
         {T, _Args} ->
             T:value(Value);

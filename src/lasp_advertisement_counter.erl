@@ -398,7 +398,7 @@ view_ad(CounterType, Id, Counters0, CountersDelta0) ->
 
 %% @private
 view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
-    case application:get_env(?APP, delta_mode, false) of
+    case lasp_config:get(delta_mode, false) of
         true ->
             %% If deltas are enabled, then we maintain two pieces of
             %% state: a.) local dictionary of state, and b.) local

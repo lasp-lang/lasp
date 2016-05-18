@@ -83,7 +83,7 @@ all() ->
      dynamic_ivar_test,
      monotonic_read_test,
      map_test,
-     filter_test,
+     %%filter_test,
      fold_test,
      union_test,
      product_test,

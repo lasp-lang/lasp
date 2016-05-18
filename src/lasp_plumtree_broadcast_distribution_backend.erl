@@ -300,13 +300,15 @@ bind(Id, Value0) ->
                           %% Ignore: this is a dynamic variable.
                           Value;
                       _ ->
-                          case lasp_type:is_delta(Type, Value) of
-                            true ->
+                          case lasp_config:get(mode, state_based) of
+                              delta_based ->
                                   %% No broadcasting for the delta.
                                   Value;
-                              _ ->
+                              state_based ->
                                   broadcast({Id, Type, Metadata, Value}),
-                                  Value
+                                  Value;
+                              pure_op_based ->
+                                  ok %% todo
                           end
                   end,
     {ok, {Id, Type, Metadata, ReturnState}}.

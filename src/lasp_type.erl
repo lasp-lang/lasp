@@ -26,74 +26,89 @@
 -export([new/1,
          update/4,
          merge/3,
-         is_delta/2,
          threshold_met/3,
          is_inflation/3,
          is_strict_inflation/3,
          query/2]).
 
-%% @doc Is this a delta?
-is_delta(_Type, {_Type, {delta, _}}) ->
-    true;
-is_delta(_, _) ->
-    false.
+current_types() ->
+    Map0 = orddict:new(),
+    Map1 = orddict:store(gcounter, {gcounter, undefined}, Map0),
+    Map2 = orddict:store(gset, {gset, undefined}, Map1),
+    Map3 = orddict:store(ivar, {ivar, undefined}, Map2),
+    Map4 = orddict:store(orset, {orset, undefined}, Map3),
+    Map5 = orddict:store(pair, {pair, undefined}, Map4),
+    orddict:store(pncounter, {pncounter, undefined}, Map5).
+
+get_mode() -> 
+    lasp_config:get(mode, state_based).
+
+get_type(T) -> 
+    get_type(T, get_mode()).
+
+get_type(T, Mode) ->
+    {ok, [StateType, PureOpType]} = orddict:find(T, current_types()),
+    case Mode of
+        delta_based ->
+            StateType;
+        state_based ->
+            StateType;
+        pure_op_based ->
+            PureOpType
+    end.
+
+remove_args({T, _Args}) -> 
+    T;
+remove_args(T) -> 
+    T.
 
 %% @doc Is strict inflation?
 is_strict_inflation(Type, Previous, Current) ->
-    Type:is_strict_inflation(Previous, Current).
+    T = get_type(remove_args(Type)),
+    T:is_strict_inflation(Previous, Current).
 
 %% @doc Is inflation?
 is_inflation(Type, Previous, Current) ->
-    Type:is_inflation(Previous, Current).
+    T = get_type(remove_args(Type)),
+    T:is_inflation(Previous, Current).
 
 %% @doc Determine if a threshold is met.
 threshold_met(Type, Value, {strict, Threshold}) ->
-    Type:is_strict_inflation(Threshold, Value);
+    T = get_type(remove_args(Type)),
+    T:is_strict_inflation(Threshold, Value);
 threshold_met(Type, Value, Threshold) ->
-    Type:is_inflation(Threshold, Value).
+    T = get_type(remove_args(Type)),
+    T:is_inflation(Threshold, Value).
 
 %% @doc Initialize a new variable for a given type.
 new(Type) ->
+    T = get_type(remove_args(Type)),
     case Type of
-        {T, Args} ->
+        {_T0, Args} ->
             T:new(Args);
-        T ->
+        _T0 ->
             T:new()
     end.
 
 %% @doc Use the proper type for performing an update.
 update(Type, Operation, Actor, Value) ->
-    case Type of
-        {T, _Args} ->
-            case lasp_config:get(delta_mode, false) of
-                true ->
-                    T:delta_mutate(Operation, Actor, Value);
-                false ->
-                    T:mutate(Operation, Actor, Value)
-            end;
-        T ->
-            case lasp_config:get(delta_mode, false) of
-                true ->
-                    T:delta_mutate(Operation, Actor, Value);
-                false ->
-                    T:mutate(Operation, Actor, Value)
-            end
+    Mode = get_mode(),
+    T = get_type(remove_args(Type), Mode),
+    case Mode of
+        delta_based ->
+            T:delta_mutate(Operation, Actor, Value);
+        state_based ->
+            T:mutate(Operation, Actor, Value);
+        pure_op_based ->
+            ok %% @todo
     end.
 
 %% @doc Call the correct merge function for a given type.
 merge(Type, Value0, Value) ->
-    case Type of
-        {T, _Args} ->
-            T:merge(Value0, Value);
-        T ->
-            T:merge(Value0, Value)
-    end.
+    T = get_type(remove_args(Type)),
+    T:merge(Value0, Value).
 
 %% @doc Return the value of a CRDT.
 query(Type, Value) ->
-    case Type of
-        {T, _Args} ->
-            T:query(Value);
-        T ->
-            T:query(Value)
-    end.
+    T = get_type(remove_args(Type)),
+    T:query(Value).

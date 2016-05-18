@@ -271,7 +271,7 @@ update(Id, Operation, Actor) ->
                           %% Ignore: this is a dynamic variable.
                           Value;
                       _ ->
-                          case lasp_type:is_delta(Type, Value) of
+                          case lasp_config:get(delta_mode, false) of
                               true ->
                                   %% No broadcasting for the delta.
                                   Value;
@@ -298,7 +298,7 @@ bind(Id, Value0) ->
                           %% Ignore: this is a dynamic variable.
                           Value;
                       _ ->
-                          case lasp_type:is_delta(Type, Value) of
+                          case lasp_config:get(delta_mode, false) of
                             true ->
                                   %% No broadcasting for the delta.
                                   Value;

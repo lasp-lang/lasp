@@ -47,7 +47,7 @@ get_type(T) ->
     get_type(T, get_mode()).
 
 get_type(T, Mode) ->
-    {ok, [StateType, PureOpType]} = orddict:find(T, current_types()),
+    {ok, {StateType, PureOpType}} = orddict:find(T, current_types()),
     case Mode of
         delta_based ->
             StateType;

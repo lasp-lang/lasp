@@ -88,7 +88,7 @@ normal_map_test(Config) ->
     Nodes = proplists:get_value(nodes, Config),
     %% Set the delta_mode to true for all nodes.
     lists:foreach(fun(Node) ->
-                        ok = rpc:call(Node, lasp_config, set, [delta_mode, true])
+                        ok = rpc:call(Node, lasp_config, set, [mode, delta_based])
                   end, Nodes),
     %% Set the incremental_computation_mode to false for all nodes.
     lists:foreach(fun(Node) ->
@@ -97,9 +97,9 @@ normal_map_test(Config) ->
                   end, Nodes),
 
     %% Enable deltas.
-    ok = lasp_config:set(delta_mode, true),
+    ok = lasp_config:set(mode, delta_based),
 
-    ?assertMatch(true, lasp_config:get(delta_mode, false)),
+    ?assertMatch(delta_based, lasp_config:get(mode, state_based)),
 
     %% Disable incremental computation.
     ok = lasp_config:set(incremental_computation_mode, false),
@@ -144,7 +144,7 @@ incremental_map_test(Config) ->
     Nodes = proplists:get_value(nodes, Config),
     %% Set the delta_mode to true for all nodes.
     lists:foreach(fun(Node) ->
-                        ok = rpc:call(Node, lasp_config, set, [delta_mode, true])
+                        ok = rpc:call(Node, lasp_config, set, [mode, delta_based])
                   end, Nodes),
     %% Set the incremental_computation_mode to true for all nodes.
     lists:foreach(fun(Node) ->
@@ -153,9 +153,9 @@ incremental_map_test(Config) ->
                   end, Nodes),
 
     %% Enable deltas.
-    ok = lasp_config:set(delta_mode, true),
+    ok = lasp_config:set(mode, delta_based),
 
-    ?assertMatch(true, lasp_config:get(delta_mode, false)),
+    ?assertMatch(delta_based, lasp_config:get(mode, state_based)),
 
     %% Enable incremental computation.
     ok = lasp_config:set(incremental_computation_mode, true),

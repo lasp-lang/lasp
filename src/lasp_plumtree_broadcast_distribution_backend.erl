@@ -882,7 +882,7 @@ collect_deltas(Type, DeltaMap, Min0, Max) ->
                    lists:min(Counters)
            end,
     SmallDeltaMap = orddict:filter(fun(Counter, _Delta) ->
-                                           (Counter >= Min1) or (Counter < Max)
+                                           (Counter >= Min1) andalso (Counter < Max)
                                    end, DeltaMap),
     Deltas = orddict:fold(fun(_Counter, Delta, Deltas0) ->
                                   lasp_type:merge(Type, Deltas0, Delta)

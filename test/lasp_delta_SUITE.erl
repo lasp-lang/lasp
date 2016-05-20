@@ -72,8 +72,7 @@ end_per_testcase(Case, Config) ->
 
 all() ->
     [
-     normal_map_test,
-     %%incremental_map_test @todo
+     normal_map_test%%,incremental_map_test @todo
     ].
 
 %% ===================================================================

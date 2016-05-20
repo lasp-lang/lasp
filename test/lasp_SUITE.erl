@@ -84,7 +84,7 @@ all() ->
      monotonic_read_test,
      map_test,
      filter_test,
-     fold_test,
+     %%fold_test, @todo
      union_test,
      product_test,
      intersection_test

@@ -193,8 +193,8 @@ graft({Id, Clock}) ->
 %% @doc Anti-entropy mechanism.
 -spec exchange(node()) -> {ok, pid()}.
 exchange(Peer) ->
-    case lasp_config:get(delta_mode, false) of
-        true ->
+    case lasp_config:get(mode, state_based) of
+        delta_based ->
             %% Anti-entropy mechanism for causal consistency of delta-CRDT.
             {ok, Pid, GCCounter} = gen_server:call(?MODULE, {exchange, Peer}, infinity),
             MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
@@ -204,7 +204,7 @@ exchange(Peer) ->
                 false ->
                     {ok, Pid}
             end;
-        false ->
+        state_based ->
             %% Naive anti-entropy mechanism; re-broadcast all messages.
             gen_server:call(?MODULE, exchange, infinity)
     end.
@@ -216,10 +216,10 @@ exchange(Peer) ->
 %% @doc Declare a new dataflow variable of a given type.
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
-    case lasp_config:get(delta_mode, false) of
-        true ->
+    case lasp_config:get(mode, state_based) of
+        delta_based ->
             gen_server:call(?MODULE, {declare, Id, Type}, infinity);
-        false ->
+        state_based ->
             {ok, Variable} = gen_server:call(?MODULE,
                                              {declare, Id, Type}, infinity),
             broadcast(Variable),
@@ -229,10 +229,10 @@ declare(Id, Type) ->
 %% @doc Declare a new dynamic variable of a given type.
 -spec declare_dynamic(id(), type()) -> {ok, var()}.
 declare_dynamic(Id, Type) ->
-    case lasp_config:get(delta_mode, false) of
-        true ->
+    case lasp_config:get(mode, state_based) of
+        delta_based ->
             gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity);
-        false ->
+        state_based ->
             {ok, Variable} = gen_server:call(?MODULE,
                                              {declare_dynamic, Id, Type},
                                              infinity),
@@ -271,13 +271,15 @@ update(Id, Operation, Actor) ->
                           %% Ignore: this is a dynamic variable.
                           Value;
                       _ ->
-                          case lasp_config:get(delta_mode, false) of
-                              true ->
+                          case lasp_config:get(mode, state_based) of
+                              delta_based  ->
                                   %% No broadcasting for the delta.
                                   Value;
-                              _ ->
+                              state_based ->
                                   broadcast({Id, Type, Metadata, Value}),
-                                  Value
+                                  Value;
+                              pure_op_based ->
+                                  ok %% @todo
                           end
                   end,
     {ok, {Id, Type, Metadata, ReturnState}}.
@@ -298,13 +300,15 @@ bind(Id, Value0) ->
                           %% Ignore: this is a dynamic variable.
                           Value;
                       _ ->
-                          case lasp_config:get(delta_mode, false) of
-                            true ->
+                          case lasp_config:get(mode, state_based) of
+                              delta_based ->
                                   %% No broadcasting for the delta.
                                   Value;
-                              _ ->
+                              state_based ->
                                   broadcast({Id, Type, Metadata, Value}),
-                                  Value
+                                  Value;
+                              pure_op_based ->
+                                  ok %% todo
                           end
                   end,
     {ok, {Id, Type, Metadata, ReturnState}}.
@@ -879,7 +883,7 @@ collect_deltas(Type, DeltaMap, Min0, Max) ->
     Deltas = orddict:fold(fun(_Counter, Delta, Deltas0) ->
                                   lasp_type:merge(Type, Deltas0, Delta)
                           end, lasp_type:new(Type), SmallDeltaMap),
-    {delta, Deltas}.
+    Deltas.
 
 %% @private
 declare_if_not_found({error, not_found}, {StorageId, TypeId},

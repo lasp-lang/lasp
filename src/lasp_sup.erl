@@ -139,8 +139,8 @@ init(_Args) ->
     lasp_config:set(profile, ProfileEnabled),
 
     %% Cache values with lasp_config to help out on the performance.
-    Delta = application:get_env(?APP, delta_mode, false),
-    lasp_config:set(delta_mode, Delta),
+    Mode = application:get_env(?APP, mode, state_based),
+    lasp_config:set(mode, Mode),
 
     StorageBackend = application:get_env(
                        ?APP,

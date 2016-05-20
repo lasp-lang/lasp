@@ -34,8 +34,8 @@
 
 -module(lasp_vclock).
 
--export([fresh/0,descends/2,merge/1,get_counter/2, subtract_dots/2,
-         increment/2,all_nodes/1, equal/2,
+-export([fresh/0, descends/2, merge/1, get_counter/2, subtract_dots/2,
+         increment/2, all_nodes/1, equal/2,
          to_binary/1, from_binary/1, dominates/2, glb/2]).
 
 -ifdef(TEST).
@@ -69,7 +69,7 @@ descends(Va, Vb) ->
         false ->
             false;
         {_, CtrA} ->
-            (CtrA >= CtrB) andalso descends(Va,RestB)
+            (CtrA >= CtrB) andalso descends(Va, RestB)
     end.
 
 -spec dominates(vclock(), vclock()) -> boolean().
@@ -105,25 +105,32 @@ merge([SingleVclock]) -> SingleVclock;
 merge([First|Rest])   -> merge(Rest, lists:keysort(1, First)).
 
 merge([], NClock) -> NClock;
-merge([AClock|VClocks],NClock) ->
+merge([AClock|VClocks], NClock) ->
     merge(VClocks, merge(lists:keysort(1, AClock), NClock, [])).
 
 merge([], [], AccClock) -> lists:reverse(AccClock);
 merge([], Left, AccClock) -> lists:reverse(AccClock, Left);
 merge(Left, [], AccClock) -> lists:reverse(AccClock, Left);
 merge(V=[{Node1, Ctr1}=NCT1|VClock],
-      N=[{Node2,Ctr2}=NCT2|NClock], AccClock) ->
-    if Node1 < Node2 ->
+      N=[{Node2, Ctr2}=NCT2|NClock], AccClock) ->
+    case compare(Node1, Node2) of
+        lt ->
             merge(VClock, N, [NCT1|AccClock]);
-       Node1 > Node2 ->
+        gt ->
             merge(V, NClock, [NCT2|AccClock]);
-       true ->
-            CT = if Ctr1 > Ctr2 -> Ctr1;
-                                   Ctr1 < Ctr2 -> Ctr2;
-                                   true        -> Ctr1
-                                end,
-            merge(VClock, NClock, [{Node1,CT}|AccClock])
+        eq ->
+            CT = case compare(Ctr1, Ctr2) of
+                lt ->
+                    Ctr2;
+                _ ->
+                    Ctr1
+            end,
+            merge(VClock, NClock, [{Node1, CT}|AccClock])
     end.
+
+compare(A, B) when A < B -> lt;
+compare(A, B) when A > B -> gt;
+compare(_, _) -> eq.
 
 % @doc Get the counter value in VClock set from Node.
 -spec get_counter(Node :: vclock_node(), VClock :: vclock()) -> counter().
@@ -137,13 +144,13 @@ get_counter(Node, VClock) ->
 -spec increment(Node :: vclock_node(),
                 VClock :: vclock()) -> vclock().
 increment(Node, VClock) ->
-    {Ctr,NewV} = case lists:keytake(Node, 1, VClock) of
+    {Ctr, NewV} = case lists:keytake(Node, 1, VClock) of
                                 false ->
                                     {1, VClock};
                                 {value, {_N, C}, ModV} ->
                                     {C + 1, ModV}
                             end,
-    [{Node,Ctr}|NewV].
+    [{Node, Ctr}|NewV].
 
 
 % @doc Return the list of all nodes that have ever incremented VClock.
@@ -153,7 +160,7 @@ all_nodes(VClock) ->
 
 % @doc Compares two VClocks for equality.
 -spec equal(VClockA :: vclock(), VClockB :: vclock()) -> boolean().
-equal(VA,VB) ->
+equal(VA, VB) ->
     lists:sort(VA) =:= lists:sort(VB).
 
 %% @doc sorts the vclock by actor
@@ -201,9 +208,9 @@ example_test() ->
     B = ?MODULE:fresh(),
     A1 = ?MODULE:increment(a, A),
     B1 = ?MODULE:increment(b, B),
-    true = ?MODULE:descends(A1,A),
-    true = ?MODULE:descends(B1,B),
-    false = ?MODULE:descends(A1,B1),
+    true = ?MODULE:descends(A1, A),
+    true = ?MODULE:descends(B1, B),
+    false = ?MODULE:descends(A1, B1),
     A2 = ?MODULE:increment(a, A1),
     C = ?MODULE:merge([A2, B1]),
     C1 = ?MODULE:increment(c, C),
@@ -214,39 +221,39 @@ example_test() ->
     ok.
 
 accessor_test() ->
-    VC = [{<<"1">>,  1},
-          {<<"2">>,  2}],
+    VC = [{<<"1">>, 1},
+          {<<"2">>, 2}],
     ?assertEqual(1, get_counter(<<"1">>, VC)),
     ?assertEqual(2, get_counter(<<"2">>, VC)),
     ?assertEqual(0, get_counter(<<"3">>, VC)),
     ?assertEqual([<<"1">>, <<"2">>], all_nodes(VC)).
 
 merge_test() ->
-    VC1 = [{<<"1">>,  1},
-           {<<"2">>,  2},
-           {<<"4">>,  4}],
-    VC2 = [{<<"3">>,  3},
-           {<<"4">>,  3}],
+    VC1 = [{<<"1">>, 1},
+           {<<"2">>, 2},
+           {<<"4">>, 4}],
+    VC2 = [{<<"3">>, 3},
+           {<<"4">>, 3}],
     ?assertEqual([], merge(?MODULE:fresh())),
-    ?assertEqual([{<<"1">>,1},{<<"2">>,2},{<<"3">>,3},{<<"4">>,4}],
+    ?assertEqual([{<<"1">>, 1}, {<<"2">>, 2}, {<<"3">>, 3}, {<<"4">>, 4}],
                  merge([VC1, VC2])).
 
 merge_less_left_test() ->
     VC1 = [{<<"5">>, 5}],
-    VC2 = [{<<"6">>,  6}, {<<"7">>,  7}],
-    ?assertEqual([{<<"5">>, 5},{<<"6">>, 6}, {<<"7">>, 7}],
+    VC2 = [{<<"6">>, 6}, {<<"7">>, 7}],
+    ?assertEqual([{<<"5">>, 5}, {<<"6">>, 6}, {<<"7">>, 7}],
                  ?MODULE:merge([VC1, VC2])).
 
 merge_less_right_test() ->
-    VC1 = [{<<"6">>, 6}, {<<"7">>,  7}],
+    VC1 = [{<<"6">>, 6}, {<<"7">>, 7}],
     VC2 = [{<<"5">>, 5}],
-    ?assertEqual([{<<"5">>, 5},{<<"6">>,  6}, {<<"7">>,  7}],
+    ?assertEqual([{<<"5">>, 5}, {<<"6">>, 6}, {<<"7">>, 7}],
                  ?MODULE:merge([VC1, VC2])).
 
 merge_same_id_test() ->
-    VC1 = [{<<"1">>, 1},{<<"2">>,1}],
-    VC2 = [{<<"1">>, 1},{<<"3">>,1}],
-    ?assertEqual([{<<"1">>, 1},{<<"2">>,1},{<<"3">>,1}],
+    VC1 = [{<<"1">>, 1}, {<<"2">>, 1}],
+    VC2 = [{<<"1">>, 1}, {<<"3">>, 1}],
+    ?assertEqual([{<<"1">>, 1}, {<<"2">>, 1}, {<<"3">>, 1}],
                  ?MODULE:merge([VC1, VC2])).
 
 -endif.

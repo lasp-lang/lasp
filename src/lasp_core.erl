@@ -378,75 +378,50 @@ bind(Id, Value, Store) ->
 
 %% @doc Define a dataflow variable to be bound a value.
 -spec bind(id(), value(), function(), store()) -> {ok, var()} | not_found().
-bind(Id, {delta, Value}, MetadataFun, Store) ->
+bind(Id, Value, MetadataFun, Store) ->
     Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
                       waiting_delta_threads=WDT, waiting_threads=WT,
                       delta_counter=Counter0, delta_map=DeltaMap0,
                       delta_ack_map=AckMap}=Object) ->
             Metadata = MetadataFun(Metadata0),
-            %% Merge may throw for invalid types.
-            try
-                Merged = lasp_type:merge(Type, Value0, Value),
-                case lasp_type:is_strict_inflation(Type, Value0, Merged) of
-                    true ->
-                        {ok, SW} = reply_to_all(WT, [],
-                                                {ok, {Id, Type, Metadata, Merged}}),
-                        %% Notify the delta
-                        {ok, SWD} = reply_to_all(WDT, [],
-                                                 {ok, {delta, {Id, Type, Metadata, Value}}}),
-                        DeltaMap = store_delta(Type, Counter0, Value, DeltaMap0),
-                        NewObject = #dv{type=Type, metadata=Metadata, value=Merged,
-                                        waiting_delta_threads=SWD, waiting_threads=SW,
-                                        delta_counter=increment_counter(Counter0),
-                                        delta_map=DeltaMap, delta_ack_map=AckMap},
-                        %% Return value is a delta state.
-                        {NewObject, {ok, {Id, Type, Metadata, {delta, Merged}}}};
-                    false ->
-                        %% Given delta state is already merged, no delta info update.
-                        {Object, {ok, {Id, Type, Metadata, {delta, Merged}}}}
-                end
-            catch
-                _:Reason ->
-                    %% Merge threw.
-                    _ = lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
-                                      [Type, Reason, Value0, Value]),
-                    {Object, {ok, {Id, Type, Metadata, Value0}}}
-            end
-    end,
-    do(update, [Store, Id, Mutator]);
-bind(Id, Value, MetadataFun, Store) ->
-    Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
-                      waiting_threads=WT, delta_counter=Counter,
-                      delta_map=DeltaMap, delta_ack_map=AckMap}=Object) ->
-            Metadata = MetadataFun(Metadata0),
             case Value0 of
                 Value ->
-                    %% Bind to current value.
                     {Object, {ok, {Id, Type, Metadata, Value}}};
                 _ ->
-                    %% Merge may throw for invalid types.
-                    try
-                        Merged = lasp_type:merge(Type, Value0, Value),
-                        case lasp_type:is_inflation(Type, Value0, Merged) of
-                            true ->
-                                {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
-                                NewObject = #dv{type=Type, metadata=Metadata,
-                                                value=Merged, waiting_threads=SW,
-                                                delta_counter=Counter,
-                                                delta_map=DeltaMap,
-                                                delta_ack_map=AckMap},
-                                {NewObject, {ok, {Id, Type, Metadata, Merged}}};
-                            false ->
-                                %% Value is old.
-                                {Object, {ok, {Id, Type, Metadata, Value0}}}
-                        end
-                    catch
-                        Error:Reason ->
-                            %% Merge threw.
-                            _ = lager:warning("~p; type: ~p, reason: ~p ~p => ~p",
-                                              [Error, Type, Reason, Value0, Value]),
-                            {Object, {ok, {Id, Type, Metadata, Value0}}}
+                %% Merge may throw for invalid types.
+                try
+                    Merged = lasp_type:merge(Type, Value0, Value),
+                    case lasp_type:is_strict_inflation(Type, Value0, Merged) of
+                        true ->
+                            {ok, SW} = reply_to_all(WT, [],
+                                                    {ok, {Id, Type, Metadata, Merged}}),
+
+                            {ok, SWD, Counter, DeltaMap} = case lasp_type:is_delta(Value) of
+                                true ->
+                                    {ok, SWD1} = reply_to_all(WDT, [],
+                                                              {ok, {Id, Type, Metadata, Value}}),
+                                    DeltaMap1 = store_delta(Type, Counter0, Value, DeltaMap0),
+                                    {ok, SWD1, increment_counter(Counter0), DeltaMap1};
+                                false ->
+                                    {ok, WDT, Counter0, DeltaMap0}
+                            end,
+                            NewObject = #dv{type=Type, metadata=Metadata, value=Merged,
+                                            waiting_delta_threads=SWD, waiting_threads=SW,
+                                            delta_counter=Counter,
+                                            delta_map=DeltaMap, delta_ack_map=AckMap},
+                            %% Return value is a delta state.
+                            {NewObject, {ok, {Id, Type, Metadata, Merged}}};
+                        false ->
+                            %% Given state is already merged, no update.
+                            {Object, {ok, {Id, Type, Metadata, Merged}}}
                     end
+                catch
+                    _:Reason ->
+                        %% Merge threw.
+                        _ = lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
+                                          [Type, Reason, Value0, Value]),
+                        {Object, {ok, {Id, Type, Metadata, Value0}}}
+                end
             end
     end,
     do(update, [Store, Id, Mutator]).
@@ -882,20 +857,21 @@ reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
             StillWaiting0 ++ [H]
     end,
     reply_to_all(T, SW, Result);
-reply_to_all([{delta, From}|T], StillWaiting, {ok, {delta, Value}}=Result) ->
-    case From of
-        {server, undefined, {Address, Ref}} ->
-            gen_server:reply({Address, Ref}, {ok, {delta, Value}});
-        {fsm, undefined, Address} ->
-            gen_fsm:send_event(Address,
-                               {ok, undefined, {delta, Value}});
-        {Address, Ref} ->
-            gen_server:reply({Address, Ref}, {ok, {delta, Value}});
-        _ ->
-            From ! Result
-    end,
-    %% After notifying, no need to keep the information.
-    reply_to_all(T, StillWaiting, Result);
+%% @todo
+%reply_to_all([{delta, From}|T], StillWaiting, {ok, {delta, Value}}=Result) ->
+%    case From of
+%        {server, undefined, {Address, Ref}} ->
+%            gen_server:reply({Address, Ref}, {ok, {delta, Value}});
+%        {fsm, undefined, Address} ->
+%            gen_fsm:send_event(Address,
+%                               {ok, undefined, {delta, Value}});
+%        {Address, Ref} ->
+%            gen_server:reply({Address, Ref}, {ok, {delta, Value}});
+%        _ ->
+%            From ! Result
+%    end,
+%    %% After notifying, no need to keep the information.
+%    reply_to_all(T, StillWaiting, Result);
 reply_to_all([From|T], StillWaiting, Result) ->
     case From of
         {server, undefined, {Address, Ref}} ->

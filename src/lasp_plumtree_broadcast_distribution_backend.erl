@@ -883,7 +883,7 @@ collect_deltas(Type, DeltaMap, Min0, Max) ->
     Deltas = orddict:fold(fun(_Counter, Delta, Deltas0) ->
                                   lasp_type:merge(Type, Deltas0, Delta)
                           end, lasp_type:new(Type), SmallDeltaMap),
-    {delta, Deltas}.
+    Deltas.
 
 %% @private
 declare_if_not_found({error, not_found}, {StorageId, TypeId},

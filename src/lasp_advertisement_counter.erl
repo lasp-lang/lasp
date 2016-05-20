@@ -306,7 +306,7 @@ synchronize(Instrumentation, SetType, AdsWithContractsId, AdsWithContracts0, Cou
                                       %% Log transmission of the local delta.
                                       log_transmission(Instrumentation, Delta),
 
-                                      {ok, {_, _, _, Counter1}} = lasp:bind(Ad, {delta, Delta}),
+                                      {ok, {_, _, _, Counter1}} = lasp:bind(Ad, Delta),
 
                                       %% Log receipt of information from the server.
                                       log_transmission(Instrumentation, Counter1),
@@ -417,7 +417,7 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
             MergedCounter = CounterType:merge(CounterDelta0, Counter0),
 
             %% Generate delta for current operation from new state.
-            {ok, {delta, Delta}} = lasp_type:update(CounterType, increment, Id, MergedCounter),
+            {ok, Delta} = lasp_type:update(CounterType, increment, Id, MergedCounter),
 
             %% Merge new delta with old delta and store in interval
             %% dictionary for next synchronization interval.

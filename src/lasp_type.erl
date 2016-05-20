@@ -27,18 +27,20 @@
          update/4,
          merge/3,
          threshold_met/3,
+         is_delta/1,
          is_inflation/3,
          is_strict_inflation/3,
          query/2]).
 
-current_types() ->
-    Map0 = orddict:new(),
-    Map1 = orddict:store(gcounter, {gcounter, undefined}, Map0),
-    Map2 = orddict:store(gset, {gset, undefined}, Map1),
-    Map3 = orddict:store(ivar, {ivar, undefined}, Map2),
-    Map4 = orddict:store(orset, {orset, undefined}, Map3),
-    Map5 = orddict:store(pair, {pair, undefined}, Map4),
-    orddict:store(pncounter, {pncounter, undefined}, Map5).
+types() ->
+    [
+        {gcounter, {gcounter, undefined}},
+        {gset, {gset, undefined}},
+        {ivar, {ivar, undefined}},
+        {orset, {orset, undefined}},
+        {pair, {pair, undefined}},
+        {pncounter, {pncounter, undefined}}
+    ].
 
 get_mode() -> 
     lasp_config:get(mode, state_based).
@@ -47,7 +49,7 @@ get_type(T) ->
     get_type(T, get_mode()).
 
 get_type(T, Mode) ->
-    {ok, {StateType, PureOpType}} = orddict:find(T, current_types()),
+    {ok, {StateType, PureOpType}} = orddict:find(T, types()),
     case Mode of
         delta_based ->
             StateType;
@@ -61,6 +63,11 @@ remove_args({T, _Args}) ->
     T;
 remove_args(T) -> 
     T.
+
+is_delta({_Type, {delta, _CRDT}}) ->
+    true;
+is_delta(_) ->
+    false.
 
 %% @doc Is strict inflation?
 is_strict_inflation(Type, Previous, Current) ->

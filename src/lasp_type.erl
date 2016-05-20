@@ -42,10 +42,10 @@ types() ->
         {pncounter, {pncounter, undefined}}
     ].
 
-get_mode() -> 
+get_mode() ->
     lasp_config:get(mode, state_based).
 
-get_type(T) -> 
+get_type(T) ->
     get_type(T, get_mode()).
 
 get_type(T, Mode) ->
@@ -59,9 +59,9 @@ get_type(T, Mode) ->
             PureOpType
     end.
 
-remove_args({T, _Args}) -> 
+remove_args({T, _Args}) ->
     T;
-remove_args(T) -> 
+remove_args(T) ->
     T.
 
 is_delta({_Type, {delta, _CRDT}}) ->

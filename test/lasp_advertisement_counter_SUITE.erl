@@ -87,15 +87,15 @@ setup_test(_Config) ->
 minimal_test(Config) ->
     Nodes = proplists:get_value(nodes, Config),
     {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
-                                  [Nodes, false, lasp_orset, lasp_gcounter, 100, 100, 10]),
+                                  [Nodes, state_based, orset, gcounter, 100, 100, 10]),
     ok.
 
 minimal_delta_test(Config) ->
     Nodes = proplists:get_value(nodes, Config),
     %% Set the delta_mode to true for all nodes.
     lists:foreach(fun(Node) ->
-                        ok = rpc:call(Node, lasp_config, set, [delta_mode, true])
+                        ok = rpc:call(Node, lasp_config, set, [mode, delta_based])
                   end, Nodes),
     {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
-                                  [Nodes, true, lasp_orset, lasp_gcounter, 100, 100, 10]),
+                                  [Nodes, delta_based, orset, gcounter, 100, 100, 10]),
     ok.

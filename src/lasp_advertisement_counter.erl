@@ -76,9 +76,9 @@ run(Args) ->
 
 %% @doc Setup lists of advertisements and lists of contracts for
 %%      advertisements.
-init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
+init([Nodes, Mode, SetType, CounterType, NumEvents, NumClients, SyncInterval]) ->
     %% Enable or disable deltas.
-    ok = lasp_config:set(delta_mode, Deltas),
+    ok = lasp_config:set(mode, Mode),
 
     %% Get the process identifier of the runner.
     Runner = self(),
@@ -117,7 +117,7 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
 
     %% Initialize divergence transmission instrumentation.
     DivergenceFilename = string:join(["divergence",
-                                      atom_to_list(Deltas),
+                                      atom_to_list(Mode),
                                       atom_to_list(SetType),
                                       atom_to_list(CounterType),
                                       integer_to_list(NumEvents),
@@ -127,7 +127,7 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
 
     %% Initialize client transmission instrumentation.
     ClientFilename = string:join(["state-client",
-                                  atom_to_list(Deltas),
+                                  atom_to_list(Mode),
                                   atom_to_list(SetType),
                                   atom_to_list(CounterType),
                                   integer_to_list(NumEvents),
@@ -137,7 +137,7 @@ init([Nodes, Deltas, SetType, CounterType, NumEvents, NumClients, SyncInterval])
 
     %% Initialize server transmission instrumentation.
     ServerFilename = string:join(["state-server",
-                                  atom_to_list(Deltas),
+                                  atom_to_list(Mode),
                                   atom_to_list(SetType),
                                   atom_to_list(CounterType),
                                   integer_to_list(NumEvents),
@@ -231,7 +231,7 @@ server({#ad{counter=Counter}=Ad, _}, Ads) ->
     {ok, _} = lasp:read(Counter, {value, ?MAX_IMPRESSIONS}),
 
     %% Remove the advertisement.
-    {ok, _} = lasp:update(Ads, {remove, Ad}, node()).
+    {ok, _} = lasp:update(Ads, {rmv, Ad}, node()).
 
 %% @doc Generate advertisements and advertisement contracts.
 create_advertisements_and_contracts(Counter, Ads, Contracts) ->
@@ -270,7 +270,7 @@ synchronize(Instrumentation, SetType, AdsWithContractsId, AdsWithContracts0, Cou
     {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
     %% Log state received from the server.
     log_transmission(Instrumentation, AdsWithContracts),
-    AdList = lasp_type:value(SetType, AdsWithContracts),
+    AdList = lasp_type:query(SetType, AdsWithContracts),
     Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
     %% Refresh our dictionary with any new values from the server.
@@ -299,14 +299,14 @@ synchronize(Instrumentation, SetType, AdsWithContractsId, AdsWithContracts0, Cou
     %%     state, prune it by identifier.
     %%
     SyncFun = fun(Ad, Counter0, Acc) ->
-                      Counter = case lasp_config:get(delta_mode, false) of
-                          true ->
+                      Counter = case lasp_config:get(mode, state_based) of
+                          delta_based ->
                               case dict:find(Ad, CountersDelta0) of
                                   {ok, Delta} ->
                                       %% Log transmission of the local delta.
                                       log_transmission(Instrumentation, Delta),
 
-                                      {ok, {_, _, _, Counter1}} = lasp:bind(Ad, {delta, Delta}),
+                                      {ok, {_, _, _, Counter1}} = lasp:bind(Ad, Delta),
 
                                       %% Log receipt of information from the server.
                                       log_transmission(Instrumentation, Counter1),
@@ -317,7 +317,7 @@ synchronize(Instrumentation, SetType, AdsWithContractsId, AdsWithContracts0, Cou
                                       %% Transmit nothing.
                                       Counter0
                               end;
-                          false ->
+                          state_based ->
                               %% Log transmission of the local delta (or state).
                               log_transmission(Instrumentation, Counter0),
 
@@ -348,7 +348,7 @@ servers(SetType, Ads, AdsWithContracts) ->
 
     %% Get the current advertisement list.
     {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
-    AdList = lasp_type:value(SetType, AdList0),
+    AdList = lasp_type:query(SetType, AdList0),
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.
@@ -398,8 +398,8 @@ view_ad(CounterType, Id, Counters0, CountersDelta0) ->
 
 %% @private
 view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
-    case application:get_env(?APP, delta_mode, false) of
-        true ->
+    case lasp_config:get(mode, state_based) of
+        delta_based ->
             %% If deltas are enabled, then we maintain two pieces of
             %% state: a.) local dictionary of state, and b.) local
             %% dictionary of delta intervals waiting to be transmitted
@@ -417,24 +417,25 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
             MergedCounter = CounterType:merge(CounterDelta0, Counter0),
 
             %% Generate delta for current operation from new state.
-            {ok, {delta, Delta}} = CounterType:update_delta(increment, Id, MergedCounter),
+            {ok, Delta} = lasp_type:update(CounterType, increment, Id, MergedCounter),
+
             %% Merge new delta with old delta and store in interval
             %% dictionary for next synchronization interval.
-            CounterDelta = CounterType:merge(Delta, CounterDelta0),
+            CounterDelta = lasp_type:merge(CounterType, Delta, CounterDelta0),
 
             %% Merge new delta into old state and store in the state
             %% dictionary.
-            Counter = CounterType:merge(MergedCounter, CounterDelta),
+            Counter = lasp_type:merge(CounterType, MergedCounter, CounterDelta),
 
             %% At this point we should have a new delta interval
             %% computed and a new state, so update dictionaries
             %% accordingly.
             {ok, {dict:store(Ad, Counter, Counters0),
                   dict:store(Ad, CounterDelta, CountersDelta0)}};
-        false ->
+        state_based ->
             %% If deltas are disabled, then just create a new copy of
             %% the object and store it in the local nodes dictionary.
-            {ok, Counter} = CounterType:update(increment, Id, Counter0),
+            {ok, Counter} = lasp_type:update(CounterType, increment, Id, Counter0),
             {ok, {dict:store(Ad, Counter, Counters0), CountersDelta0}}
     end.
 

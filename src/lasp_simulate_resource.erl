@@ -34,8 +34,8 @@
 -define(NUM_EVENTS, 200000).
 -define(NUM_CLIENTS_PER_VM, 1).
 
--define(ORSET, lasp_orset).
--define(COUNTER, lasp_gcounter).
+-define(ORSET, orset).
+-define(COUNTER, gcounter).
 
 -spec init(list()) -> {ok, term()}.
 init(_) ->
@@ -110,7 +110,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
     {ok, [DivergenceFilename1,
           ClientFilename1|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
-                                                     false,
+                                                     state_based,
                                                      ?ORSET,
                                                      ?COUNTER,
                                                      ?NUM_EVENTS,
@@ -122,7 +122,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
     {ok, [_,
           ClientFilename2|_]} = lasp_simulation:run(lasp_advertisement_counter,
                                                     [Nodes,
-                                                     true,
+                                                     delta_based,
                                                      ?ORSET,
                                                      ?COUNTER,
                                                      ?NUM_EVENTS,
@@ -133,7 +133,7 @@ advertisement_counter_transmission_simulation(Nodes) ->
     {ok, [DivergenceFilename2
           |_]} = lasp_simulation:run(lasp_advertisement_counter,
                                     [Nodes,
-                                     false,
+                                     state_based,
                                      ?ORSET,
                                      ?COUNTER,
                                      ?NUM_EVENTS,

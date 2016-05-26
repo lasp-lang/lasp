@@ -204,7 +204,7 @@ map_test(_Config) ->
     %% Read resulting value.
     {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
 
-    ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6,8,10,12]},
+    ?assertEqual({ok, sets:from_list([1,2,3,4,5,6]), sets:from_list([2,4,6,8,10,12])},
                  {ok, lasp_type:query(?SET, S1V4), lasp_type:query(?SET, S2V1)}),
 
     ok.
@@ -238,7 +238,7 @@ filter_test(_Config) ->
     %% Read resulting value.
     {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
 
-    ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6]},
+    ?assertEqual({ok, sets:from_list([1,2,3,4,5,6]), sets:from_list([2,4,6])},
                  {ok, lasp_type:query(?SET, S1V4), lasp_type:query(?SET, S2V1)}),
 
     ok.
@@ -311,7 +311,7 @@ union_test(_Config) ->
     %% Read union value.
     Union = lasp_type:query(?SET, Union0),
 
-    ?assertEqual({ok, [1,2,3,a,b,c]}, {ok, Union}),
+    ?assertEqual({ok, sets:from_list([1,2,3,a,b,c])}, {ok, Union}),
 
     ok.
 
@@ -340,7 +340,7 @@ intersection_test(_Config) ->
     %% Read intersection value.
     Intersection = lasp_type:query(?SET, Intersection0),
 
-    ?assertEqual({ok, [3]}, {ok, Intersection}),
+    ?assertEqual({ok, sets:from_list([3])}, {ok, Intersection}),
 
     ok.
 
@@ -369,7 +369,7 @@ product_test(_Config) ->
     %% Read product value.
     Product = lasp_type:query(?SET, Product0),
 
-    ?assertEqual({ok,[{1,3},{1,a},{1,b},{2,3},{2,a},{2,b},{3,3},{3,a},{3,b}]}, {ok, Product}),
+    ?assertEqual({ok,sets:from_list([{1,3},{1,a},{1,b},{2,3},{2,a},{2,b},{3,3},{3,a},{3,b}])}, {ok, Product}),
 
     ok.
 
@@ -417,7 +417,8 @@ monotonic_read_test(_Config) ->
             lasp_type:query(?SET, Y)
     end,
 
-    ?assertMatch({[1,2,3], [1,2,3,4,5]}, {Set1, Set2}),
+    ?assertEqual({sets:from_list([1,2,3]), sets:from_list([1,2,3,4,5])},
+                 {Set1, Set2}),
 
     ok.
 
@@ -435,11 +436,13 @@ dynamic_ivar_test(Config) ->
 
     %% Bind node 1's name to the value on node 1: this should not
     %% trigger a broadcast message because the variable is dynamic.
-    {ok, {Id, _, _, {ivar, Node1}}} = rpc:call(Node1, lasp, bind, [{?ID, ivar}, {ivar, Node1}]),
+    ?assertMatch({ok, {Id, _, _, {_, Node1}}},
+                 rpc:call(Node1, lasp, bind, [{?ID, ivar}, {state_ivar, Node1}])),
 
     %% Bind node 2's name to the value on node 2: this should not
     %% trigger a broadcast message because the variable is dynamic.
-    {ok, {Id, _, _, {ivar, Node2}}} = rpc:call(Node2, lasp, bind, [{?ID, ivar}, {ivar, Node2}]),
+    ?assertMatch({ok, {Id, _, _, {_, Node2}}},
+                 rpc:call(Node2, lasp, bind, [{?ID, ivar}, {state_ivar, Node2}])),
 
     %% Verify variable has the correct value.
     {ok, Node1} = rpc:call(Node1, lasp, query, [{?ID, ivar}]),

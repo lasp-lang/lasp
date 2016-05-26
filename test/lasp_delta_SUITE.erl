@@ -125,7 +125,7 @@ normal_map_test(Config) ->
 
     %% Read resulting value.
     {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
-    ?assertEqual(lists:map(Function, lists:seq(1, ?MAX_INPUT)), lasp_type:query(?SET, S2V1)),
+    ?assertEqual(sets:from_list(lists:map(Function, lists:seq(1, ?MAX_INPUT))), lasp_type:query(?SET, S2V1)),
 
     %% Bind again.
     ?assertMatch({ok, _}, lasp:update(S1, {add_all, [?MAX_INPUT + 1,?MAX_INPUT + 2]}, a)),
@@ -133,7 +133,7 @@ normal_map_test(Config) ->
     %% Read resulting value.
     {Time, {ok, {_, _, _, S2V2}}} = timer:tc(lasp, read, [S2, {strict, S2V1}]),
 
-    ?assertEqual(lists:seq(2, ?MAX_INPUT * 2 + 4, 2), lasp_type:query(?SET, S2V2)),
+    ?assertEqual(sets:from_list(lists:seq(2, ?MAX_INPUT * 2 + 4, 2)), lasp_type:query(?SET, S2V2)),
     lager:info("Time without incremental computation: ~p", [Time]),
 
     ok.

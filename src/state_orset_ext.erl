@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(orset_ext).
+-module(state_orset_ext).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -export([intersect/2,
@@ -28,49 +28,49 @@
          filter/2]).
 
 union(LValue, RValue) ->
-    orset:merge(LValue, RValue).
+    state_orset:merge(LValue, RValue).
 
-product({orset, LValue}, {orset, RValue}) ->
-    FolderFun = fun({X, XCausality}, {orset, Acc}) ->
-        {orset, Acc ++ [{{X, Y}, causal_product(XCausality, YCausality)} || {Y, YCausality} <- RValue]}
+product({state_orset, LValue}, {state_orset, RValue}) ->
+    FolderFun = fun({X, XCausality}, {state_orset, Acc}) ->
+        {state_orset, Acc ++ [{{X, Y}, causal_product(XCausality, YCausality)} || {Y, YCausality} <- RValue]}
     end,
     lists:foldl(FolderFun, new(), LValue).
 
-intersect({orset, LValue}, RValue) ->
+intersect({state_orset, LValue}, RValue) ->
     lists:foldl(intersect_folder(RValue), new(), LValue).
 
 %% @private
-intersect_folder({orset, RValue}) ->
-    fun({X, XCausality}, {orset, Acc}) ->
+intersect_folder({state_orset, RValue}) ->
+    fun({X, XCausality}, {state_orset, Acc}) ->
             Values = case lists:keyfind(X, 1, RValue) of
                          {_Y, YCausality} ->
                              [{X, causal_union(XCausality, YCausality)}];
                          false ->
                              []
                      end,
-            {orset, Acc ++ Values}
+            {state_orset, Acc ++ Values}
     end.
 
-map(Function, {orset, V}) ->
-    FolderFun = fun({X, Causality}, {orset, Acc}) ->
-                        {orset, Acc ++ [{Function(X), Causality}]}
+map(Function, {state_orset, V}) ->
+    FolderFun = fun({X, Causality}, {state_orset, Acc}) ->
+                        {state_orset, Acc ++ [{Function(X), Causality}]}
                 end,
     lists:foldl(FolderFun, new(), V).
 
-filter(Function, {orset, V}) ->
-    FolderFun = fun({X, Causality}, {orset, Acc}) ->
+filter(Function, {state_orset, V}) ->
+    FolderFun = fun({X, Causality}, {state_orset, Acc}) ->
                         case Function(X) of
                             true ->
-                                {orset, Acc ++ [{X, Causality}]};
+                                {state_orset, Acc ++ [{X, Causality}]};
                             false ->
-                                {orset, Acc}
+                                {state_orset, Acc}
                         end
                 end,
     lists:foldl(FolderFun, new(), V).
 
 %% @private
 new() ->
-    orset:new().
+    state_orset:new().
 
 %% @private
 causal_product(Xs, Ys) ->

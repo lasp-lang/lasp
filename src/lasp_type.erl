@@ -34,12 +34,12 @@
 
 types() ->
     [
-        {gcounter, {gcounter, undefined}},
-        {gset, {gset, undefined}},
-        {ivar, {ivar, undefined}},
-        {orset, {orset, undefined}},
-        {pair, {pair, undefined}},
-        {pncounter, {pncounter, undefined}}
+        {gcounter, {state_gcounter, undefined}},
+        {gset, {state_gset, undefined}},
+        {ivar, {state_ivar, undefined}},
+        {orset, {state_orset, undefined}},
+        {pair, {state_pair, undefined}},
+        {pncounter, {state_pncounter, undefined}}
     ].
 
 get_mode() ->

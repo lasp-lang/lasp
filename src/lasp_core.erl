@@ -613,17 +613,14 @@ fold_internal(orset, Value, Function, AccType, AccValue) ->
 -spec product(id(), id(), id(), store(), function(), function(),
               function()) -> {ok, pid()}.
 product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, T, _, LValue}, {_, _, _, RValue}) ->
+    Fun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
             case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    AccValue = case T of
-                        orset ->
-                            orset_ext:product(LValue, RValue)
-                    end,
+                    AccValue = state_orset_ext:product(LValue, RValue),
                     {ok, _} = BindFun(AccId, AccValue, Store)
             end
     end,
@@ -642,17 +639,14 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec intersection(id(), id(), id(), store(), function(), function(),
                    function()) -> {ok, pid()}.
 intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, T, _, LValue}, {_, _, _, RValue}) ->
+    Fun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
             case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    AccValue = case T of
-                                   orset ->
-                                       orset_ext:intersect(LValue, RValue)
-                               end,
+                    AccValue = state_orset_ext:intersect(LValue, RValue),
                     {ok, _} = BindFun(AccId, AccValue, Store)
             end
     end,
@@ -671,17 +665,14 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec union(id(), id(), id(), store(), function(), function(),
             function()) -> {ok, pid()}.
 union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, T, _, LValue}, {_, _, _, RValue}) ->
+    Fun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
         case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    AccValue = case T of
-                        orset ->
-                            orset_ext:union(LValue, RValue)
-                    end,
+                    AccValue = state_orset_ext:union(LValue, RValue),
                     {ok, _} = BindFun(AccId, AccValue, Store)
             end
     end,
@@ -701,19 +692,13 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec map(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun({_, T, _, V}) ->
-                  AccValue = case T of
-                                 orset ->
-                                     orset_ext:map(Function, V)
-                             end,
+    Fun = fun({_, _, _, V}) ->
+                  AccValue = state_orset_ext:map(Function, V),
                   {ok, _} = BindFun(AccId, AccValue, Store);
              %% A delta of the input will be transformed into a delta of the output
              %% and the delta of the output will be binded to the output.
-             ({delta, {_, T, _, V}}) ->
-                  AccValue = case T of
-                                 orset ->
-                                     orset_ext:map(Function, V)
-                             end,
+             ({delta, {_, _, _, V}}) ->
+                  AccValue = state_orset_ext:map(Function, V),
                   {ok, _} = BindFun(AccId, {delta, AccValue}, Store)
           end,
     lasp_process:start_link([[{Id, ReadFun}], Fun]).
@@ -731,11 +716,8 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 -spec filter(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun({_, T, _, V}) ->
-            AccValue = case T of
-                orset ->
-                               orset_ext:filter(Function, V)
-            end,
+    Fun = fun({_, _, _, V}) ->
+            AccValue = state_orset_ext:filter(Function, V),
             {ok, _} = BindFun(AccId, AccValue, Store)
     end,
     lasp_process:start_link([[{Id, ReadFun}], Fun]).

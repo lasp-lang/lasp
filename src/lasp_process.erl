@@ -28,7 +28,7 @@
 -endif.
 
 %% API
--export([start_link/1]).
+-export([start_link/1, start_dag_link/3]).
 
 %% Callbacks
 -export([init/1, read/1, process/2]).
@@ -46,13 +46,21 @@
 start_link(Args) ->
     lasp_process_sup:start_child(Args).
 
+start_dag_link(ReadFuns, TransFun, WriteFun) ->
+    %% @todo, register in dag
+    lasp_process_sup:start_child([ReadFuns, TransFun, WriteFun]).
+
 %%%===================================================================
 %%% Callbacks
 %%%===================================================================
 
 %% @doc Initialize state.
 init([ReadFuns, Function]) ->
-    {ok, #state{read_funs=ReadFuns, function=Function}}.
+    {ok, #state{read_funs=ReadFuns, function=Function}};
+
+init([ReadFuns, TransFun, WriteFun]) ->
+    %% @todo: Add new fields to state
+    {ok, #state{read_funs=ReadFuns, function={TransFun, WriteFun}}}.
 
 %% @doc Return list of read functions.
 read(#state{read_funs=ReadFuns0}=State) ->
@@ -65,9 +73,19 @@ process(Args, #state{function=Function}=State) ->
         true ->
             ok;
         false ->
-            erlang:apply(Function, Args)
+            %% @todo: change this once state is changed
+            case Function of
+                {TransFun, {AccId, WriteFun}} ->
+                    BindFun = gen_write_fun(AccId, WriteFun),
+                    BindFun(erlang:apply(TransFun, Args));
+                _ -> erlang:apply(Function, Args)
+            end
     end,
     {ok, State}.
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
 
 %% @doc Generate ReadFun.
 gen_read_fun(Id, ReadFun) ->
@@ -85,3 +103,9 @@ gen_read_fun(Id, ReadFun) ->
                         exit({lasp_process, not_found})
                 end
         end.
+
+%% @doc Generate WriteFun.
+gen_write_fun(Id, WriteFun) ->
+    fun(Value) ->
+        WriteFun(Id, Value)
+    end.

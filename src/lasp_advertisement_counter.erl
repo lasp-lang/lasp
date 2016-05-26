@@ -268,9 +268,10 @@ create_advertisements_and_contracts(Counter, Ads, Contracts) ->
 synchronize(Instrumentation, SetType, AdsWithContractsId, AdsWithContracts0, Counters0, CountersDelta0) ->
     %% Get latest list of advertisements from the server.
     {ok, {_, _, _, AdsWithContracts}} = lasp:read(AdsWithContractsId, AdsWithContracts0),
+
     %% Log state received from the server.
     log_transmission(Instrumentation, AdsWithContracts),
-    AdList = lasp_type:query(SetType, AdsWithContracts),
+    AdList = sets:to_list(lasp_type:query(SetType, AdsWithContracts)),
     Identifiers = [Id || {#ad{counter=Id}, _} <- AdList],
 
     %% Refresh our dictionary with any new values from the server.
@@ -348,7 +349,7 @@ servers(SetType, Ads, AdsWithContracts) ->
 
     %% Get the current advertisement list.
     {ok, {_, _, _, AdList0}} = lasp:read(AdsWithContracts, {strict, undefined}),
-    AdList = lasp_type:query(SetType, AdList0),
+    AdList = sets:to_list(lasp_type:query(SetType, AdList0)),
 
     %% For each advertisement, launch one server for tracking it's
     %% impressions and wait to disable.

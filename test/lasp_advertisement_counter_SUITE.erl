@@ -72,9 +72,9 @@ end_per_testcase(Case, Config) ->
 
 all() ->
     [
-        setup_test,
-        minimal_test,
-        minimal_delta_test
+        % setup_test,
+        % minimal_test,
+        % minimal_delta_test
     ].
 
 %% ===================================================================

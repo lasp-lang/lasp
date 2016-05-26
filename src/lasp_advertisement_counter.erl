@@ -412,9 +412,9 @@ view_ad(CounterType, Id, Counters0, CountersDelta0, Ad, Counter0) ->
                            {ok, PreviousDelta} ->
                                PreviousDelta;
                            error ->
-                               CounterType:new()
+                               lasp_type:new(CounterType)
                        end,
-            MergedCounter = CounterType:merge(CounterDelta0, Counter0),
+            MergedCounter = lasp_type:merge(CounterType, CounterDelta0, Counter0),
 
             %% Generate delta for current operation from new state.
             {ok, Delta} = lasp_type:update(CounterType, increment, Id, MergedCounter),

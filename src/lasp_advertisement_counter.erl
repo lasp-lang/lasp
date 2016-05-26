@@ -162,7 +162,7 @@ init([Nodes, Mode, SetType, CounterType, NumEvents, NumClients, SyncInterval]) -
                }}.
 
 %% @doc Launch a series of client processes, each of which is responsible
-%% for displaying a particular advertisement.
+%%      for displaying a particular advertisement.
 clients(#state{runner=Runner, nodes=Nodes, num_clients=NumClients,
                instrumentation=Instrumentation, set_type=SetType,
                counter_type=CounterType, sync_interval=SyncInterval,

@@ -605,7 +605,7 @@ handle_call({intersection, Left, Right, Intersection},
 
 %% Spawn a process to compute the union.
 handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?BIND, ?READ,
+    {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?WRITE, ?READ,
                              ?READ),
     {reply, ok, State};
 

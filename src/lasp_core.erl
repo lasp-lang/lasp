@@ -150,7 +150,7 @@ union(Left, Right, Union, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read(_Right, _Threshold, _Variables)
     end,
-    union(Left, Right, Union, Store, ?BIND, ReadLeftFun, ReadRightFun).
+    union(Left, Right, Union, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -671,19 +671,18 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec union(id(), id(), id(), store(), function(), function(),
             function()) -> {ok, pid()}.
 union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
+    TransFun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
         case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    AccValue = state_orset_ext:union(LValue, RValue),
-                    {ok, _} = BindFun(AccId, AccValue, Store)
+                    state_orset_ext:union(LValue, RValue)
             end
     end,
-    lasp_process:start_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
-                             Fun]).
+    lasp_process:start_dag_link([{Left, ReadLeftFun}, {Right, ReadRightFun}],
+                                TransFun, {AccId, BindFun(Store)}).
 
 %% @doc Lap values from one lattice into another.
 %%

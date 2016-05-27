@@ -165,7 +165,7 @@ product(Left, Right, Product, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read(_Right, _Threshold, _Variables)
     end,
-    product(Left, Right, Product, Store, ?BIND, ReadLeftFun, ReadRightFun).
+    product(Left, Right, Product, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Perform a read for a particular identifier.
 %%
@@ -619,19 +619,18 @@ fold_internal(orset, Value, Function, AccType, AccValue) ->
 -spec product(id(), id(), id(), store(), function(), function(),
               function()) -> {ok, pid()}.
 product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
+    TransFun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
             case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    AccValue = state_orset_ext:product(LValue, RValue),
-                    {ok, _} = BindFun(AccId, AccValue, Store)
+                    state_orset_ext:product(LValue, RValue)
             end
     end,
-    lasp_process:start_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
-                            Fun]).
+    lasp_process:start_dag_link([{Left, ReadLeftFun}, {Right, ReadRightFun}],
+                                TransFun, {AccId, BindFun(Store)}).
 
 %% @doc Compute the intersection of two sets.
 %%

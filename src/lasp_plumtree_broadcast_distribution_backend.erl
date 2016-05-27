@@ -591,7 +591,7 @@ handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
 handle_call({product, Left, Right, Product},
             _From,
             #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?BIND,
+    {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?WRITE,
                                ?READ, ?READ),
     {reply, ok, State};
 

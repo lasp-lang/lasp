@@ -77,6 +77,12 @@
                 ?MODULE:bind(_AccId, AccValue, _Store)
               end).
 
+-define(WRITE, fun(_Store) ->
+                 fun(_AccId, _AccValue) ->
+                   {ok, _} = ?MODULE:bind(_AccId, _AccValue, _Store)
+                 end
+               end).
+
 -define(READ, fun(_Id, _Threshold) ->
                 ?MODULE:read(_Id, _Threshold, Store)
               end).

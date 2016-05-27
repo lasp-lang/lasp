@@ -89,6 +89,12 @@
                 ?CORE:bind(_AccId, _AccValue, _Store)
               end).
 
+-define(WRITE, fun(_Store) ->
+                 fun(_AccId, _AccValue) ->
+                   {ok, _} = ?CORE:bind(_AccId, _AccValue, _Store)
+                 end
+               end).
+
 -define(READ, fun(_Id, _Threshold) ->
                 ?CORE:read(_Id, _Threshold, Store)
               end).

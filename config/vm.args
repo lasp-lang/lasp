@@ -9,3 +9,6 @@
 
 ## Enable multi_time_warp
 +C multi_time_warp
+
+## Hidden nodes
+-hidden

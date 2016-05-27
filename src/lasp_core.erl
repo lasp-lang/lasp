@@ -737,10 +737,11 @@ stream(Id, Function, Store) ->
 %%      stream can result in observable nondeterminism.
 %%
 stream(Id, Function, _Store, ReadFun) ->
-    Fun = fun({_, T, _, V}) ->
-            Function(lasp_type:query(T, V))
+    TransFun = fun({_, T, _, V}) ->
+        Function(lasp_type:query(T, V))
     end,
-    lasp_process:start_link([[{Id, ReadFun}], Fun]).
+    WriteFun = fun(_, X) -> X end,
+    lasp_process:start_dag_link([{Id, ReadFun}], TransFun, {undefined, WriteFun}).
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
 %%      change the reply and blocking replies.

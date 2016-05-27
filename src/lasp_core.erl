@@ -573,6 +573,8 @@ bind_to(AccId, Id, Store, BindFun, ReadFun) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
+%%      @todo track in dag
+%%
 -spec fold(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 fold(Id, Function, AccId, Store, BindFun, ReadFun) ->

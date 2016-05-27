@@ -111,7 +111,7 @@ handle_call({is_loop, From, To}, _From, #state{dag=Dag}=State) ->
 
 %% @doc For all V in Src, create an edge from V to Dst labelled with Pid.
 handle_call({add_edges, Src, Dst, Pid}, _From, #state{dag=Dag}=State) ->
-    %% @todo: Add metadata and duplicate checking.
+    %% @todo Add metadata and duplicate checking.
     Status = [digraph:add_edge(Dag, V, Dst, Pid) || V <- Src],
     R = case lists:any(fun is_graph_error/1, Status) of
         false -> ok;

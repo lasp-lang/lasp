@@ -74,7 +74,7 @@ init([ReadFuns, Function]) ->
     {ok, #state{read_funs=ReadFuns, function=Function}};
 
 init([ReadFuns, TransFun, WriteFun]) ->
-    %% @todo: Add new fields to state
+    %% @todo Add new fields to state
     {ok, #state{read_funs=ReadFuns, function={TransFun, WriteFun}}}.
 
 %% @doc Return list of read functions.
@@ -88,7 +88,7 @@ process(Args, #state{function=Function}=State) ->
         true ->
             ok;
         false ->
-            %% @todo: change this once state is changed
+            %% @todo change this once state is changed
             case Function of
                 {TransFun, {AccId, WriteFun}} ->
                     BindFun = gen_write_fun(AccId, WriteFun),

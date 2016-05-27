@@ -12,3 +12,6 @@
 
 ## Hidden nodes
 -hidden
+
+## Explicit connections only.
+-connect_all false

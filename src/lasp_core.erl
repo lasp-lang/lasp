@@ -100,7 +100,7 @@ start(Identifier) ->
 %%
 -spec filter(id(), function(), id(), store()) -> {ok, pid()}.
 filter(Id, Function, AccId, Store) ->
-    filter(Id, Function, AccId, Store, ?BIND, ?READ).
+    filter(Id, Function, AccId, Store, ?WRITE, ?READ).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -722,11 +722,10 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 -spec filter(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun({_, _, _, V}) ->
-            AccValue = state_orset_ext:filter(Function, V),
-            {ok, _} = BindFun(AccId, AccValue, Store)
+    TransFun = fun({_, _, _, V}) ->
+        state_orset_ext:filter(Function, V)
     end,
-    lasp_process:start_link([[{Id, ReadFun}], Fun]).
+    lasp_process:start_dag_link([{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}).
 
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.

@@ -584,7 +584,7 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
 
 %% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?BIND, ?READ),
+    {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?WRITE, ?READ),
     {reply, ok, State};
 
 %% Spawn a process to compute a product.

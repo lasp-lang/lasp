@@ -611,12 +611,12 @@ handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
 
 %% Spawn a process to perform a map with incremental computation.
 handle_call({map_inc, Id, Function, AccId}, _From, #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?BIND, ?READ_DELTA),
+    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?WRITE, ?READ_DELTA),
     {reply, ok, State};
 
 %% Spawn a process to perform a map.
 handle_call({map, Id, Function, AccId}, _From, #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?BIND, ?READ),
+    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?WRITE, ?READ),
     {reply, ok, State};
 
 %% Spawn a process to perform a fold.

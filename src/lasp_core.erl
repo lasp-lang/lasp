@@ -120,7 +120,7 @@ fold(Id, Function, AccId, Store) ->
 %%
 -spec map(id(), function(), id(), store()) -> {ok, pid()}.
 map(Id, Function, AccId, Store) ->
-    map(Id, Function, AccId, Store, ?BIND, ?READ).
+    map(Id, Function, AccId, Store, ?WRITE, ?READ).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -698,16 +698,16 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec map(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun({_, _, _, V}) ->
-                  AccValue = state_orset_ext:map(Function, V),
-                  {ok, _} = BindFun(AccId, AccValue, Store);
-             %% A delta of the input will be transformed into a delta of the output
-             %% and the delta of the output will be binded to the output.
-             ({delta, {_, _, _, V}}) ->
-                  AccValue = state_orset_ext:map(Function, V),
-                  {ok, _} = BindFun(AccId, {delta, AccValue}, Store)
-          end,
-    lasp_process:start_link([[{Id, ReadFun}], Fun]).
+    TransFun = fun
+        ({_, _, _, V}) ->
+            state_orset_ext:map(Function, V);
+
+        %% A delta of the input will be transformed into a delta of the output
+        ({delta, {_, _, _, V}}) ->
+            AccValue = state_orset_ext:map(Function, V),
+            {delta, AccValue}
+    end,
+    lasp_process:start_dag_link([{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}).
 
 %% @doc Filter values from one lattice into another.
 %%

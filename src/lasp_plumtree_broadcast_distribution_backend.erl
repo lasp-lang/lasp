@@ -547,7 +547,7 @@ handle_call({bind, Id, Metadata0, Value}, _From,
 
 %% Bind two variables together.
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?BIND, ?READ),
+    {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?WRITE, ?READ),
     {reply, ok, State};
 
 %% Perform an update, and ensure that we bump the logical clock as we

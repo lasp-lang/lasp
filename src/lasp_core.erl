@@ -305,7 +305,7 @@ query(Id, Store) ->
 %%
 -spec bind_to(id(), id(), store()) -> {ok, pid()}.
 bind_to(AccId, Id, Store) ->
-    bind_to(AccId, Id, Store, ?BIND, ?READ).
+    bind_to(AccId, Id, Store, ?WRITE, ?READ).
 
 %% @doc Spawn a function.
 %%
@@ -560,10 +560,8 @@ bind_to(AccId, Id, Store, BindFun) ->
     bind_to(AccId, Id, Store, BindFun, ?READ).
 
 bind_to(AccId, Id, Store, BindFun, ReadFun) ->
-    Fun = fun({_, _, _, V}) ->
-        {ok, _} = BindFun(AccId, V, Store)
-    end,
-    lasp_process:start_link([[{Id, ReadFun}], Fun]).
+    TransFun = fun({_, _, _, V}) -> V end,
+    lasp_process:start_dag_link([{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}).
 
 %% @doc Fold values from one lattice into another.
 %%

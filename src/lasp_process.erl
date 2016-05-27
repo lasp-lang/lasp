@@ -35,9 +35,12 @@
 
 %% Types
 -type read_fun() :: {atom(), function()}.
+-type write_fun() :: {atom(), function()}.
 
 %% Records
--record(state, {read_funs :: [read_fun()], function :: function()}).
+-record(state, {read_funs :: [read_fun()],
+                trans_fun :: function(),
+                write_fun :: write_fun()}).
 
 %%%===================================================================
 %%% API
@@ -71,11 +74,14 @@ start_dag_link(ReadFuns, TransFun, WriteFun) ->
 
 %% @doc Initialize state.
 init([ReadFuns, Function]) ->
-    {ok, #state{read_funs=ReadFuns, function=Function}};
+    {ok, #state{read_funs=ReadFuns,
+                trans_fun=Function,
+                write_fun=undefined}};
 
 init([ReadFuns, TransFun, WriteFun]) ->
-    %% @todo Add new fields to state
-    {ok, #state{read_funs=ReadFuns, function={TransFun, WriteFun}}}.
+    {ok, #state{read_funs=ReadFuns,
+                trans_fun=TransFun,
+                write_fun=WriteFun}}.
 
 %% @doc Return list of read functions.
 read(#state{read_funs=ReadFuns0}=State) ->
@@ -83,17 +89,15 @@ read(#state{read_funs=ReadFuns0}=State) ->
     {ok, ReadFuns, State}.
 
 %% @doc Computation to execute when inputs change.
-process(Args, #state{function=Function}=State) ->
+process(Args, #state{trans_fun=Function, write_fun=WriteFunction}=State) ->
     case lists:any(fun(X) -> X =:= undefined end, Args) of
         true ->
             ok;
         false ->
-            %% @todo change this once state is changed
-            case Function of
-                {TransFun, {AccId, WriteFun}} ->
-                    BindFun = gen_write_fun(AccId, WriteFun),
-                    BindFun(erlang:apply(TransFun, Args));
-                _ -> erlang:apply(Function, Args)
+            case WriteFunction of
+                undefined -> erlang:apply(Function, Args);
+                {AccId, WFun} ->
+                    WFun(AccId, erlang:apply(Function, Args))
             end
     end,
     {ok, State}.
@@ -118,9 +122,3 @@ gen_read_fun(Id, ReadFun) ->
                         exit({lasp_process, not_found})
                 end
         end.
-
-%% @doc Generate WriteFun.
-gen_write_fun(Id, WriteFun) ->
-    fun(Value) ->
-        WriteFun(Id, Value)
-    end.

@@ -10,6 +10,14 @@
          add_vertex/1,
          add_vertices/1]).
 
+%% Test
+-export([n_vertices/0,
+         n_edges/0,
+         out_degree/1,
+         in_degree/1,
+         out_edges/1,
+         in_edges/1]).
+
 %% gen_server callbacks
 -export([init/1,
          handle_call/3,
@@ -57,6 +65,24 @@ is_loop(Src, Dst) ->
 add_edges(Src, Dst, Pid) ->
     gen_server:call(?MODULE, {add_edges, Src, Dst, Pid}, infinity).
 
+n_vertices() ->
+    gen_server:call(?MODULE, n_vertices, infinity).
+
+n_edges() ->
+    gen_server:call(?MODULE, n_edges, infinity).
+
+in_degree(V) ->
+    gen_server:call(?MODULE, {in_degree, V}, infinity).
+
+out_degree(V) ->
+    gen_server:call(?MODULE, {out_degree, V}, infinity).
+
+out_edges(V) ->
+    gen_server:call(?MODULE, {out_edges, V}, infinity).
+
+in_edges(V) ->
+    gen_server:call(?MODULE, {in_edges, V}, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -68,6 +94,26 @@ init([]) ->
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
+
+handle_call(n_vertices, _From, #state{dag=Dag}=State) ->
+    {reply, {ok, digraph:no_vertices(Dag)}, State};
+
+handle_call(n_edges, _From, #state{dag=Dag}=State) ->
+    {reply, {ok, digraph:no_edges(Dag)}, State};
+
+handle_call({in_degree, V}, _From, #state{dag=Dag}=State) ->
+    {reply, {ok, digraph:in_degree(Dag, V)}, State};
+
+handle_call({out_degree, V}, _From, #state{dag=Dag}=State) ->
+    {reply, {ok, digraph:out_degree(Dag, V)}, State};
+
+handle_call({out_edges, V}, _From, #state{dag=Dag}=State) ->
+    Edges = [digraph:edge(Dag, E) || E <- digraph:out_edges(Dag, V)],
+    {reply, {ok, Edges}, State};
+
+handle_call({in_edges, V}, _From, #state{dag=Dag}=State) ->
+    Edges = [digraph:edge(Dag, E) || E <- digraph:in_edges(Dag, V)],
+    {reply, {ok, Edges}, State};
 
 handle_call({add_vertex, V}, _From, #state{dag=Dag}=State) ->
     digraph:add_vertex(Dag, V),

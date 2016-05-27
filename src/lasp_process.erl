@@ -46,9 +46,24 @@
 start_link(Args) ->
     lasp_process_sup:start_child(Args).
 
+%% @todo move to lasp_process_sup ?
 start_dag_link(ReadFuns, TransFun, WriteFun) ->
-    %% @todo, register in dag
-    lasp_process_sup:start_child([ReadFuns, TransFun, WriteFun]).
+    From = [Id || {Id, _} <- ReadFuns],
+    {To, _} = WriteFun,
+
+    %% @todo remove, track all declares
+    lasp_dependence_dag:add_vertices(From),
+    lasp_dependence_dag:add_vertex(To),
+
+    case lasp_dependence_dag:is_loop(From, To) of
+        false ->
+            {ok, Pid} = lasp_process_sup:start_child([ReadFuns, TransFun, WriteFun]),
+            ok = lasp_dependence_dag:add_edges(From, To, Pid),
+            {ok, Pid};
+        true ->
+            %% @todo propagate errors
+            {ok, ignore}
+    end.
 
 %%%===================================================================
 %%% Callbacks

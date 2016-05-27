@@ -28,7 +28,8 @@
 -endif.
 
 %% API
--export([start_link/1, start_dag_link/3]).
+-export([start_link/1,
+         start_dag_link/1]).
 
 %% Callbacks
 -export([init/1, read/1, process/2]).
@@ -50,7 +51,7 @@ start_link(Args) ->
     lasp_process_sup:start_child(Args).
 
 %% @todo move to lasp_process_sup ?
-start_dag_link(ReadFuns, TransFun, WriteFun) ->
+start_dag_link([ReadFuns, TransFun, WriteFun]) ->
     From = [Id || {Id, _} <- ReadFuns],
     {To, _} = WriteFun,
 

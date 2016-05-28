@@ -162,20 +162,11 @@ maybe_connect(Nodes, SeenNodes) ->
     ToConnect = Nodes -- SeenNodes,
 
     %% Attempt connection to any new nodes.
-    Attempted = case ToConnect of
+    case ToConnect of
         [] ->
             [];
         _ ->
             lists:map(fun connect/1, ToConnect)
-    end,
-
-    %% Log the output of the attempt.
-    case Attempted of
-        [] ->
-            ok;
-        _ ->
-            _ = lager:info("Attempted to connect: ~p", [Attempted]),
-            ok
     end,
 
     %% Return list of seen nodes with the new node.

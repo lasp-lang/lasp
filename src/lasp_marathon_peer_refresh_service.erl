@@ -139,15 +139,22 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @doc Generate a list of Erlang node names.
 generate_nodes(#{<<"app">> := App}) ->
-    lager:info("Generate nodes from: ~p", [App]),
     #{<<"tasks">> := Tasks} = App,
-    [generate_node(Host, Port)
-     || #{<<"host">> := Host, <<"ports">> := [Port]} <- Tasks].
+    lists:map(fun(Task) ->
+                #{<<"host">> := Host,
+                  <<"env">> := Environment,
+                  <<"ports">> := [EPMDPort, PeerPort]} = Task,
+                #{<<"IP">> := IPAddress} = Environment,
+        generate_node(Host, IPAddress, EPMDPort, PeerPort)
+        end, Tasks).
 
 %% @doc Generate a single Erlang node name.
-generate_node(Host, Port) ->
-    Name = "lasp-" ++ integer_to_list(Port) ++ "@" ++ binary_to_list(Host),
-    list_to_atom(Name).
+generate_node(Host, IPAddress0, EPMDPort, PeerPort) ->
+    Name = "lasp-" ++ integer_to_list(EPMDPort) ++ "@" ++ binary_to_list(Host),
+    {ok, IPAddress} = inet_parse:address(IPAddress0),
+    Node = {list_to_atom(Name), {IPAddress, PeerPort}},
+    lager:info("Generated node: ~p", [Node]),
+    Node.
 
 %% @doc Attempt to connect disconnected nodes.
 %% @private

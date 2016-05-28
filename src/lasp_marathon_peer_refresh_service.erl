@@ -148,6 +148,7 @@ generate_nodes(#{<<"app">> := App}) ->
 
 %% @doc Generate a single Erlang node name.
 generate_node(Host, EPMDPort, PeerPort) ->
+    lager:info("Generating node: ~p ~p ~p", [Host, EPMDPort, PeerPort]),
     Name = "lasp-" ++ integer_to_list(EPMDPort) ++ "@" ++ binary_to_list(Host),
     {ok, IPAddress} = inet_parse:address(Host),
     Node = {list_to_atom(Name), {IPAddress, PeerPort}},

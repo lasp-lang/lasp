@@ -142,16 +142,14 @@ generate_nodes(#{<<"app">> := App}) ->
     #{<<"tasks">> := Tasks} = App,
     lists:map(fun(Task) ->
                 #{<<"host">> := Host,
-                  <<"env">> := Environment,
                   <<"ports">> := [EPMDPort, PeerPort]} = Task,
-                #{<<"IP">> := IPAddress} = Environment,
-        generate_node(Host, IPAddress, EPMDPort, PeerPort)
+        generate_node(Host, EPMDPort, PeerPort)
         end, Tasks).
 
 %% @doc Generate a single Erlang node name.
-generate_node(Host, IPAddress0, EPMDPort, PeerPort) ->
+generate_node(Host, EPMDPort, PeerPort) ->
     Name = "lasp-" ++ integer_to_list(EPMDPort) ++ "@" ++ binary_to_list(Host),
-    {ok, IPAddress} = inet_parse:address(IPAddress0),
+    {ok, IPAddress} = inet_parse:address(Host),
     Node = {list_to_atom(Name), {IPAddress, PeerPort}},
     lager:info("Generated node: ~p", [Node]),
     Node.

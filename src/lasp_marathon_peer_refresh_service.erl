@@ -155,12 +155,15 @@ generate_node(Host, EPMDPort, PeerPort) ->
     lager:info("Generated node: ~p", [Node]),
     Node.
 
-%% @doc Attempt to connect disconnected nodes.
 %% @private
 maybe_connect(Nodes, SeenNodes) ->
-    ToConnect = Nodes -- (SeenNodes ++ [node()]),
+    %% If this is the first time you've seen the node, attempt to
+    %% connect; only attempt to connect once, because node might be
+    %% migrated to a passive view of the membership.
+    %%
+    ToConnect = Nodes -- SeenNodes,
 
-    %% Attempt connection.
+    %% Attempt connection to any new nodes.
     Attempted = case ToConnect of
         [] ->
             [];
@@ -177,19 +180,13 @@ maybe_connect(Nodes, SeenNodes) ->
             ok
     end,
 
-    %% Return list of connected nodes.
-    nodes().
+    %% Return list of seen nodes with the new node.
+    SeenNodes ++ Nodes.
 
 %% @private
 connect(Node) ->
-    Ping = net_adm:ping(Node),
-    case Ping of
-        pang ->
-            ok;
-        pong ->
-            lasp_peer_service:join(Node)
-    end,
-    {Node, Ping}.
+    lager:info("Connect issued for node: ~p", [Node]),
+    lasp_peer_service:join(Node).
 
 %% @private
 request() ->

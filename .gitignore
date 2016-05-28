@@ -29,3 +29,4 @@ priv/plots/*.pdf
 fprof.trace
 .rebar3/
 .eqc/
+dcos/

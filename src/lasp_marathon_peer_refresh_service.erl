@@ -150,7 +150,7 @@ generate_nodes(#{<<"app">> := App}) ->
 generate_node(Host, EPMDPort, PeerPort) ->
     lager:info("Generating node: ~p ~p ~p", [Host, EPMDPort, PeerPort]),
     Name = "lasp-" ++ integer_to_list(EPMDPort) ++ "@" ++ binary_to_list(Host),
-    {ok, IPAddress} = inet_parse:address(Host),
+    {ok, IPAddress} = inet_parse:address(binary_to_list(Host)),
     Node = {list_to_atom(Name), {IPAddress, PeerPort}},
     lager:info("Generated node: ~p", [Node]),
     Node.

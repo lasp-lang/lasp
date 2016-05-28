@@ -56,13 +56,12 @@ init(_Args) ->
     %% Before initializing the partisan backend, be sure to configure it
     %% to use the proper ports.
     %%
-    case os:getenv("PORT1", "false") of
+    case os:getenv("PEER_PORT", "false") of
         "false" ->
             %% No-op.
             ok;
-        Port ->
-            lager:info("PORT1: ~p", [Port]),
-            partisan_config:set(peer_port, list_to_integer(Port)),
+        PeerPort ->
+            partisan_config:set(peer_port, list_to_integer(PeerPort)),
             ok
     end,
 

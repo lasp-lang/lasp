@@ -53,6 +53,19 @@ init(_Args) ->
                permanent, 5000, worker,
                [lasp_unique]},
 
+    %% Before initializing the partisan backend, be sure to configure it
+    %% to use the proper ports.
+    %%
+    case os:getenv("PORT1", "false") of
+        "false" ->
+            %% No-op.
+            ok;
+        Port ->
+            lager:info("PORT1: ~p", [Port]),
+            partisan_config:set(peer_port, list_to_integer(Port)),
+            ok
+    end,
+
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},
                  permanent, infinity, supervisor, [partisan_sup]},

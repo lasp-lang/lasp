@@ -94,7 +94,8 @@ init(_Args) ->
                  PlumtreeBackend,
                  Plumtree,
                  MarathonPeerRefresh,
-                 Process],
+                 Process,
+                 Web],
 
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
     InstrEnabled = application:get_env(?APP, instrumentation, InstrDefault),
@@ -121,8 +122,7 @@ init(_Args) ->
 
             BaseSpecs ++ [ClientTrans,
                           ServerTrans,
-                          Divergence,
-                          Web];
+                          Divergence];
         false ->
             ok = application:set_env(?APP, instrumentation, InstrEnabled),
             BaseSpecs

@@ -94,11 +94,6 @@ init(_Args) ->
             ok
     end,
 
-    Web = {webmachine_mochiweb,
-           {webmachine_mochiweb, start, [lasp_config:web_config()]},
-            permanent, 5000, worker,
-            [mochiweb_socket_server]},
-
     MarathonPeerRefresh = {lasp_marathon_peer_refresh_service,
                            {lasp_marathon_peer_refresh_service, start_link, []},
                             permanent, 5000, worker,
@@ -109,8 +104,7 @@ init(_Args) ->
                  PlumtreeBackend,
                  Plumtree,
                  MarathonPeerRefresh,
-                 Process,
-                 Web],
+                 Process],
 
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
     InstrEnabled = application:get_env(?APP, instrumentation, InstrDefault),
@@ -135,13 +129,25 @@ init(_Args) ->
 
             %% If instrumentation is enabled, run the web service on
             %% port 80.
+            Web = {webmachine_mochiweb,
+                   {webmachine_mochiweb, start, [lasp_config:web_config()]},
+                    permanent, 5000, worker,
+                    [mochiweb_socket_server]},
+
             lasp_config:set(web_port, 80),
 
             BaseSpecs ++ [ClientTrans,
                           ServerTrans,
-                          Divergence];
+                          Divergence,
+                          Web];
         false ->
-            BaseSpecs
+            %% Run the web service otherwise for health checks.
+            Web = {webmachine_mochiweb,
+                   {webmachine_mochiweb, start, [lasp_config:web_config()]},
+                    permanent, 5000, worker,
+                    [mochiweb_socket_server]},
+
+            BaseSpecs ++ [Web]
     end,
 
     SimDefault = list_to_atom(os:getenv("AD_COUNTER_SIM", "false")),

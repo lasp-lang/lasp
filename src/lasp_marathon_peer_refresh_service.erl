@@ -139,6 +139,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @doc Generate a list of Erlang node names.
 generate_nodes(#{<<"app">> := App}) ->
+    lager:info("Generate nodes from: ~p", [App]),
     #{<<"tasks">> := Tasks} = App,
     [generate_node(Host, Port)
      || #{<<"host">> := Host, <<"ports">> := [Port]} <- Tasks].

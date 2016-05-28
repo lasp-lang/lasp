@@ -5,7 +5,7 @@ ERLANG_BIN       = $(shell dirname $(shell which erl))
 REBAR            = $(shell pwd)/rebar3
 MAKE						 = make
 
-.PHONY: rel deps test eqc plots
+.PHONY: rel deps test eqc plots dcos
 
 all: compile
 
@@ -81,6 +81,9 @@ publish:
 
 shell:
 	${REBAR} shell --apps lasp
+
+dcos:
+	bin/dcos-deploy.sh
 
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 

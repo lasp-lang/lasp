@@ -78,6 +78,22 @@ init(_Args) ->
                 {plumtree_sup, start_link, []},
                  permanent, infinity, supervisor, [plumtree_sup]},
 
+    %% Before initializing the web backend, configure it using the
+    %% proper ports.
+    case os:getenv("WEB_PORT", "false") of
+        "false" ->
+            %% Generate a random web port.
+            random:seed(erlang:phash2([node()]),
+                        erlang:monotonic_time(),
+                        erlang:unique_integer()),
+            WebPort = random:uniform(1000) + 10000,
+            lasp_config:set(web_port, WebPort),
+            ok;
+        WebPort ->
+            lasp_config:set(web_port, list_to_integer(WebPort)),
+            ok
+    end,
+
     Web = {webmachine_mochiweb,
            {webmachine_mochiweb, start, [lasp_config:web_config()]},
             permanent, 5000, worker,

@@ -118,8 +118,6 @@ init(_Args) ->
 
     Children = case InstrEnabled of
         true ->
-            ok = application:set_env(?APP, instrumentation, InstrEnabled),
-
             ClientTrans = {lasp_client_transmission_instrumentation,
                            {lasp_transmission_instrumentation, start_link, [client]},
                             permanent, 5000, worker,
@@ -139,7 +137,6 @@ init(_Args) ->
                           ServerTrans,
                           Divergence];
         false ->
-            ok = application:set_env(?APP, instrumentation, InstrEnabled),
             BaseSpecs
     end,
 

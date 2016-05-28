@@ -133,6 +133,10 @@ init(_Args) ->
                            permanent, 5000, worker,
                            [lasp_divergence_instrumentation]},
 
+            %% If instrumentation is enabled, run the web service on
+            %% port 80.
+            lasp_config:set(web_port, 80),
+
             BaseSpecs ++ [ClientTrans,
                           ServerTrans,
                           Divergence];

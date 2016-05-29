@@ -59,7 +59,7 @@ start_dag_link([ReadFuns, TransFun, WriteFun]) ->
     lasp_dependence_dag:add_vertices(From),
     lasp_dependence_dag:add_vertex(To),
 
-    case lasp_dependence_dag:is_loop(From, To) of
+    case lasp_dependence_dag:will_form_cycle(From, To) of
         false ->
             {ok, Pid} = lasp_process_sup:start_child([ReadFuns, TransFun, WriteFun]),
             ok = lasp_dependence_dag:add_edges(From, To, Pid),

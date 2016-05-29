@@ -5,7 +5,7 @@
 
 %% API
 -export([start_link/0,
-         is_loop/2,
+         will_form_cycle/2,
          add_edges/3,
          add_vertex/1,
          add_vertices/1]).
@@ -51,9 +51,9 @@ add_vertices(Vs) ->
     gen_server:call(?MODULE, {add_vertices, Vs}, infinity).
 
 %% @doc Check if linking the given vertices will form a loop.
--spec is_loop(list(id()), id()) -> boolean().
-is_loop(Src, Dst) ->
-    gen_server:call(?MODULE, {is_loop, Src, Dst}, infinity).
+-spec will_form_cycle(list(id()), id()) -> boolean().
+will_form_cycle(Src, Dst) ->
+    gen_server:call(?MODULE, {will_form_cycle, Src, Dst}, infinity).
 
 %% @doc For all V in Src, create an edge from V to Dst labelled with Pid.
 %%
@@ -123,13 +123,12 @@ handle_call({add_vertices, Vs}, _From, #state{dag=Dag}=State) ->
     [digraph:add_vertex(Dag, V) || V <- Vs],
     {reply, ok, State};
 
-%% @doc Check if linking the given vertices will form a loop.
+%% @doc Check if linking the given vertices will introduce a cycle in the graph.
 %%
-%%      Naive approach first: trying to link the same vertices
+%%      Naive approach first: see if To is a member of From
 %%
 %%      Second approach: let the digraph module figure it out,
-%%      creating an edge between the vertices and then catching
-%%      the {error, {bad_edge, _}} error.
+%%      as digraph:add_edge/3 will return {error, {bad_edge, _}}.
 %%
 %%      As this second approach creates edges, we delete them all
 %%      after we're done (we don't want edges without an associated
@@ -138,7 +137,7 @@ handle_call({add_vertices, Vs}, _From, #state{dag=Dag}=State) ->
 %%      We want to check this before spawning a lasp process, otherwise
 %%      an infinite loop can be created if the vertices form a loop.
 %%
-handle_call({is_loop, From, To}, _From, #state{dag=Dag}=State) ->
+handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag}=State) ->
     Response = case lists:member(To, From) of
         true -> true;
         false ->

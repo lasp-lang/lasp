@@ -28,16 +28,20 @@
 -endif.
 
 %% API
--export([start_link/1]).
+-export([start_link/1,
+         start_dag_link/1]).
 
 %% Callbacks
 -export([init/1, read/1, process/2]).
 
 %% Types
 -type read_fun() :: {atom(), function()}.
+-type write_fun() :: {atom(), function()}.
 
 %% Records
--record(state, {read_funs :: [read_fun()], function :: function()}).
+-record(state, {read_funs :: [read_fun()],
+                trans_fun :: function(),
+                write_fun :: write_fun()}).
 
 %%%===================================================================
 %%% API
@@ -46,13 +50,39 @@
 start_link(Args) ->
     lasp_process_sup:start_child(Args).
 
+%% @todo move to lasp_process_sup ?
+start_dag_link([ReadFuns, TransFun, WriteFun]) ->
+    From = [Id || {Id, _} <- ReadFuns],
+    {To, _} = WriteFun,
+
+    %% @todo remove, track all declares
+    lasp_dependence_dag:add_vertices(From),
+    lasp_dependence_dag:add_vertex(To),
+
+    case lasp_dependence_dag:will_form_cycle(From, To) of
+        false ->
+            {ok, Pid} = lasp_process_sup:start_child([ReadFuns, TransFun, WriteFun]),
+            ok = lasp_dependence_dag:add_edges(From, To, Pid),
+            {ok, Pid};
+        true ->
+            %% @todo propagate errors
+            {ok, ignore}
+    end.
+
 %%%===================================================================
 %%% Callbacks
 %%%===================================================================
 
 %% @doc Initialize state.
 init([ReadFuns, Function]) ->
-    {ok, #state{read_funs=ReadFuns, function=Function}}.
+    {ok, #state{read_funs=ReadFuns,
+                trans_fun=Function,
+                write_fun=undefined}};
+
+init([ReadFuns, TransFun, WriteFun]) ->
+    {ok, #state{read_funs=ReadFuns,
+                trans_fun=TransFun,
+                write_fun=WriteFun}}.
 
 %% @doc Return list of read functions.
 read(#state{read_funs=ReadFuns0}=State) ->
@@ -60,14 +90,22 @@ read(#state{read_funs=ReadFuns0}=State) ->
     {ok, ReadFuns, State}.
 
 %% @doc Computation to execute when inputs change.
-process(Args, #state{function=Function}=State) ->
+process(Args, #state{trans_fun=Function, write_fun=WriteFunction}=State) ->
     case lists:any(fun(X) -> X =:= undefined end, Args) of
         true ->
             ok;
         false ->
-            erlang:apply(Function, Args)
+            case WriteFunction of
+                undefined -> erlang:apply(Function, Args);
+                {AccId, WFun} ->
+                    WFun(AccId, erlang:apply(Function, Args))
+            end
     end,
     {ok, State}.
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
 
 %% @doc Generate ReadFun.
 gen_read_fun(Id, ReadFun) ->

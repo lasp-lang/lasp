@@ -77,6 +77,12 @@
                 ?MODULE:bind(_AccId, AccValue, _Store)
               end).
 
+-define(WRITE, fun(_Store) ->
+                 fun(_AccId, _AccValue) ->
+                   {ok, _} = ?MODULE:bind(_AccId, _AccValue, _Store)
+                 end
+               end).
+
 -define(READ, fun(_Id, _Threshold) ->
                 ?MODULE:read(_Id, _Threshold, Store)
               end).
@@ -94,7 +100,7 @@ start(Identifier) ->
 %%
 -spec filter(id(), function(), id(), store()) -> {ok, pid()}.
 filter(Id, Function, AccId, Store) ->
-    filter(Id, Function, AccId, Store, ?BIND, ?READ).
+    filter(Id, Function, AccId, Store, ?WRITE, ?READ).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -114,7 +120,7 @@ fold(Id, Function, AccId, Store) ->
 %%
 -spec map(id(), function(), id(), store()) -> {ok, pid()}.
 map(Id, Function, AccId, Store) ->
-    map(Id, Function, AccId, Store, ?BIND, ?READ).
+    map(Id, Function, AccId, Store, ?WRITE, ?READ).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -129,7 +135,7 @@ intersection(Left, Right, Intersection, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read(_Right, _Threshold, _Variables)
     end,
-    intersection(Left, Right, Intersection, Store, ?BIND, ReadLeftFun, ReadRightFun).
+    intersection(Left, Right, Intersection, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Compute the union of two sets.
 %%
@@ -144,7 +150,7 @@ union(Left, Right, Union, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read(_Right, _Threshold, _Variables)
     end,
-    union(Left, Right, Union, Store, ?BIND, ReadLeftFun, ReadRightFun).
+    union(Left, Right, Union, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -159,7 +165,7 @@ product(Left, Right, Product, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read(_Right, _Threshold, _Variables)
     end,
-    product(Left, Right, Product, Store, ?BIND, ReadLeftFun, ReadRightFun).
+    product(Left, Right, Product, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Perform a read for a particular identifier.
 %%
@@ -299,7 +305,7 @@ query(Id, Store) ->
 %%
 -spec bind_to(id(), id(), store()) -> {ok, pid()}.
 bind_to(AccId, Id, Store) ->
-    bind_to(AccId, Id, Store, ?BIND, ?READ).
+    bind_to(AccId, Id, Store, ?WRITE, ?READ).
 
 %% @doc Spawn a function.
 %%
@@ -554,10 +560,8 @@ bind_to(AccId, Id, Store, BindFun) ->
     bind_to(AccId, Id, Store, BindFun, ?READ).
 
 bind_to(AccId, Id, Store, BindFun, ReadFun) ->
-    Fun = fun({_, _, _, V}) ->
-        {ok, _} = BindFun(AccId, V, Store)
-    end,
-    lasp_process:start_link([[{Id, ReadFun}], Fun]).
+    TransFun = fun({_, _, _, V}) -> V end,
+    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -568,6 +572,8 @@ bind_to(AccId, Id, Store, BindFun, ReadFun) ->
 %%      Similar to {@link fold/4}, however, provides an override
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
+%%
+%%      @todo track in dag
 %%
 -spec fold(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
@@ -613,19 +619,18 @@ fold_internal(orset, Value, Function, AccType, AccValue) ->
 -spec product(id(), id(), id(), store(), function(), function(),
               function()) -> {ok, pid()}.
 product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
+    TransFun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
             case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    AccValue = state_orset_ext:product(LValue, RValue),
-                    {ok, _} = BindFun(AccId, AccValue, Store)
+                    state_orset_ext:product(LValue, RValue)
             end
     end,
-    lasp_process:start_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
-                            Fun]).
+    lasp_process:start_dag_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
+                                TransFun, {AccId, BindFun(Store)}]).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -639,19 +644,18 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec intersection(id(), id(), id(), store(), function(), function(),
                    function()) -> {ok, pid()}.
 intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
+    TransFun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
             case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    AccValue = state_orset_ext:intersect(LValue, RValue),
-                    {ok, _} = BindFun(AccId, AccValue, Store)
+                    state_orset_ext:intersect(LValue, RValue)
             end
     end,
-    lasp_process:start_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
-                             Fun]).
+    lasp_process:start_dag_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
+                                TransFun, {AccId, BindFun(Store)}]).
 
 %% @doc Compute the union of two sets.
 %%
@@ -665,19 +669,18 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec union(id(), id(), id(), store(), function(), function(),
             function()) -> {ok, pid()}.
 union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
+    TransFun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
         case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    AccValue = state_orset_ext:union(LValue, RValue),
-                    {ok, _} = BindFun(AccId, AccValue, Store)
+                    state_orset_ext:union(LValue, RValue)
             end
     end,
-    lasp_process:start_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
-                             Fun]).
+    lasp_process:start_dag_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
+                                TransFun, {AccId, BindFun(Store)}]).
 
 %% @doc Lap values from one lattice into another.
 %%
@@ -692,16 +695,16 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec map(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun({_, _, _, V}) ->
-                  AccValue = state_orset_ext:map(Function, V),
-                  {ok, _} = BindFun(AccId, AccValue, Store);
-             %% A delta of the input will be transformed into a delta of the output
-             %% and the delta of the output will be binded to the output.
-             ({delta, {_, _, _, V}}) ->
-                  AccValue = state_orset_ext:map(Function, V),
-                  {ok, _} = BindFun(AccId, {delta, AccValue}, Store)
-          end,
-    lasp_process:start_link([[{Id, ReadFun}], Fun]).
+    TransFun = fun
+        ({_, _, _, V}) ->
+            state_orset_ext:map(Function, V);
+
+        %% A delta of the input will be transformed into a delta of the output
+        ({delta, {_, _, _, V}}) ->
+            AccValue = state_orset_ext:map(Function, V),
+            {delta, AccValue}
+    end,
+    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -716,11 +719,10 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 -spec filter(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun({_, _, _, V}) ->
-            AccValue = state_orset_ext:filter(Function, V),
-            {ok, _} = BindFun(AccId, AccValue, Store)
+    TransFun = fun({_, _, _, V}) ->
+        state_orset_ext:filter(Function, V)
     end,
-    lasp_process:start_link([[{Id, ReadFun}], Fun]).
+    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
 
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.
@@ -732,10 +734,11 @@ stream(Id, Function, Store) ->
 %%      stream can result in observable nondeterminism.
 %%
 stream(Id, Function, _Store, ReadFun) ->
-    Fun = fun({_, T, _, V}) ->
-            Function(lasp_type:query(T, V))
+    TransFun = fun({_, T, _, V}) ->
+        Function(lasp_type:query(T, V))
     end,
-    lasp_process:start_link([[{Id, ReadFun}], Fun]).
+    WriteFun = fun(_, X) -> X end,
+    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {ignore, WriteFun}]).
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
 %%      change the reply and blocking replies.

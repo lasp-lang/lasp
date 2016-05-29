@@ -89,6 +89,12 @@
                 ?CORE:bind(_AccId, _AccValue, _Store)
               end).
 
+-define(WRITE, fun(_Store) ->
+                 fun(_AccId, _AccValue) ->
+                   {ok, _} = ?CORE:bind(_AccId, _AccValue, _Store)
+                 end
+               end).
+
 -define(READ, fun(_Id, _Threshold) ->
                 ?CORE:read(_Id, _Threshold, Store)
               end).
@@ -541,7 +547,7 @@ handle_call({bind, Id, Metadata0, Value}, _From,
 
 %% Bind two variables together.
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?BIND, ?READ),
+    {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?WRITE, ?READ),
     {reply, ok, State};
 
 %% Perform an update, and ensure that we bump the logical clock as we
@@ -578,14 +584,14 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
 
 %% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?BIND, ?READ),
+    {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?WRITE, ?READ),
     {reply, ok, State};
 
 %% Spawn a process to compute a product.
 handle_call({product, Left, Right, Product},
             _From,
             #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?BIND,
+    {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?WRITE,
                                ?READ, ?READ),
     {reply, ok, State};
 
@@ -594,23 +600,23 @@ handle_call({intersection, Left, Right, Intersection},
             _From,
             #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:intersection(Left, Right, Intersection, Store,
-                                    ?BIND, ?READ, ?READ),
+                                    ?WRITE, ?READ, ?READ),
     {reply, ok, State};
 
 %% Spawn a process to compute the union.
 handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?BIND, ?READ,
+    {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?WRITE, ?READ,
                              ?READ),
     {reply, ok, State};
 
 %% Spawn a process to perform a map with incremental computation.
 handle_call({map_inc, Id, Function, AccId}, _From, #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?BIND, ?READ_DELTA),
+    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?WRITE, ?READ_DELTA),
     {reply, ok, State};
 
 %% Spawn a process to perform a map.
 handle_call({map, Id, Function, AccId}, _From, #state{store=Store}=State) ->
-    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?BIND, ?READ),
+    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?WRITE, ?READ),
     {reply, ok, State};
 
 %% Spawn a process to perform a fold.

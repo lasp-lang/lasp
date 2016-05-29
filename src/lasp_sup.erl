@@ -44,6 +44,10 @@ start_link() ->
 %% ===================================================================
 
 init(_Args) ->
+    DepDag = {lasp_dependence_dag,
+              {lasp_dependence_dag, start_link, []},
+               permanent, 5000, worker, [lasp_dependence_dag]},
+
     Process = {lasp_process_sup,
                {lasp_process_sup, start_link, []},
                 permanent, infinity, supervisor, [lasp_process_sup]},
@@ -104,7 +108,8 @@ init(_Args) ->
                             permanent, 5000, worker,
                             [lasp_marathon_peer_refresh_service]},
 
-    BaseSpecs = [Unique,
+    BaseSpecs = [DepDag,
+                 Unique,
                  Partisan,
                  PlumtreeBackend,
                  Plumtree,

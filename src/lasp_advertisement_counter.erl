@@ -473,7 +473,7 @@ launch_clients(Node, NumClients, _Nodes, Instrumentation, SetType, CounterType, 
                Runner, AdsWithContracts) ->
     lists:map(fun(Id) ->
                       {ok, Pid} = rpc:call(Node,
-                                           lasp_advertisement_counter_client,
+                                           lasp_advertisement_counter_pseudo_client,
                                            start,
                                            [
                                             Instrumentation,

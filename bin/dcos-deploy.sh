@@ -75,11 +75,14 @@ sleep 10
 
 cat <<EOF > lasp.json
 {
+  "acceptedResourceRoles": [
+    "slave_public"
+  ],
   "id": "lasp",
   "dependencies": [],
   "cpus": 0.5,
   "mem": 2048.0,
-  "instances": 50,
+  "instances": 10,
   "container": {
     "type": "DOCKER",
     "docker": {

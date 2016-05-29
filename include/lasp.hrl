@@ -93,3 +93,7 @@
 
 %% @doc The type of objects that we can be notified about.
 -type object() :: crdt().
+
+%% Test identifiers.
+-define(ADS_WITH_CONTRACTS, <<"ads_with_contracts">>).
+-define(SET_TYPE, orset).

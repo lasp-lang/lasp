@@ -37,7 +37,7 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {}).
+-record(state, {cache}).
 
 %%%===================================================================
 %%% API
@@ -55,7 +55,15 @@ start_link() ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([]) ->
-    {ok, #state{}}.
+    lager:info("Advertisement counter client initialized."),
+
+    %% Schedule initial state transfer for counters.
+    refresh_advertisement_counters(undefined),
+
+    %% Start local cache out at zero.
+    Cache = dict:new(),
+
+    {ok, #state{cache=Cache}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -71,6 +79,18 @@ handle_cast(Msg, State) ->
     {noreply, State}.
 
 %% @private
+-spec handle_info(term(), #state{}) -> {noreply, #state{}}.
+handle_info({Id, _Type, _Metadata, _Value}=Result,
+            #state{cache=Cache0}=State) ->
+    lager:info("Received update: ~p", [Result]),
+
+    %% Update cache.
+    Cache = dict:store(Id, Result, Cache0),
+
+    %% Schedule initial state transfer for counters.
+    refresh_advertisement_counters(undefined),
+
+    {noreply, State#state{cache=Cache}};
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
@@ -88,3 +108,15 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+%% @private
+refresh_advertisement_counters(Previous) ->
+    Self = self(),
+    spawn_link(fun() ->
+                       %% Wait for updated counters.
+                       {ok, Result} = lasp:read({?ADS_WITH_CONTRACTS, ?SET_TYPE},
+                                                {strict, Previous}),
+
+                       %% Send them back to the gen_server.
+                       Self ! {update, Result}
+               end).

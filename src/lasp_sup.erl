@@ -129,12 +129,12 @@ init(_Args) ->
 
             %% If instrumentation is enabled, run the web service on
             %% port 80.
+            lasp_config:set(web_port, 80),
+
             Web = {webmachine_mochiweb,
                    {webmachine_mochiweb, start, [lasp_config:web_config()]},
                     permanent, 5000, worker,
                     [mochiweb_socket_server]},
-
-            lasp_config:set(web_port, 80),
 
             BaseSpecs ++ [ClientTrans,
                           ServerTrans,

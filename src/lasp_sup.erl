@@ -121,7 +121,7 @@ init(_Args) ->
     InstrEnabled = application:get_env(?APP, instrumentation, InstrDefault),
     lasp_config:set(instrumentation, InstrEnabled),
 
-    Children = case InstrEnabled of
+    Children0 = case InstrEnabled of
         true ->
             ClientTrans = {lasp_client_transmission_instrumentation,
                            {lasp_transmission_instrumentation, start_link, [client]},
@@ -145,21 +145,30 @@ init(_Args) ->
             BaseSpecs
     end,
 
-    SimDefault = list_to_atom(os:getenv("AD_COUNTER_SIM", "false")),
-    SimEnabled = application:get_env(?APP,
-                                     ad_counter_simulation_on_boot,
-                                     SimDefault),
+    AdSimDefault = list_to_atom(os:getenv("AD_COUNTER_SIM", "false")),
+    AdSimEnabled = application:get_env(?APP,
+                                       ad_counter_simulation_on_boot,
+                                       AdSimDefault),
 
     %% Run local simulations if instrumentation is enabled.
-    case SimEnabled of
+    Children = case AdSimEnabled of
         true ->
+            %% Start one advertisement counter client process per node.
+            AdCounterClient = {lasp_advertisement_counter_client,
+                               {lasp_advertisement_counter_client, start_link, []},
+                                permanent, 5000, worker,
+                                [lasp_advertisement_counter_client]},
+
+            %% Start simulator.
             spawn(fun() ->
                         timer:sleep(10000),
                         lasp_simulate_resource:run()
                   end),
-            ok;
+
+            %% Add to child specifications.
+            Children0 ++ [AdCounterClient];
         false ->
-            ok
+            Children0
     end,
 
     ProfileDefault = list_to_atom(os:getenv("PROFILE", "false")),

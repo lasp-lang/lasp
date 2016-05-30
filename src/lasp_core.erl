@@ -269,6 +269,8 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
             %% Do nothing; make declare idempotent at each replica.
             {ok, {{Id, Type}, Type, Metadata, Value}};
         _ ->
+            %% @todo is this the correct place?
+            lasp_dependence_dag:add_vertex({Id, Type}),
             Value = lasp_type:new(Type),
             Metadata = MetadataFun(MetadataNew),
             Counter0 = 0,

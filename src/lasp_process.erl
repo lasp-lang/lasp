@@ -55,9 +55,7 @@ start_dag_link([ReadFuns, TransFun, {To, _}=WriteFun]) ->
     From = [Id || {Id, _} <- ReadFuns],
     case lasp_dependence_dag:will_form_cycle(From, To) of
         false ->
-            {ok, Pid} = lasp_process_sup:start_child([ReadFuns, TransFun, WriteFun]),
-            ok = lasp_dependence_dag:add_edges(From, To, Pid),
-            {ok, Pid};
+            lasp_process_sup:start_child([ReadFuns, TransFun, WriteFun]);
         true ->
             %% @todo propagate errors
             {ok, ignore}
@@ -73,7 +71,9 @@ init([ReadFuns, Function]) ->
                 trans_fun=Function,
                 write_fun=undefined}};
 
-init([ReadFuns, TransFun, WriteFun]) ->
+init([ReadFuns, TransFun, {To, _}=WriteFun]) ->
+    From = [Id || {Id, _} <- ReadFuns],
+    lasp_dependence_dag:add_edges(From, To, self()),
     {ok, #state{read_funs=ReadFuns,
                 trans_fun=TransFun,
                 write_fun=WriteFun}}.

@@ -268,11 +268,11 @@ is_edge_error(_) ->
 %% @doc Delete all edges between Src and Dst with the given label.
 -spec delete_with_label(digraph:graph(), id(), id(), term()) -> digraph:graph().
 delete_with_label(Graph, Src, Dst, Label) ->
-  lists:filtermap(fun
-                    ({E, _, _, L}) when L =:= Label -> {true, digraph:del_edge(Graph, E)};
-                    (_) -> false
-                  end, get_direct_edges(Graph, Src, Dst)),
-  Graph.
+    lists:foreach(fun
+        ({E, _, _, L}) when L =:= Label -> digraph:del_edge(Graph, E);
+        (_) -> ok
+    end, get_direct_edges(Graph, Src, Dst)),
+    Graph.
 
 %% @doc Return all direct edges linking V1 and V2.
 %%

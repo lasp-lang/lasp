@@ -64,14 +64,6 @@ init([]) ->
     %% Generate actor identifier.
     Actor = self(),
 
-    %% Delay initialization to ensure the application has been declared.
-    %%
-    %% @todo Main issue here is that the declare-if-not-found behaviour
-    %% doesn't store anything in waiting-threads or store the pending
-    %% threshold read, which causes this to halt forever.
-    %%
-    timer:sleep(5000),
-
     %% Schedule advertisement counter impression.
     schedule_impression(),
 

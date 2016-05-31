@@ -18,6 +18,10 @@
 %%
 %% -------------------------------------------------------------------
 
+%% @todo I don't believe the cache is even necessary, but use it for
+%%       now.  At this point, it's superfluous, given that it
+%%       immediately updates the cache on update.
+
 -module(lasp_advertisement_counter_client).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
@@ -36,8 +40,12 @@
 
 -include("lasp.hrl").
 
+%% Macros.
+-define(IMPRESSION_INTERVAL, 1000).
+-define(LOG_INTERVAL, 10000).
+
 %% State record.
--record(state, {cache}).
+-record(state, {actor, cache, impressions}).
 
 %%%===================================================================
 %%% API
@@ -57,13 +65,30 @@ start_link() ->
 init([]) ->
     lager:info("Advertisement counter client initialized."),
 
+    %% Generate actor identifier.
+    Actor = self(),
+
+    %% Delay initialization to ensure the application has been declared.
+    %%
+    %% @todo Main issue here is that the declare-if-not-found behaviour
+    %% doesn't store anything in waiting-threads or store the pending
+    %% threshold read, which causes this to halt forever.
+    %%
+    timer:sleep(5000),
+
     %% Schedule initial state transfer for counters.
     refresh_advertisement_counters(undefined),
+
+    %% Schedule advertisement counter impression.
+    schedule_impression(),
+
+    %% Schedule logging.
+    schedule_logging(),
 
     %% Start local cache out at zero.
     Cache = dict:new(),
 
-    {ok, #state{cache=Cache}}.
+    {ok, #state{actor=Actor, impressions=0, cache=Cache}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -80,15 +105,47 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info({Id, _Type, _Metadata, _Value}=Result,
-            #state{cache=Cache0}=State) ->
-    lager:info("Received update: ~p", [Result]),
+handle_info(log, #state{impressions=Impressions}=State) ->
+    lager:info("Impressions: ~p", [Impressions]),
 
+    %% Schedule advertisement counter impression.
+    schedule_logging(),
+
+    {noreply, State};
+handle_info(view, #state{actor=Actor, impressions=Impressions, cache=Cache}=State0) ->
+    %% Find list of ads in the cache.
+    State = case dict:find({?ADS_WITH_CONTRACTS, ?SET_TYPE}, Cache) of
+        {ok, {_Id, Type, _Metadata, Value}} ->
+            %% Get value.
+            Ads = lasp_type:query(Type, Value),
+
+            %% Select random.
+            Random = lasp_support:puniform(sets:size(Ads)),
+
+            %% @todo Exposes internal details of record.
+            {{ad, _, _, Counter},
+             _Contract} = lists:nth(Random, sets:to_list(Ads)),
+
+            %% Increment counter.
+            {ok, _} = lasp:update(Counter, increment, Actor),
+
+            %% Increment impressions.
+            State0#state{impressions=Impressions+1};
+        error ->
+            exit(no_ads)
+    end,
+
+    %% Schedule advertisement counter impression.
+    schedule_impression(),
+
+    {noreply, State};
+handle_info({Id, _Type, _Metadata, Value}=Result,
+            #state{cache=Cache0}=State) ->
     %% Update cache.
     Cache = dict:store(Id, Result, Cache0),
 
     %% Schedule initial state transfer for counters.
-    refresh_advertisement_counters(undefined),
+    refresh_advertisement_counters(Value),
 
     {noreply, State#state{cache=Cache}};
 handle_info(Msg, State) ->
@@ -118,5 +175,13 @@ refresh_advertisement_counters(Previous) ->
                                                 {strict, Previous}),
 
                        %% Send them back to the gen_server.
-                       Self ! {update, Result}
+                       Self ! Result
                end).
+
+%% @private
+schedule_impression() ->
+    erlang:send_after(?IMPRESSION_INTERVAL, self(), view).
+
+%% @private
+schedule_logging() ->
+    erlang:send_after(?LOG_INTERVAL, self(), log).

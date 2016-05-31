@@ -206,6 +206,7 @@ advertisement_counter_child_specs() ->
                                        ad_counter_simulation_on_boot,
                                        AdSimDefault),
     lasp_config:set(ad_counter_simulation_on_boot, AdSimEnabled),
+    lager:info("AdSimEnabled: ~p", [AdSimEnabled]),
 
     %% Figure out who is acting as the server.
     AdServerDefault = list_to_atom(os:getenv("AD_COUNTER_SIM_SERVER", "false")),
@@ -213,6 +214,7 @@ advertisement_counter_child_specs() ->
                                           ad_counter_simulation_server,
                                           AdServerDefault),
     lasp_config:set(ad_counter_simulation_server, AdServerEnabled),
+    lager:info("AdServerEnabled: ~p", [AdServerEnabled]),
 
     case AdSimEnabled of
         true ->

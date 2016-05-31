@@ -42,6 +42,7 @@ cat <<EOF > lasp-orchestrator.json
   "ports": [0, 0],
   "env": {
     "INSTRUMENTATION": "true",
+    "AD_COUNTER_SIM_SERVER": "true",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"
   },
@@ -93,6 +94,7 @@ cat <<EOF > lasp.json
   },
   "ports": [0, 0],
   "env": {
+    "AD_COUNTER_SIM": "true",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"
   },

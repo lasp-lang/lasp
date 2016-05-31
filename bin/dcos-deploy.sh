@@ -94,7 +94,7 @@ cat <<EOF > lasp.json
   },
   "ports": [0, 0],
   "env": {
-    "AD_COUNTER_SIM": "true",
+    "AD_COUNTER_SIM_CLIENT": "true",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"
   },

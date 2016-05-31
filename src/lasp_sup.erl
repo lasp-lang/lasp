@@ -200,13 +200,27 @@ configure_defaults() ->
 
 %% @private
 advertisement_counter_child_specs() ->
-    %% Figure out if the advertisement counter example is enabled.
-    AdSimDefault = list_to_atom(os:getenv("AD_COUNTER_SIM", "false")),
-    AdSimEnabled = application:get_env(?APP,
-                                       ad_counter_simulation_on_boot,
-                                       AdSimDefault),
-    lasp_config:set(ad_counter_simulation_on_boot, AdSimEnabled),
-    lager:info("AdSimEnabled: ~p", [AdSimEnabled]),
+    %% Figure out who is acting as the client.
+    AdClientDefault = list_to_atom(os:getenv("AD_COUNTER_SIM_CLIENT", "false")),
+    AdClientEnabled = application:get_env(?APP,
+                                          ad_counter_simulation_client,
+                                          AdClientDefault),
+    lasp_config:set(ad_counter_simulation_client, AdClientEnabled),
+    lager:info("AdClientEnabled: ~p", [AdClientEnabled]),
+
+    ClientSpecs = case AdClientEnabled of
+        true ->
+            %% Start one advertisement counter client process per node.
+            AdCounterClient = {lasp_advertisement_counter_client,
+                               {lasp_advertisement_counter_client, start_link, []},
+                                permanent, 5000, worker,
+                                [lasp_advertisement_counter_client]},
+
+
+            [AdCounterClient];
+        false ->
+            []
+    end,
 
     %% Figure out who is acting as the server.
     AdServerDefault = list_to_atom(os:getenv("AD_COUNTER_SIM_SERVER", "false")),
@@ -216,26 +230,15 @@ advertisement_counter_child_specs() ->
     lasp_config:set(ad_counter_simulation_server, AdServerEnabled),
     lager:info("AdServerEnabled: ~p", [AdServerEnabled]),
 
-    case AdSimEnabled of
+    ServerSpecs = case AdServerEnabled of
         true ->
-            %% Start one advertisement counter client process per node.
-            AdCounterClient = {lasp_advertisement_counter_client,
-                               {lasp_advertisement_counter_client, start_link, []},
+            AdCounterServer = {lasp_advertisement_counter_server,
+                               {lasp_advertisement_counter_server, start_link, []},
                                 permanent, 5000, worker,
-                                [lasp_advertisement_counter_client]},
-
-            ServerSpecs = case AdServerEnabled of
-                true ->
-                    AdCounterServer = {lasp_advertisement_counter_server,
-                                       {lasp_advertisement_counter_server, start_link, []},
-                                        permanent, 5000, worker,
-                                        [lasp_advertisement_counter_server]},
-                    [AdCounterServer];
-                false ->
-                    []
-            end,
-
-            [AdCounterClient | ServerSpecs];
+                                [lasp_advertisement_counter_server]},
+            [AdCounterServer];
         false ->
             []
-    end.
+    end,
+
+    ClientSpecs ++ ServerSpecs.

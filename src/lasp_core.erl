@@ -295,10 +295,14 @@ declare_dynamic(Id, Type, MetadataFun0, Store) ->
 %% @doc Return the current value of a CRDT.
 %% @todo Why isn't this using the ReadFun?
 -spec query(id(), store()) -> {ok, term()}.
-query(Id, Store) ->
-    {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
-    Value = lasp_type:query(Type, Value0),
-    {ok, Value}.
+query({_, Type}=Id, Store) ->
+    Value = case do(get, [Store, Id]) of
+        {ok, #dv{value=Value0, type=Type}} ->
+            Value0;
+        {error, not_found} ->
+            lasp_type:new(Type)
+    end,
+    {ok, lasp_type:query(Type, Value)}.
 
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.

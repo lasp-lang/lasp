@@ -72,7 +72,7 @@
 -type store() :: ets:tid() | atom() | reference() | pid().
 -type threshold() :: value() | {strict, value()}.
 -type pending_threshold() :: {threshold, read | wait, pid(), type(), threshold()}.
--type operation() :: {atom(), value()} | {atom(), value(), value()}.
+-type operation() :: {atom(), value()} | {atom(), value(), value()} | atom().
 -type operations() :: list(operation()).
 -type actor() :: term().
 -type error() :: {error, atom()}.

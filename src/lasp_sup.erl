@@ -160,11 +160,11 @@ init(_Args) ->
                                 permanent, 5000, worker,
                                 [lasp_advertisement_counter_client]},
 
-            % %% Start simulator.
-            % spawn(fun() ->
-            %             timer:sleep(10000),
-            %             lasp_simulate_resource:run()
-            %       end),
+            %% Start simulator.
+            spawn(fun() ->
+                        timer:sleep(5000),
+                        lasp_simulate_resource:run()
+                  end),
 
             %% Add to child specifications.
             Children0 ++ [AdCounterClient];

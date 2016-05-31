@@ -38,7 +38,7 @@
 -include("lasp.hrl").
 
 %% Macros.
--define(MAX_IMPRESSIONS, 10).
+-define(MAX_IMPRESSIONS, 50000).
 -define(LOG_INTERVAL, 10000).
 
 %% State record.

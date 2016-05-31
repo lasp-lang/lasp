@@ -103,7 +103,7 @@ init([Nodes, Mode, SetType, CounterType, NumEvents, NumClients, SyncInterval]) -
     ok = lasp:product(Ads, Contracts, AdsContracts),
 
     %% Filter items by join on item it.
-    {ok, {AdsWithContracts, _, _, _}} = lasp:declare(SetType),
+    {ok, {AdsWithContracts, _, _, _}} = lasp:declare(?ADS_WITH_CONTRACTS, SetType),
     FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
         Id1 =:= Id2
     end,

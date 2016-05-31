@@ -72,7 +72,7 @@
 -type store() :: ets:tid() | atom() | reference() | pid().
 -type threshold() :: value() | {strict, value()}.
 -type pending_threshold() :: {threshold, read | wait, pid(), type(), threshold()}.
--type operation() :: {atom(), value()} | {atom(), value(), value()}.
+-type operation() :: {atom(), value()} | {atom(), value(), value()} | atom().
 -type operations() :: list(operation()).
 -type actor() :: term().
 -type error() :: {error, atom()}.
@@ -93,3 +93,8 @@
 
 %% @doc The type of objects that we can be notified about.
 -type object() :: crdt().
+
+%% Test identifiers.
+-define(ADS_WITH_CONTRACTS, <<"ads_with_contracts">>).
+-define(SET_TYPE, orset).
+-define(COUNTER_TYPE, gcounter).

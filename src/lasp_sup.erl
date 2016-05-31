@@ -84,6 +84,7 @@ init(_Args) ->
 
     %% Before initializing the web backend, configure it using the
     %% proper ports.
+    %%
     case os:getenv("WEB_PORT", "false") of
         "false" ->
             %% Generate a random web port.
@@ -145,42 +146,32 @@ init(_Args) ->
             BaseSpecs
     end,
 
-    AdSimDefault = list_to_atom(os:getenv("AD_COUNTER_SIM", "false")),
-    AdSimEnabled = application:get_env(?APP,
-                                       ad_counter_simulation_on_boot,
-                                       AdSimDefault),
+    %% Setup the advertisement counter example, if necessary.
+    AdSpecs = advertisement_counter_child_specs(),
+    Children = Children0 ++ AdSpecs,
 
-    %% Run local simulations if instrumentation is enabled.
-    Children = case AdSimEnabled of
-        true ->
-            %% Start one advertisement counter client process per node.
-            AdCounterClient = {lasp_advertisement_counter_client,
-                               {lasp_advertisement_counter_client, start_link, []},
-                                permanent, 5000, worker,
-                                [lasp_advertisement_counter_client]},
+    %% Configure defaults.
+    configure_defaults(),
 
-            %% Start simulator.
-            spawn(fun() ->
-                        timer:sleep(10000),
-                        lasp_simulate_resource:run()
-                  end),
+    {ok, {{one_for_one, 5, 10}, Children}}.
 
-            %% Add to child specifications.
-            Children0 ++ [AdCounterClient];
-        false ->
-            Children0
-    end,
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
 
+%% @private
+configure_defaults() ->
     ProfileDefault = list_to_atom(os:getenv("PROFILE", "false")),
     ProfileEnabled = application:get_env(?APP,
                                          profile,
                                          ProfileDefault),
     lasp_config:set(profile, ProfileEnabled),
 
-    %% Cache values with lasp_config to help out on the performance.
+    %% Operation mode.
     Mode = application:get_env(?APP, mode, state_based),
     lasp_config:set(mode, Mode),
 
+    %% Backend configurations.
     StorageBackend = application:get_env(
                        ?APP,
                        storage_backend,
@@ -193,16 +184,58 @@ init(_Args) ->
                             lasp_plumtree_broadcast_distribution_backend),
     lasp_config:set(distribution_backend, DistributionBackend),
 
+    %% Delta specific configuration values.
     MaxDeltaSlots = application:get_env(?APP, delta_mode_max_slots, 10),
     lasp_config:set(delta_mode_max_slots, MaxDeltaSlots),
 
     MaxGCCounter = application:get_env(?APP, delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
     lasp_config:set(delta_mode_max_gc_counter, MaxGCCounter),
 
+    %% Incremental computation.
     IncrementalComputation = application:get_env(
                                ?APP,
                                incremental_computation_mode,
                                false),
-    lasp_config:set(incremental_computation_mode, IncrementalComputation),
+    lasp_config:set(incremental_computation_mode, IncrementalComputation).
 
-    {ok, {{one_for_one, 5, 10}, Children}}.
+%% @private
+advertisement_counter_child_specs() ->
+    %% Figure out if the advertisement counter example is enabled.
+    AdSimDefault = list_to_atom(os:getenv("AD_COUNTER_SIM", "false")),
+    AdSimEnabled = application:get_env(?APP,
+                                       ad_counter_simulation_on_boot,
+                                       AdSimDefault),
+    lasp_config:set(ad_counter_simulation_on_boot, AdSimEnabled),
+    lager:info("AdSimEnabled: ~p", [AdSimEnabled]),
+
+    %% Figure out who is acting as the server.
+    AdServerDefault = list_to_atom(os:getenv("AD_COUNTER_SIM_SERVER", "false")),
+    AdServerEnabled = application:get_env(?APP,
+                                          ad_counter_simulation_server,
+                                          AdServerDefault),
+    lasp_config:set(ad_counter_simulation_server, AdServerEnabled),
+    lager:info("AdServerEnabled: ~p", [AdServerEnabled]),
+
+    case AdSimEnabled of
+        true ->
+            %% Start one advertisement counter client process per node.
+            AdCounterClient = {lasp_advertisement_counter_client,
+                               {lasp_advertisement_counter_client, start_link, []},
+                                permanent, 5000, worker,
+                                [lasp_advertisement_counter_client]},
+
+            ServerSpecs = case AdServerEnabled of
+                true ->
+                    AdCounterServer = {lasp_advertisement_counter_server,
+                                       {lasp_advertisement_counter_server, start_link, []},
+                                        permanent, 5000, worker,
+                                        [lasp_advertisement_counter_server]},
+                    [AdCounterServer];
+                false ->
+                    []
+            end,
+
+            [AdCounterClient | ServerSpecs];
+        false ->
+            []
+    end.

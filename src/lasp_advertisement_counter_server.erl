@@ -69,6 +69,9 @@ init([]) ->
     %% Generate actor identifier.
     Actor = self(),
 
+    %% Schedule logging.
+    schedule_logging(),
+
     %% Build DAG.
     {ok, Ads, AdList} = build_dag(),
     lager:info("AdList: ~p", [hd(AdList)]),

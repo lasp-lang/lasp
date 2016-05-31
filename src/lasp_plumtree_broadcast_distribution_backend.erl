@@ -167,7 +167,6 @@ start_link(Opts) ->
     {{broadcast_id(), broadcast_clock()}, broadcast_payload()}.
 broadcast_data(#broadcast{id=Id, type=Type, clock=Clock,
                           metadata=Metadata, value=Value}) ->
-    lager:info("Received ~p", [{Id, Clock}]),
     {{Id, Clock}, {Id, Type, Metadata, Value}}.
 
 %% @doc Perform a merge of an incoming object with an object in the

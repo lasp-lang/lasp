@@ -88,7 +88,13 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(log, #state{impressions=Impressions}=State) ->
+    %% Get current value of the list of advertisements.
+    {ok, Ads} = lasp:query({?ADS_WITH_CONTRACTS, ?SET_TYPE}),
+    AdList = sets:to_list(Ads),
+
     lager:info("Impressions: ~p", [Impressions]),
+
+    lager:info("Current advertisement list: ~p", [AdList]),
 
     %% Schedule advertisement counter impression.
     schedule_logging(),

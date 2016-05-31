@@ -661,7 +661,6 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
 handle_call({exchange, Peer}, _From, #state{store=Store, gc_counter=GCCounter}=State) ->
-    lager:info("Delta-based AAE triggered with ~p", [Peer]),
     Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
                             delta_counter=Counter, delta_map=DeltaMap,
                             delta_ack_map=AckMap}},
@@ -701,7 +700,6 @@ handle_call({exchange, Peer}, _From, #state{store=Store, gc_counter=GCCounter}=S
 
 %% Naive anti-entropy mechanism; periodically re-broadcast all messages.
 handle_call(exchange, _From, #state{store=Store}=State) ->
-    lager:info("Standard AAE triggered!", []),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->

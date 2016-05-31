@@ -708,7 +708,6 @@ handle_call(exchange, _From, #state{store=Store}=State) ->
                             %% Ignore: this is a dynamic variable.
                             ok;
                         _ ->
-                            lager:info("Broadcasting ~p", [Id]),
                             broadcast({Id, Type, Metadata, Value})
                     end,
                     [{ok, {Id, Type, Metadata, Value}}|Acc0]

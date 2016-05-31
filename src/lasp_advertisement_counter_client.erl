@@ -98,18 +98,25 @@ handle_info(view, #state{actor=Actor, impressions=Impressions}=State0) ->
     %% Get current value of the list of advertisements.
     {ok, Ads} = lasp:query({?ADS_WITH_CONTRACTS, ?SET_TYPE}),
 
-    %% Select random.
-    Random = lasp_support:puniform(sets:size(Ads)),
+    %% Make sure we have ads...
+    State = case sets:size(Ads) of
+        0 ->
+            %% Do nothing.
+            State0;
+        Size ->
+            %% Select random.
+            Random = lasp_support:puniform(Size),
 
-    %% @todo Exposes internal details of record.
-    {{ad, _, _, Counter},
-     _Contract} = lists:nth(Random, sets:to_list(Ads)),
+            %% @todo Exposes internal details of record.
+            {{ad, _, _, Counter},
+             _Contract} = lists:nth(Random, sets:to_list(Ads)),
 
-    %% Increment counter.
-    {ok, _} = lasp:update(Counter, increment, Actor),
+            %% Increment counter.
+            {ok, _} = lasp:update(Counter, increment, Actor),
 
-    %% Increment impressions.
-    State = State0#state{impressions=Impressions+1},
+            %% Increment impressions.
+            State0#state{impressions=Impressions+1}
+    end,
 
     %% Schedule advertisement counter impression.
     schedule_impression(),

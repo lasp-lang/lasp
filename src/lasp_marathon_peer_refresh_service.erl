@@ -101,7 +101,17 @@ handle_cast(Msg, State) ->
 handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
     timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE),
 
-    Nodes = case request() of
+    %% Randomly get information from the orchestrator nodes and the
+    %% regular nodes.
+    %%
+    Task = case random:uniform(10) rem 2 == 0 of
+        true ->
+            "lasp-orchestrator";
+        false ->
+            "lasp"
+    end,
+
+    Nodes = case request(Task) of
         {ok, Response} ->
             Nodes1 = generate_nodes(Response),
             Nodes1;
@@ -178,7 +188,7 @@ connect(Node) ->
     lasp_peer_service:join(Node).
 
 %% @private
-request() ->
+request(Task) ->
     IP = os:getenv("IP", "127.0.0.1"),
     DCOS = os:getenv("DCOS", "false"),
     Headers = case DCOS of
@@ -190,9 +200,9 @@ request() ->
     end,
     Url = case DCOS of
               "false" ->
-                "http://" ++ IP ++ ":8080/v2/apps/lasp?embed=app.taskStats";
+                "http://" ++ IP ++ ":8080/v2/apps/" ++ Task ++ "?embed=app.taskStats";
               _ ->
-                DCOS ++ "/marathon/v2/apps/lasp?embed=app.taskStats"
+                DCOS ++ "/marathon/v2/apps/" ++ Task ++ "?embed=app.taskStats"
           end,
     case httpc:request(get, {Url, Headers}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, Body}} ->

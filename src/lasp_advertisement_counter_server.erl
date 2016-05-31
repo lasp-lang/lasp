@@ -74,7 +74,6 @@ init([]) ->
 
     %% Build DAG.
     {ok, Ads, AdList} = build_dag(),
-    lager:info("AdList: ~p", [hd(AdList)]),
 
     %% Initialize triggers.
     launch_triggers(AdList, Ads, Actor),

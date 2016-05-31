@@ -69,8 +69,8 @@ will_form_cycle(Src, Dst) ->
 add_edges(Src, Dst, Pid) ->
     gen_server:call(?MODULE, {add_edges, Src, Dst, Pid}, infinity).
 
-%% @doc Print the dot representation of the dag to stdout.
--spec to_dot() -> ok.
+%% @doc Return the dot representation as a string.
+-spec to_dot() -> {ok, string()}.
 to_dot() ->
   gen_server:call(?MODULE, to_dot, infinity).
 
@@ -137,8 +137,7 @@ handle_call({add_vertices, Vs}, _From, #state{dag=Dag}=State) ->
     {reply, ok, State};
 
 handle_call(to_dot, _From, #state{dag=Dag}=State) ->
-    io:format(to_dot(Dag)),
-    {reply, ok, State};
+    {reply, {ok, to_dot(Dag)}, State};
 
 handle_call({export_dot, Path}, _From, #state{dag=Dag}=State) ->
     R = file:write_file(Path, to_dot(Dag)),
@@ -225,7 +224,7 @@ to_dot(Graph) ->
     Start = ["digraph dag {\n"],
     VertexList = digraph_utils:topsort(Graph),
     DrawedVertices =  lists:foldl(fun(V, Acc) ->
-        Acc ++ v_str(V) ++ ";\n"
+        Acc ++ v_str(V) ++ " [fontcolor=black, style=filled, fillcolor=\"#613B93\"];\n"
     end, Start, VertexList),
     unicode:characters_to_list(write_edges(Graph, VertexList, [], DrawedVertices) ++ "}\n").
 

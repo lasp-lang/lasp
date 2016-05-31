@@ -24,7 +24,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/0,
+         trigger/3]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -37,9 +38,11 @@
 -include("lasp.hrl").
 
 %% Macros.
+-define(MAX_IMPRESSIONS, 10).
+-define(LOG_INTERVAL, 10000).
 
 %% State record.
--record(state, {actor}).
+-record(state, {actor, ads}).
 
 -record(ad, {id, image, counter}).
 
@@ -66,33 +69,14 @@ init([]) ->
     %% Generate actor identifier.
     Actor = self(),
 
-    %% For each identifier, generate a contract.
-    {ok, {Contracts, _, _, _}} = lasp:declare(?SET_TYPE),
+    %% Build DAG.
+    {ok, Ads, AdList} = build_dag(),
+    lager:info("AdList: ~p", [hd(AdList)]),
 
-    %% Generate Rovio's advertisements.
-    {ok, {RovioAds, _, _, _}} = lasp:declare(?SET_TYPE),
-    _RovioAdList = create_ads_and_contracts(RovioAds, Contracts),
+    %% Initialize triggers.
+    launch_triggers(AdList, Ads, Actor),
 
-    %% Generate Riot's advertisements.
-    {ok, {RiotAds, _, _, _}} = lasp:declare(?SET_TYPE),
-    _RiotAdList = create_ads_and_contracts(RiotAds, Contracts),
-
-    %% Union ads.
-    {ok, {Ads, _, _, _}} = lasp:declare(?SET_TYPE),
-    ok = lasp:union(RovioAds, RiotAds, Ads),
-
-    %% Compute the Cartesian product of both ads and contracts.
-    {ok, {AdsContracts, _, _, _}} = lasp:declare(?SET_TYPE),
-    ok = lasp:product(Ads, Contracts, AdsContracts),
-
-    %% Filter items by join on item it.
-    {ok, {AdsWithContracts, _, _, _}} = lasp:declare(?ADS_WITH_CONTRACTS, ?SET_TYPE),
-    FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
-        Id1 =:= Id2
-    end,
-    ok = lasp:filter(AdsContracts, FilterFun, AdsWithContracts),
-
-    {ok, #state{actor=Actor}}.
+    {ok, #state{actor=Actor, ads=Ads}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -109,6 +93,17 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
+handle_info(log, #state{ads=Ads}=State) ->
+    %% Print number of enabled ads.
+    {ok, AdList} = lasp:query(Ads),
+    Size = sets:size(AdList),
+
+    lager:info("Enabled advertisements: ~p", [Size]),
+
+    %% Schedule advertisement counter impression.
+    schedule_logging(),
+
+    {noreply, State};
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
@@ -127,7 +122,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-%% @doc Generate advertisements and advertisement contracts.
+%% @private
 create_ads_and_contracts(Ads, Contracts) ->
     AdIds = lists:map(fun(_) ->
                               {ok, Unique} = lasp_unique:unique(),
@@ -151,3 +146,59 @@ create_ads_and_contracts(Ads, Contracts) ->
 
                 end, AdIds).
 
+%% @private
+build_dag() ->
+    %% For each identifier, generate a contract.
+    {ok, {Contracts, _, _, _}} = lasp:declare(?SET_TYPE),
+
+    %% Generate Rovio's advertisements.
+    {ok, {RovioAds, _, _, _}} = lasp:declare(?SET_TYPE),
+    RovioAdList = create_ads_and_contracts(RovioAds, Contracts),
+
+    %% Generate Riot's advertisements.
+    {ok, {RiotAds, _, _, _}} = lasp:declare(?SET_TYPE),
+    RiotAdList = create_ads_and_contracts(RiotAds, Contracts),
+
+    %% Gather ads.
+    AdList = RovioAdList ++ RiotAdList,
+
+    %% Union ads.
+    {ok, {Ads, _, _, _}} = lasp:declare(?SET_TYPE),
+    ok = lasp:union(RovioAds, RiotAds, Ads),
+
+    %% Compute the Cartesian product of both ads and contracts.
+    {ok, {AdsContracts, _, _, _}} = lasp:declare(?SET_TYPE),
+    ok = lasp:product(Ads, Contracts, AdsContracts),
+
+    %% Filter items by join on item it.
+    {ok, {AdsWithContracts, _, _, _}} = lasp:declare(?ADS_WITH_CONTRACTS, ?SET_TYPE),
+    FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
+        Id1 =:= Id2
+    end,
+    ok = lasp:filter(AdsContracts, FilterFun, AdsWithContracts),
+
+    {ok, Ads, AdList}.
+
+%% @private
+launch_triggers(AdList, Ads, Actor) ->
+    lists:map(fun(Ad) ->
+                      spawn_link(fun() ->
+                                         trigger(Ad, Ads, Actor)
+                                 end)
+              end, AdList).
+
+%% @private
+trigger(#ad{counter=CounterId} = Ad, Ads, Actor) ->
+    %% Blocking threshold read for max advertisement impressions.
+    {ok, _} = lasp:read(CounterId, {value, ?MAX_IMPRESSIONS}),
+
+    lager:info("Threshold for ~p reached; disabling!", [Ad]),
+
+    %% Remove the advertisement.
+    {ok, _} = lasp:update(Ads, {rmv, Ad}, Actor),
+
+    ok.
+
+%% @private
+schedule_logging() ->
+    erlang:send_after(?LOG_INTERVAL, self(), log).

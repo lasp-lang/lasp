@@ -41,6 +41,10 @@
 %% State record.
 -record(state, {actor}).
 
+-record(ad, {id, image, counter}).
+
+-record(contract, {id}).
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -61,6 +65,32 @@ init([]) ->
 
     %% Generate actor identifier.
     Actor = self(),
+
+    %% For each identifier, generate a contract.
+    {ok, {Contracts, _, _, _}} = lasp:declare(?SET_TYPE),
+
+    %% Generate Rovio's advertisements.
+    {ok, {RovioAds, _, _, _}} = lasp:declare(?SET_TYPE),
+    _RovioAdList = create_ads_and_contracts(RovioAds, Contracts),
+
+    %% Generate Riot's advertisements.
+    {ok, {RiotAds, _, _, _}} = lasp:declare(?SET_TYPE),
+    _RiotAdList = create_ads_and_contracts(RiotAds, Contracts),
+
+    %% Union ads.
+    {ok, {Ads, _, _, _}} = lasp:declare(?SET_TYPE),
+    ok = lasp:union(RovioAds, RiotAds, Ads),
+
+    %% Compute the Cartesian product of both ads and contracts.
+    {ok, {AdsContracts, _, _, _}} = lasp:declare(?SET_TYPE),
+    ok = lasp:product(Ads, Contracts, AdsContracts),
+
+    %% Filter items by join on item it.
+    {ok, {AdsWithContracts, _, _, _}} = lasp:declare(?ADS_WITH_CONTRACTS, ?SET_TYPE),
+    FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
+        Id1 =:= Id2
+    end,
+    ok = lasp:filter(AdsContracts, FilterFun, AdsWithContracts),
 
     {ok, #state{actor=Actor}}.
 
@@ -96,3 +126,28 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+%% @doc Generate advertisements and advertisement contracts.
+create_ads_and_contracts(Ads, Contracts) ->
+    AdIds = lists:map(fun(_) ->
+                              {ok, Unique} = lasp_unique:unique(),
+                              Unique
+                      end, lists:seq(1, 10)),
+    lists:map(fun(Id) ->
+                {ok, _} = lasp:update(Contracts,
+                                      {add, #contract{id=Id}},
+                                      node())
+                end, AdIds),
+    lists:map(fun(Id) ->
+                %% Generate a G-Counter.
+                {ok, {CounterId, _, _, _}} = lasp:declare(?COUNTER_TYPE),
+
+                Ad = #ad{id=Id, counter=CounterId},
+
+                %% Add it to the advertisement set.
+                {ok, _} = lasp:update(Ads, {add, Ad}, node()),
+
+                Ad
+
+                end, AdIds).
+

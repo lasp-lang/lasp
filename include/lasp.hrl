@@ -97,3 +97,4 @@
 %% Test identifiers.
 -define(ADS_WITH_CONTRACTS, <<"ads_with_contracts">>).
 -define(SET_TYPE, orset).
+-define(COUNTER_TYPE, gcounter).

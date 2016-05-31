@@ -27,6 +27,29 @@ $(document).ready(function() {
     }
   });
 
+
+  $.get("/api/dag", function(data) {
+      var contents = data.dot_content || [];
+      var stringContents = contents.map(function(e) {
+          return String.fromCharCode(e);
+      }).join("");
+
+      $(".dag").empty();
+      $(".dag").append(Viz(stringContents));
+
+      setInterval(function() {
+          $.get("/api/dag", function(data) {
+              var contents = data.dot_content || [];
+              var stringContents = contents.map(function(e) {
+                  return String.fromCharCode(e);
+              }).join("");
+
+              $(".dag").empty()
+              $(".dag").append(Viz(stringContents));
+            });
+        }, 10000);
+  });
+
   $("#logo").fadeOut("slow", function() {
 
     $("#header").fadeIn();

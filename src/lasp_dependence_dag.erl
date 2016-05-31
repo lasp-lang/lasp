@@ -10,6 +10,10 @@
          add_vertex/1,
          add_vertices/1]).
 
+%% Utility
+-export([to_dot/0,
+         export_dot/1]).
+
 %% Test
 -export([n_vertices/0,
          n_edges/0,
@@ -64,6 +68,15 @@ will_form_cycle(Src, Dst) ->
 -spec add_edges(list(id()), id(), pid()) -> ok | error.
 add_edges(Src, Dst, Pid) ->
     gen_server:call(?MODULE, {add_edges, Src, Dst, Pid}, infinity).
+
+%% @doc Print the dot representation of the dag to stdout.
+-spec to_dot() -> ok.
+to_dot() ->
+  gen_server:call(?MODULE, to_dot, infinity).
+
+%% @doc Write the dot representation of the dag to the given file path.
+export_dot(Path) ->
+  gen_server:call(?MODULE, {export_dot, Path}, infinity).
 
 n_vertices() ->
     gen_server:call(?MODULE, n_vertices, infinity).
@@ -122,6 +135,14 @@ handle_call({add_vertex, V}, _From, #state{dag=Dag}=State) ->
 handle_call({add_vertices, Vs}, _From, #state{dag=Dag}=State) ->
     [digraph:add_vertex(Dag, V) || V <- Vs],
     {reply, ok, State};
+
+handle_call(to_dot, _From, #state{dag=Dag}=State) ->
+    io:format(to_dot(Dag)),
+    {reply, ok, State};
+
+handle_call({export_dot, Path}, _From, #state{dag=Dag}=State) ->
+    R = file:write_file(Path, to_dot(Dag)),
+    {reply, R, State};
 
 %% @doc Check if linking the given vertices will introduce a cycle in the graph.
 %%
@@ -199,3 +220,30 @@ is_edge_error({error, {bad_edge, _}}) ->
 
 is_edge_error(_) ->
     false.
+
+to_dot(Graph) ->
+    Start = ["digraph dag {\n"],
+    VertexList = digraph_utils:topsort(Graph),
+    DrawedVertices =  lists:foldl(fun(V, Acc) ->
+        Acc ++ v_str(V) ++ ";\n"
+    end, Start, VertexList),
+    unicode:characters_to_list(write_edges(Graph, VertexList, [], DrawedVertices) ++ "}\n").
+
+write_edges(G, [V | Vs], Visited, Result) ->
+    Edges = lists:map(fun(E) -> digraph:edge(G, E) end, digraph:out_edges(G, V)),
+    R = lists:foldl(fun({_, _, To, Label}, Acc) ->
+        case lists:member(To, Visited) of
+            true -> Acc;
+            false ->
+                Acc ++ v_str(V) ++ " -> " ++ v_str(To) ++
+                " [label=" ++ erlang:pid_to_list(Label) ++ "];\n"
+        end
+    end, Result, Edges),
+    write_edges(G, Vs, [V | Visited], R);
+
+write_edges(_G, [], _Visited, Result) ->
+    Result.
+
+%% @doc Generate an unique identifier for a vertex.
+v_str({Id, _}) ->
+  erlang:integer_to_list(erlang:phash2(Id)).

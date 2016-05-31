@@ -37,11 +37,9 @@
 -include("lasp.hrl").
 
 %% Macros.
--define(IMPRESSION_INTERVAL, 1000).
--define(LOG_INTERVAL, 10000).
 
 %% State record.
--record(state, {actor, impressions}).
+-record(state, {actor}).
 
 %%%===================================================================
 %%% API
@@ -64,13 +62,7 @@ init([]) ->
     %% Generate actor identifier.
     Actor = self(),
 
-    %% Schedule advertisement counter impression.
-    schedule_impression(),
-
-    %% Schedule logging.
-    schedule_logging(),
-
-    {ok, #state{actor=Actor, impressions=0}}.
+    {ok, #state{actor=Actor}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -87,41 +79,6 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(log, #state{impressions=Impressions}=State) ->
-    lager:info("Impressions: ~p", [Impressions]),
-
-    %% Schedule advertisement counter impression.
-    schedule_logging(),
-
-    {noreply, State};
-handle_info(view, #state{actor=Actor, impressions=Impressions}=State0) ->
-    %% Get current value of the list of advertisements.
-    {ok, Ads} = lasp:query({?ADS_WITH_CONTRACTS, ?SET_TYPE}),
-
-    %% Make sure we have ads...
-    State = case sets:size(Ads) of
-        0 ->
-            %% Do nothing.
-            State0;
-        Size ->
-            %% Select random.
-            Random = lasp_support:puniform(Size),
-
-            %% @todo Exposes internal details of record.
-            {{ad, _, _, Counter},
-             _Contract} = lists:nth(Random, sets:to_list(Ads)),
-
-            %% Increment counter.
-            {ok, _} = lasp:update(Counter, increment, Actor),
-
-            %% Increment impressions.
-            State0#state{impressions=Impressions+1}
-    end,
-
-    %% Schedule advertisement counter impression.
-    schedule_impression(),
-
-    {noreply, State};
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
@@ -139,11 +96,3 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-%% @private
-schedule_impression() ->
-    erlang:send_after(?IMPRESSION_INTERVAL, self(), view).
-
-%% @private
-schedule_logging() ->
-    erlang:send_after(?LOG_INTERVAL, self(), log).

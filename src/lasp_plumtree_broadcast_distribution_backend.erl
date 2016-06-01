@@ -539,7 +539,6 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    lager:info("Actor identifier is: ~p", [Actor]),
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_INCR(Actor), Store]),
@@ -567,6 +566,8 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 %% perform the update.
 handle_call({update, Id, Operation, Actor}, _From,
             #state{store=Store, counter=Counter}=State) ->
+    lager:info("Actor identifier is: ~p", [Actor]),
+    lager:info("Clock incr is: ~p", [?CLOCK_INCR(Actor)]),
     Result0 = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR(Actor), Store),
     {ok, Result} = declare_if_not_found(Result0, Id, State, ?CORE, update,
                                         [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
@@ -664,8 +665,6 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
         {ok, {_, _, Metadata, _}} ->
             OurClock = orddict:fetch(clock, Metadata),
             Stale = lasp_vclock:descends(OurClock, TheirClock),
-            lager:info("is_stale: ~p theirclock: ~p OurClock: ~p",
-                       [Stale, TheirClock, OurClock]),
             Stale;
         {error, _Error} ->
             false

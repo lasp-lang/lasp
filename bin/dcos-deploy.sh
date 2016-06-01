@@ -81,8 +81,8 @@ cat <<EOF > lasp.json
   "id": "lasp",
   "dependencies": [],
   "cpus": 1.0,
-  "mem": 8192.0,
-  "instances": 10,
+  "mem": 2048.0,
+  "instances": 30,
   "container": {
     "type": "DOCKER",
     "docker": {

@@ -564,6 +564,10 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 
 %% Perform an update, and ensure that we bump the logical clock as we
 %% perform the update.
+%%
+%% @todo We specifically ignore the user supplied actor and use the
+%%       actor identifier from the overlay.
+%%
 handle_call({update, Id, Operation, _Actor}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
     lager:info("Actor identifier is: ~p", [Actor]),

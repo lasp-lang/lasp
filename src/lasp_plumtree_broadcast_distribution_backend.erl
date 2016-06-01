@@ -862,14 +862,15 @@ broadcast({Id, Type, Metadata, Value}=Payload) ->
 
 %% @private
 local_bind(Id, Type, Metadata, Value) ->
+    lager:info("Local bind called."),
     case gen_server:call(?MODULE, {bind, Id, Metadata, Value}, infinity) of
         {error, not_found} ->
             {ok, _} = gen_server:call(?MODULE,
                                       {declare, Id, Metadata, Type},
                                       infinity),
-            lager:info("merged in remote state"),
             local_bind(Id, Type, Metadata, Value);
         {ok, X} ->
+           lager:info("merged in remote state"),
            {ok, X}
     end.
 

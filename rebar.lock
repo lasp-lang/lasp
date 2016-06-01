@@ -32,7 +32,7 @@
   0},
  {<<"plumtree">>,
   {git,"https://github.com/lasp-lang/plumtree",
-       {ref,"f762bffa30195731e7a78b8a22dd6112326bbb36"}},
+       {ref,"a65f12724666567b978e08fb94289f158acc428e"}},
   0},
  {<<"ranch">>,
   {git,"https://github.com/extend/ranch.git",

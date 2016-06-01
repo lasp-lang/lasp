@@ -924,7 +924,7 @@ schedule_memory_report() ->
 
 %% @private
 memory_report() ->
-    PlumtreeBroadcast = erlang:whereis_name(plumtree_broadcast),
+    PlumtreeBroadcast = erlang:whereis(plumtree_broadcast),
     lager:info("plumtree_broadcast message queue: ~p",
                [process_info(PlumtreeBroadcast, message_queue_len)]).
 

@@ -864,6 +864,7 @@ local_bind(Id, Type, Metadata, Value) ->
             {ok, _} = gen_server:call(?MODULE,
                                       {declare, Id, Metadata, Type},
                                       infinity),
+            lager:info("merged in remote state"),
             local_bind(Id, Type, Metadata, Value);
         {ok, X} ->
            {ok, X}

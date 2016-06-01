@@ -835,7 +835,6 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 broadcast({Id, Type, Metadata, Value}=Payload) ->
-    lager:info("Broadcast called for ~p", [Payload]),
     log_transmission(Payload),
     Clock = orddict:fetch(clock, Metadata),
     Broadcast = #broadcast{id=Id, clock=Clock, type=Type,

@@ -660,7 +660,7 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
     Result = case get(Id, Store) of
         {ok, {_, _, Metadata, _}} ->
             OurClock = orddict:fetch(clock, Metadata),
-            Stale = lasp_vclock:dominates(OurClock, TheirClock),
+            Stale = lasp_vclock:descends(OurClock, TheirClock),
             lager:info("is_stale: ~p theirclock: ~p OurClock: ~p",
                        [Stale, TheirClock, OurClock]),
             Stale;

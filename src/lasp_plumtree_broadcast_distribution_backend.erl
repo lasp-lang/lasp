@@ -199,6 +199,8 @@ graft({Id, Clock}) ->
 %% @doc Anti-entropy mechanism.
 -spec exchange(node()) -> {ok, pid()}.
 exchange(Peer) ->
+    lager:info("Exchange triggered with ~p", [Peer]),
+
     case lasp_config:get(mode, state_based) of
         delta_based ->
             %% Anti-entropy mechanism for causal consistency of delta-CRDT.

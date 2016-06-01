@@ -109,16 +109,16 @@
 
 %% Metadata mutation macros.
 
--define(CLOCK_INIT, fun(Metadata) ->
-            VClock = lasp_vclock:increment(Actor, lasp_vclock:fresh()),
-            orddict:store(clock, VClock, Metadata)
-    end).
+-define(CLOCK_INIT(BackendActor), fun(Metadata) ->
+                                    VClock = lasp_vclock:increment(BackendActor, lasp_vclock:fresh()),
+                                    orddict:store(clock, VClock, Metadata)
+                                  end).
 
--define(CLOCK_INCR, fun(Metadata) ->
-            Clock = orddict:fetch(clock, Metadata),
-            VClock = lasp_vclock:increment(Actor, Clock),
-            orddict:store(clock, VClock, Metadata)
-    end).
+-define(CLOCK_INCR(BackendActor), fun(Metadata) ->
+                                        Clock = orddict:fetch(clock, Metadata),
+                                        VClock = lasp_vclock:increment(BackendActor, Clock),
+                                        orddict:store(clock, VClock, Metadata)
+                                  end).
 
 -define(CLOCK_MERG, fun(Metadata) ->
             %% Incoming request has to have a clock, given it's coming
@@ -496,7 +496,7 @@ handle_call(reset, _From, #state{store=Store}=State) ->
 %% broadcast the value to the remote nodes.
 handle_call({declare, Id, Type}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    Result = ?CORE:declare(Id, Type, ?CLOCK_INIT, Store),
+    Result = ?CORE:declare(Id, Type, ?CLOCK_INIT(Actor), Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Incoming bind request, where we do not have information about the
@@ -517,7 +517,7 @@ handle_call({declare, Id, IncomingMetadata, Type}, _From,
 %% metadata and result in the broadcast operation.
 handle_call({declare_dynamic, Id, Type}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT, Store),
+    Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT(Actor), Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Stream values out of the Lasp system; using the values from this
@@ -537,9 +537,9 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR, Store),
+    Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
-                                  [Id, Value, ?CLOCK_INCR, Store]),
+                                  [Id, Value, ?CLOCK_INCR(Actor), Store]),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Incoming bind operation; merge incoming clock with the remote clock.
@@ -564,9 +564,9 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 %% perform the update.
 handle_call({update, Id, Operation, Actor}, _From,
             #state{store=Store, counter=Counter}=State) ->
-    Result0 = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR, Store),
+    Result0 = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR(Actor), Store),
     {ok, Result} = declare_if_not_found(Result0, Id, State, ?CORE, update,
-                                        [Id, Operation, Actor, ?CLOCK_INCR, Store]),
+                                        [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
     {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};
 
 %% Spawn a function.
@@ -806,8 +806,8 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
             #state{store=Store, actor=Actor}=State) ->
     _Result = ?CORE:receive_delta(Store, {delta_send,
                                           {Id, Type, _Metadata, Deltas},
-                                          ?CLOCK_INCR,
-                                          ?CLOCK_INIT}),
+                                          ?CLOCK_INCR(Actor),
+                                          ?CLOCK_INIT(Actor)}),
     gen_server:cast({?MODULE, From}, {delta_ack, node(), Id, Counter}),
     {noreply, State};
 
@@ -918,7 +918,7 @@ collect_deltas(Type, DeltaMap, Min0, Max) ->
 declare_if_not_found({error, not_found}, {StorageId, TypeId},
                      #state{store=Store, actor=Actor}, Module, Function, Args) ->
     {ok, {{StorageId, TypeId}, _, _, _}} = ?CORE:declare(StorageId, TypeId,
-                                                         ?CLOCK_INIT, Store),
+                                                         ?CLOCK_INIT(Actor), Store),
     erlang:apply(Module, Function, Args);
 declare_if_not_found(Result, _Id, _State, _Module, _Function, _Args) ->
     Result.

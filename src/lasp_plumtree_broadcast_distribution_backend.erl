@@ -539,6 +539,7 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    lager:info("Actor identifier is: ~p", [Actor]),
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_INCR(Actor), Store]),

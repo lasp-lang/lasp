@@ -82,6 +82,7 @@ all() ->
 %% ===================================================================
 
 setup_test(_Config) ->
+    timer:sleep(2000),
     ok.
 
 minimal_test(Config) ->

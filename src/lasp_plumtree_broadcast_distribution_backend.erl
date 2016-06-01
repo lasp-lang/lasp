@@ -662,7 +662,7 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
             OurClock = orddict:fetch(clock, Metadata),
             Stale = lasp_vclock:dominates(OurClock, TheirClock),
             lager:info("is_stale: ~p theirclock: ~p OurClock: ~p",
-                       [TheirClock, OurClock, Stale]),
+                       [Stale, TheirClock, OurClock]),
             Stale;
         {error, _Error} ->
             false

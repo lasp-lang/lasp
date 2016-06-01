@@ -83,7 +83,7 @@
                     metadata :: metadata(),
                     value :: value()}).
 
--define(MEMORY_INTERVAL, 1000).
+-define(MEMORY_INTERVAL, 10000).
 
 %% Definitions for the bind/read fun abstraction.
 
@@ -924,22 +924,9 @@ schedule_memory_report() ->
 
 %% @private
 memory_report() ->
-    MemoryData = {_, _, {BadPid, _}} = memsup:get_memory_data(),
-    _ = lager:info(""),
-    _ = lager:info("-----------------------------------------------------------", []),
-    _ = lager:info("Allocated areas: ~p", [erlang:system_info(allocated_areas)]),
-    try
-        _ = lager:info("Worst: ~p", [process_info(BadPid)]),
-        ok
-    catch
-        _:_ ->
-            %% Process might die while trying to get info.
-            ok
-    end,
-    _ = lager:info("Memory Data: ~p", [MemoryData]),
-    _ = lager:info("System memory data: ~p", [memsup:get_system_memory_data()]),
-    _ = lager:info("-----------------------------------------------------------", []),
-    _ = lager:info("").
+    PlumtreeBroadcast = erlang:whereis_name(plumtree_broadcast),
+    lager:info("plumtree_broadcast message queue: ~p",
+               [process_info(PlumtreeBroadcast, message_queue_len)]).
 
 -ifdef(TEST).
 

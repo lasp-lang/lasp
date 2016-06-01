@@ -42,6 +42,7 @@ cat <<EOF > lasp-orchestrator.json
   "ports": [0, 0],
   "env": {
     "AD_COUNTER_SIM_SERVER": "true",
+    "AD_COUNTER_SIM_CLIENT": "true",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"
   },
@@ -82,7 +83,7 @@ cat <<EOF > lasp.json
   "dependencies": [],
   "cpus": 1.0,
   "mem": 2048.0,
-  "instances": 10,
+  "instances": 1,
   "container": {
     "type": "DOCKER",
     "docker": {

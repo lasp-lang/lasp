@@ -41,7 +41,6 @@ cat <<EOF > lasp-orchestrator.json
   },
   "ports": [0, 0],
   "env": {
-    "INSTRUMENTATION": "true",
     "AD_COUNTER_SIM_SERVER": "true",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"

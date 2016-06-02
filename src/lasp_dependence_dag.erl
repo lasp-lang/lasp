@@ -6,7 +6,7 @@
 %% API
 -export([start_link/0,
          will_form_cycle/2,
-         add_edges/3,
+         add_edges/4,
          add_vertex/1,
          add_vertices/1]).
 
@@ -47,11 +47,17 @@
 -record(state, {dag :: digraph:graph(),
                 process_map :: process_map()}).
 
+%% We store the function metadata as the edge label.
+-record(edge_label, {pid :: pid(),
+                    read :: function(),
+                    transform :: function(),
+                    write :: function()}).
+
 %% Return type of digraph:edge/2
 -type edge() :: {digraph:edge(),
                  digraph:vertex(),
                  digraph:vertex(),
-                 term()}.
+                 #edge_label{}}.
 
 %%%===================================================================
 %%% API
@@ -82,9 +88,9 @@ will_form_cycle(Src, Dst) ->
 %%      either because it formed a loop, or because some of the
 %%      vertices weren't in the graph.
 %%
--spec add_edges(list(id()), id(), pid()) -> ok | error.
-add_edges(Src, Dst, Pid) ->
-    gen_server:call(?MODULE, {add_edges, Src, Dst, Pid}, infinity).
+-spec add_edges(list(id()), id(), pid(), list(term())) -> ok | error.
+add_edges(Src, Dst, Pid, FuncList) ->
+    gen_server:call(?MODULE, {add_edges, Src, Dst, Pid, FuncList}, infinity).
 
 %% @doc Return the dot representation as a string.
 -spec to_dot() -> {ok, string()} | {error, no_data}.
@@ -205,16 +211,31 @@ handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag}=State) ->
 %%
 %%      We monitor all edge Pids to know when they die or get restarted.
 %%
-handle_call({add_edges, Src, Dst, Pid}, _From, #state{dag=Dag, process_map=Pm}=State) ->
-    %% @todo Add metadata and duplicate checking.
-    Status = [digraph:add_edge(Dag, V, Dst, Pid) || V <- Src],
+handle_call({add_edges, Src, Dst, Pid, [ReadFuns, TransFun, {Dst, WriteFun}]},
+            _From, #state{dag=Dag, process_map=Pm}=State) ->
+
+    %% @todo Add duplicate checking.
+    %% For all V in Src, make edge (V, Dst) with label {Pid, Read, Trans, Write}
+    %% (where {Id, Read} = ReadFuns s.t. Id = V)
+    Status = lists:map(fun(V) ->
+        Read = lists:nth(1, [ReadF || {Id, ReadF} <- ReadFuns, Id =:= V]),
+        digraph:add_edge(Dag, V, Dst, #edge_label{pid=Pid,
+                                                  read=Read,
+                                                  transform=TransFun,
+                                                  write=WriteFun})
+    end, Src),
     {R, St} = case lists:any(fun is_graph_error/1, Status) of
         true -> {error, State};
         false ->
             erlang:monitor(process, Pid),
-            {ok, State#state{process_map=lists:foldl(fun(El, D) ->
+
+            %% For all V in Src, append Pid -> {V, Dst}
+            %% in the process map.
+            ProcessMap = lists:foldl(fun(El, D) ->
                 dict:append(Pid, {El, Dst}, D)
-            end, Pm, Src)}}
+            end, Pm, Src),
+
+            {ok, State#state{process_map=ProcessMap}}
     end,
     {reply, R, St}.
 
@@ -235,7 +256,7 @@ handle_cast(_Request, State) ->
 handle_info({'DOWN', _, process, Pid, _Reason}, #state{dag=Dag, process_map=PM}=State) ->
     {ok, Edges} = dict:find(Pid, PM),
     NewDag = lists:foldl(fun({F, T}, G) ->
-        delete_with_label(G, F, T, Pid)
+        delete_with_pid(G, F, T, Pid)
     end, Dag, Edges),
     {noreply, State#state{dag=NewDag, process_map=dict:erase(Pid, PM)}};
 
@@ -269,11 +290,12 @@ is_edge_error({error, {bad_edge, _}}) ->
 is_edge_error(_) ->
     false.
 
-%% @doc Delete all edges between Src and Dst with the given label.
--spec delete_with_label(digraph:graph(), id(), id(), term()) -> digraph:graph().
-delete_with_label(Graph, Src, Dst, Label) ->
+%% @doc Delete all edges between Src and Dst with the given pid..
+-spec delete_with_pid(digraph:graph(), id(), id(), term()) -> digraph:graph().
+delete_with_pid(Graph, Src, Dst, Pid) ->
     lists:foreach(fun
-        ({E, _, _, L}) when L =:= Label -> digraph:del_edge(Graph, E);
+        ({E, _, _, #edge_label{pid=TargetPid}}) when TargetPid =:= Pid ->
+            digraph:del_edge(Graph, E);
         (_) -> ok
     end, get_direct_edges(Graph, Src, Dst)),
     Graph.
@@ -330,12 +352,12 @@ to_dot(Graph) ->
 
 write_edges(G, [V | Vs], Visited, Result) ->
     Edges = lists:map(fun(E) -> digraph:edge(G, E) end, digraph:out_edges(G, V)),
-    R = lists:foldl(fun({_, _, To, Label}, Acc) ->
+    R = lists:foldl(fun({_, _, To, #edge_label{pid=Pid}}, Acc) ->
         case lists:member(To, Visited) of
             true -> Acc;
             false ->
                 Acc ++ v_str(V) ++ " -> " ++ v_str(To) ++
-                " [label=" ++ erlang:pid_to_list(Label) ++ "];\n"
+                " [label=" ++ erlang:pid_to_list(Pid) ++ "];\n"
         end
     end, Result, Edges),
     write_edges(G, Vs, [V | Visited], R);

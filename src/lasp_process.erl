@@ -76,8 +76,12 @@ init([ReadFuns, Function]) ->
 init([ReadFuns, TransFun, {To, _}=WriteFun]) ->
     From = [Id || {Id, _} <- ReadFuns],
     case lasp_config:get(dag_enabled, false) of
-        true -> lasp_dependence_dag:add_edges(From, To, self());
-        false -> ok
+        false -> ok;
+        true ->
+            lasp_dependence_dag:add_edges(From, To,
+                                          self(), [ReadFuns,
+                                                   TransFun,
+                                                   WriteFun])
     end,
     {ok, #state{read_funs=ReadFuns,
                 trans_fun=TransFun,

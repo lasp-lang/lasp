@@ -27,27 +27,41 @@ $(document).ready(function() {
     }
   });
 
+  var updateDag = function(data, cache) {
+        var cacheStatus, cacheContents;
+
+        var present = data.present || false;
+        var contents = data.dot_content || [];
+
+        if (cache !== undefined) {
+            cacheStatus = cache.status || false;
+            cacheContents = cache.dot_content || [];
+        }
+
+        if ((present === cacheStatus) && (contents.length === cacheContents.length)) {
+            return;
+        }
+
+        $(".dag").empty();
+
+        if (!present) {
+            $(".dag").append("<p>No graph data.</p>")
+            return;
+        }
+
+        var stringContents = contents.map(function(e) {
+            return String.fromCharCode(e);
+        }).join("");
+        $(".dag").append(Viz(stringContents));
+  };
 
   $.get("/api/dag", function(data) {
-      var contents = data.dot_content || [];
-      var stringContents = contents.map(function(e) {
-          return String.fromCharCode(e);
-      }).join("");
-
-      $(".dag").empty();
-      $(".dag").append(Viz(stringContents));
-
-      setInterval(function() {
+      updateDag(data, undefined);
+      setInterval(function(cache) {
           $.get("/api/dag", function(data) {
-              var contents = data.dot_content || [];
-              var stringContents = contents.map(function(e) {
-                  return String.fromCharCode(e);
-              }).join("");
-
-              $(".dag").empty()
-              $(".dag").append(Viz(stringContents));
-            });
-        }, 10000);
+              updateDag(data, cache)
+          });
+        }, 10000, data);
   });
 
   $("#logo").fadeOut("slow", function() {

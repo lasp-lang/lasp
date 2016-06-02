@@ -570,8 +570,6 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 %%
 handle_call({update, Id, Operation, CRDTActor}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    lager:info("Actor identifier is: ~p", [Actor]),
-    lager:info("Clock incr is: ~p", [?CLOCK_INCR(Actor)]),
     Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor), Store),
     {ok, Result} = declare_if_not_found(Result0, Id, State, ?CORE, update,
                                         [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
@@ -868,7 +866,6 @@ broadcast({Id, Type, Metadata, Value}=Payload) ->
 
 %% @private
 local_bind(Id, Type, Metadata, Value) ->
-    lager:info("Local bind called."),
     case gen_server:call(?MODULE, {bind, Id, Metadata, Value}, infinity) of
         {error, not_found} ->
             {ok, _} = gen_server:call(?MODULE,
@@ -876,7 +873,6 @@ local_bind(Id, Type, Metadata, Value) ->
                                       infinity),
             local_bind(Id, Type, Metadata, Value);
         {ok, X} ->
-           lager:info("merged in remote state"),
            {ok, X}
     end.
 

@@ -53,12 +53,14 @@ start_link(Args) ->
 %% @todo rename to start_link once all functions are tracked
 start_dag_link([ReadFuns, TransFun, {To, _}=WriteFun]) ->
     From = [Id || {Id, _} <- ReadFuns],
-    case lasp_dependence_dag:will_form_cycle(From, To) of
-        false ->
-            lasp_process_sup:start_child([ReadFuns, TransFun, WriteFun]);
-        true ->
-            %% @todo propagate errors
-            {ok, ignore}
+    case lasp_config:get(dag_enabled, false) of
+        false -> lasp_process_sup:start_child([ReadFuns, TransFun, WriteFun]);
+        true -> case lasp_dependence_dag:will_form_cycle(From, To) of
+            false -> lasp_process_sup:start_child([ReadFuns, TransFun, WriteFun]);
+            true ->
+                %% @todo propagate errors
+                {ok, ignore}
+        end
     end.
 
 %%%===================================================================
@@ -73,7 +75,10 @@ init([ReadFuns, Function]) ->
 
 init([ReadFuns, TransFun, {To, _}=WriteFun]) ->
     From = [Id || {Id, _} <- ReadFuns],
-    lasp_dependence_dag:add_edges(From, To, self()),
+    case lasp_config:get(dag_enabled, false) of
+        true -> lasp_dependence_dag:add_edges(From, To, self());
+        false -> ok
+    end,
     {ok, #state{read_funs=ReadFuns,
                 trans_fun=TransFun,
                 write_fun=WriteFun}}.

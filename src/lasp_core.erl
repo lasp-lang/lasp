@@ -269,7 +269,10 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
             %% Do nothing; make declare idempotent at each replica.
             {ok, {{Id, Type}, Type, Metadata, Value}};
         _ ->
-            lasp_dependence_dag:add_vertex({Id, Type}),
+            case lasp_config:get(dag_enabled, false) of
+                true -> lasp_dependence_dag:add_vertex({Id, Type});
+                false -> ok
+            end,
             Value = lasp_type:new(Type),
             Metadata = MetadataFun(MetadataNew),
             Counter0 = 0,

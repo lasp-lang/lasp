@@ -565,14 +565,14 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 %% Perform an update, and ensure that we bump the logical clock as we
 %% perform the update.
 %%
-%% @todo We specifically ignore the user supplied actor and use the
-%%       actor identifier from the overlay.
+%% The CRDT actor is used to distinguish actors *per-thread*, if
+%% necessary, where the vclock is serialized *per-node*.
 %%
-handle_call({update, Id, Operation, _Actor}, _From,
+handle_call({update, Id, Operation, CRDTActor}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
     lager:info("Actor identifier is: ~p", [Actor]),
     lager:info("Clock incr is: ~p", [?CLOCK_INCR(Actor)]),
-    Result0 = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR(Actor), Store),
+    Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor), Store),
     {ok, Result} = declare_if_not_found(Result0, Id, State, ?CORE, update,
                                         [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
     {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};

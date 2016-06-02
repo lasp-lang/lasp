@@ -126,7 +126,6 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
     {noreply, State#state{nodes=ConnectedNodes}};
 handle_info(?NODES_MESSAGE, State) ->
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
-    _ = lager:info("Currently connected nodes via distributed erlang: ~p", [nodes()]),
     _ = lager:info("Currently connected nodes via Lasp peer service: ~p", [lasp_peer_service:members()]),
     {noreply, State};
 handle_info(Msg, State) ->
@@ -184,7 +183,6 @@ maybe_connect(Nodes, SeenNodes) ->
 
 %% @private
 connect(Node) ->
-    lager:info("Connect issued for node: ~p", [Node]),
     lasp_peer_service:join(Node).
 
 %% @private

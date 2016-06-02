@@ -38,7 +38,7 @@
 -include("lasp.hrl").
 
 %% Macros.
--define(MAX_IMPRESSIONS, 50000).
+-define(MAX_IMPRESSIONS, 100).
 -define(LOG_INTERVAL, 10000).
 
 %% State record.
@@ -192,9 +192,10 @@ launch_triggers(AdList, Ads, Actor) ->
 %% @private
 trigger(#ad{counter=CounterId} = Ad, Ads, Actor) ->
     %% Blocking threshold read for max advertisement impressions.
-    {ok, _} = lasp:read(CounterId, {value, ?MAX_IMPRESSIONS}),
+    {ok, Value} = lasp:read(CounterId, {value, ?MAX_IMPRESSIONS}),
 
     lager:info("Threshold for ~p reached; disabling!", [Ad]),
+    lager:info("Counter: ~p", [Value]),
 
     %% Remove the advertisement.
     {ok, _} = lasp:update(Ads, {rmv, Ad}, Actor),

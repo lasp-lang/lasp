@@ -13,6 +13,8 @@ content_types_provided(Req, Ctx) ->
     {[{"application/json", to_json}], Req, Ctx}.
 
 to_json(ReqData, State) ->
-    {ok, DotFile} = lasp_dependence_dag:to_dot(),
-    Content = jsx:encode(#{dot_content => DotFile}),
-    {Content, ReqData, State}.
+    Status = case lasp_dependence_dag:to_dot() of
+        {ok, Content} -> #{present => true, dot_content => Content};
+        _ -> #{present => false}
+    end,
+    {jsx:encode(Status), ReqData, State}.

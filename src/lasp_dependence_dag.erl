@@ -70,11 +70,12 @@ add_edges(Src, Dst, Pid) ->
     gen_server:call(?MODULE, {add_edges, Src, Dst, Pid}, infinity).
 
 %% @doc Return the dot representation as a string.
--spec to_dot() -> {ok, string()}.
+-spec to_dot() -> {ok, string()} | {error, no_data}.
 to_dot() ->
   gen_server:call(?MODULE, to_dot, infinity).
 
 %% @doc Write the dot representation of the dag to the given file path.
+-spec export_dot(string()) -> ok | {error, no_data}.
 export_dot(Path) ->
   gen_server:call(?MODULE, {export_dot, Path}, infinity).
 
@@ -137,10 +138,13 @@ handle_call({add_vertices, Vs}, _From, #state{dag=Dag}=State) ->
     {reply, ok, State};
 
 handle_call(to_dot, _From, #state{dag=Dag}=State) ->
-    {reply, {ok, to_dot(Dag)}, State};
+    {reply, to_dot(Dag), State};
 
 handle_call({export_dot, Path}, _From, #state{dag=Dag}=State) ->
-    R = file:write_file(Path, to_dot(Dag)),
+    R = case to_dot(Dag) of
+        {ok, Content} -> file:write_file(Path, Content);
+        Error -> Error
+    end,
     {reply, R, State};
 
 %% @doc Check if linking the given vertices will introduce a cycle in the graph.
@@ -221,12 +225,15 @@ is_edge_error(_) ->
     false.
 
 to_dot(Graph) ->
-    Start = ["digraph dag {\n"],
-    VertexList = digraph_utils:topsort(Graph),
-    DrawedVertices =  lists:foldl(fun(V, Acc) ->
-        Acc ++ v_str(V) ++ " [fontcolor=black, style=filled, fillcolor=\"#613B93\"];\n"
-    end, Start, VertexList),
-    unicode:characters_to_list(write_edges(Graph, VertexList, [], DrawedVertices) ++ "}\n").
+    case digraph_utils:topsort(Graph) of
+        [] -> {error, no_data};
+        VertexList ->
+            Start = ["digraph dag {\n"],
+            DrawedVertices =  lists:foldl(fun(V, Acc) ->
+                Acc ++ v_str(V) ++ " [fontcolor=black, style=filled, fillcolor=\"#613B93\"];\n"
+            end, Start, VertexList),
+            {ok, unicode:characters_to_list(write_edges(Graph, VertexList, [], DrawedVertices) ++ "}\n")}
+    end.
 
 write_edges(G, [V | Vs], Visited, Result) ->
     Edges = lists:map(fun(E) -> digraph:edge(G, E) end, digraph:out_edges(G, V)),

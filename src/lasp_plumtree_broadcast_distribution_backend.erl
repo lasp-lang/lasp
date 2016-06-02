@@ -66,6 +66,9 @@
          terminate/2,
          code_change/3]).
 
+%% debug callbacks
+-export([local_bind/4]).
+
 -export([broadcast/1]).
 
 -include("lasp.hrl").
@@ -182,7 +185,8 @@ merge({Id, Clock}, {Id, Type, Metadata, Value}=Payload) ->
         true ->
             false;
         false ->
-            {ok, _} = local_bind(Id, Type, Metadata, Value),
+            {Time, {ok, _}} = timer:tc(?MODULE, local_bind, [Id, Type, Metadata, Value]),
+            lager:info("Merge time: ~p", [Time]),
             true
     end.
 

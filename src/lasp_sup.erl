@@ -109,19 +109,19 @@ init(_Args) ->
                             permanent, 5000, worker,
                             [lasp_marathon_peer_refresh_service]},
 
-    BaseSpecs = [Unique,
-                 Partisan,
-                 PlumtreeBackend,
-                 Plumtree,
-                 MarathonPeerRefresh,
-                 Process,
-                 Web],
+    BaseSpecs0 = [Unique,
+                  Partisan,
+                  PlumtreeBackend,
+                  Plumtree,
+                  MarathonPeerRefresh,
+                  Process,
+                  Web],
 
     DagEnabled = application:get_env(?APP, dag_enabled, false),
     lasp_config:set(dag_enabled, DagEnabled),
     BaseSpecs = case DagEnabled of
-        true -> BaseSpecs ++ DepDag;
-        false -> BaseSpecs
+        true -> [DepDag | BaseSpecs0];
+        false -> BaseSpecs0
     end,
 
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),

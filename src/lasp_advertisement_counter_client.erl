@@ -94,7 +94,7 @@ handle_info(log, #state{impressions=Impressions}=State) ->
 
     lager:info("Impressions: ~p", [Impressions]),
 
-    lager:info("Current advertisement list: ~p", [AdList]),
+    lager:info("Current advertisement list size: ~p", [length(AdList)]),
 
     %% Schedule advertisement counter impression.
     schedule_logging(),

@@ -125,8 +125,9 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
 
     {noreply, State#state{nodes=ConnectedNodes}};
 handle_info(?NODES_MESSAGE, State) ->
+    {ok, Nodes} = lasp_peer_service:members(),
+    _ = lager:info("Currently connected nodes via peer service: ~p", [Nodes]),
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
-    _ = lager:info("Currently connected nodes via Lasp peer service: ~p", [lasp_peer_service:members()]),
     {noreply, State};
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),

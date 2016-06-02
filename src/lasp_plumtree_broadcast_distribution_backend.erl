@@ -457,6 +457,11 @@ reset() ->
 %% @private
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
+    %% Seed the process at initialization.
+    random:seed(erlang:phash2([node()]),
+                erlang:monotonic_time(),
+                erlang:unique_integer()),
+
     {ok, Actor} = lasp_unique:unique(),
 
     Counter = 0,
@@ -930,7 +935,7 @@ schedule_memory_report() ->
 %% @private
 memory_report() ->
     PlumtreeBroadcast = erlang:whereis(plumtree_broadcast),
-    lager:info("plumtree_broadcast message queue: ~p",
+    lager:info("Plumtree message queue: ~p",
                [process_info(PlumtreeBroadcast, message_queue_len)]).
 
 -ifdef(TEST).

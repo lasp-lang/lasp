@@ -110,13 +110,11 @@
 %% Metadata mutation macros.
 
 -define(CLOCK_INIT(BackendActor), fun(Metadata) ->
-                                    lager:info("Initializing clock for actor ~p", [BackendActor]),
                                     VClock = lasp_vclock:increment(BackendActor, lasp_vclock:fresh()),
                                     orddict:store(clock, VClock, Metadata)
                                   end).
 
 -define(CLOCK_INCR(BackendActor), fun(Metadata) ->
-                                        lager:info("Incrementing clock for actor ~p", [BackendActor]),
                                         Clock = orddict:fetch(clock, Metadata),
                                         VClock = lasp_vclock:increment(BackendActor, Clock),
                                         orddict:store(clock, VClock, Metadata)

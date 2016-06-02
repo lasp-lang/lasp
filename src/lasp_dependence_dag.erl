@@ -15,7 +15,9 @@
          export_dot/1]).
 
 %% Test
+%% @todo Only export on test.
 -export([n_vertices/0,
+         process_map/0,
          n_edges/0,
          out_degree/1,
          in_degree/1,
@@ -34,7 +36,22 @@
 %%% Type definitions
 %%%===================================================================
 
--record(state, {dag :: digraph:graph()}).
+%% We store a mapping Pid -> [{parent_node, child_node}] to
+%% find the edge labeled with it without traversing the graph.
+%%
+%% This is useful when the Pid of a lasp process changes
+%% (because it gets restarted or it just terminates), as it
+%% lets us quickly delete those edges.
+-type process_map() :: dict:dict(pid(), {id(), id()}).
+
+-record(state, {dag :: digraph:graph(),
+                process_map :: process_map()}).
+
+%% Return type of digraph:edge/2
+-type edge() :: {digraph:edge(),
+                 digraph:vertex(),
+                 digraph:vertex(),
+                 term()}.
 
 %%%===================================================================
 %%% API
@@ -97,15 +114,18 @@ out_edges(V) ->
 in_edges(V) ->
     gen_server:call(?MODULE, {in_edges, V}, infinity).
 
+process_map() ->
+    gen_server:call(?MODULE, get_process_map, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
 %% @doc Initialize state.
 init([]) ->
-    {ok, #state{dag=digraph:new([acyclic])}}.
+    {ok, #state{dag=digraph:new([acyclic]),
+                process_map=dict:new()}}.
 
-%% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
@@ -147,9 +167,12 @@ handle_call({export_dot, Path}, _From, #state{dag=Dag}=State) ->
     end,
     {reply, R, State};
 
+handle_call(get_process_map, _From, #state{process_map=PM}=State) ->
+    {reply, {ok, dict:to_list(PM)}, State};
+
 %% @doc Check if linking the given vertices will introduce a cycle in the graph.
 %%
-%%      Naive approach first: see if To is a member of From
+%%      Naive approach first: check if To is a member of From
 %%
 %%      Second approach: let the digraph module figure it out,
 %%      as digraph:add_edge/3 will return {error, {bad_edge, _}}.
@@ -179,14 +202,21 @@ handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag}=State) ->
     {reply, Response, State};
 
 %% @doc For all V in Src, create an edge from V to Dst labelled with Pid.
-handle_call({add_edges, Src, Dst, Pid}, _From, #state{dag=Dag}=State) ->
+%%
+%%      We monitor all edge Pids to know when they die or get restarted.
+%%
+handle_call({add_edges, Src, Dst, Pid}, _From, #state{dag=Dag, process_map=Pm}=State) ->
     %% @todo Add metadata and duplicate checking.
     Status = [digraph:add_edge(Dag, V, Dst, Pid) || V <- Src],
-    R = case lists:any(fun is_graph_error/1, Status) of
-        false -> ok;
-        true -> error
+    {R, St} = case lists:any(fun is_graph_error/1, Status) of
+        true -> {error, State};
+        false ->
+            erlang:monitor(process, Pid),
+            {ok, State#state{process_map=lists:foldl(fun(El, D) ->
+                dict:append(Pid, {El, Dst}, D)
+            end, Pm, Src)}}
     end,
-    {reply, R, State}.
+    {reply, R, St}.
 
 %% @private
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
@@ -195,7 +225,22 @@ handle_cast(_Request, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(_Info, State) ->
+
+%% @doc Remove the edges associated with a lasp process when it terminates.
+%%
+%%      Given that lasp processes might get restarted or terminated,
+%%      we have to know when it happens so we can delete the appropiate
+%%      edges in the graph.
+%%
+handle_info({'DOWN', _, process, Pid, _Reason}, #state{dag=Dag, process_map=PM}=State) ->
+    {ok, Edges} = dict:find(Pid, PM),
+    NewDag = lists:foldl(fun({F, T}, G) ->
+        delete_with_label(G, F, T, Pid)
+    end, Dag, Edges),
+    {noreply, State#state{dag=NewDag, process_map=dict:erase(Pid, PM)}};
+
+handle_info(Msg, State) ->
+    _ = lager:warning("Unhandled messages ~p", [Msg]),
     {noreply, State}.
 
 %% @private
@@ -223,6 +268,54 @@ is_edge_error({error, {bad_edge, _}}) ->
 
 is_edge_error(_) ->
     false.
+
+%% @doc Delete all edges between Src and Dst with the given label.
+-spec delete_with_label(digraph:graph(), id(), id(), term()) -> digraph:graph().
+delete_with_label(Graph, Src, Dst, Label) ->
+    lists:foreach(fun
+        ({E, _, _, L}) when L =:= Label -> digraph:del_edge(Graph, E);
+        (_) -> ok
+    end, get_direct_edges(Graph, Src, Dst)),
+    Graph.
+
+%% @doc Return all direct edges linking V1 and V2.
+%%
+%%      If V1 and V2 are not linked, return the empty list.
+%%
+%%      Otherwise, get all emanating edges from V1, and return
+%%      only the ones linking to V2.
+%%
+-spec get_direct_edges(digraph:graph(),
+    digraph:vertex(), digraph:vertex()) -> list(edge()).
+
+get_direct_edges(G, V1, V2) ->
+  case directly_connected(G, V1, V2) of
+    false -> [];
+    true ->
+      lists:flatmap(fun(Ed) ->
+        case digraph:edge(G, Ed) of
+          {_, _, To, _}=E when To =:= V2 -> [E];
+          _ -> []
+        end
+                    end, digraph:out_edges(G, V1))
+  end.
+
+%% @doc Are V1 and V2 linked directly?
+%%
+%%      digraph:get_short_path/3 returns a list of vertices if V1 and V2
+%%      are connected, false otherwise.
+%%
+%%      If they are linked directly, this vertex list will only contain V1
+%%      and V2.
+%%
+-spec directly_connected(digraph:graph(),
+    digraph:vertex(), digraph:vertex()) -> boolean().
+
+directly_connected(G, V1, V2) ->
+  case digraph:get_short_path(G, V1, V2) of
+    [V1, V2] -> true;
+    _        -> false
+  end.
 
 to_dot(Graph) ->
     case digraph_utils:topsort(Graph) of

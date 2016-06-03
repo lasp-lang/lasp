@@ -6,7 +6,7 @@
 %% API
 -export([start_link/0,
          will_form_cycle/2,
-         add_edges/4,
+         add_edges/6,
          add_vertex/1,
          add_vertices/1]).
 
@@ -88,9 +88,9 @@ will_form_cycle(Src, Dst) ->
 %%      either because it formed a loop, or because some of the
 %%      vertices weren't in the graph.
 %%
--spec add_edges(list(id()), id(), pid(), list(term())) -> ok | error.
-add_edges(Src, Dst, Pid, FuncList) ->
-    gen_server:call(?MODULE, {add_edges, Src, Dst, Pid, FuncList}, infinity).
+-spec add_edges(list(id()), id(), pid(), list({id(), function()}), function(), {id(), function()}) -> ok | error.
+add_edges(Src, Dst, Pid, ReadFuns, TransFun, WriteFun) ->
+    gen_server:call(?MODULE, {add_edges, Src, Dst, Pid, ReadFuns, TransFun, WriteFun}, infinity).
 
 %% @doc Return the dot representation as a string.
 -spec to_dot() -> {ok, string()} | {error, no_data}.
@@ -211,7 +211,7 @@ handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag}=State) ->
 %%
 %%      We monitor all edge Pids to know when they die or get restarted.
 %%
-handle_call({add_edges, Src, Dst, Pid, [ReadFuns, TransFun, {Dst, WriteFun}]},
+handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
             _From, #state{dag=Dag, process_map=Pm}=State) ->
 
     %% @todo Add duplicate checking.

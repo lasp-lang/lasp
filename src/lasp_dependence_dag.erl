@@ -308,19 +308,19 @@ delete_with_pid(Graph, Src, Dst, Pid) ->
 %%      only the ones linking to V2.
 %%
 -spec get_direct_edges(digraph:graph(),
-    digraph:vertex(), digraph:vertex()) -> list(edge()).
+                       digraph:vertex(), digraph:vertex()) -> list(edge()).
 
 get_direct_edges(G, V1, V2) ->
-  case directly_connected(G, V1, V2) of
-    false -> [];
-    true ->
-      lists:flatmap(fun(Ed) ->
-        case digraph:edge(G, Ed) of
-          {_, _, To, _}=E when To =:= V2 -> [E];
-          _ -> []
-        end
-                    end, digraph:out_edges(G, V1))
-  end.
+    case directly_connected(G, V1, V2) of
+        false -> [];
+        true ->
+            lists:flatmap(fun(Ed) ->
+                case digraph:edge(G, Ed) of
+                    {_, _, To, _}=E when To =:= V2 -> [E];
+                    _ -> []
+                end
+            end, digraph:out_edges(G, V1))
+    end.
 
 %% @doc Are V1 and V2 linked directly?
 %%
@@ -331,13 +331,13 @@ get_direct_edges(G, V1, V2) ->
 %%      and V2.
 %%
 -spec directly_connected(digraph:graph(),
-    digraph:vertex(), digraph:vertex()) -> boolean().
+                         digraph:vertex(), digraph:vertex()) -> boolean().
 
 directly_connected(G, V1, V2) ->
-  case digraph:get_short_path(G, V1, V2) of
-    [V1, V2] -> true;
-    _        -> false
-  end.
+    case digraph:get_short_path(G, V1, V2) of
+        [V1, V2] -> true;
+        _        -> false
+    end.
 
 to_dot(Graph) ->
     case digraph_utils:topsort(Graph) of
@@ -367,4 +367,4 @@ write_edges(_G, [], _Visited, Result) ->
 
 %% @doc Generate an unique identifier for a vertex.
 v_str({Id, _}) ->
-  erlang:integer_to_list(erlang:phash2(Id)).
+    erlang:integer_to_list(erlang:phash2(Id)).

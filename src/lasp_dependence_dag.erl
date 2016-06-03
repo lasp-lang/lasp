@@ -311,33 +311,12 @@ delete_with_pid(Graph, Src, Dst, Pid) ->
                        digraph:vertex(), digraph:vertex()) -> list(edge()).
 
 get_direct_edges(G, V1, V2) ->
-    case directly_connected(G, V1, V2) of
-        false -> [];
-        true ->
-            lists:flatmap(fun(Ed) ->
-                case digraph:edge(G, Ed) of
-                    {_, _, To, _}=E when To =:= V2 -> [E];
-                    _ -> []
-                end
-            end, digraph:out_edges(G, V1))
-    end.
-
-%% @doc Are V1 and V2 linked directly?
-%%
-%%      digraph:get_short_path/3 returns a list of vertices if V1 and V2
-%%      are connected, false otherwise.
-%%
-%%      If they are linked directly, this vertex list will only contain V1
-%%      and V2.
-%%
--spec directly_connected(digraph:graph(),
-                         digraph:vertex(), digraph:vertex()) -> boolean().
-
-directly_connected(G, V1, V2) ->
-    case digraph:get_short_path(G, V1, V2) of
-        [V1, V2] -> true;
-        _        -> false
-    end.
+    lists:flatmap(fun(Ed) ->
+        case digraph:edge(G, Ed) of
+            {_, _, To, _}=E when To =:= V2 -> [E];
+            _ -> []
+        end
+    end, digraph:out_edges(G, V1)).
 
 to_dot(Graph) ->
     case digraph_utils:topsort(Graph) of

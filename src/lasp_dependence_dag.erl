@@ -214,7 +214,6 @@ handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag}=State) ->
 handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
             _From, #state{dag=Dag, process_map=Pm}=State) ->
 
-    %% @todo Add duplicate checking.
     %% For all V in Src, make edge (V, Dst) with label {Pid, Read, Trans, Write}
     %% (where {Id, Read} = ReadFuns s.t. Id = V)
     Status = lists:map(fun(V) ->
@@ -234,6 +233,9 @@ handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
             ProcessMap = lists:foldl(fun(El, D) ->
                 dict:append(Pid, {El, Dst}, D)
             end, Pm, Src),
+
+            %% Merge all edges representing unary functions together
+            lists:foreach(fun(V) -> merge_unary(V, Dst, Dag) end, Src),
 
             {ok, State#state{process_map=ProcessMap}}
     end,
@@ -317,6 +319,89 @@ get_direct_edges(G, V1, V2) ->
             _ -> []
         end
     end, digraph:out_edges(G, V1)).
+
+%% @doc Direct edges linking V1 and V2 that represent a process with an arity.
+-spec get_direct_edges_with_arity(digraph:graph(), id(), id(), pos_integer()) -> [edge()].
+get_direct_edges_with_arity(G, V1, V2, Arity) ->
+    lists:filter(fun({_, _, _, L}) ->
+        fun_arity(L#edge_label.transform) =:= Arity
+    end, get_direct_edges(G, V1, V2)).
+
+%% @doc Collect all transform functions and associated Pids from a list of edges.
+-spec collect_transform_functions([edge()]) -> {[function()], [pid()]}.
+collect_transform_functions(Edges) ->
+    lists:foldl(fun({_, _, _, Label}, {Fs, Pids}) ->
+        {[Label#edge_label.transform | Fs], [Label#edge_label.pid | Pids]}
+    end, {[], []}, Edges).
+
+%% @doc Merge all edges between Src and Dst into one single edge.
+%%
+%%      For each edge connecting Src and Dst that represents a
+%%      function of arity 1, collect all transforming functions
+%%      into a new process that represents the union of all of them.
+%%
+-spec merge_unary(id(), id(), digraph:graph()) -> ok | pid().
+merge_unary(Src, Dst, G) ->
+    Edges = get_direct_edges_with_arity(G, Src, Dst, 1),
+    union_unary(Edges).
+
+%% @doc Given a list of edges, merge them together into a single one.
+%%
+%%      Collect all transform functions into a new one that performs
+%%      the union of all results. Then kill all old Pids and start a
+%%      new lasp process with the mentioned function.
+%%
+%%      Note: assumes all read and write functions are the same in all
+%%      edges.
+%%
+%%      @todo add support for deltas (see map:core/6)
+%%
+-spec union_unary([edge()]) -> ok | pid().
+union_unary([{_, Src, Dst, L}, _ | _]=Edges) ->
+    %% If we have less than 2 edges, we are already optimized.
+
+    Read = {Src, L#edge_label.read},
+
+    %% Gather all transform functions with their associated Pids.
+    {Transforms, Pids} = collect_transform_functions(Edges),
+
+    Write = {Dst, L#edge_label.write},
+
+    NewTransform = fun(V) ->
+        orset_union_list(lists:map(fun(F) -> F(V) end, Transforms))
+    end,
+
+    kill_then_start(Pids, [[Read], NewTransform, Write]);
+
+union_unary(_) -> ok.
+
+%% @doc Perform the orset union of all the elements in the list.
+orset_union_list([H | T]) ->
+    lists:foldl(fun(R, Acc) ->
+        state_orset_ext:union(R, Acc)
+    end, H, T).
+
+%% @doc Kill all given Pids and then start a new lasp process.
+%%
+%%      Old Pids that are killed will remove themselves from
+%%      the dag, and the new one will register automatically.
+%%
+%%      Execute in a new process, otherwise we block.
+%%
+kill_then_start(Pids, Args) ->
+    spawn(fun() ->
+        lists:foreach(fun(P) ->
+            ok = lasp_process_sup:terminate_child(lasp_process_sup, P)
+        end, Pids),
+        lasp_process:start_dag_link(Args)
+    end).
+
+-spec fun_arity(function()) -> non_neg_integer().
+fun_arity(F) when is_function(F) ->
+    {arity, N} = lists:keyfind(arity, 1, erlang:fun_info(F)),
+    N;
+
+fun_arity(_) -> 0.
 
 to_dot(Graph) ->
     case digraph_utils:topsort(Graph) of

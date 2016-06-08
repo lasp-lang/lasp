@@ -359,6 +359,10 @@ merge_unary(Src, Dst, G) ->
 -spec union_unary([edge()]) -> ok | pid().
 union_unary([{_, Src, Dst, L}, _ | _]=Edges) ->
     %% If we have less than 2 edges, we are already optimized.
+    %%
+    %% Since this function merges all edges representing unary
+    %% functions, the optimization should only execute when we
+    %% have more than 2 edges.
 
     Read = {Src, L#edge_label.read},
 

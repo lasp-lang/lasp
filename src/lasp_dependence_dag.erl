@@ -17,6 +17,7 @@
 %% Test
 %% @todo Only export on test.
 -export([n_vertices/0,
+         merge_unary_edges/2,
          process_map/0,
          n_edges/0,
          out_degree/1,
@@ -122,6 +123,9 @@ in_edges(V) ->
 
 process_map() ->
     gen_server:call(?MODULE, get_process_map, infinity).
+
+merge_unary_edges(Src, Dst) ->
+    gen_server:call(?MODULE, {merge_unary_edges, Src, Dst}, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -234,12 +238,13 @@ handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
                 dict:append(Pid, {El, Dst}, D)
             end, Pm, Src),
 
-            %% Merge all edges representing unary functions together
-            lists:foreach(fun(V) -> merge_unary(V, Dst, Dag) end, Src),
-
             {ok, State#state{process_map=ProcessMap}}
     end,
-    {reply, R, St}.
+    {reply, R, St};
+
+handle_call({merge_unary_edges, Src, Dst}, _From, #state{dag=Dag}=State) ->
+    merge_unary(Src, Dst, Dag),
+    {reply, ok, State}.
 
 %% @private
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.

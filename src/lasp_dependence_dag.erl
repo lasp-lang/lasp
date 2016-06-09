@@ -346,9 +346,12 @@ collect_transform_functions(Edges) ->
 %%      into a new process that represents the union of all of them.
 %%
 -spec merge_unary(id(), id(), digraph:graph()) -> ok | pid().
-merge_unary(Src, Dst, G) ->
+merge_unary({_, orset}=Src, Dst, G) ->
     Edges = get_direct_edges_with_arity(G, Src, Dst, 1),
-    union_unary(Edges).
+    union_unary(Edges);
+
+merge_unary(_, _, _) ->
+    ok.
 
 %% @doc Given a list of edges, merge them together into a single one.
 %%

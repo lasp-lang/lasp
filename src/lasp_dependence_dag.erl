@@ -214,7 +214,15 @@ handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag}=State) ->
 handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
             _From, #state{dag=Dag, process_map=Pm}=State) ->
 
-    %% @todo Add duplicate checking.
+    %% All other vertices are tracked at the `declare` level, but
+    %% stream is a special case. We check if it is already a vertex
+    %% in the graph since adding an already existing vertex removes
+    %% any previous vertex labels.
+    case (Dst =:= stream) andalso (digraph:vertex(Dag, Dst) =:= false) of
+        true -> digraph:add_vertex(Dag, Dst);
+        _ -> ok
+    end,
+
     %% For all V in Src, make edge (V, Dst) with label {Pid, Read, Trans, Write}
     %% (where {Id, Read} = ReadFuns s.t. Id = V)
     Status = lists:map(fun(V) ->
@@ -346,4 +354,7 @@ write_edges(_G, [], _Visited, Result) ->
 
 %% @doc Generate an unique identifier for a vertex.
 v_str({Id, _}) ->
-    erlang:integer_to_list(erlang:phash2(Id)).
+    erlang:integer_to_list(erlang:phash2(Id));
+
+v_str(stream) ->
+    erlang:atom_to_list(stream).

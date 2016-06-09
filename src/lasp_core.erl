@@ -746,7 +746,7 @@ stream(Id, Function, _Store, ReadFun) ->
         Function(lasp_type:query(T, V))
     end,
     WriteFun = fun(_, X) -> X end,
-    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {ignore, WriteFun}]).
+    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {stream, WriteFun}]).
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
 %%      change the reply and blocking replies.

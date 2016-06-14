@@ -43,6 +43,7 @@ cat <<EOF > lasp-orchestrator.json
   "env": {
     "AD_COUNTER_SIM_SERVER": "true",
     "AD_COUNTER_SIM_CLIENT": "true",
+    "MODE": "delta_based",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"
   },
@@ -95,6 +96,7 @@ cat <<EOF > lasp.json
   "ports": [0, 0],
   "env": {
     "AD_COUNTER_SIM_CLIENT": "true",
+    "MODE": "delta_based",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"
   },

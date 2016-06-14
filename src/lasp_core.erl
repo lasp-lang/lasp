@@ -703,14 +703,8 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec map(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    TransFun = fun
-        ({_, _, _, V}) ->
-            state_orset_ext:map(Function, V);
-
-        %% A delta of the input will be transformed into a delta of the output
-        ({delta, {_, _, _, V}}) ->
-            AccValue = state_orset_ext:map(Function, V),
-            {delta, AccValue}
+    TransFun = fun({_, _, _, V}) ->
+            state_orset_ext:map(Function, V)
     end,
     lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
 

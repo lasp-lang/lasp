@@ -174,7 +174,8 @@ configure_defaults() ->
     lasp_config:set(profile, ProfileEnabled),
 
     %% Operation mode.
-    Mode = application:get_env(?APP, mode, state_based),
+    ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),
+    Mode = application:get_env(?APP, mode, ModeDefault),
     lasp_config:set(mode, Mode),
 
     %% Backend configurations.

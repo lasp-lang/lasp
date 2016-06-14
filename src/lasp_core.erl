@@ -30,7 +30,6 @@
          bind_to/3,
          read/2,
          read/3,
-         read_delta/3,
          read_any/2,
          declare/1,
          declare/2,
@@ -196,32 +195,6 @@ read(Id, Threshold, Store) ->
                 end
             end,
     read(Id, Threshold, Store, Self, ReplyFun, BlockingFun).
-
-%% @doc Perform a delta read for a particular identifier.
-%%
-%%      Given an `Id', perform a blocking read until a delta is
-%%      delivered.
-%%
-%%      This operation blocks until any deltas have been delivered.
-%%
--spec read_delta(id(), value(), store()) -> {ok, {delta, var()}}.
-read_delta(Id, Threshold, Store) ->
-    case Threshold of
-        {strict, undefined} ->
-            %% The first run uses the current value.
-            lasp:read(Id, undefined);
-        {strict, _} ->
-            %% From the second run, it always waits for a delta
-            %% (from the local or the remote).
-            Self = self(),
-            {ok, Object} = do(get, [Store, Id]),
-            WDT = lists:append(Object#dv.waiting_delta_threads, [{delta, Self}]),
-            do(put, [Store, Id, Object#dv{waiting_delta_threads=WDT}]),
-            receive
-                X ->
-                    X
-            end
-    end.
 
 %% @doc Perform a monotonic read for a series of given idenfitiers --
 %%      first response wins.

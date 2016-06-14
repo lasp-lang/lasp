@@ -27,7 +27,6 @@
          update/4,
          merge/3,
          threshold_met/3,
-         is_delta/1,
          is_inflation/3,
          is_strict_inflation/3,
          query/2]).
@@ -63,11 +62,6 @@ remove_args({T, _Args}) ->
     T;
 remove_args(T) ->
     T.
-
-is_delta({_Type, {delta, _CRDT}}) ->
-    true;
-is_delta(_) ->
-    false.
 
 %% @doc Is strict inflation?
 is_strict_inflation(Type, Previous, Current) ->

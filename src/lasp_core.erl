@@ -410,14 +410,14 @@ bind(Id, Value, MetadataFun, Store) ->
                             {ok, SW} = reply_to_all(WT, [],
                                                     {ok, {Id, Type, Metadata, Merged}}),
 
-                            {ok, SWD, Counter, DeltaMap} = case lasp_type:is_delta(Value) of
-                                true ->
+                            {ok, SWD, Counter, DeltaMap} = case lasp_config:get(mode, state_based) of
+                                state_based ->
+                                    {ok, WDT, Counter0, DeltaMap0};
+                                delta_based ->
                                     {ok, SWD1} = reply_to_all(WDT, [],
                                                               {ok, {Id, Type, Metadata, Value}}),
                                     DeltaMap1 = store_delta(Type, Counter0, Value, DeltaMap0),
-                                    {ok, SWD1, increment_counter(Counter0), DeltaMap1};
-                                false ->
-                                    {ok, WDT, Counter0, DeltaMap0}
+                                    {ok, SWD1, increment_counter(Counter0), DeltaMap1}
                             end,
                             NewObject = #dv{type=Type, metadata=Metadata, value=Merged,
                                             waiting_delta_threads=SWD, waiting_threads=SW,

@@ -37,7 +37,7 @@
 -include("lasp.hrl").
 
 %% Macros.
--define(IMPRESSION_INTERVAL, 1000).
+-define(IMPRESSION_INTERVAL, 10000).
 -define(LOG_INTERVAL, 10000).
 
 %% State record.
@@ -148,7 +148,9 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 schedule_impression() ->
-    erlang:send_after(?IMPRESSION_INTERVAL, self(), view).
+    %% Add random jitter.
+    Jitter = random:uniform(?IMPRESSION_INTERVAL),
+    erlang:send_after(?IMPRESSION_INTERVAL + Jitter, self(), view).
 
 %% @private
 schedule_logging() ->

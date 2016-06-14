@@ -485,12 +485,15 @@ orset_test(_Config) ->
     timer:sleep(4000),
 
     %% Verify the same value is contained by all.
-    ?assertMatch({ok, {_, _, _, S2}}, lasp:read(L3, {strict, undefined})),
-    ?assertMatch({ok, {_, _, _, S2}}, lasp:read(L2, {strict, undefined})),
-    ?assertMatch({ok, {_, _, _, S2}}, lasp:read(L1, {strict, undefined})),
+    {ok, {_, _, _, S2L3}} = lasp:read(L3, {strict, undefined}),
+    ?assertEqual(S2L3, lasp_type:merge(?SET, S2, S2L3)),
+    {ok, {_, _, _, S2L2}} = lasp:read(L2, {strict, undefined}),
+    ?assertEqual(S2L2, lasp_type:merge(?SET, S2, S2L2)),
+    {ok, {_, _, _, S2L1}} = lasp:read(L1, {strict, undefined}),
+    ?assertEqual(S2L1, lasp_type:merge(?SET, S2, S2L1)),
 
     %% Read at the S2 threshold level.
-    {ok, {_, _, _, S2}} = lasp:read(L1, S2),
+    {ok, {_, _, _, _}} = lasp:read(L1, S2),
 
     %% Wait for wait_needed to unblock.
     receive

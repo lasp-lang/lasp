@@ -9,6 +9,8 @@ script:
   - make xref
   - make dialyzer
   - make lint
+  - MODE=state_based make ct
+  - MODE=delta_based make ct
 notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D

@@ -84,7 +84,6 @@ all() ->
      monotonic_read_test,
      map_test,
      filter_test,
-     %%fold_test, @todo
      union_test,
      product_test,
      intersection_test
@@ -239,49 +238,6 @@ filter_test(_Config) ->
     {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
 
     ?assertEqual({ok, sets:from_list([1,2,3,4,5,6]), sets:from_list([2,4,6])},
-                 {ok, lasp_type:query(?SET, S1V4), lasp_type:query(?SET, S2V1)}),
-
-    ok.
-
-%% @doc Fold operation test.
-fold_test(_Config) ->
-    %% Create initial set.
-    {ok, {S1, _, _, _}} = lasp:declare(?SET),
-
-    %% Perform some operations.
-    ?assertMatch({ok, _},
-                 lasp:update(S1, {add_all, [1,2,3]}, a)),
-    ?assertMatch({ok, _},
-                 lasp:update(S1, {rmv_all, [2,3]}, b)),
-    ?assertMatch({ok, _},
-                 lasp:update(S1, {add, 2}, c)),
-
-    %% Create second set.
-    {ok, {S2, _, _, _}} = lasp:declare(?COUNTER),
-
-    %% Define the fold function.
-    FoldFun = fun(X, _Acc) ->
-                      case (X band 1) == 0 of
-                          true ->
-                              [{increment, 1}];
-                          false ->
-                              []
-                      end
-              end,
-
-    %% Apply fold.
-    ?assertMatch(ok, lasp:fold(S1, FoldFun, S2)),
-
-    %% Wait.
-    timer:sleep(4000),
-
-    %% Read resulting value.
-    {ok, {_, _, _, S1V4}} = lasp:read(S1, {strict, undefined}),
-
-    %% Read resulting value.
-    {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
-
-    ?assertEqual({ok, [1,2], 1},
                  {ok, lasp_type:query(?SET, S1V4), lasp_type:query(?SET, S2V1)}),
 
     ok.

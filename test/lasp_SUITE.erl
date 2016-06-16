@@ -416,7 +416,7 @@ orset_test(_Config) ->
 
     %% Attempt pre, and post- dataflow variable bind operations.
     ?assertMatch(ok, lasp:bind_to(L2, L1)),
-    ?assertMatch({ok, _}, lasp:update(L1, {add, 1}, a)),
+    {ok, {_, _, _, S2}} = lasp:update(L1, {add, 1}, a),
     ?assertMatch(ok, lasp:bind_to(L3, L1)),
 
     timer:sleep(4000),
@@ -425,9 +425,6 @@ orset_test(_Config) ->
     {ok, {_, _, _, S1}} = lasp:read(L3, {strict, undefined}),
     {ok, {_, _, _, S1}} = lasp:read(L2, {strict, undefined}),
     {ok, {_, _, _, S1}} = lasp:read(L1, {strict, undefined}),
-
-    %% Test inflations.
-    {ok, S2} = lasp_type:update(?SET, {add, 2}, a, S1),
 
     Self = self(),
 

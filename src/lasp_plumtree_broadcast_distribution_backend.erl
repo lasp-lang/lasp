@@ -800,10 +800,16 @@ handle_call(Msg, _From, State) ->
 handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
             #state{store=Store, actor=Actor}=State) ->
     lager:info("Delta received from: ~p for ~p", [From, Counter]),
-    Result = ?CORE:receive_delta(Store, {delta_send,
-                                         {Id, Type, _Metadata, Deltas},
-                                         ?CLOCK_INCR(Actor),
-                                         ?CLOCK_INIT(Actor)}),
+    Result = try
+                ?CORE:receive_delta(Store, {delta_send,
+                                           {Id, Type, _Metadata, Deltas},
+                                           ?CLOCK_INCR(Actor),
+                                           ?CLOCK_INIT(Actor)})
+             catch
+                 _:Error ->
+                     lager:info("Threw: ~p", [Error]),
+                     Error
+             end,
     lager:info("Result of delta receive: ~p", [Result]),
     send({delta_ack, node(), Id, Counter}, From),
     {noreply, State};

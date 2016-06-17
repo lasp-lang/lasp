@@ -954,5 +954,4 @@ log_transmission(Term) ->
 send(Msg, Peer) ->
     PeerServiceManager = lasp_config:get(peer_service_manager,
                                          partisan_peer_service),
-    lager:info("PeerServiceManager: ~p", [PeerServiceManager]),
     PeerServiceManager:forward_message(Peer, ?MODULE, Msg).

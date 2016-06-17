@@ -846,14 +846,12 @@ reply_to_all([], StillWaiting, _Result) ->
     ok | error.
 receive_delta(Store, {delta_send, {Id, Type, Metadata, Deltas},
                       MetadataFunBind, MetadataFunDeclare}) ->
-    lager:info("Receive delta called."),
     case do(get, [Store, Id]) of
         {ok, _Object} ->
-            lager:info("Object ~p found.", [Id]),
             {ok, _Result} = bind(Id, Deltas, MetadataFunBind, Store);
         {error, not_found} ->
             lager:info("Object ~p not found.", [Id]),
-            {ok, Result} = declare(Id, Type, MetadataFunDeclare, Store),
+            {ok, {Id, Type, _, _} = Result} = declare(Id, Type, MetadataFunDeclare, Store),
             lager:info("Declare called: ~p, result: ~p", [Id, Result]),
             receive_delta(Store, {delta_send, {Id, Type, Metadata, Deltas},
                                   MetadataFunBind, MetadataFunDeclare})

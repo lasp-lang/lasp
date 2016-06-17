@@ -952,8 +952,7 @@ log_transmission(Term) ->
 
 %% @private
 send(Msg, Peer) ->
-    PeerService = application:get_env(plumtree,
-                                      peer_service,
-                                      partisan_peer_service),
-    PeerServiceManager = PeerService:manager(),
+    PeerServiceManager = lasp_config:get(peer_service_manager,
+                                         partisan_peer_service),
+    lager:info("PeerServiceManager: ~p", [PeerServiceManager]),
     PeerServiceManager:forward_message(Peer, ?MODULE, Msg).

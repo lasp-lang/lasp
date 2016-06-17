@@ -179,6 +179,13 @@ configure_defaults() ->
     lager:info("Setting operation mode: ~p", [Mode]),
     lasp_config:set(mode, Mode),
 
+    %% Peer service.
+    PeerService = application:get_env(plumtree,
+                                      peer_service,
+                                      partisan_peer_service),
+    PeerServiceManager = PeerService:manager(),
+    lasp_config:set(peer_service_manager, PeerServiceManager),
+
     %% Backend configurations.
     StorageBackend = application:get_env(
                        ?APP,

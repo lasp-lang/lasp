@@ -210,7 +210,6 @@ exchange(Peer) ->
             MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
             case GCCounter == MaxGCCounter of
                 true ->
-                    lager:info("Triggering delta-GC."),
                     gen_server:call(?MODULE, delta_gc, infinity);
                 false ->
                     {ok, Pid}
@@ -680,6 +679,7 @@ handle_call({exchange, Peer}, _From, #state{store=Store, gc_counter=GCCounter}=S
                                  error ->
                                      0
                              end,
+                       lager:info("Peer ~p last acked: ~p of ~p", [Peer, Ack, Counter]),
                        case Ack < Counter of
                            true ->
                                Causality = case orddict:fetch_keys(DeltaMap) of

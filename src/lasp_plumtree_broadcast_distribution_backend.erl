@@ -201,6 +201,8 @@ graft({Id, Clock}) ->
 %% @doc Anti-entropy mechanism.
 -spec exchange(node()) -> {ok, pid()}.
 exchange(Peer) ->
+    lager:info("Exchange called with peer: ~p", [Peer]),
+
     case lasp_config:get(mode, state_based) of
         delta_based ->
             %% Anti-entropy mechanism for causal consistency of delta-CRDT.
@@ -208,6 +210,7 @@ exchange(Peer) ->
             MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
             case GCCounter == MaxGCCounter of
                 true ->
+                    lager:info("Triggering delta-GC."),
                     gen_server:call(?MODULE, delta_gc, infinity);
                 false ->
                     {ok, Pid}

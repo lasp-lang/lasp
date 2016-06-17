@@ -36,7 +36,10 @@ cat <<EOF > lasp-orchestrator.json
     "docker": {
       "image": "cmeiklejohn/lasp-dev",
       "network": "HOST",
-      "forcePullImage": true
+      "forcePullImage": true,
+      "parameters": [
+        { "key": "oom-kill-disable", "value": "true" }
+      ]
     }
   },
   "ports": [0, 0],
@@ -90,7 +93,10 @@ cat <<EOF > lasp.json
     "docker": {
       "image": "cmeiklejohn/lasp-dev",
       "network": "HOST",
-      "forcePullImage": true
+      "forcePullImage": true,
+      "parameters": [
+        { "key": "oom-kill-disable", "value": "true" }
+      ]
     }
   },
   "ports": [0, 0],

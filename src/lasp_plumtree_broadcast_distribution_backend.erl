@@ -677,10 +677,8 @@ handle_call({exchange, Peer}, _From, #state{store=Store, gc_counter=GCCounter}=S
                                  {ok, {Ack0, _GCed}} ->
                                      Ack0;
                                  error ->
-                                     lager:info("Peer not in ackmap: ~p", [Peer]),
                                      0
                              end,
-                       lager:info("Peer ~p last acked: ~p of ~p", [Peer, Ack, Counter]),
                        case Ack < Counter of
                            true ->
                                Causality = case orddict:fetch_keys(DeltaMap) of

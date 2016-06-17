@@ -850,9 +850,7 @@ receive_delta(Store, {delta_send, {Id, Type, Metadata, Deltas},
         {ok, _Object} ->
             {ok, _Result} = bind(Id, Deltas, MetadataFunBind, Store);
         {error, not_found} ->
-            lager:info("Object ~p not found.", [Id]),
             {ok, {Id, Type, _, _} = Result} = declare(Id, Type, MetadataFunDeclare, Store),
-            lager:info("Declare called: ~p, result: ~p", [Id, Result]),
             receive_delta(Store, {delta_send, {Id, Type, Metadata, Deltas},
                                   MetadataFunBind, MetadataFunDeclare})
     end,

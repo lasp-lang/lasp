@@ -47,7 +47,7 @@ cat <<EOF > lasp-orchestrator.json
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"
   },
-  "labels":{
+  "labels": {
       "HAPROXY_GROUP":"external",
       "HAPROXY_0_VHOST":"$ELB_HOST"
   },

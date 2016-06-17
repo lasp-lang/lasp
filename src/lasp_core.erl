@@ -252,7 +252,7 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
             DeltaMap0 = orddict:new(),
             AckMap = orddict:new(),
             NewId = case Id of
-                        {Id, Type} ->
+                        {_, Type} ->
                             Id;
                         _ ->
                             {Id, Type}

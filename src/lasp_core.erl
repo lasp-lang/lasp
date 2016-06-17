@@ -850,7 +850,7 @@ receive_delta(Store, {delta_send, {Id, Type, Metadata, Deltas},
         {ok, _Object} ->
             {ok, _Result} = bind(Id, Deltas, MetadataFunBind, Store);
         {error, not_found} ->
-            {ok, {Id, Type, _, _} = Result} = declare(Id, Type, MetadataFunDeclare, Store),
+            {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
             receive_delta(Store, {delta_send, {Id, Type, Metadata, Deltas},
                                   MetadataFunBind, MetadataFunDeclare})
     end,

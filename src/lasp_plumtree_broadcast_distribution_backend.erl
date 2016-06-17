@@ -803,7 +803,7 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
                                           {Id, Type, _Metadata, Deltas},
                                           ?CLOCK_INCR(Actor),
                                           ?CLOCK_INIT(Actor)}),
-    gen_server:cast({?MODULE, From}, {delta_ack, node(), Id, Counter}),
+    send({delta_ack, node(), Id, Counter}, From),
     {noreply, State};
 
 handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->

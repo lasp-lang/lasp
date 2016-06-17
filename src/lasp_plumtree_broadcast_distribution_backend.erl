@@ -807,6 +807,7 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
     {noreply, State};
 
 handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
+    lager:info("Delta acknowledgement received from: ~p for ~p", [From, Counter]),
     _Result = ?CORE:receive_delta(Store, {delta_ack,
                                           Id,
                                           From,

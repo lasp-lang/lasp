@@ -695,11 +695,7 @@ handle_call({exchange, Peer}, _From, #state{store=Store, gc_counter=GCCounter}=S
                                             false ->
                                                 collect_deltas(Type, DeltaMap, Ack, Counter)
                                         end,
-                               gen_server:cast({?MODULE, Peer},
-                                               {delta_send,
-                                                node(),
-                                                {Id, Type, Metadata, Deltas},
-                                                Counter}),
+                               send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
                                [{ok, Id}|Acc0];
                            false ->
                                Acc0
@@ -959,3 +955,11 @@ log_transmission(Term) ->
         _:_ ->
             ok
     end.
+
+%% @private
+send(Msg, Peer) ->
+    PeerService = application:get_env(plumtree,
+                                      peer_service,
+                                      partisan_peer_service),
+    PeerServiceManager = PeerService:manager(),
+    PeerServiceManager:forward_message(Peer, ?MODULE, Msg).

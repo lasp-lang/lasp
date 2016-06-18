@@ -257,7 +257,7 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
                         _ ->
                             {Id, Type}
                     end,
-            DeltaMap = orddict:store(Counter0, Value, DeltaMap0),
+            DeltaMap = orddict:store(Counter0, {node(), Value}, DeltaMap0),
             ok = do(put, [Store, NewId, #dv{value=Value,
                                             type=Type,
                                             metadata=Metadata,
@@ -369,9 +369,13 @@ bind(Id, Value, Store) ->
     MetadataFun = fun(X) -> X end,
     bind(Id, Value, MetadataFun, Store).
 
-%% @doc Define a dataflow variable to be bound a value.
--spec bind(id(), value(), function(), store()) -> {ok, var()} | not_found().
 bind(Id, Value, MetadataFun, Store) ->
+    bind(node(), Id, Value, MetadataFun, Store).
+
+%% @doc Define a dataflow variable to be bound a value.
+-spec bind(node(), id(), value(), function(), store()) ->
+    {ok, var()} | not_found().
+bind(Origin, Id, Value, MetadataFun, Store) ->
     Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
                       waiting_delta_threads=WDT, waiting_threads=WT,
                       delta_counter=Counter0, delta_map=DeltaMap0,
@@ -396,7 +400,7 @@ bind(Id, Value, MetadataFun, Store) ->
                                 delta_based ->
                                     {ok, SWD1} = reply_to_all(WDT, [],
                                                               {ok, {Id, Type, Metadata, Value}}),
-                                    DeltaMap1 = store_delta(Counter0, Value, DeltaMap0),
+                                    DeltaMap1 = store_delta(Origin, Counter0, Value, DeltaMap0),
                                     DeltaEagerMap1 = DeltaEagerMap0 ++ [Value],
                                     {ok, SWD1, increment_counter(Counter0), DeltaMap1, DeltaEagerMap1}
                             end,
@@ -844,17 +848,17 @@ reply_to_all([], StillWaiting, _Result) ->
 %% @doc When the delta interval is arrived, bind it with the existing object.
 %%      If the object does not exist, declare it.
 %%
--spec receive_delta(store(), {delta_send, value(), function(), function()} |
+-spec receive_delta(store(), {delta_send, node(), value(), function(), function()} |
                              {delta_ack, id(), node(), non_neg_integer()}) ->
     ok | error.
-receive_delta(Store, {delta_send, {Id, Type, Metadata, Deltas},
+receive_delta(Store, {delta_send, Origin, {Id, Type, Metadata, Deltas},
                       MetadataFunBind, MetadataFunDeclare}) ->
     case do(get, [Store, Id]) of
         {ok, _Object} ->
-            {ok, _Result} = bind(Id, Deltas, MetadataFunBind, Store);
+            {ok, _Result} = bind(Origin, Id, Deltas, MetadataFunBind, Store);
         {error, not_found} ->
             {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
-            receive_delta(Store, {delta_send, {Id, Type, Metadata, Deltas},
+            receive_delta(Store, {delta_send, Origin, {Id, Type, Metadata, Deltas},
                                   MetadataFunBind, MetadataFunDeclare})
     end,
     ok;
@@ -904,8 +908,8 @@ increment_counter(Counter) ->
     Counter + 1.
 
 %% @private
-store_delta(Counter, Delta, DeltaMap0) ->
-    orddict:store(Counter, Delta, DeltaMap0).
+store_delta(Origin, Counter, Delta, DeltaMap0) ->
+    orddict:store(Counter, {Origin, Delta}, DeltaMap0).
 
 -ifdef(TEST).
 

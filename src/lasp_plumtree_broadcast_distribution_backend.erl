@@ -712,7 +712,7 @@ handle_cast({exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) -
                                             true ->
                                                 Value;
                                             false ->
-                                                collect_deltas(Type, DeltaMap, Ack, Counter)
+                                                collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
                                         end,
                                send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
                                [{ok, Id}|Acc0];
@@ -729,6 +729,7 @@ handle_cast({exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) -
 handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
             #state{store=Store, actor=Actor}=State) ->
     ?CORE:receive_delta(Store, {delta_send,
+                                From,
                                {Id, Type, _Metadata, Deltas},
                                ?CLOCK_INCR(Actor),
                                ?CLOCK_INIT(Actor)}),
@@ -924,7 +925,7 @@ increment_counter(Counter) ->
     Counter + 1.
 
 %% @private
-collect_deltas(Type, DeltaMap, Min0, Max) ->
+collect_deltas(Destination, Type, DeltaMap, Min0, Max) ->
     Counters = orddict:fetch_keys(DeltaMap),
     Min1 = case lists:member(Min0, Counters) of
                true ->
@@ -935,8 +936,13 @@ collect_deltas(Type, DeltaMap, Min0, Max) ->
     SmallDeltaMap = orddict:filter(fun(Counter, _Delta) ->
                                            (Counter >= Min1) andalso (Counter < Max)
                                    end, DeltaMap),
-    Deltas = orddict:fold(fun(_Counter, Delta, Deltas0) ->
-                                  lasp_type:merge(Type, Deltas0, Delta)
+    Deltas = orddict:fold(fun(_Counter, {Origin, Delta}, Deltas0) ->
+                                  case Origin of
+                                      Destination ->
+                                        Deltas0;
+                                      _ ->
+                                        lasp_type:merge(Type, Deltas0, Delta)
+                                  end
                           end, lasp_type:new(Type), SmallDeltaMap),
     Deltas.
 

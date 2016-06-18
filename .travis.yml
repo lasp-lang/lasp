@@ -4,7 +4,6 @@ otp_release:
 install:
   - make
   - ./rebar3 update
-  - pip install codecov
 script:
   - make test
   - make xref
@@ -17,4 +16,3 @@ notifications:
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D
   irc: "irc.freenode.org#lasp-lang"
 sudo: false
-after_success: codecov

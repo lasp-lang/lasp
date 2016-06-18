@@ -196,7 +196,11 @@ start_node(Name, Config, Case) ->
                                                              lasp_config,
                                                              get,
                                                              [web_port, undefined]),
-                                          ct:pal("Node: ~p WebPort ~p", [N, WebPort])
+                                          PeerPort = rpc:call(N,
+                                                              lasp_config,
+                                                              get,
+                                                              [peer_port, undefined]),
+                                          lager:info("Node: ~p PeerPort: ~p WebPort ~p", [N, PeerPort, WebPort])
                                   end, proplists:get_value(started, Config) ++ [Node]),
                     ct:fail(can_not_initialize_node)
             end,

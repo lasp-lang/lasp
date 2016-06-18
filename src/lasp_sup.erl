@@ -144,14 +144,6 @@ init(_Args) ->
 %%% Internal functions
 %%%===================================================================
 
--ifdef(TEST).
-
-%% @private
-web_specs() ->
-    [].
-
--else.
-
 %% @private
 web_specs() ->
     %% Before initializing the web backend, configure it using the
@@ -159,12 +151,7 @@ web_specs() ->
     %%
     case os:getenv("WEB_PORT", "false") of
         "false" ->
-            %% Generate a random web port.
-            random:seed(erlang:phash2([node()]),
-                        erlang:monotonic_time(),
-                        erlang:unique_integer()),
-            WebPort = random:uniform(1000) + 10000,
-            lasp_config:set(web_port, WebPort),
+            lasp_config:set(web_port, 0),
             ok;
         WebPort ->
             lasp_config:set(web_port, list_to_integer(WebPort)),
@@ -177,8 +164,6 @@ web_specs() ->
             [mochiweb_socket_server]},
 
     [Web].
-
--endif.
 
 %% @private
 configure_defaults() ->

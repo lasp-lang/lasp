@@ -260,7 +260,7 @@ advertisement_counter_child_specs() ->
 
 %% @private
 random_port() ->
-    {ok, Socket} = gen_tcp:listen(0,[]),
+    {ok, Socket} = gen_tcp:listen(0, []),
     {ok, {_, Port}} = inet:sockname(Socket),
     ok = gen_tcp:close(Socket),
     Port.

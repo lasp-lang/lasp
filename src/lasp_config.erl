@@ -63,5 +63,6 @@ web_config() ->
         {log_dir, "priv/log"},
         {dispatch, dispatch()}
     ],
-    lager:info("Enabling web configuration: ~p", [Config]),
+    Node = node(),
+    lager:info("Node ~p enabling web configuration: ~p", [Node, Config]),
     Config.

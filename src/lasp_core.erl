@@ -396,7 +396,7 @@ bind(Id, Value, MetadataFun, Store) ->
                                 delta_based ->
                                     {ok, SWD1} = reply_to_all(WDT, [],
                                                               {ok, {Id, Type, Metadata, Value}}),
-                                    DeltaMap1 = store_delta(Type, Counter0, Value, DeltaMap0),
+                                    DeltaMap1 = store_delta(Counter0, Value, DeltaMap0),
                                     DeltaEagerMap1 = DeltaEagerMap0 ++ [Value],
                                     {ok, SWD1, increment_counter(Counter0), DeltaMap1, DeltaEagerMap1}
                             end,
@@ -904,28 +904,8 @@ increment_counter(Counter) ->
     Counter + 1.
 
 %% @private
-store_delta(Type, Counter, Delta, DeltaMap0) ->
-    MaxDeltaSlots = lasp_config:get(delta_mode_max_slots, 10),
-    %% Check the space of the DeltaMap
-    case orddict:size(DeltaMap0) < MaxDeltaSlots of
-        true ->
-            %% Store a new delta.
-            orddict:store(Counter, Delta, DeltaMap0);
-        false ->
-            %% Find the minimum and 2nd minimum counters & those deltas.
-            [{MinCounter0, MinCounterDelta0}, {MinCounter1, MinCounterDelta1} | _Rest] =
-                orddict:to_list(DeltaMap0),
-            %% Merge them.
-            Merged = lasp_type:merge(Type,
-                                     MinCounterDelta0,
-                                     MinCounterDelta1),
-            %% Store the merged delta (minimum + 2nd minimum).
-            DeltaMap1 = orddict:store(MinCounter0, Merged, DeltaMap0),
-            %% Remove the 2nd minimum delta.
-            DeltaMap2 = orddict:erase(MinCounter1, DeltaMap1),
-            %% Store a new delta.
-            orddict:store(Counter, Delta, DeltaMap2)
-    end.
+store_delta(Counter, Delta, DeltaMap0) ->
+    orddict:store(Counter, Delta, DeltaMap0).
 
 -ifdef(TEST).
 

@@ -218,9 +218,6 @@ configure_defaults() ->
     lasp_config:set(distribution_backend, DistributionBackend),
 
     %% Delta specific configuration values.
-    MaxDeltaSlots = application:get_env(?APP, delta_mode_max_slots, 10),
-    lasp_config:set(delta_mode_max_slots, MaxDeltaSlots),
-
     MaxGCCounter = application:get_env(?APP, delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
     lasp_config:set(delta_mode_max_gc_counter, MaxGCCounter),
 

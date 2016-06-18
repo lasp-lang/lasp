@@ -190,8 +190,13 @@ start_node(Name, Config, Case) ->
             ok = rpc:call(Node, application, set_env, [lasp,
                                                        web_port,
                                                        WebPort]),
-            ct:pal("Initializing Lasp on node: ~p", [Node]),
-            {ok, _} = rpc:call(Node, application, ensure_all_started, [lasp]),
+            try
+                {ok, _} = rpc:call(Node, application, ensure_all_started, [lasp])
+            catch
+                _:Error ->
+                    lager:info("Failed: ~p", [Error]),
+                    ct:fail(can_not_initialize_node)
+            end,
             ok = wait_until(fun() ->
                             case rpc:call(Node, lasp_peer_service, members, []) of
                                 {ok, _Res} -> true;

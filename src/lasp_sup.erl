@@ -186,6 +186,9 @@ configure_defaults() ->
     PeerServiceManager = PeerService:manager(),
     lasp_config:set(peer_service_manager, PeerServiceManager),
 
+    %% Exchange mode.
+    application:set_env(plumtree, exchange_selection, normal),
+
     %% Backend configurations.
     StorageBackend = application:get_env(
                        ?APP,

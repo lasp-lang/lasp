@@ -151,7 +151,6 @@ start_node(Name, Config, Case) ->
         {ok, Node} ->
             PrivDir = proplists:get_value(priv_dir, Config),
             NodeDir = filename:join([PrivDir, Node, Case]),
-            WebPort = web_port(Name),
 
             %% Manually force sasl loading, and disable the logger.
             ok = rpc:call(Node, application, load, [sasl]),
@@ -187,9 +186,6 @@ start_node(Name, Config, Case) ->
             ok = rpc:call(Node, application, set_env, [lasp,
                                                        data_root,
                                                        NodeDir]),
-            ok = rpc:call(Node, application, set_env, [lasp,
-                                                       web_port,
-                                                       WebPort]),
             try
                 {ok, _} = rpc:call(Node, application, ensure_all_started, [lasp])
             catch
@@ -228,9 +224,6 @@ heal_cluster(ANodes, BNodes) ->
          [{Node1, Node2} || Node1 <- ANodes, Node2 <- BNodes]),
     ok.
 
-web_port(_) ->
-    random:uniform(5000) + 1024.
-
 nodelist() ->
     lists:map(fun(X) ->
                       list_to_atom("node-" ++ integer_to_list(X))
@@ -238,10 +231,10 @@ nodelist() ->
 
 start_nodes(Case, Config) ->
     Nodes = lasp_support:pmap(fun(N) -> lasp_support:start_node(N, Config, Case) end, lasp_support:nodelist()),
-    ct:pal("Nodes: ~p", [Nodes]),
+    % ct:pal("Nodes: ~p", [Nodes]),
 
     RunnerNode = runner_node(),
-    ct:pal("RunnerNode: ~p", [RunnerNode]),
+    % ct:pal("RunnerNode: ~p", [RunnerNode]),
 
     %% Attempt to join all nodes in the cluster.
     lists:foreach(fun(N) ->
@@ -250,7 +243,7 @@ start_nodes(Case, Config) ->
 
     %% Consider the runner part of the cluster.
     Nodes1 = [RunnerNode|Nodes],
-    ct:pal("Nodes1: ~p", [Nodes1]),
+    % ct:pal("Nodes1: ~p", [Nodes1]),
 
     %% Sleep until application is fully started.
     %% @todo: Change to a wait_until, eventually.
@@ -258,7 +251,7 @@ start_nodes(Case, Config) ->
 
     %% Wait until convergence.
     ok = lasp_support:wait_until_joined(Nodes1, Nodes1),
-    ct:pal("Cluster converged."),
+    % ct:pal("Cluster converged."),
 
     {ok, _} = ct_cover:add_nodes(Nodes1),
 
@@ -331,8 +324,8 @@ join_to(N, RunnerNode) ->
                         partisan_config,
                         get,
                         [peer_port, ?PEER_PORT]),
-    ct:pal("Joining node: ~p to ~p at port ~p",
-           [N, RunnerNode, PeerPort]),
+    % ct:pal("Joining node: ~p to ~p at port ~p",
+    %        [N, RunnerNode, PeerPort]),
     ok = rpc:call(RunnerNode,
                   lasp_peer_service,
                   join,

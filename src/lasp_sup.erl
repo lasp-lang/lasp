@@ -62,7 +62,7 @@ init(_Args) ->
     %%
     case os:getenv("PEER_PORT", "false") of
         "false" ->
-            %% No-op.
+            partisan_config:set(peer_port, random_port()),
             ok;
         PeerPort ->
             partisan_config:set(peer_port, list_to_integer(PeerPort)),
@@ -151,7 +151,7 @@ web_specs() ->
     %%
     case os:getenv("WEB_PORT", "false") of
         "false" ->
-            lasp_config:set(web_port, 0),
+            lasp_config:set(web_port, random_port()),
             ok;
         WebPort ->
             lasp_config:set(web_port, list_to_integer(WebPort)),
@@ -257,3 +257,10 @@ advertisement_counter_child_specs() ->
     end,
 
     ClientSpecs ++ ServerSpecs.
+
+%% @private
+random_port() ->
+    {ok, Socket} = gen_tcp:listen(0,[]),
+    {ok, {_, Port}} = inet:sockname(Socket),
+    ok = gen_tcp:close(Socket),
+    Port.

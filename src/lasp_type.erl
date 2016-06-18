@@ -28,6 +28,7 @@
          merge/3,
          threshold_met/3,
          is_inflation/3,
+         is_bottom/2,
          is_strict_inflation/3,
          query/2]).
 
@@ -62,6 +63,11 @@ remove_args({T, _Args}) ->
     T;
 remove_args(T) ->
     T.
+
+%% @doc Is bottom?
+is_bottom(Type, Value) ->
+    T = get_type(remove_args(Type)),
+    T:is_bottom(Value).
 
 %% @doc Is strict inflation?
 is_strict_inflation(Type, Previous, Current) ->

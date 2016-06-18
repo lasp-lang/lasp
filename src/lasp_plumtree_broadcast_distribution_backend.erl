@@ -714,7 +714,12 @@ handle_cast({exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) -
                                             false ->
                                                 collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
                                         end,
-                               send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
+                               case lasp_type:is_bottom(Type, Deltas) of
+                                   true ->
+                                       ok;
+                                   false ->
+                                       send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer)
+                               end,
                                [{ok, Id}|Acc0];
                            false ->
                                Acc0

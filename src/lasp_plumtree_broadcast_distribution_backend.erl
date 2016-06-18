@@ -87,6 +87,8 @@
                     value :: value()}).
 
 -define(MEMORY_INTERVAL, 10000).
+-define(DELTA_INTERVAL, 10000).
+-define(DELTA_GC_INTERVAL, 30000).
 
 %% Definitions for the bind/read fun abstraction.
 
@@ -201,17 +203,12 @@ graft({Id, Clock}) ->
 %% @doc Anti-entropy mechanism.
 -spec exchange(node()) -> {ok, pid()}.
 exchange(Peer) ->
+    lager:info("Exchange triggered for peer: ~p", [Peer]),
+
     case lasp_config:get(mode, state_based) of
         delta_based ->
-            %% Anti-entropy mechanism for causal consistency of delta-CRDT.
-            {ok, Pid, GCCounter} = gen_server:call(?MODULE, {exchange, Peer}, infinity),
-            MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
-            case GCCounter == MaxGCCounter of
-                true ->
-                    gen_server:call(?MODULE, delta_gc, infinity);
-                false ->
-                    {ok, Pid}
-            end;
+            %% Delta anti-entropy mechanism; ship buffered updates.
+            init_delta_sync(Peer);
         state_based ->
             %% Naive anti-entropy mechanism; re-broadcast all messages.
             gen_server:call(?MODULE, exchange, infinity)
@@ -455,6 +452,9 @@ init([]) ->
                 erlang:monotonic_time(),
                 erlang:unique_integer()),
 
+    schedule_delta_synchronization(),
+    schedule_delta_garbage_collection(),
+
     {ok, Actor} = lasp_unique:unique(),
 
     Counter = 0,
@@ -664,9 +664,32 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
     end,
     {reply, Result, State};
 
+%% Naive anti-entropy mechanism; periodically re-broadcast all messages.
+handle_call(exchange, _From, #state{store=Store}=State) ->
+    Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
+                    case orddict:find(dynamic, Metadata) of
+                        {ok, true} ->
+                            %% Ignore: this is a dynamic variable.
+                            ok;
+                        _ ->
+                            broadcast({Id, Type, Metadata, Value})
+                    end,
+                    [{ok, {Id, Type, Metadata, Value}}|Acc0]
+               end,
+    Pid = spawn(fun() -> do(fold, [Store, Function, []]) end),
+    {reply, {ok, Pid}, State};
+
+%% @private
+handle_call(Msg, _From, State) ->
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    {reply, ok, State}.
+
+-spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
-handle_call({exchange, Peer}, _From, #state{store=Store, gc_counter=GCCounter}=State) ->
+handle_cast({exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) ->
+    lager:info("Exchange starting for ~p", [Peer]),
+
     Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
                             delta_counter=Counter, delta_map=DeltaMap,
                             delta_ack_map=AckMap}},
@@ -697,25 +720,66 @@ handle_call({exchange, Peer}, _From, #state{store=Store, gc_counter=GCCounter}=S
                                Acc0
                        end
                end,
-    Pid = spawn(fun() -> do(fold, [Store, Function, []]) end),
-    {reply, {ok, Pid, GCCounter}, State#state{gc_counter=increment_counter(GCCounter)}};
+    spawn_link(fun() -> do(fold, [Store, Function, []]) end),
 
-%% Naive anti-entropy mechanism; periodically re-broadcast all messages.
-handle_call(exchange, _From, #state{store=Store}=State) ->
-    Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
-                    case orddict:find(dynamic, Metadata) of
-                        {ok, true} ->
-                            %% Ignore: this is a dynamic variable.
-                            ok;
-                        _ ->
-                            broadcast({Id, Type, Metadata, Value})
-                    end,
-                    [{ok, {Id, Type, Metadata, Value}}|Acc0]
-               end,
-    Pid = spawn(fun() -> do(fold, [Store, Function, []]) end),
-    {reply, {ok, Pid}, State};
+    lager:info("Exchange finished."),
 
-handle_call(delta_gc, _From, #state{store=Store}=State) ->
+    {noreply, State#state{gc_counter=increment_counter(GCCounter)}};
+
+handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
+            #state{store=Store, actor=Actor}=State) ->
+    ?CORE:receive_delta(Store, {delta_send,
+                               {Id, Type, _Metadata, Deltas},
+                               ?CLOCK_INCR(Actor),
+                               ?CLOCK_INIT(Actor)}),
+    send({delta_ack, node(), Id, Counter}, From),
+    {noreply, State};
+
+handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
+    ?CORE:receive_delta(Store, {delta_ack, Id, From, Counter}),
+    {noreply, State};
+
+%% @private
+handle_cast(Msg, State) ->
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    {noreply, State}.
+
+%% @private
+-spec handle_info(term(), #state{}) -> {noreply, #state{}}.
+handle_info(memory_report, State) ->
+    %% Log
+    memory_report(),
+
+    %% Schedule report.
+    schedule_memory_report(),
+
+    {noreply, State};
+handle_info(delta_sync, State) ->
+    lager:info("Beginning delta synchronization."),
+
+    %% Get the active set from the membership protocol.
+    %%
+    %% @todo: If full, this has to be changed to fanout; otherwise,
+    %% fanout is the active set.
+    %%
+    {ok, Members} = lasp_peer_service:members(),
+
+    %% Remove ourself.
+    Peers = Members -- [node()],
+
+    lager:info("Beginning sync for peers: ~p", [Peers]),
+
+    %% Ship buffered updates for the fanout value.
+    lists:foreach(fun(Peer) ->
+                          init_delta_sync(Peer)
+                  end, Peers),
+
+    %% Schedule next synchronization.
+    schedule_delta_synchronization(),
+
+    {noreply, State};
+handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
+    MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
     Function =
         fun({Id, #dv{delta_map=DeltaMap0, delta_ack_map=AckMap0,
                      delta_counter=Counter}=_Object},
@@ -768,59 +832,35 @@ handle_call(delta_gc, _From, #state{store=Store}=State) ->
                         end
                 end
         end,
-    Pid = spawn(
-            fun() ->
-                    {ok, Results} = do(fold, [Store, Function, []]),
-                    lists:foreach(
-                      fun({ok, Id, DeltaMap, RemovedAckMap}) ->
-                              case do(get, [Store, Id]) of
-                                  {ok, Object} ->
-                                      _ = do(put,
-                                             [Store, Id,
-                                              Object#dv{delta_map=DeltaMap,
-                                                        delta_ack_map=RemovedAckMap}]),
-                                      ok;
-                                  _ ->
-                                      ok
-                              end
-                      end, Results)
-            end),
-    {reply, {ok, Pid}, State#state{gc_counter=0}};
+    GCCounter = case GCCounter0 == MaxGCCounter of
+        false ->
+            GCCounter0;
+        true ->
+            spawn(
+                fun() ->
+                        {ok, Results} = do(fold, [Store, Function, []]),
+                        lists:foreach(
+                          fun({ok, Id, DeltaMap, RemovedAckMap}) ->
+                                  case do(get, [Store, Id]) of
+                                      {ok, Object} ->
+                                          _ = do(put,
+                                                 [Store, Id,
+                                                  Object#dv{delta_map=DeltaMap,
+                                                            delta_ack_map=RemovedAckMap}]),
+                                          ok;
+                                      _ ->
+                                          ok
+                                  end
+                          end, Results)
+                end),
+            0
+    end,
 
-%% @private
-handle_call(Msg, _From, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
-    {reply, ok, State}.
+    %% Schedule next GC and reset counter.
+    schedule_delta_garbage_collection(),
 
--spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
-handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
-            #state{store=Store, actor=Actor}=State) ->
-    ?CORE:receive_delta(Store, {delta_send,
-                               {Id, Type, _Metadata, Deltas},
-                               ?CLOCK_INCR(Actor),
-                               ?CLOCK_INIT(Actor)}),
-    send({delta_ack, node(), Id, Counter}, From),
-    {noreply, State};
+    {noreply, State#state{gc_counter=GCCounter}};
 
-handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
-    ?CORE:receive_delta(Store, {delta_ack, Id, From, Counter}),
-    {noreply, State};
-
-%% @private
-handle_cast(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
-    {noreply, State}.
-
-%% @private
--spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(memory_report, State) ->
-    %% Log
-    memory_report(),
-
-    %% Schedule report.
-    schedule_memory_report(),
-
-    {noreply, State};
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
@@ -950,7 +990,30 @@ log_transmission(Term) ->
     end.
 
 %% @private
+schedule_delta_synchronization() ->
+    case lasp_config:get(mode, state_based) of
+        delta_based ->
+            erlang:send_after(?DELTA_INTERVAL, self(), delta_sync);
+        state_based ->
+            ok
+    end.
+
+%% @private
+schedule_delta_garbage_collection() ->
+    case lasp_config:get(mode, state_based) of
+        delta_based ->
+            erlang:send_after(?DELTA_GC_INTERVAL, self(), delta_gc);
+        state_based ->
+            ok
+    end.
+
+%% @private
 send(Msg, Peer) ->
     PeerServiceManager = lasp_config:get(peer_service_manager,
                                          partisan_peer_service),
     PeerServiceManager:forward_message(Peer, ?MODULE, Msg).
+
+%% @private
+init_delta_sync(Peer) ->
+    lager:info("Initializing delta synchronization with peer: ~p", [Peer]),
+    gen_server:cast(?MODULE, {exchange, Peer}).

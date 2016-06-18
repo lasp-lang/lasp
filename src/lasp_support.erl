@@ -190,7 +190,14 @@ start_node(Name, Config, Case) ->
                 {ok, _} = rpc:call(Node, application, ensure_all_started, [lasp])
             catch
                 _:Error ->
-                    lager:info("Failed: ~p", [Error]),
+                    lager:info("Node initialization for ~p failed: ~p", [Node, Error]),
+                    lists:foreach(fun(N) ->
+                                          WebPort = rpc:call(N,
+                                                             lasp_config,
+                                                             get,
+                                                             [web_port, undefined]),
+                                          ct:pal("Node: ~p WebPort ~p", [N, WebPort])
+                                  end, proplists:get_value(started, Config) ++ [Node]),
                     ct:fail(can_not_initialize_node)
             end,
             ok = wait_until(fun() ->
@@ -229,8 +236,15 @@ nodelist() ->
                       list_to_atom("node-" ++ integer_to_list(X))
               end, lists:seq(1, ?NUM_NODES)).
 
-start_nodes(Case, Config) ->
-    Nodes = lasp_support:pmap(fun(N) -> lasp_support:start_node(N, Config, Case) end, lasp_support:nodelist()),
+start_nodes(Case, Config0) ->
+    StartedConfig = lists:foldl(fun(N, Config) ->
+                                Node = lasp_support:start_node(N, Config, Case),
+                                Started0 = proplists:get_value(started, Config, []),
+                                Started = [Node|Started0],
+                                Config1 = proplists:delete(started, Config0),
+                                [{started, Started}|Config1]
+                        end, Config0, lasp_support:nodelist()),
+    Nodes = proplists:get_value(started, StartedConfig),
     % ct:pal("Nodes: ~p", [Nodes]),
 
     RunnerNode = runner_node(),

@@ -206,11 +206,17 @@ exchange(Peer) ->
     case lasp_config:get(mode, state_based) of
         delta_based ->
             %% Ignore the standard anti-entropy mechanism from plumtree.
-            ok;
+            %%
+            %% Spawn a process that terminates immediately, because the
+            %% broadcast exchange timer tracks the number of in progress
+            %% exchanges and bounds it by that limit.
+            %%
+            Pid = spawn_link(fun() -> ok end),
+            {ok, Pid};
         state_based ->
             %% Naive anti-entropy mechanism; re-broadcast all messages.
             lager:info("Exchange triggered for peer: ~p", [Peer]),
-            gen_server:call(?MODULE, exchange, infinity)
+            gen_server:call(?MODULE, {exchange, Peer}, infinity)
     end.
 
 %%%===================================================================
@@ -664,7 +670,7 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
     {reply, Result, State};
 
 %% Naive anti-entropy mechanism; periodically re-broadcast all messages.
-handle_call(exchange, _From, #state{store=Store}=State) ->
+handle_call({exchange, _Peer}, _From, #state{store=Store}=State) ->
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
@@ -675,7 +681,7 @@ handle_call(exchange, _From, #state{store=Store}=State) ->
                     end,
                     [{ok, {Id, Type, Metadata, Value}}|Acc0]
                end,
-    Pid = spawn(fun() -> do(fold, [Store, Function, []]) end),
+    Pid = spawn_link(fun() -> do(fold, [Store, Function, []]) end),
     {reply, {ok, Pid}, State};
 
 %% @private

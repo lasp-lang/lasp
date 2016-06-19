@@ -43,6 +43,8 @@
          partition_cluster/2,
          heal_cluster/2]).
 
+-define(EXCHANGE_TIMER, 120).
+
 puniform(Range) ->
     erlang:phash2(erlang:statistics(io), Range) + 1.
 
@@ -179,7 +181,7 @@ start_node(Name, Config, Case) ->
                                                        partisan_peer_service]),
             ok = rpc:call(Node, application, set_env, [plumtree,
                                                        broadcast_exchange_timer,
-                                                       60000]),
+                                                       ?EXCHANGE_TIMER]),
             ok = rpc:call(Node, application, set_env, [plumtree,
                                                        broadcast_mods,
                                                        [lasp_plumtree_broadcast_distribution_backend]]),
@@ -322,7 +324,7 @@ start_runner() ->
                              partisan_peer_service),
     ok = application:set_env(plumtree,
                              broadcast_exchange_timer,
-                             60000),
+                             ?EXCHANGE_TIMER),
     ok = application:set_env(plumtree,
                              broadcast_mods,
                              [lasp_plumtree_broadcast_distribution_backend]),

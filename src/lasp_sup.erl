@@ -187,7 +187,14 @@ configure_defaults() ->
     lasp_config:set(peer_service_manager, PeerServiceManager),
 
     %% Exchange mode.
-    application:set_env(plumtree, exchange_selection, optimized),
+    case Mode of
+        delta_based ->
+            application:set_env(plumtree, exchange_selection,
+                                optimized);
+        _ ->
+            application:set_env(plumtree, exchange_selection,
+                                normal)
+    end,
 
     %% Backend configurations.
     StorageBackend = application:get_env(

@@ -52,6 +52,7 @@
          wait_needed/3,
          reply_to_all/2,
          reply_to_all/3,
+         receive_value/2,
          receive_delta/2]).
 
 %% Exported functions for vnode integration, where callback behavior is
@@ -844,6 +845,20 @@ reply_to_all([From|T], StillWaiting, Result) ->
     reply_to_all(T, StillWaiting, Result);
 reply_to_all([], StillWaiting, _Result) ->
     {ok, StillWaiting}.
+
+-spec receive_value(store(), {aae_send, node(), value(), function(),
+                              function()}) -> ok | error.
+receive_value(Store, {aae_send, Origin, {Id, Type, Metadata, Value},
+                      MetadataFunBind, MetadataFunDeclare}) ->
+    case do(get, [Store, Id]) of
+        {ok, _Object} ->
+            {ok, _Result} = bind(Origin, Id, Value, MetadataFunBind, Store);
+        {error, not_found} ->
+            {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
+            receive_value(Store, {aae_send, Origin, {Id, Type, Metadata, Value},
+                                  MetadataFunBind, MetadataFunDeclare})
+    end,
+    ok.
 
 %% @doc When the delta interval is arrived, bind it with the existing object.
 %%      If the object does not exist, declare it.

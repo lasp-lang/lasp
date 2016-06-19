@@ -669,15 +669,15 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
     end,
     {reply, Result, State};
 
-%% Naive anti-entropy mechanism; periodically re-broadcast all messages.
-handle_call({exchange, _Peer}, _From, #state{store=Store}=State) ->
+%% Naive anti-entropy mechanism; pairwise state shipping.
+handle_call({exchange, Peer}, _From, #state{store=Store}=State) ->
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
                             %% Ignore: this is a dynamic variable.
                             ok;
                         _ ->
-                            broadcast({Id, Type, Metadata, Value})
+                            send({aae_send, node(), {Id, Type, Metadata, Value}}, Peer)
                     end,
                     [{ok, {Id, Type, Metadata, Value}}|Acc0]
                end,
@@ -735,6 +735,15 @@ handle_cast({exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) -
     lager:info("Exchange finished."),
 
     {noreply, State#state{gc_counter=increment_counter(GCCounter)}};
+
+handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
+            #state{store=Store, actor=Actor}=State) ->
+    ?CORE:receive_value(Store, {aae_send,
+                                From,
+                               {Id, Type, _Metadata, Value},
+                               ?CLOCK_INCR(Actor),
+                               ?CLOCK_INIT(Actor)}),
+    {noreply, State};
 
 handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
             #state{store=Store, actor=Actor}=State) ->

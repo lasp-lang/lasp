@@ -203,14 +203,13 @@ graft({Id, Clock}) ->
 %% @doc Anti-entropy mechanism.
 -spec exchange(node()) -> {ok, pid()}.
 exchange(Peer) ->
-    lager:info("Exchange triggered for peer: ~p", [Peer]),
-
     case lasp_config:get(mode, state_based) of
         delta_based ->
-            %% Delta anti-entropy mechanism; ship buffered updates.
-            init_delta_sync(Peer);
+            %% Ignore the standard anti-entropy mechanism from plumtree.
+            ok;
         state_based ->
             %% Naive anti-entropy mechanism; re-broadcast all messages.
+            lager:info("Exchange triggered for peer: ~p", [Peer]),
             gen_server:call(?MODULE, exchange, infinity)
     end.
 

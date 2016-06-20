@@ -97,10 +97,17 @@ pause_test(Config) ->
 
     lager:info("Restarting Lasp on all nodes."),
     lists:foreach(fun(Node) ->
-                        lager:info("Restarting ~p", [Node]),
+                        lager:info("Restarting ~p and re-joining...", [Node]),
                         ok = rpc:call(Node, application, stop, [lasp]),
                         {ok, _} = rpc:call(Node, application, ensure_all_started,
-                                           [lasp])
+                                           [lasp]),
+                        RunnerNode = lasp_support:runner_node(),
+                        lasp_support:join_to(Node, RunnerNode),
+                        timer:sleep(4000),
+                        {ok, Members} = rpc:call(Node, lasp_peer_service, members, []),
+                        {ok, LocalMembers} = lasp_peer_service:members(),
+                        lager:info("* Members; ~p", [Members]),
+                        lager:info("* LocalMembers; ~p", [LocalMembers])
                   end, Nodes),
 
     timer:sleep(20000),

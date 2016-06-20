@@ -40,6 +40,7 @@
          stop_runner/0,
          start_runner/0,
          puniform/1,
+         join_to/2,
          partition_cluster/2,
          heal_cluster/2]).
 
@@ -338,8 +339,8 @@ join_to(N, RunnerNode) ->
                         partisan_config,
                         get,
                         [peer_port, ?PEER_PORT]),
-    % ct:pal("Joining node: ~p to ~p at port ~p",
-    %        [N, RunnerNode, PeerPort]),
+    ct:pal("Joining node: ~p to ~p at port ~p",
+           [N, RunnerNode, PeerPort]),
     ok = rpc:call(RunnerNode,
                   lasp_peer_service,
                   join,

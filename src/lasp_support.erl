@@ -99,9 +99,6 @@ wait_until_joined(Nodes, ExpectedCluster) ->
             wait_until(fun() ->
                         lists:sort(ExpectedCluster) ==
                         lists:usort(lists:flatten(pmap(fun(Node) ->
-                                                lager:info("node ~p has ~p",
-                                                           [Node,
-                                                            get_cluster_members(Node)]),
                                         get_cluster_members(Node)
                                 end, Nodes)))
                 end, 60*2, 500);
@@ -109,9 +106,6 @@ wait_until_joined(Nodes, ExpectedCluster) ->
             wait_until(fun() ->
                         lists:all(fun(X) -> X == true end,
                                   pmap(fun(Node) ->
-                                                lager:info("node ~p has ~p",
-                                                           [Node,
-                                                            get_cluster_members(Node)]),
                                         lists:sort(ExpectedCluster) ==
                                         lists:sort(get_cluster_members(Node))
                                 end, Nodes))

@@ -40,6 +40,7 @@
          stop_runner/0,
          start_runner/0,
          puniform/1,
+         join_to/2,
          partition_cluster/2,
          heal_cluster/2]).
 
@@ -99,9 +100,6 @@ wait_until_joined(Nodes, ExpectedCluster) ->
             wait_until(fun() ->
                         lists:sort(ExpectedCluster) ==
                         lists:usort(lists:flatten(pmap(fun(Node) ->
-                                                lager:info("node ~p has ~p",
-                                                           [Node,
-                                                            get_cluster_members(Node)]),
                                         get_cluster_members(Node)
                                 end, Nodes)))
                 end, 60*2, 500);
@@ -109,9 +107,6 @@ wait_until_joined(Nodes, ExpectedCluster) ->
             wait_until(fun() ->
                         lists:all(fun(X) -> X == true end,
                                   pmap(fun(Node) ->
-                                                lager:info("node ~p has ~p",
-                                                           [Node,
-                                                            get_cluster_members(Node)]),
                                         lists:sort(ExpectedCluster) ==
                                         lists:sort(get_cluster_members(Node))
                                 end, Nodes))
@@ -344,8 +339,8 @@ join_to(N, RunnerNode) ->
                         partisan_config,
                         get,
                         [peer_port, ?PEER_PORT]),
-    % ct:pal("Joining node: ~p to ~p at port ~p",
-    %        [N, RunnerNode, PeerPort]),
+    ct:pal("Joining node: ~p to ~p at port ~p",
+           [N, RunnerNode, PeerPort]),
     ok = rpc:call(RunnerNode,
                   lasp_peer_service,
                   join,

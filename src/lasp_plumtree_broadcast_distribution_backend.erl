@@ -979,9 +979,15 @@ schedule_memory_report() ->
 
 %% @private
 memory_report() ->
-    PlumtreeBroadcast = erlang:whereis(plumtree_broadcast),
-    lager:info("Plumtree message queue: ~p",
-               [process_info(PlumtreeBroadcast, message_queue_len)]).
+    case lasp_config:get(memory_report, false) of
+        true ->
+            PlumtreeBroadcast = erlang:whereis(plumtree_broadcast),
+            lager:info("Plumtree message queue: ~p",
+                       [process_info(PlumtreeBroadcast, message_queue_len)]),
+            ok;
+        false ->
+            ok
+    end.
 
 -ifdef(TEST).
 

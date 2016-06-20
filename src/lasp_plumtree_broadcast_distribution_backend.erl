@@ -215,7 +215,6 @@ exchange(Peer) ->
             {ok, Pid};
         state_based ->
             %% Naive anti-entropy mechanism; re-broadcast all messages.
-            lager:info("Exchange triggered for peer: ~p", [Peer]),
             gen_server:call(?MODULE, {exchange, Peer}, infinity)
     end.
 

@@ -27,7 +27,7 @@
 -export([start_link/1,
          start/3,
          stop/1,
-         log/3]).
+         log/5]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -40,16 +40,16 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {type,
+-record(state, {entity,
                 tref,
-                size=0,
+                size_per_type=orddict:new(),
                 clients=0,
                 lines="",
                 clock=0,
                 status=init,
                 filename}).
 
--define(INTERVAL, 10000). %% 10 seconds.
+-define(INTERVAL, 1000). %% 1 second.
 
 %%%===================================================================
 %%% API
@@ -57,20 +57,20 @@
 
 %% @doc Start and link to calling process.
 -spec start_link(list(term()))-> {ok, pid()} | ignore | {error, term()}.
-start_link(Type) ->
-    gen_server:start_link({global, {?MODULE, Type}}, ?MODULE, [Type], []).
+start_link(Entity) ->
+    gen_server:start_link({global, {?MODULE, Entity}}, ?MODULE, [Entity], []).
 
--spec log(term(), term(), node()) -> ok | error().
-log(Type, Term, Node) ->
-    gen_server:call({global, {?MODULE, Type}}, {log, Term, Node}, infinity).
+-spec log(term(), term(), term(), pos_integer(), node()) -> ok | error().
+log(Entity, Type, Payload, PeerCount, Node) ->
+    gen_server:call({global, {?MODULE, Entity}}, {log, Type, Payload, PeerCount, Node}, infinity).
 
 -spec start(term(), list(), pos_integer()) -> ok | error().
-start(Type, Filename, Clients) ->
-    gen_server:call({global, {?MODULE, Type}}, {start, Filename, Clients}, infinity).
+start(Entity, Filename, Clients) ->
+    gen_server:call({global, {?MODULE, Entity}}, {start, Filename, Clients}, infinity).
 
 -spec stop(term()) -> ok | error().
-stop(Type) ->
-    gen_server:call({global, {?MODULE, Type}}, stop, infinity).
+stop(Entity) ->
+    gen_server:call({global, {?MODULE, Entity}}, stop, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -78,32 +78,38 @@ stop(Type) ->
 
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
-init([Type]) ->
-    Line = io_lib:format("Seconds,MegaBytes,MeanMegaBytesPerClient\n", []),
-    Line2 = io_lib:format("0,0,0\n", []),
-    {ok, #state{type=Type, lines=Line ++ Line2}}.
+init([Entity]) ->
+    Line = io_lib:format("Type,Seconds,MegaBytes,MeanMegaBytesPerClient\n", []),
+    {ok, #state{entity=Entity, lines=Line}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({log, Term, _Node}, _From, #state{type=_Type, size=Size0}=State) ->
-    Size = termsize(Term),
-    {reply, ok, State#state{size=Size0 + Size}};
+handle_call({log, Type, Payload, PeerCount, _Node}, _From, #state{entity=_Entity, size_per_type=Map0}=State) ->
+    Size = termsize(Payload) * PeerCount,
+    Current = case orddict:find(Type, Map0) of
+        {ok, Value} ->
+            Value;
+        error ->
+            0
+    end,
+    Map = orddict:store(Type, Current + Size, Map0),
+    {reply, ok, State#state{size_per_type=Map}};
 
-handle_call({start, Filename, Clients}, _From, #state{type=Type}=State) ->
+handle_call({start, Filename, Clients}, _From, #state{entity=Entity}=State) ->
     {ok, TRef} = start_timer(),
-    _ = lager:info("Instrumentation timer for ~p enabled!", [Type]),
+    _ = lager:info("Instrumentation timer for ~p enabled!", [Entity]),
     {reply, ok, State#state{tref=TRef, clock=0, clients=Clients,
-                            filename=Filename, status=running, size=0,
+                            filename=Filename, status=running, size_per_type=orddict:new(),
                             lines = []}};
 
-handle_call(stop, _From, #state{type=Type, lines=Lines0, clock=Clock0,
-                                clients=Clients, size=Size,
+handle_call(stop, _From, #state{entity=Entity, lines=Lines0, clock=Clock0,
+                                clients=Clients, size_per_type=Map,
                                 filename=Filename, tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
-    {ok, Clock, Lines} = record(Clock0, Size, Clients, Filename, Lines0),
-    _ = lager:info("Instrumentation timer for ~p disabled!", [Type]),
+    {ok, Clock, Lines} = record(Clock0, Map, Clients, Filename, Lines0),
+    _ = lager:info("Instrumentation timer for ~p disabled!", [Entity]),
     {reply, ok, State#state{tref=undefined, clock=Clock, lines=Lines}};
 
 %% @private
@@ -120,14 +126,16 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(record, #state{filename=Filename, clients=Clients,
-                           size=Size, clock=Clock0, status=running,
+                           size_per_type=Map, clock=Clock0, status=running,
                            lines=Lines0}=State) ->
+    lager:info("RECORD"),
+
     {ok, TRef} = start_timer(),
-    {ok, Clock, Lines} = record(Clock0, Size, Clients, Filename, Lines0),
+    {ok, Clock, Lines} = record(Clock0, Map, Clients, Filename, Lines0),
     {noreply, State#state{tref=TRef, clock=Clock, lines=Lines}};
 
 handle_info(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("INFO Unhandled messages: ~p~n~p", [Msg, State]),
     {noreply, State}.
 
 %% @private
@@ -168,13 +176,22 @@ clock(Clock) ->
     Clock / 1000.
 
 %% @private
-record(Clock0, Size, Clients, Filename, Lines0) ->
+record(Clock0, Map, Clients, Filename, Lines0) ->
+    lager:info("RECORD"),
     Clock = Clock0 + ?INTERVAL,
-    Line = io_lib:format("~w,~w,~w\n",
-                         [clock(Clock),
-                          megasize(Size),
-                          megasize(Size) / Clients]),
-    Lines = Lines0 ++ Line,
+    Lines = orddict:fold(
+        fun(Type, Size, Acc) ->
+            Line = io_lib:format("~w,~w,~w,~w\n",
+                                 [Type,
+                                  clock(Clock),
+                                  megasize(Size),
+                                  megasize(Size) / Clients]),
+            lager:info("LINE: ~p~n~n~n", [Line]),
+            Acc ++ Line
+        end,
+        Lines0,
+        Map
+    ),
     ok = file:write_file(filename(Filename), Lines),
     {ok, Clock, Lines}.
 

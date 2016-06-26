@@ -360,10 +360,10 @@ servers(SetType, Ads, AdsWithContracts) ->
                 end, AdList).
 
 %% @private
-log_transmission(Instrumentation, Term) ->
+log_transmission(Instrumentation, Payload) ->
     case Instrumentation of
         true ->
-            lasp_transmission_instrumentation:log(client, Term, node());
+            lasp_transmission_instrumentation:log(client, from_server, Payload, 1, node());
         false ->
             ok
     end.

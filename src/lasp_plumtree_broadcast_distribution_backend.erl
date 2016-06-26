@@ -177,8 +177,7 @@ broadcast_data(#broadcast{id=Id, type=Type, clock=Clock,
 %%      for the same object.
 -spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) ->
     boolean().
-merge({Id, Clock}, {Id, Type, Metadata, Value}=Payload) ->
-    log_transmission(Payload),
+merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
     case is_stale({Id, Clock}) of
         true ->
             false;
@@ -901,7 +900,8 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 broadcast({Id, Type, Metadata, Value}=Payload) ->
-    log_transmission(Payload),
+    PeerCount = 1, % @todo fix this
+    log_transmission(broadcast, Payload, PeerCount),
     Clock = orddict:fetch(clock, Metadata),
     Broadcast = #broadcast{id=Id, clock=Clock, type=Type,
                            metadata=Metadata, value=Value},
@@ -1005,11 +1005,11 @@ do(Function, Args) ->
 -endif.
 
 %% @private
-log_transmission(Term) ->
+log_transmission(Type, Payload, PeerCount) ->
     try
         case lasp_config:get(instrumentation, false) of
             true ->
-                ok = lasp_transmission_instrumentation:log(server, Term, node()),
+                ok = lasp_transmission_instrumentation:log(server, Type, Payload, PeerCount, node()),
                 ok;
             false ->
                 ok
@@ -1038,7 +1038,8 @@ schedule_delta_garbage_collection() ->
     end.
 
 %% @private
-send(Msg, Peer) ->
+send({Type, _From, Payload}=Msg, Peer) ->
+    log_transmission(Type, Payload, 1),
     PeerServiceManager = lasp_config:get(peer_service_manager,
                                          partisan_peer_service),
     PeerServiceManager:forward_message(Peer, ?MODULE, Msg).

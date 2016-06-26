@@ -49,7 +49,7 @@
                 status=init,
                 filename}).
 
--define(INTERVAL, 1000). %% 1 second.
+-define(INTERVAL, 10000). %% 10 seconds.
 
 %%%===================================================================
 %%% API
@@ -128,14 +128,12 @@ handle_cast(Msg, State) ->
 handle_info(record, #state{filename=Filename, clients=Clients,
                            size_per_type=Map, clock=Clock0, status=running,
                            lines=Lines0}=State) ->
-    lager:info("RECORD"),
-
     {ok, TRef} = start_timer(),
     {ok, Clock, Lines} = record(Clock0, Map, Clients, Filename, Lines0),
     {noreply, State#state{tref=TRef, clock=Clock, lines=Lines}};
 
 handle_info(Msg, State) ->
-    _ = lager:warning("INFO Unhandled messages: ~p~n~p", [Msg, State]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
@@ -177,7 +175,6 @@ clock(Clock) ->
 
 %% @private
 record(Clock0, Map, Clients, Filename, Lines0) ->
-    lager:info("RECORD"),
     Clock = Clock0 + ?INTERVAL,
     Lines = orddict:fold(
         fun(Type, Size, Acc) ->
@@ -186,7 +183,6 @@ record(Clock0, Map, Clients, Filename, Lines0) ->
                                   clock(Clock),
                                   megasize(Size),
                                   megasize(Size) / Clients]),
-            lager:info("LINE: ~p~n~n~n", [Line]),
             Acc ++ Line
         end,
         Lines0,

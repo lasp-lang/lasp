@@ -60,11 +60,11 @@ start_link() ->
 -spec log(term(), term(), pos_integer(), node()) -> ok | error().
 log(Type, Payload, PeerCount, Node) ->
     lager:info("lasp_transmission_instrumentation:log"),
-    gen_server:call({local, ?MODULE}, {log, Type, Payload, PeerCount, Node}, infinity).
+    gen_server:call(?MODULE, {log, Type, Payload, PeerCount, Node}, infinity).
 
 -spec stop() -> ok | error().
 stop() ->
-    gen_server:call({local, ?MODULE}, stop, infinity).
+    gen_server:call(?MODULE, stop, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -75,6 +75,7 @@ stop() ->
 init([]) ->
     Filename = io_lib:format("~w", [node()]),
     Line = io_lib:format("Type,Seconds,MegaBytes\n", []),
+
     {ok, TRef} = start_timer(),
 
     _ = lager:info("Instrumentation timer enabled!"),

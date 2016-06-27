@@ -900,7 +900,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 broadcast({Id, Type, Metadata, Value}=Payload) ->
-    PeerCount = 1, % @todo fix this
+    PeerCount = length(plumtree_broadcast:broadcast_members()),
     log_transmission({broadcast, Payload}, PeerCount),
     Clock = orddict:fetch(clock, Metadata),
     Broadcast = #broadcast{id=Id, clock=Clock, type=Type,

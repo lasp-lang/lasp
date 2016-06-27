@@ -90,6 +90,15 @@ pause_test(Config) ->
     lager:info("Enabling ad server simulation on local node."),
     ok = lasp_config:set(ad_counter_simulation_server, true),
 
+    lager:info("Enabling instrumentation."),
+    ok = lasp_config:set(instrumentation, true),
+
+    lager:info("Enabling instrumentation on all nodes."),
+    lists:foreach(fun(Node) ->
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [instrumentation, true])
+                  end, Nodes),
+
     lager:info("Restarting Lasp on all nodes."),
     lists:foreach(fun(Node) ->
                         lager:info("Restarting ~p and re-joining...", [Node]),

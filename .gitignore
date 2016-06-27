@@ -30,3 +30,4 @@ fprof.trace
 .rebar3/
 .eqc/
 dcos/
+priv/logs

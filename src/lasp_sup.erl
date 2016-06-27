@@ -114,13 +114,7 @@ init(_Args) ->
                              permanent, 5000, worker,
                              [lasp_transmission_instrumentation]},
 
-            Divergence = {lasp_divergence_instrumentation,
-                          {lasp_divergence_instrumentation, start_link, []},
-                           permanent, 5000, worker,
-                           [lasp_divergence_instrumentation]},
-
-            BaseSpecs ++ [Transmission,
-                          Divergence];
+            BaseSpecs ++ [Transmission];
         false ->
             BaseSpecs
     end,

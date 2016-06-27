@@ -25,7 +25,7 @@
 
 %% API
 -export([start_link/0,
-         start/2,
+         start/1,
          log/4,
          stop/0]).
 
@@ -42,7 +42,6 @@
 %% State record.
 -record(state, {tref,
                 size_per_type=orddict:new(),
-                clients=0,
                 lines="",
                 clock=0,
                 status=init,
@@ -63,9 +62,9 @@ start_link() ->
 log(Type, Payload, PeerCount, Node) ->
     gen_server:call({local, ?MODULE}, {log, Type, Payload, PeerCount, Node}, infinity).
 
--spec start(list(), pos_integer()) -> ok | error().
-start(Filename, Clients) ->
-    gen_server:call({local, ?MODULE}, {start, Filename, Clients}, infinity).
+-spec start(list()) -> ok | error().
+start(Filename) ->
+    gen_server:call({local, ?MODULE}, {start, Filename}, infinity).
 
 -spec stop() -> ok | error().
 stop() ->
@@ -78,7 +77,7 @@ stop() ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([]) ->
-    Line = io_lib:format("Type,Seconds,MegaBytes,MeanMegaBytesPerClient\n", []),
+    Line = io_lib:format("Type,Seconds,MegaBytes\n", []),
     {ok, #state{lines=Line}}.
 
 %% @private
@@ -96,18 +95,18 @@ handle_call({log, Type, Payload, PeerCount, _Node}, _From, #state{size_per_type=
     Map = orddict:store(Type, Current + Size, Map0),
     {reply, ok, State#state{size_per_type=Map}};
 
-handle_call({start, Filename, Clients}, _From, #state{}=State) ->
+handle_call({start, Filename}, _From, #state{}=State) ->
     {ok, TRef} = start_timer(),
     _ = lager:info("Instrumentation timer enabled!"),
-    {reply, ok, State#state{tref=TRef, clock=0, clients=Clients,
+    {reply, ok, State#state{tref=TRef, clock=0,
                             filename=Filename, status=running,
-                            size_per_type=orddict:new(), lines = []}};
+                            size_per_type=orddict:new(), lines=[]}};
 
 handle_call(stop, _From, #state{lines=Lines0, clock=Clock0,
-                                clients=Clients, size_per_type=Map,
+                                size_per_type=Map,
                                 filename=Filename, tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
-    {ok, Clock, Lines} = record(Clock0, Map, Clients, Filename, Lines0),
+    {ok, Clock, Lines} = record(Clock0, Map, Filename, Lines0),
     _ = lager:info("Instrumentation timer disabled!"),
     {reply, ok, State#state{tref=undefined, clock=Clock, lines=Lines}};
 
@@ -124,11 +123,11 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(record, #state{filename=Filename, clients=Clients,
-                           size_per_type=Map, clock=Clock0, status=running,
+handle_info(record, #state{filename=Filename, size_per_type=Map,
+                           clock=Clock0, status=running,
                            lines=Lines0}=State) ->
     {ok, TRef} = start_timer(),
-    {ok, Clock, Lines} = record(Clock0, Map, Clients, Filename, Lines0),
+    {ok, Clock, Lines} = record(Clock0, Map, Filename, Lines0),
     {noreply, State#state{tref=TRef, clock=Clock, lines=Lines}};
 
 handle_info(Msg, State) ->
@@ -173,15 +172,14 @@ clock(Clock) ->
     Clock / 1000.
 
 %% @private
-record(Clock0, Map, Clients, Filename, Lines0) ->
+record(Clock0, Map, Filename, Lines0) ->
     Clock = Clock0 + ?INTERVAL,
     Lines = orddict:fold(
         fun(Type, Size, Acc) ->
-            Line = io_lib:format("~w,~w,~w,~w\n",
+            Line = io_lib:format("~w,~w,~w\n",
                                  [Type,
                                   clock(Clock),
-                                  megasize(Size),
-                                  megasize(Size) / Clients]),
+                                  megasize(Size)]),
             Acc ++ Line
         end,
         Lines0,

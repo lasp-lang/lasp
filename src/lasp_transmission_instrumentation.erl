@@ -25,7 +25,6 @@
 
 %% API
 -export([start_link/0,
-         start/1,
          log/4,
          stop/0]).
 
@@ -47,7 +46,7 @@
                 status=init,
                 filename}).
 
--define(INTERVAL, 10000). %% 10 seconds.
+-define(INTERVAL, 1000). %% 1 second.
 
 %%%===================================================================
 %%% API
@@ -60,11 +59,8 @@ start_link() ->
 
 -spec log(term(), term(), pos_integer(), node()) -> ok | error().
 log(Type, Payload, PeerCount, Node) ->
+    lager:info("lasp_transmission_instrumentation:log"),
     gen_server:call({local, ?MODULE}, {log, Type, Payload, PeerCount, Node}, infinity).
-
--spec start(list()) -> ok | error().
-start(Filename) ->
-    gen_server:call({local, ?MODULE}, {start, Filename}, infinity).
 
 -spec stop() -> ok | error().
 stop() ->
@@ -77,14 +73,22 @@ stop() ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([]) ->
+    Filename = io_lib:format("~w", [node()]),
     Line = io_lib:format("Type,Seconds,MegaBytes\n", []),
-    {ok, #state{lines=Line}}.
+    {ok, TRef} = start_timer(),
+
+    _ = lager:info("Instrumentation timer enabled!"),
+
+    {ok, #state{tref=TRef, clock=0,
+                filename=Filename, status=running,
+                size_per_type=orddict:new(), lines=Line}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
 handle_call({log, Type, Payload, PeerCount, _Node}, _From, #state{size_per_type=Map0}=State) ->
+    lager:info("lasp_transmission_instrumentation:handle_call({log,"),
     Size = termsize(Payload) * PeerCount,
     Current = case orddict:find(Type, Map0) of
         {ok, Value} ->
@@ -93,14 +97,8 @@ handle_call({log, Type, Payload, PeerCount, _Node}, _From, #state{size_per_type=
             0
     end,
     Map = orddict:store(Type, Current + Size, Map0),
+    lager:info("~p", [Map]),
     {reply, ok, State#state{size_per_type=Map}};
-
-handle_call({start, Filename}, _From, #state{}=State) ->
-    {ok, TRef} = start_timer(),
-    _ = lager:info("Instrumentation timer enabled!"),
-    {reply, ok, State#state{tref=TRef, clock=0,
-                            filename=Filename, status=running,
-                            size_per_type=orddict:new(), lines=[]}};
 
 handle_call(stop, _From, #state{lines=Lines0, clock=Clock0,
                                 size_per_type=Map,
@@ -185,6 +183,7 @@ record(Clock0, Map, Filename, Lines0) ->
         Lines0,
         Map
     ),
+    lager:info("Lines: \n~p", [Lines]),
     ok = file:write_file(filename(Filename), Lines),
     {ok, Clock, Lines}.
 

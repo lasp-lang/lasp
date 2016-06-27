@@ -87,7 +87,7 @@ dcos:
 
 ## Temporary
 ads:
-	pkill -9 beam.smp; clear; ./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE --case=pause_test
+	pkill -9 beam.smp; clear; INSTRUMENTATION=true AD_COUNTER_SIM_CLIENT=true AD_COUNTER_SIM_SERVER=true ./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE --case=pause_test
 
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 

@@ -24,10 +24,10 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1,
-         start/3,
-         stop/1,
-         log/5]).
+-export([start_link/0,
+         start/2,
+         log/4,
+         stop/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -56,21 +56,21 @@
 %%%===================================================================
 
 %% @doc Start and link to calling process.
--spec start_link(list(term()))-> {ok, pid()} | ignore | {error, term()}.
-start_link(Entity) ->
-    gen_server:start_link({global, {?MODULE, Entity}}, ?MODULE, [Entity], []).
+-spec start_link()-> {ok, pid()} | ignore | {error, term()}.
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec log(term(), term(), term(), pos_integer(), node()) -> ok | error().
-log(Entity, Type, Payload, PeerCount, Node) ->
-    gen_server:call({global, {?MODULE, Entity}}, {log, Type, Payload, PeerCount, Node}, infinity).
+-spec log(term(), term(), pos_integer(), node()) -> ok | error().
+log(Type, Payload, PeerCount, Node) ->
+    gen_server:call({local, ?MODULE}, {log, Type, Payload, PeerCount, Node}, infinity).
 
--spec start(term(), list(), pos_integer()) -> ok | error().
-start(Entity, Filename, Clients) ->
-    gen_server:call({global, {?MODULE, Entity}}, {start, Filename, Clients}, infinity).
+-spec start(list(), pos_integer()) -> ok | error().
+start(Filename, Clients) ->
+    gen_server:call({local, ?MODULE}, {start, Filename, Clients}, infinity).
 
--spec stop(term()) -> ok | error().
-stop(Entity) ->
-    gen_server:call({global, {?MODULE, Entity}}, stop, infinity).
+-spec stop() -> ok | error().
+stop() ->
+    gen_server:call({local, ?MODULE}, stop, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -78,15 +78,15 @@ stop(Entity) ->
 
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
-init([Entity]) ->
+init([]) ->
     Line = io_lib:format("Type,Seconds,MegaBytes,MeanMegaBytesPerClient\n", []),
-    {ok, #state{entity=Entity, lines=Line}}.
+    {ok, #state{lines=Line}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({log, Type, Payload, PeerCount, _Node}, _From, #state{entity=_Entity, size_per_type=Map0}=State) ->
+handle_call({log, Type, Payload, PeerCount, _Node}, _From, #state{size_per_type=Map0}=State) ->
     Size = termsize(Payload) * PeerCount,
     Current = case orddict:find(Type, Map0) of
         {ok, Value} ->
@@ -97,19 +97,19 @@ handle_call({log, Type, Payload, PeerCount, _Node}, _From, #state{entity=_Entity
     Map = orddict:store(Type, Current + Size, Map0),
     {reply, ok, State#state{size_per_type=Map}};
 
-handle_call({start, Filename, Clients}, _From, #state{entity=Entity}=State) ->
+handle_call({start, Filename, Clients}, _From, #state{}=State) ->
     {ok, TRef} = start_timer(),
-    _ = lager:info("Instrumentation timer for ~p enabled!", [Entity]),
+    _ = lager:info("Instrumentation timer enabled!"),
     {reply, ok, State#state{tref=TRef, clock=0, clients=Clients,
-                            filename=Filename, status=running, size_per_type=orddict:new(),
-                            lines = []}};
+                            filename=Filename, status=running,
+                            size_per_type=orddict:new(), lines = []}};
 
-handle_call(stop, _From, #state{entity=Entity, lines=Lines0, clock=Clock0,
+handle_call(stop, _From, #state{lines=Lines0, clock=Clock0,
                                 clients=Clients, size_per_type=Map,
                                 filename=Filename, tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
     {ok, Clock, Lines} = record(Clock0, Map, Clients, Filename, Lines0),
-    _ = lager:info("Instrumentation timer for ~p disabled!", [Entity]),
+    _ = lager:info("Instrumentation timer disabled!"),
     {reply, ok, State#state{tref=undefined, clock=Clock, lines=Lines}};
 
 %% @private

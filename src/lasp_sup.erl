@@ -109,23 +109,17 @@ init(_Args) ->
 
     Children0 = case InstrEnabled of
         true ->
-            ClientTrans = {lasp_client_transmission_instrumentation,
-                           {lasp_transmission_instrumentation, start_link, [client]},
-                            permanent, 5000, worker,
-                            [lasp_transmission_instrumentation]},
-
-            ServerTrans = {lasp_server_transmission_instrumentation,
-                           {lasp_transmission_instrumentation, start_link, [server]},
-                            permanent, 5000, worker,
-                            [lasp_transmission_instrumentation]},
+            Transmission = {lasp_client_transmission_instrumentation,
+                            {lasp_transmission_instrumentation, start_link, []},
+                             permanent, 5000, worker,
+                             [lasp_transmission_instrumentation]},
 
             Divergence = {lasp_divergence_instrumentation,
                           {lasp_divergence_instrumentation, start_link, []},
                            permanent, 5000, worker,
                            [lasp_divergence_instrumentation]},
 
-            BaseSpecs ++ [ClientTrans,
-                          ServerTrans,
+            BaseSpecs ++ [Transmission,
                           Divergence];
         false ->
             BaseSpecs

@@ -1009,7 +1009,7 @@ log_transmission(Type, Payload, PeerCount) ->
     try
         case lasp_config:get(instrumentation, false) of
             true ->
-                ok = lasp_transmission_instrumentation:log(server, Type, Payload, PeerCount, node()),
+                ok = lasp_transmission_instrumentation:log(Type, Payload, PeerCount, node()),
                 ok;
             false ->
                 ok

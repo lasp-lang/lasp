@@ -71,12 +71,7 @@ end_per_testcase(Case, Config) ->
     %% delete the data on disk, but this is cleaner.)
     lasp_support:stop_runner().
 
-all() ->
-    [
-        setup_test,
-        minimal_test,
-        minimal_delta_test
-    ].
+all() -> [].
 
 %% ===================================================================
 %% tests
@@ -111,24 +106,4 @@ pause_test(Config) ->
                   end, Nodes),
 
     timer:sleep(20000),
-    ok.
-
-setup_test(_Config) ->
-    timer:sleep(2000),
-    ok.
-
-minimal_test(Config) ->
-    Nodes = proplists:get_value(nodes, Config),
-    {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
-                                  [Nodes, state_based, orset, gcounter, 100, 100, 10]),
-    ok.
-
-minimal_delta_test(Config) ->
-    Nodes = proplists:get_value(nodes, Config),
-    %% Set the delta_mode to true for all nodes.
-    lists:foreach(fun(Node) ->
-                        ok = rpc:call(Node, lasp_config, set, [mode, delta_based])
-                  end, Nodes),
-    {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
-                                  [Nodes, delta_based, orset, gcounter, 100, 100, 10]),
     ok.

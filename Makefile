@@ -85,6 +85,10 @@ shell:
 dcos:
 	bin/dcos-deploy.sh
 
+## Temporary
+ads:
+	pkill -9 beam.smp; clear; ./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE --case=pause_test
+
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 
 include tools.mk

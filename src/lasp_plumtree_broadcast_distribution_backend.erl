@@ -1015,7 +1015,8 @@ log_transmission({Type, Payload}, PeerCount) ->
                 ok
         end
     catch
-        _:_ ->
+        _:Error ->
+            lager:error("Couldn't log transmission: ~p", [Error]),
             ok
     end.
 

@@ -896,12 +896,12 @@ code_change(_OldVsn, State, _Extra) ->
 
 %%%===================================================================
 %%% Internal functions
-%%%===================================================================
+%%%===============================1====================================
 
 %% @private
 broadcast({Id, Type, Metadata, Value}=Payload) ->
     PeerCount = 1, % @todo fix this
-    log_transmission(broadcast, Payload, PeerCount),
+    log_transmission({broadcast, Payload}, PeerCount),
     Clock = orddict:fetch(clock, Metadata),
     Broadcast = #broadcast{id=Id, clock=Clock, type=Type,
                            metadata=Metadata, value=Value},
@@ -1005,7 +1005,7 @@ do(Function, Args) ->
 -endif.
 
 %% @private
-log_transmission(Type, Payload, PeerCount) ->
+log_transmission({Type, Payload}, PeerCount) ->
     try
         case lasp_config:get(instrumentation, false) of
             true ->
@@ -1038,11 +1038,17 @@ schedule_delta_garbage_collection() ->
     end.
 
 %% @private
-send({Type, _From, Payload}=Msg, Peer) ->
-    log_transmission(Type, Payload, 1),
+send(Msg, Peer) ->
+    log_transmission(extract_type_and_payload(Msg), 1),
     PeerServiceManager = lasp_config:get(peer_service_manager,
                                          partisan_peer_service),
     PeerServiceManager:forward_message(Peer, ?MODULE, Msg).
+
+%% @private
+extract_type_and_payload({Type, _From, Payload}) ->
+    {Type, Payload};
+extract_type_and_payload({Type, _From, Payload, _Count}) ->
+    {Type, Payload}.
 
 %% @private
 init_delta_sync(Peer) ->

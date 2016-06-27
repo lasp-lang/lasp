@@ -109,7 +109,7 @@ init(_Args) ->
 
     Children0 = case InstrEnabled of
         true ->
-            Transmission = {lasp_client_transmission_instrumentation,
+            Transmission = {lasp_transmission_instrumentation,
                             {lasp_transmission_instrumentation, start_link, []},
                              permanent, 5000, worker,
                              [lasp_transmission_instrumentation]},

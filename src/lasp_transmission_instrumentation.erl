@@ -40,8 +40,7 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {entity,
-                tref,
+-record(state, {tref,
                 size_per_type=orddict:new(),
                 clients=0,
                 lines="",

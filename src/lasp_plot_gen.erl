@@ -364,7 +364,7 @@ get_titles(Types) ->
     ).
 
 %% @private
-get_title(aae_send)   -> "AEE Send";
+get_title(aae_send)   -> "AAE Send";
 get_title(ack_send)   -> "Ack Send";
 get_title(delta_send) -> "Delta Send";
 get_title(broadcast)  -> "Broadcast".

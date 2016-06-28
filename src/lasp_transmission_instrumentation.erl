@@ -42,7 +42,6 @@
 -record(state, {tref,
                 size_per_type=orddict:new(),
                 lines="",
-                clock=0,
                 status=init,
                 filename}).
 
@@ -79,8 +78,7 @@ init([]) ->
 
     _ = lager:info("Instrumentation timer enabled!"),
 
-    {ok, #state{tref=TRef, clock=0,
-                filename=Filename, status=running,
+    {ok, #state{tref=TRef, filename=Filename, status=running,
                 size_per_type=orddict:new(), lines=Line}}.
 
 %% @private
@@ -98,13 +96,12 @@ handle_call({log, Type, Payload, PeerCount, _Node}, _From, #state{size_per_type=
     Map = orddict:store(Type, Current + Size, Map0),
     {reply, ok, State#state{size_per_type=Map}};
 
-handle_call(stop, _From, #state{lines=Lines0, clock=Clock0,
-                                size_per_type=Map,
+handle_call(stop, _From, #state{lines=Lines0, size_per_type=Map,
                                 filename=Filename, tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
-    {ok, Clock, Lines} = record(Clock0, Map, Filename, Lines0),
+    {ok, Lines} = record(Map, Filename, Lines0),
     _ = lager:info("Instrumentation timer disabled!"),
-    {reply, ok, State#state{tref=undefined, clock=Clock, lines=Lines}};
+    {reply, ok, State#state{tref=undefined, lines=Lines}};
 
 %% @private
 handle_call(Msg, _From, State) ->
@@ -120,11 +117,10 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(record, #state{filename=Filename, size_per_type=Map,
-                           clock=Clock0, status=running,
-                           lines=Lines0}=State) ->
+                           status=running, lines=Lines0}=State) ->
     {ok, TRef} = start_timer(),
-    {ok, Clock, Lines} = record(Clock0, Map, Filename, Lines0),
-    {noreply, State#state{tref=TRef, clock=Clock, lines=Lines}};
+    {ok, Lines} = record(Map, Filename, Lines0),
+    {noreply, State#state{tref=TRef, lines=Lines}};
 
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -164,23 +160,22 @@ megasize(Size) ->
     MegaSize.
 
 %% @private
-clock(Clock) ->
-    Clock / 1000.
-
-%% @private
-record(Clock0, Map, Filename, Lines0) ->
-    Clock = Clock0 + ?INTERVAL,
+record(Map, Filename, Lines0) ->
+    Timestamp = timestamp(),
     Lines = orddict:fold(
         fun(Type, Size, Acc) ->
-            Line = io_lib:format("~w,~w,~w\n",
-                                 [Type,
-                                  clock(Clock),
-                                  megasize(Size)]),
+            Line = io_lib:format(
+                "~w,~w,~w\n",
+                [Type, Timestamp, megasize(Size)]
+            ),
             Acc ++ Line
         end,
         Lines0,
         Map
     ),
     ok = file:write_file(filename(Filename), Lines),
-    {ok, Clock, Lines}.
+    {ok, Lines}.
 
+timestamp() ->
+    {Mega, Sec, _Micro} = erlang:timestamp(),
+    Mega * 1000000 + Sec.

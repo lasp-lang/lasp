@@ -48,7 +48,6 @@ generate_plot() ->
     ),
 
     lager:info("Types found: ~p", [Types]),
-    lager:info("Times found: ~p", [Times]),
 
     %% Assume unknown logs with last known values
     Map1 = assume_unknown_logs(Types, Times, Map0),
@@ -125,7 +124,7 @@ load_to_map(File, Map) ->
         fun(Line, {Map0, Types0, Times0}) ->
             %% Parse log line
             [Type, Time, Bytes] = string:tokens(Line, ",\n"),
-            {TimeF, _} = string:to_float(Time),
+            {TimeF, _} = string:to_integer(Time),
             {BytesF, _} = string:to_float(Bytes),
 
             %% Get dictionary that maps time to logs of this file
@@ -252,7 +251,6 @@ revert_tuple_order(LastKnown) ->
 %% - Produces a dictionary that maps types to a list of 
 %%   pairs {time, bytes}
 average(Types, Times, Map) ->
-    NodesNumber = orddict:size(Map),
     Empty = create_empty_dict_type_to_time_and_bytes(Types, Times),
 
     %% Create dictionary the maps types to a lists of
@@ -278,16 +276,20 @@ average(Types, Times, Map) ->
         Map
     ),
 
+    TimeZero = lists:min(Times),
+    NodesNumber = orddict:size(Map),
+
     %% Divide each sum by the number of nodes
+    %% Also subtract `TimeZero` to all times
     orddict:map(
         fun(_Type, List) ->
             lists:map(
                 fun({Time, Sum}) ->
                     case Sum == 0 of
                         true ->
-                            {Time, Sum};
+                            {Time - TimeZero, Sum};
                         false ->
-                            {Time, Sum / NodesNumber}
+                            {Time - TimeZero, Sum / NodesNumber}
                     end
                 end,
                 List

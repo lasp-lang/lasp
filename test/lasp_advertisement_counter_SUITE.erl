@@ -69,7 +69,10 @@ end_per_testcase(Case, Config) ->
     %% Runner must start and stop in between test runs as well, to
     %% ensure that we clear the membership list (otherwise, we could
     %% delete the data on disk, but this is cleaner.)
-    lasp_support:stop_runner().
+    lasp_support:stop_runner(),
+
+    %% Generate transmission plot
+    lasp_plot_gen:generate_plot().
 
 all() -> [].
 

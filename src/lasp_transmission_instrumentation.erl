@@ -59,7 +59,6 @@ start_link() ->
 
 -spec log(term(), term(), pos_integer(), node()) -> ok | error().
 log(Type, Payload, PeerCount, Node) ->
-    lager:info("lasp_transmission_instrumentation:log"),
     gen_server:call(?MODULE, {log, Type, Payload, PeerCount, Node}, infinity).
 
 -spec stop() -> ok | error().
@@ -73,7 +72,7 @@ stop() ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([]) ->
-    Filename = io_lib:format("~w", [node()]),
+    Filename = io_lib:format("~s.csv", [node()]),
     Line = io_lib:format("Type,Seconds,MegaBytes\n", []),
 
     {ok, TRef} = start_timer(),
@@ -89,7 +88,6 @@ init([]) ->
     {reply, term(), #state{}}.
 
 handle_call({log, Type, Payload, PeerCount, _Node}, _From, #state{size_per_type=Map0}=State) ->
-    lager:info("lasp_transmission_instrumentation:handle_call({log,"),
     Size = termsize(Payload) * PeerCount,
     Current = case orddict:find(Type, Map0) of
         {ok, Value} ->
@@ -98,7 +96,6 @@ handle_call({log, Type, Payload, PeerCount, _Node}, _From, #state{size_per_type=
             0
     end,
     Map = orddict:store(Type, Current + Size, Map0),
-    lager:info("~p", [Map]),
     {reply, ok, State#state{size_per_type=Map}};
 
 handle_call(stop, _From, #state{lines=Lines0, clock=Clock0,
@@ -184,7 +181,6 @@ record(Clock0, Map, Filename, Lines0) ->
         Lines0,
         Map
     ),
-    lager:info("Lines: \n~p", [Lines]),
     ok = file:write_file(filename(Filename), Lines),
     {ok, Clock, Lines}.
 

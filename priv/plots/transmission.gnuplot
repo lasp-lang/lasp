@@ -23,12 +23,13 @@ set border 3 back linestyle 80 # Remove border on top and right.  These
 
 # Line styles: try to pick pleasing colors, rather
 # than strictly primary colors or hard-to-see colors
+
 # like gnuplot's default yellow.  Make the lines thick
 # so they're easy to see in small plots in papers.
-set style line 1 lt rgb "#A00000" lw 2 pt 1
-#set style line 2 lt rgb "#00A000" lw 2 pt 6
-#set style line 3 lt rgb "#5060D0" lw 2 pt 2
-#set style line 4 lt rgb "#F25900" lw 2 pt 9
+set style line 1 lc rgb "#A00000" lw 2 pt 7 ps 0.5
+set style line 2 lc rgb "#00A000" lw 2 pt 7 ps 0.5
+set style line 3 lc rgb "#5060D0" lw 2 pt 7 ps 0.5
+set style line 4 lc rgb "#F25900" lw 2 pt 7 ps 0.5
 
 set output outputname
 set xlabel "Time in Seconds"
@@ -56,4 +57,4 @@ pretty(title) = system("echo ".title." | sed 's/_/ /g'")
 # Input file contains comma-separated values fields
 set datafile separator ","
 
-plot for [i=0:words(inputnames) - 1] word(inputnames, i + 1) using 1:2 title pretty(word(titles, i + 1)) with linespoints
+plot for [i=0:words(inputnames) - 1] word(inputnames, i + 1) using 1:2 title pretty(word(titles, i + 1)) with linespoints ls i + 1

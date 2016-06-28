@@ -62,7 +62,7 @@ generate_plot() ->
     lager:info("Wrote average to files: ~p", [InputFiles]),
 
     Titles = get_titles(Types),
-    
+
     Result = run_gnuplot(InputFiles, Titles),
     _ = lager:info("Generating plot. Output: ~p", [Result]),
     ok.
@@ -135,7 +135,7 @@ load_to_map(File, Map) ->
                     orddict:new()
             end,
 
-            %% Update dictionary `TimeToLogs0` adding new pair log to 
+            %% Update dictionary `TimeToLogs0` adding new pair log to
             %% the list of logs mapped to time `TimeF`
             TimeToLogs1 = orddict:append(TimeF, {BytesF, Type}, TimeToLogs0),
 
@@ -155,7 +155,7 @@ load_to_map(File, Map) ->
 %% @private
 read_lines(File, FileDescriptor) ->
     case io:get_line(FileDescriptor, '') of
-        eof -> 
+        eof ->
             [];
         {error, Error} ->
             lager:warning("Error while reading line from file ~p. Error: ~p", [File, Error]),
@@ -165,7 +165,7 @@ read_lines(File, FileDescriptor) ->
     end.
 
 %% @private
-%% If in the logs of one node, we don't find some reference to some 
+%% If in the logs of one node, we don't find some reference to some
 %% time, for every type of log, assume the last known value
 assume_unknown_logs(Types, Times, Map) ->
     orddict:fold(
@@ -246,9 +246,9 @@ revert_tuple_order(LastKnown) ->
 %% - Receives:
 %%   * set of known types
 %%   * set of known times
-%%   * a dictionary that maps nodes to dictionaries 
+%%   * a dictionary that maps nodes to dictionaries
 %%     (from times to pairs {bytes, type})
-%% - Produces a dictionary that maps types to a list of 
+%% - Produces a dictionary that maps types to a list of
 %%   pairs {time, bytes}
 average(Types, Times, Map) ->
     Empty = create_empty_dict_type_to_time_and_bytes(Types, Times),

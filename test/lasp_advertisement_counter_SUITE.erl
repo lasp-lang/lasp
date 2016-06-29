@@ -74,14 +74,37 @@ end_per_testcase(Case, Config) ->
     %% Generate transmission plot
     lasp_plot_gen:generate_plot().
 
-all() -> [].
+all() -> [
+          state_based_with_aae,
+          state_based_with_aae_and_tree,
+          delta_based_with_aae
+          ].
 
 %% ===================================================================
 %% tests
 %% ===================================================================
 
-pause_test(Config) ->
-    lager:info("Running the pause test..."),
+state_based_with_aae(Config) ->
+    configure(Config, [{mode, state_based}, {broadcast, false}]),
+    wait_for_completion(),
+    ok.
+
+state_based_with_aae_and_tree(Config) ->
+    configure(Config, [{mode, state_based}, {broadcast, true}]),
+    wait_for_completion(),
+    ok.
+
+delta_based_with_aae(Config) ->
+    configure(Config, [{mode, delta_based}, {broadcast, false}]),
+    wait_for_completion(),
+    ok.
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+configure(Config, Options) ->
+    lager:info("Configuring nodes; options: ~p", [Options]),
     Nodes = proplists:get_value(nodes, Config),
 
     lager:info("Enabling ad client simulation on all nodes."),
@@ -102,6 +125,28 @@ pause_test(Config) ->
                                       [instrumentation, true])
                   end, Nodes),
 
+    Mode = proplists:get_value(mode, Options),
+
+    lager:info("Enabling mode locally: ~p.", [Mode]),
+    ok = lasp_config:set(mode, Mode),
+
+    lager:info("Enabling mode on all nodes: ~p", [Mode]),
+    lists:foreach(fun(Node) ->
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [mode, Mode])
+                  end, Nodes),
+
+    Broadcast = proplists:get_value(broadcast, Options),
+
+    lager:info("Enabling broadcast locally: ~p.", [broadcast]),
+    ok = lasp_config:set(broadcast, Broadcast),
+
+    lager:info("Enabling broadcast on all nodes: ~p", [Broadcast]),
+    lists:foreach(fun(Node) ->
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [broadcast, Broadcast])
+                  end, Nodes),
+
     lager:info("Restarting Lasp on all nodes."),
     lists:foreach(fun(Node) ->
                         lager:info("Restarting ~p and re-joining...", [Node]),
@@ -117,5 +162,7 @@ pause_test(Config) ->
                         lager:info("* LocalMembers; ~p", [LocalMembers])
                   end, Nodes),
 
-    timer:sleep(20000),
     ok.
+
+wait_for_completion() ->
+    timer:sleep(20000).

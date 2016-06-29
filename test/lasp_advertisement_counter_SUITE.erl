@@ -91,7 +91,7 @@ all() ->
 %% ===================================================================
 
 -define(EVAL_NUMBER, 3).
--define(EVAL_TIME, 20000).
+-define(EVAL_TIME, 2000).
 
 state_based_with_aae(Config) ->
     run(Config, [{mode, state_based},

@@ -74,9 +74,6 @@ end_per_testcase(Case, Config) ->
     %% delete the data on disk, but this is cleaner.)
     lasp_support:stop_runner(),
 
-    %% Generate transmission plot
-    lasp_plot_gen:generate_plot(),
-
     Config.
 
 all() ->
@@ -129,12 +126,16 @@ run(Config, Options) ->
             wait_for_completion()
         end,
         lists:seq(1, ?EVAL_NUMBER)
-    ).
+    ),
+
+    %% Generate transmission plot.
+    lasp_plot_gen:generate_plot(),
+
+    ok.
 
 configure(Config, Options) ->
     lager:info("Configuring nodes; options: ~p", [Options]),
     Nodes = proplists:get_value(nodes, Config),
-
 
     %% Settings ads
     lager:info("Enabling ad client simulation on all nodes."),
@@ -145,7 +146,6 @@ configure(Config, Options) ->
 
     lager:info("Enabling ad server simulation on local node."),
     ok = lasp_config:set(ad_counter_simulation_server, true),
-
 
     %% Enabling instrumentation
     lager:info("Enabling instrumentation locally."),

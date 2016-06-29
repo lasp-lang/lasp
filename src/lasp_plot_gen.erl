@@ -86,7 +86,7 @@ generate_plot(EvalDir, EvalId, EvalNumber) ->
     OutputFile = output_file(PlotDir),
     lager:info("Wrote average to files: ~p", [InputFiles]),
 
-    Result = run_gnuplot(InputFiles, Titles, PlotDir),
+    Result = run_gnuplot(InputFiles, Titles, OutputFile),
     lager:info("Generating plot ~p. Output: ~p", [OutputFile, Result]),
     ok.
 
@@ -376,7 +376,6 @@ write_to_files(TypeToTimeAndBytes, PlotDir) ->
             lists:foreach(
                 fun({Time, Bytes}) ->
                     Line = io_lib:format("~w,~w\n", [Time, Bytes]),
-                    lager:info("LINE : ~p", [Line]),
                     file:write_file(InputFile, Line, [append])
                 end,
                 List
@@ -414,6 +413,7 @@ run_gnuplot(InputFiles, Titles, OutputFile) ->
                   ++ "outputname='" ++ OutputFile ++ "'; "
                   ++ "inputnames='" ++ join_filenames(InputFiles) ++ "'; "
                   ++ "titles='" ++  join_titles(Titles) ++ "'\" " ++ plot_file(),
+    lager:info("~p", [Command]),
     os:cmd(Command).
 
 %% @private

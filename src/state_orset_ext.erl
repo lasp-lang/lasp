@@ -330,12 +330,16 @@ join_all_events(AllEventsA, AllEventsB) ->
     ordsets:union(AllEventsA, AllEventsB).
 
 %% @private
+is_equal_inter({sqltuple, _}=ElemL, {sqltuple, _}=ElemR) ->
+    lasp_sql_query_SUITE:is_equal_inter(ElemL, ElemR);
 is_equal_inter(Elem, Elem) ->
     true;
 is_equal_inter(_ElemL, _ElemR) ->
     false.
 
 %% @private
+get_inter_elem({sqltuple, _}=ElemL, {sqltuple, _}=ElemR) ->
+    lasp_sql_query_SUITE:get_inter_elem(ElemL, ElemR);
 get_inter_elem(Elem, Elem) ->
     Elem.
 

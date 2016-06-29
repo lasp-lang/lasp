@@ -60,8 +60,8 @@ terminate_child(Supervisor, Pid) ->
 
 %% @doc supervisor callback.
 init([]) ->
-    Spec = {gen_flow,
-            {gen_flow, start_link, [lasp_process]},
-             transient, 5000, worker, [gen_flow]},
+    Spec = {gen_flow_inc,
+            {gen_flow_inc, start_link, [lasp_process]},
+             transient, 5000, worker, [gen_flow_inc]},
 
     {ok, {{simple_one_for_one, 10, 10}, [Spec]}}.

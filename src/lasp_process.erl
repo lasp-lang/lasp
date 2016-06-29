@@ -21,7 +21,7 @@
 -module(lasp_process).
 -author('Christopher Meiklejohn <christopher.meiklejohn@gmail.com>').
 
--behaviour(gen_flow).
+-behaviour(gen_flow_inc).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

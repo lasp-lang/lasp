@@ -900,12 +900,17 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 broadcast({Id, Type, Metadata, Value}=Payload) ->
-    PeerCount = length(plumtree_broadcast:broadcast_members()),
-    log_transmission({broadcast, Payload}, PeerCount),
-    Clock = orddict:fetch(clock, Metadata),
-    Broadcast = #broadcast{id=Id, clock=Clock, type=Type,
-                           metadata=Metadata, value=Value},
-    plumtree_broadcast:broadcast(Broadcast, ?MODULE).
+    case lasp_config:get(broadcast, false) of
+        true ->
+            PeerCount = length(plumtree_broadcast:broadcast_members()),
+            log_transmission({broadcast, Payload}, PeerCount),
+            Clock = orddict:fetch(clock, Metadata),
+            Broadcast = #broadcast{id=Id, clock=Clock, type=Type,
+                                   metadata=Metadata, value=Value},
+            plumtree_broadcast:broadcast(Broadcast, ?MODULE);
+        false ->
+            ok
+    end.
 
 %% @private
 local_bind(Id, Type, Metadata, Value) ->

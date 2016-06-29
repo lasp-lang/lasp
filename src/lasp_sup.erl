@@ -162,6 +162,12 @@ configure_defaults() ->
                                          ProfileDefault),
     lasp_config:set(profile, ProfileEnabled),
 
+    BroadcastDefault = list_to_atom(os:getenv("BROADCAST", "false")),
+    BroadcastEnabled = application:get_env(?APP,
+                                           broadcast,
+                                           BroadcastDefault),
+    lasp_config:set(broadcast, BroadcastEnabled),
+
     %% Operation mode.
     ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),
     Mode = application:get_env(?APP, mode, ModeDefault),

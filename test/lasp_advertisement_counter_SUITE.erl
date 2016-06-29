@@ -54,16 +54,19 @@ end_per_suite(_Config) ->
     _Config.
 
 init_per_testcase(Case, Config) ->
+    ct:pal("Beginning case: ~p", [Case]),
+
     %% Runner must start and stop in between test runs as well, to
     %% ensure that we clear the membership list (otherwise, we could
     %% delete the data on disk, but this is cleaner.)
     lasp_support:start_runner(),
 
     Nodes = lasp_support:start_nodes(Case, Config),
-
     [{nodes, Nodes}|Config].
 
 end_per_testcase(Case, Config) ->
+    ct:pal("Case finished: ~p", [Case]),
+
     lasp_support:stop_nodes(Case, Config),
 
     %% Runner must start and stop in between test runs as well, to
@@ -71,14 +74,14 @@ end_per_testcase(Case, Config) ->
     %% delete the data on disk, but this is cleaner.)
     lasp_support:stop_runner(),
 
-    %% Generate transmission plot
-    lasp_plot_gen:generate_plot().
+    Config.
 
 all() ->
     [
-     state_based_with_aae,
-     state_based_with_aae_and_tree,
-     delta_based_with_aae
+     state_based_with_aae_test,
+     state_based_with_aae_and_tree_test,
+     delta_based_with_aae_test,
+     default_test
     ].
 
 %% ===================================================================
@@ -86,21 +89,24 @@ all() ->
 %% ===================================================================
 
 -define(EVAL_NUMBER, 3).
--define(EVAL_TIME, 20000).
+-define(EVAL_TIME, 2000).
 
-state_based_with_aae(Config) ->
+default_test(_Config) ->
+    ok.
+
+state_based_with_aae_test(Config) ->
     run(Config, [{mode, state_based},
                  {broadcast, false},
                  {evaluation_identifier, state_based_with_aae}]),
     ok.
 
-state_based_with_aae_and_tree(Config) ->
+state_based_with_aae_and_tree_test(Config) ->
     run(Config, [{mode, state_based},
                  {broadcast, true},
                  {evaluation_identifier, state_based_with_aae_and_tree}]),
     ok.
 
-delta_based_with_aae(Config) ->
+delta_based_with_aae_test(Config) ->
     run(Config, [{mode, delta_based},
                  {broadcast, false},
                  {evaluation_identifier, delta_based_with_aae}]),
@@ -120,12 +126,16 @@ run(Config, Options) ->
             wait_for_completion()
         end,
         lists:seq(1, ?EVAL_NUMBER)
-    ).
+    ),
+
+    %% Generate transmission plot.
+    lasp_plot_gen:generate_plot(),
+
+    ok.
 
 configure(Config, Options) ->
     lager:info("Configuring nodes; options: ~p", [Options]),
     Nodes = proplists:get_value(nodes, Config),
-
 
     %% Settings ads
     lager:info("Enabling ad client simulation on all nodes."),
@@ -136,7 +146,6 @@ configure(Config, Options) ->
 
     lager:info("Enabling ad server simulation on local node."),
     ok = lasp_config:set(ad_counter_simulation_server, true),
-
 
     %% Enabling instrumentation
     lager:info("Enabling instrumentation locally."),

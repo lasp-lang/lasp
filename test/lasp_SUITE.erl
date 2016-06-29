@@ -37,6 +37,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/inet.hrl").
 
+-define(PEER_SERVICE, partisan_hyparview_peer_service_manager).
+
 %% ===================================================================
 %% common_test callbacks
 %% ===================================================================
@@ -86,7 +88,8 @@ all() ->
      filter_test,
      union_test,
      product_test,
-     intersection_test
+     intersection_test,
+     membership_test
     ].
 
 %% ===================================================================
@@ -468,5 +471,21 @@ orset_test(_Config) ->
         read_any ->
             ok
     end,
+
+    ok.
+
+%% @doc Membership test.
+membership_test(Config) ->
+    Nodes = proplists:get_value(nodes, Config),
+    lager:info("Nodes: ~p", [Nodes]),
+
+    lager:info("Waiting for cluster to stabilize."),
+    timer:sleep(5000),
+
+    lists:foreach(fun(Node) ->
+                        {ok, {state, Myself, Active, Passive, _, _, _}} = rpc:call(Node, ?PEER_SERVICE, state, []),
+                        lager:info("~p; active: ~p", [Myself, sets:to_list(Active)]),
+                        lager:info("~p; passive: ~p", [Myself, sets:to_list(Passive)])
+                  end, Nodes),
 
     ok.

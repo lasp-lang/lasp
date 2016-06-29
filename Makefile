@@ -91,8 +91,8 @@ dcos:
 ads:
 	pkill -9 beam.smp; \
 		clear; \
-		rm -rf priv/plots/*_with_aee*; \
-		rm -rf priv/logs/*_with_aee*; \
+		rm -rf priv/plots/*_with_aae*; \
+		rm -rf priv/logs/*_with_aae*; \
 		AD_COUNTER_SIM_CLIENT=true AD_COUNTER_SIM_SERVER=true ./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE
 
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto

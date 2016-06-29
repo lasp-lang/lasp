@@ -85,17 +85,23 @@ all() -> [
 %% ===================================================================
 
 state_based_with_aae(Config) ->
-    configure(Config, [{mode, state_based}, {broadcast, false}]),
+    configure(Config, [{mode, state_based},
+                       {broadcast, false},
+                       {evaluation_identifier, state_based_with_aae}]),
     wait_for_completion(),
     ok.
 
 state_based_with_aae_and_tree(Config) ->
-    configure(Config, [{mode, state_based}, {broadcast, true}]),
+    configure(Config, [{mode, state_based},
+                       {broadcast, true},
+                       {evaluation_identifier, state_based_with_aae_and_tree}]),
     wait_for_completion(),
     ok.
 
 delta_based_with_aae(Config) ->
-    configure(Config, [{mode, delta_based}, {broadcast, false}]),
+    configure(Config, [{mode, delta_based},
+                       {broadcast, false},
+                       {evaluation_identifier, delta_based_with_aae}]),
     wait_for_completion(),
     ok.
 
@@ -112,6 +118,14 @@ configure(Config, Options) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [ad_counter_simulation_client, true])
                   end, Nodes),
+
+    lager:info("Setting evaluation identifier on all nodes."),
+    Identifier = lasp_config:get(evaluation_identifier, undefined),
+    lists:foreach(fun(Node) ->
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [evaluation_identifier, Identifier])
+                  end, Nodes),
+
 
     lager:info("Enabling ad server simulation on local node."),
     ok = lasp_config:set(ad_counter_simulation_server, true),

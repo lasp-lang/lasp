@@ -168,6 +168,12 @@ configure_defaults() ->
                                            BroadcastDefault),
     lasp_config:set(broadcast, BroadcastEnabled),
 
+    EvaluationDefault = list_to_atom(os:getenv("EVAL_ID", "false")),
+    EvaluationEnabled = application:get_env(?APP,
+                                           evaluation_identifier,
+                                           EvaluationDefault),
+    lasp_config:set(evaluation_identifier, EvaluationEnabled),
+
     %% Operation mode.
     ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),
     Mode = application:get_env(?APP, mode, ModeDefault),

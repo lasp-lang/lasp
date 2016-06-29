@@ -199,7 +199,7 @@ graft({Id, Clock}) ->
 %% @doc Anti-entropy mechanism.
 -spec exchange(node()) -> {ok, pid()}.
 exchange(Peer) ->
-    lager:info("Exchange triggered with ~p", [Peer]),
+    %%lager:info("Exchange triggered with ~p", [Peer]),
 
     case lasp_config:get(mode, state_based) of
         delta_based ->
@@ -364,7 +364,12 @@ read_any(Reads) ->
 %%
 -spec product(id(), id(), id()) -> ok | error().
 product(Left, Right, Product) ->
-    gen_server:call(?MODULE, {product, Left, Right, Product}, infinity).
+    case lasp_config:get(incremental_computation_mode, false) of
+        true ->
+            gen_server:call(?MODULE, {product_inc, Left, Right, Product}, infinity);
+        false ->
+            gen_server:call(?MODULE, {product, Left, Right, Product}, infinity)
+    end.
 
 %% @doc Compute the union of two sets.
 %%
@@ -373,7 +378,12 @@ product(Left, Right, Product) ->
 %%
 -spec union(id(), id(), id()) -> ok | error().
 union(Left, Right, Union) ->
-    gen_server:call(?MODULE, {union, Left, Right, Union}, infinity).
+    case lasp_config:get(incremental_computation_mode, false) of
+        true ->
+            gen_server:call(?MODULE, {union_inc, Left, Right, Union}, infinity);
+        false ->
+            gen_server:call(?MODULE, {union, Left, Right, Union}, infinity)
+    end.
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -382,9 +392,16 @@ union(Left, Right, Union) ->
 %%
 -spec intersection(id(), id(), id()) -> ok | error().
 intersection(Left, Right, Intersection) ->
-    gen_server:call(?MODULE,
-                    {intersection, Left, Right, Intersection},
-                    infinity).
+    case lasp_config:get(incremental_computation_mode, false) of
+        true ->
+            gen_server:call(?MODULE,
+                            {intersection_inc, Left, Right, Intersection},
+                            infinity);
+        false ->
+            gen_server:call(?MODULE,
+                            {intersection, Left, Right, Intersection},
+                            infinity)
+    end.
 
 %% @doc Map values from one lattice into another.
 %%
@@ -419,7 +436,12 @@ fold(Id, Function, AccId) ->
 %%
 -spec filter(id(), function(), id()) -> ok | error().
 filter(Id, Function, AccId) ->
-    gen_server:call(?MODULE, {filter, Id, Function, AccId}, infinity).
+    case lasp_config:get(incremental_computation_mode, false) of
+        true ->
+            gen_server:call(?MODULE, {filter_inc, Id, Function, AccId}, infinity);
+        false ->
+            gen_server:call(?MODULE, {filter, Id, Function, AccId}, infinity)
+    end.
 
 %% @doc Spawn a function.
 %%
@@ -584,9 +606,22 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
     declare_if_not_found(Value0, Id, State, ?CORE, read,
                          [Id, Threshold, Store, From, ReplyFun, ?BLOCKING]);
 
+%% Spawn a process to perform a filter with incremental computation.
+handle_call({filter_inc, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?WRITE, ?READ_DELTA),
+    {reply, ok, State};
+
 %% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?WRITE, ?READ),
+    {reply, ok, State};
+
+%% Spawn a process to compute the union with incremental computation.
+handle_call({product_inc, Left, Right, Product},
+            _From,
+            #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?WRITE,
+                               ?READ_DELTA, ?READ_DELTA),
     {reply, ok, State};
 
 %% Spawn a process to compute a product.
@@ -597,12 +632,26 @@ handle_call({product, Left, Right, Product},
                                ?READ, ?READ),
     {reply, ok, State};
 
+%% Spawn a process to compute the intersection with incremental computation.
+handle_call({intersection_inc, Left, Right, Intersection},
+            _From,
+            #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:intersection(Left, Right, Intersection, Store,
+                                    ?WRITE, ?READ_DELTA, ?READ_DELTA),
+    {reply, ok, State};
+
 %% Spawn a process to compute the intersection.
 handle_call({intersection, Left, Right, Intersection},
             _From,
             #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:intersection(Left, Right, Intersection, Store,
                                     ?WRITE, ?READ, ?READ),
+    {reply, ok, State};
+
+%% Spawn a process to compute the union with incremental computation.
+handle_call({union_inc, Left, Right, Union}, _From, #state{store=Store}=State) ->
+    {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?WRITE, ?READ_DELTA,
+                             ?READ_DELTA),
     {reply, ok, State};
 
 %% Spawn a process to compute the union.

@@ -42,7 +42,7 @@
 %% ===================================================================
 
 init_per_suite(_Config) ->
-    %% Start Lasp on the runner and enable instrumentation.
+    %% Start Lasp on the runner.
     lasp_support:start_runner(),
 
     _Config.
@@ -126,6 +126,8 @@ configure(Config, Options) ->
     lager:info("Configuring nodes; options: ~p", [Options]),
     Nodes = proplists:get_value(nodes, Config),
 
+
+    %% Settings ads
     lager:info("Enabling ad client simulation on all nodes."),
     lists:foreach(fun(Node) ->
                         ok = rpc:call(Node, lasp_config, set,
@@ -134,6 +136,7 @@ configure(Config, Options) ->
 
     lager:info("Enabling ad server simulation on local node."),
     ok = lasp_config:set(ad_counter_simulation_server, true),
+
 
     %% Enabling instrumentation
     lager:info("Enabling instrumentation locally."),
@@ -145,11 +148,10 @@ configure(Config, Options) ->
                                       [instrumentation, true])
                   end, Nodes),
 
-
     %% Setting mode
     Mode = proplists:get_value(mode, Options),
 
-    lager:info("Setting mode locally: ~p.", [Mode]),
+    lager:info("Setting mode locally: ~p", [Mode]),
     ok = lasp_config:set(mode, Mode),
 
     lager:info("Setting mode on all nodes: ~p", [Mode]),
@@ -162,7 +164,7 @@ configure(Config, Options) ->
     %% Setting broadcast
     Broadcast = proplists:get_value(broadcast, Options),
 
-    lager:info("Setting broadcast locally: ~p.", [Broadcast]),
+    lager:info("Setting broadcast locally: ~p", [Broadcast]),
     ok = lasp_config:set(broadcast, Broadcast),
 
     lager:info("Setting broadcast on all nodes: ~p", [Broadcast]),
@@ -175,7 +177,7 @@ configure(Config, Options) ->
     %% Setting evaluation identifier
     EvalIdentifier = proplists:get_value(evaluation_identifier, Options),
 
-    lager:info("Setting evaluation identifier locally: ~p.", [EvalIdentifier]),
+    lager:info("Setting evaluation identifier locally: ~p", [EvalIdentifier]),
     ok = lasp_config:set(evaluation_identifier, EvalIdentifier),
 
     lager:info("Setting evaluation identifier on all nodes: ~p", [EvalIdentifier]),
@@ -188,7 +190,7 @@ configure(Config, Options) ->
     %% Setting evaluation number
     EvalNumber = proplists:get_value(evaluation_number, Options),
 
-    lager:info("Setting evaluation number locally: ~p.", [EvalNumber]),
+    lager:info("Setting evaluation number locally: ~p", [EvalNumber]),
     ok = lasp_config:set(evaluation_number, EvalNumber),
 
     lager:info("Setting evaluation number on all nodes: ~p", [EvalNumber]),

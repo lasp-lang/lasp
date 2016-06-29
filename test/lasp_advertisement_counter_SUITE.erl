@@ -83,7 +83,8 @@ all() ->
     [
      state_based_with_aae_test,
      state_based_with_aae_and_tree_test,
-     delta_based_with_aae_test
+     delta_based_with_aae_test,
+     default_test
     ].
 
 %% ===================================================================
@@ -93,19 +94,22 @@ all() ->
 -define(EVAL_NUMBER, 3).
 -define(EVAL_TIME, 2000).
 
-state_based_with_aae(Config) ->
+default_test(_Config) ->
+    ok.
+
+state_based_with_aae_test(Config) ->
     run(Config, [{mode, state_based},
                  {broadcast, false},
                  {evaluation_identifier, state_based_with_aae}]),
     ok.
 
-state_based_with_aae_and_tree(Config) ->
+state_based_with_aae_and_tree_test(Config) ->
     run(Config, [{mode, state_based},
                  {broadcast, true},
                  {evaluation_identifier, state_based_with_aae_and_tree}]),
     ok.
 
-delta_based_with_aae(Config) ->
+delta_based_with_aae_test(Config) ->
     run(Config, [{mode, delta_based},
                  {broadcast, false},
                  {evaluation_identifier, delta_based_with_aae}]),

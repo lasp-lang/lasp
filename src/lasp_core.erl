@@ -377,7 +377,7 @@ update(Id, Operation, Actor, Store) ->
     {ok, var()} | not_found().
 update(Id, Operation, Actor, MetadataFun, Store) ->
     {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
-    {ok, Value} = lasp_type:update(Type, Operation, Actor, Value0),
+    {ok, Value} = lasp_type:update(Type, Operation, {Id, Actor}, Value0),
     bind(Id, Value, MetadataFun, Store).
 
 %% @doc Define a dataflow variable to be bound a value.

@@ -323,9 +323,6 @@ start_runner() ->
     ok = application:set_env(plumtree,
                              broadcast_mods,
                              [lasp_plumtree_broadcast_distribution_backend]),
-    ok = application:set_env(lasp,
-                             instrumentation,
-                             true),
 
     {ok, _} = application:ensure_all_started(lasp),
 

@@ -71,7 +71,7 @@ stop() ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([]) ->
-    Filename = io_lib:format("~s.csv", [node()]),
+    Filename = create_dir(),
     Line = io_lib:format("Type,Seconds,MegaBytes\n", []),
 
     {ok, TRef} = start_timer(),
@@ -149,9 +149,20 @@ start_timer() ->
     timer:send_after(?INTERVAL, record).
 
 %% @private
-filename(Filename) ->
-    Root = code:priv_dir(?APP),
-    Root ++ "/logs/" ++ Filename.
+log_dir() ->
+    code:priv_dir(?APP) ++ "/logs".
+
+%% @private
+create_dir() ->
+    EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
+    EvalNumber = lasp_config:get(evaluation_number, 0),
+    Filename = io_lib:format("~s.csv", [node()]),
+    Path = log_dir() ++ "/"
+        ++ atom_to_list(EvalIdentifier) ++ "/"
+        ++ integer_to_list(EvalNumber) ++ "/",
+    filelib:ensure_dir(Path),
+    Filename = io_lib:format("~s.csv", [node()]),
+    Path ++ Filename.
 
 %% @private
 megasize(Size) ->
@@ -173,7 +184,7 @@ record(Map, Filename, Lines0) ->
         Lines0,
         Map
     ),
-    ok = file:write_file(filename(Filename), Lines),
+    ok = file:write_file(Filename, Lines),
     {ok, Lines}.
 
 timestamp() ->

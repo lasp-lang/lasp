@@ -480,7 +480,7 @@ membership_test(Config) ->
     lager:info("Nodes: ~p", [Nodes]),
 
     lager:info("Waiting for cluster to stabilize."),
-    timer:sleep(5000),
+    timer:sleep(10000),
 
     lists:foreach(fun(Node) ->
                         {ok, {state, Myself, Active, Passive, _, _, _}} = rpc:call(Node, ?PEER_SERVICE, state, []),

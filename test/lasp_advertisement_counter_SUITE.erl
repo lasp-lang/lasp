@@ -42,7 +42,7 @@
 %% ===================================================================
 
 init_per_suite(_Config) ->
-    %% Start Lasp on the runner and enable instrumentation.
+    %% Start Lasp on the runner.
     lasp_support:start_runner(),
 
     _Config.
@@ -74,63 +74,72 @@ end_per_testcase(Case, Config) ->
     %% Generate transmission plot
     lasp_plot_gen:generate_plot().
 
-all() -> [
-          state_based_with_aae,
-          state_based_with_aae_and_tree,
-          delta_based_with_aae
-          ].
+all() ->
+    [
+     state_based_with_aae,
+     state_based_with_aae_and_tree,
+     delta_based_with_aae
+    ].
 
 %% ===================================================================
 %% tests
 %% ===================================================================
 
+-define(EVAL_NUMBER, 3).
+-define(EVAL_TIME, 20000).
+
 state_based_with_aae(Config) ->
-    configure(Config, [{mode, state_based},
-                       {broadcast, false},
-                       {evaluation_identifier, state_based_with_aae}]),
-    wait_for_completion(),
+    run(Config, [{mode, state_based},
+                 {broadcast, false},
+                 {evaluation_identifier, state_based_with_aae}]),
     ok.
 
 state_based_with_aae_and_tree(Config) ->
-    configure(Config, [{mode, state_based},
-                       {broadcast, true},
-                       {evaluation_identifier, state_based_with_aae_and_tree}]),
-    wait_for_completion(),
+    run(Config, [{mode, state_based},
+                 {broadcast, true},
+                 {evaluation_identifier, state_based_with_aae_and_tree}]),
     ok.
 
 delta_based_with_aae(Config) ->
-    configure(Config, [{mode, delta_based},
-                       {broadcast, false},
-                       {evaluation_identifier, delta_based_with_aae}]),
-    wait_for_completion(),
+    run(Config, [{mode, delta_based},
+                 {broadcast, false},
+                 {evaluation_identifier, delta_based_with_aae}]),
     ok.
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
 
+run(Config, Options) ->
+    lists:foreach(
+        fun(EvalNumber) ->
+            configure(
+              Config,
+              [{evaluation_number, EvalNumber} | Options]
+            ),
+            wait_for_completion()
+        end,
+        lists:seq(1, ?EVAL_NUMBER)
+    ).
+
 configure(Config, Options) ->
     lager:info("Configuring nodes; options: ~p", [Options]),
     Nodes = proplists:get_value(nodes, Config),
 
+
+    %% Settings ads
     lager:info("Enabling ad client simulation on all nodes."),
     lists:foreach(fun(Node) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [ad_counter_simulation_client, true])
                   end, Nodes),
 
-    lager:info("Setting evaluation identifier on all nodes."),
-    Identifier = lasp_config:get(evaluation_identifier, undefined),
-    lists:foreach(fun(Node) ->
-                        ok = rpc:call(Node, lasp_config, set,
-                                      [evaluation_identifier, Identifier])
-                  end, Nodes),
-
-
     lager:info("Enabling ad server simulation on local node."),
     ok = lasp_config:set(ad_counter_simulation_server, true),
 
-    lager:info("Enabling instrumentation."),
+
+    %% Enabling instrumentation
+    lager:info("Enabling instrumentation locally."),
     ok = lasp_config:set(instrumentation, true),
 
     lager:info("Enabling instrumentation on all nodes."),
@@ -139,27 +148,57 @@ configure(Config, Options) ->
                                       [instrumentation, true])
                   end, Nodes),
 
+    %% Setting mode
     Mode = proplists:get_value(mode, Options),
 
-    lager:info("Enabling mode locally: ~p.", [Mode]),
+    lager:info("Setting mode locally: ~p", [Mode]),
     ok = lasp_config:set(mode, Mode),
 
-    lager:info("Enabling mode on all nodes: ~p", [Mode]),
+    lager:info("Setting mode on all nodes: ~p", [Mode]),
     lists:foreach(fun(Node) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [mode, Mode])
                   end, Nodes),
 
+
+    %% Setting broadcast
     Broadcast = proplists:get_value(broadcast, Options),
 
-    lager:info("Enabling broadcast locally: ~p.", [broadcast]),
+    lager:info("Setting broadcast locally: ~p", [Broadcast]),
     ok = lasp_config:set(broadcast, Broadcast),
 
-    lager:info("Enabling broadcast on all nodes: ~p", [Broadcast]),
+    lager:info("Setting broadcast on all nodes: ~p", [Broadcast]),
     lists:foreach(fun(Node) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [broadcast, Broadcast])
                   end, Nodes),
+
+
+    %% Setting evaluation identifier
+    EvalIdentifier = proplists:get_value(evaluation_identifier, Options),
+
+    lager:info("Setting evaluation identifier locally: ~p", [EvalIdentifier]),
+    ok = lasp_config:set(evaluation_identifier, EvalIdentifier),
+
+    lager:info("Setting evaluation identifier on all nodes: ~p", [EvalIdentifier]),
+    lists:foreach(fun(Node) ->
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [evaluation_identifier, EvalIdentifier])
+                  end, Nodes),
+
+
+    %% Setting evaluation number
+    EvalNumber = proplists:get_value(evaluation_number, Options),
+
+    lager:info("Setting evaluation number locally: ~p", [EvalNumber]),
+    ok = lasp_config:set(evaluation_number, EvalNumber),
+
+    lager:info("Setting evaluation number on all nodes: ~p", [EvalNumber]),
+    lists:foreach(fun(Node) ->
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [evaluation_number, EvalNumber])
+                  end, Nodes),
+
 
     lager:info("Restarting Lasp on all nodes."),
     lists:foreach(fun(Node) ->
@@ -179,4 +218,4 @@ configure(Config, Options) ->
     ok.
 
 wait_for_completion() ->
-    timer:sleep(20000).
+    timer:sleep(?EVAL_TIME).

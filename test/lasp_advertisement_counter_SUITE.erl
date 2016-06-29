@@ -129,8 +129,7 @@ run(Config, Options) ->
     ),
 
     %% Generate transmission plot.
-    lasp_plot_gen:generate_plot(),
-
+    lasp_plot_gen:generate_plots(Options),
     ok.
 
 configure(Config, Options) ->

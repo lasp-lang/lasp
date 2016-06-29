@@ -21,20 +21,38 @@
 -module(lasp_plot_gen).
 -author("Vitor Enes Duarte <vitorenesduarte@gmail.com>").
 
--export([generate_plot/0]).
+-export([generate_plots/1]).
 
 -include("lasp.hrl").
 
 %% @doc Generate plots.
-generate_plot() ->
-    LogFiles = log_files(),
+generate_plots(Options) ->
+    EvalId = proplists:get_value(evaluation_identifier, Options),
+    EvalIdDir = root_log_dir() ++ "/" ++ atom_to_list(EvalId),
+    EvalNumbers = only_dirs(EvalIdDir),
+
+    lists:foreach(
+        fun(EvalNumber) ->
+            EvalDir = EvalIdDir ++ "/" ++ EvalNumber,
+            generate_plot(EvalDir, EvalId, EvalNumber)
+        end,
+        EvalNumbers
+    ).
+
+%% @private
+generate_plot(EvalDir, EvalId, EvalNumber) ->
+    lager:info("Will analyse the following directory: ~p", [EvalDir]),
+
+    LogFiles = only_csv_files(EvalDir),
     lager:info("Will analyse the following logs: ~p", [LogFiles]),
 
     {Map0, Types, Times} = lists:foldl(
-        fun(File0, {Map0, Types0, Times0}) ->
+        fun(File, {Map0, Types0, Times0}) ->
+            FilePath = EvalDir ++ "/" ++ File,
+
             %% Load this file to the map
             %% Also get the types and times found on that log file
-            {Map1, Types1, Times1} = load_to_map(File0, Map0),
+            {Map1, Types1, Times1} = load_to_map(FilePath, Map0),
 
             %% Update set of types
             Types2 = ordsets:union(Types0, Types1),
@@ -58,12 +76,12 @@ generate_plot() ->
     lager:info("Average computed!"),
 
     %% Write average to files (one file per type)
-    InputFiles = write_to_files(TypeToTimeAndBytes),
+    InputFiles = write_to_files(TypeToTimeAndBytes, EvalId, EvalNumber),
     lager:info("Wrote average to files: ~p", [InputFiles]),
 
     Titles = get_titles(Types),
 
-    Result = run_gnuplot(InputFiles, Titles),
+    Result = run_gnuplot(InputFiles, Titles, EvalId, EvalNumber),
     _ = lager:info("Generating plot. Output: ~p", [Result]),
     ok.
 
@@ -72,34 +90,49 @@ priv_dir() ->
     code:priv_dir(?APP).
 
 %% @private
-log_dir() ->
+root_log_dir() ->
     priv_dir() ++ "/logs".
 
 %% @private
-log_dir(File) ->
-    log_dir() ++ "/" ++ File.
-
-%% @private
-plot_dir() ->
+root_plot_dir() ->
     priv_dir() ++ "/plots".
 
 %% @private
-plot_dir(File) ->
-    plot_dir() ++ "/" ++ File.
-
-%% @private
-output_file() ->
-    plot_dir("out.pdf").
+root_plot_dir(File) ->
+    root_plot_dir() ++ "/" ++ File.
 
 %% @private
 plot_file() ->
-    plot_dir("transmission.gnuplot").
+    root_plot_dir("transmission.gnuplot").
 
 %% @private
-log_files() ->
-    {ok, LogFiles} = file:list_dir(log_dir()),
+output_file(PlotDir) ->
+    PlotDir ++ "/plot.pdf".
 
-    % Ignore not csv files
+%% @private
+only_dirs(Dir) ->
+    lager:info("ONLY DIRS"),
+    {ok, DirFiles} = file:list_dir(Dir),
+
+    lager:info("FILES ~p", [DirFiles]),
+
+    %% Ignore files
+    Dirs = lists:filter(
+        fun(Elem) ->
+            filelib:is_dir(Dir ++ "/" ++ Elem)
+        end,
+        DirFiles
+    ),
+
+    lager:info("DIRS ~p", [Dirs]),
+
+    Dirs.
+
+%% @private
+only_csv_files(LogDir) ->
+    {ok, LogFiles} = file:list_dir(LogDir),
+
+    %% Ignore not csv files
     lists:filter(
         fun(Elem) ->
             case re:run(Elem, ".*.csv") of
@@ -113,12 +146,12 @@ log_files() ->
     ).
 
 %% @private
-load_to_map(File, Map) ->
+load_to_map(FilePath, Map) ->
     %% Open log file
-    {ok, FileDescriptor} = file:open(log_dir(File), [read]),
+    {ok, FileDescriptor} = file:open(FilePath, [read]),
 
     %% Ignore the first line
-    [_ | Lines] = read_lines(File, FileDescriptor),
+    [_ | Lines] = read_lines(FilePath, FileDescriptor),
 
     lists:foldl(
         fun(Line, {Map0, Types0, Times0}) ->
@@ -128,7 +161,7 @@ load_to_map(File, Map) ->
             {BytesF, _} = string:to_float(Bytes),
 
             %% Get dictionary that maps time to logs of this file
-            TimeToLogs0 = case orddict:find(File, Map0) of
+            TimeToLogs0 = case orddict:find(FilePath, Map0) of
                 {ok, Value} ->
                     Value;
                 error ->
@@ -140,7 +173,7 @@ load_to_map(File, Map) ->
             TimeToLogs1 = orddict:append(TimeF, {BytesF, Type}, TimeToLogs0),
 
             %% Update dictionary `Map0` with new value `TimeToLogs1`
-            Map1 = orddict:store(File, TimeToLogs1, Map0),
+            Map1 = orddict:store(FilePath, TimeToLogs1, Map0),
             %% Update set of types
             Types1 = ordsets:add_element(Type, Types0),
             %% Update set of times
@@ -153,15 +186,15 @@ load_to_map(File, Map) ->
     ).
 
 %% @private
-read_lines(File, FileDescriptor) ->
+read_lines(FilePath, FileDescriptor) ->
     case io:get_line(FileDescriptor, '') of
         eof ->
             [];
         {error, Error} ->
-            lager:warning("Error while reading line from file ~p. Error: ~p", [File, Error]),
+            lager:warning("Error while reading line from file ~p. Error: ~p", [FilePath, Error]),
             [];
         Line ->
-            [Line | read_lines(File, FileDescriptor)]
+            [Line | read_lines(FilePath, FileDescriptor)]
     end.
 
 %% @private
@@ -335,12 +368,18 @@ update_average_dict(Type, Time, Bytes, Map) ->
 
 %% @private
 %% Write the average to files and return the name of the files.
-write_to_files(TypeToTimeAndBytes) ->
+write_to_files(TypeToTimeAndBytes, EvalId, EvalNumber) ->
+    PlotDir = root_plot_dir() ++ "/"
+           ++ EvalId ++ "/"
+           ++ EvalNumber ++ "/",
+    filelib:ensure_dir(PlotDir),
+
     lists:foldl(
         fun({Type, List}, InputFiles) ->
-            InputFile = plot_dir(Type) ++ ".csv",
             %% truncate file
+            InputFile = PlotDir ++ Type ++ ".csv",
             file:write_file(InputFile, "", [write]),
+
             lists:foreach(
                 fun({Time, Bytes}) ->
                     Line = io_lib:format("~w,~w\n", [Time, Bytes]),
@@ -370,7 +409,10 @@ get_title(delta_send) -> "Delta Send";
 get_title(broadcast)  -> "Broadcast".
 
 %% @private
-run_gnuplot(InputFiles, Titles) ->
+run_gnuplot(InputFiles, Titles, EvalId, EvalNumber) ->
+    PlotDir = root_plot_dir() ++ "/"
+           ++ EvalId ++ "/"
+           ++ EvalNumber,
     Bin = case os:getenv("MESOS_TASK_ID", "false") of
         "false" ->
             "gnuplot";
@@ -378,7 +420,7 @@ run_gnuplot(InputFiles, Titles) ->
             "/usr/bin/gnuplot"
     end,
     Command = Bin ++ " -e \""
-                  ++ "outputname='" ++ output_file() ++ "'; "
+                  ++ "outputname='" ++ output_file(PlotDir) ++ "'; "
                   ++ "inputnames='" ++ join_filenames(InputFiles) ++ "'; "
                   ++ "titles='" ++  join_titles(Titles) ++ "'\" " ++ plot_file(),
     os:cmd(Command).

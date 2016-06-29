@@ -83,7 +83,7 @@ generate_plot(EvalDir, EvalId, EvalNumber) ->
 
     InputFiles = write_to_files(TypeToTimeAndBytes, PlotDir),
     Titles = get_titles(Types),
-    OutputFile = output_file(PlotDir)
+    OutputFile = output_file(PlotDir),
     lager:info("Wrote average to files: ~p", [InputFiles]),
 
     Result = run_gnuplot(InputFiles, Titles, PlotDir),

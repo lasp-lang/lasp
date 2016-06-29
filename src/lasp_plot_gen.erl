@@ -75,14 +75,19 @@ generate_plot(EvalDir, EvalId, EvalNumber) ->
     TypeToTimeAndBytes = average(Types, Times, Map1),
     lager:info("Average computed!"),
 
-    %% Write average to files (one file per type)
-    InputFiles = write_to_files(TypeToTimeAndBytes, EvalId, EvalNumber),
+    %% Write average in files (one file per type) to `PlotDir`
+    PlotDir = root_plot_dir() ++ "/"
+           ++ atom_to_list(EvalId) ++ "/"
+           ++ EvalNumber ++ "/",
+    lager:info("Will write average .csv files and plot in directory: ~p", [PlotDir]),
+
+    InputFiles = write_to_files(TypeToTimeAndBytes, PlotDir),
+    Titles = get_titles(Types),
+    OutputFile = output_file(PlotDir)
     lager:info("Wrote average to files: ~p", [InputFiles]),
 
-    Titles = get_titles(Types),
-
-    Result = run_gnuplot(InputFiles, Titles, EvalId, EvalNumber),
-    _ = lager:info("Generating plot. Output: ~p", [Result]),
+    Result = run_gnuplot(InputFiles, Titles, PlotDir),
+    lager:info("Generating plot ~p. Output: ~p", [OutputFile, Result]),
     ok.
 
 %% @private
@@ -107,26 +112,19 @@ plot_file() ->
 
 %% @private
 output_file(PlotDir) ->
-    PlotDir ++ "/plot.pdf".
+    PlotDir ++ "plot.pdf".
 
 %% @private
 only_dirs(Dir) ->
-    lager:info("ONLY DIRS"),
     {ok, DirFiles} = file:list_dir(Dir),
 
-    lager:info("FILES ~p", [DirFiles]),
-
     %% Ignore files
-    Dirs = lists:filter(
+    lists:filter(
         fun(Elem) ->
             filelib:is_dir(Dir ++ "/" ++ Elem)
         end,
         DirFiles
-    ),
-
-    lager:info("DIRS ~p", [Dirs]),
-
-    Dirs.
+    ).
 
 %% @private
 only_csv_files(LogDir) ->
@@ -368,21 +366,17 @@ update_average_dict(Type, Time, Bytes, Map) ->
 
 %% @private
 %% Write the average to files and return the name of the files.
-write_to_files(TypeToTimeAndBytes, EvalId, EvalNumber) ->
-    PlotDir = root_plot_dir() ++ "/"
-           ++ EvalId ++ "/"
-           ++ EvalNumber ++ "/",
+write_to_files(TypeToTimeAndBytes, PlotDir) ->
     filelib:ensure_dir(PlotDir),
 
     lists:foldl(
         fun({Type, List}, InputFiles) ->
-            %% truncate file
             InputFile = PlotDir ++ Type ++ ".csv",
-            file:write_file(InputFile, "", [write]),
 
             lists:foreach(
                 fun({Time, Bytes}) ->
                     Line = io_lib:format("~w,~w\n", [Time, Bytes]),
+                    lager:info("LINE : ~p", [Line]),
                     file:write_file(InputFile, Line, [append])
                 end,
                 List
@@ -409,10 +403,7 @@ get_title(delta_send) -> "Delta Send";
 get_title(broadcast)  -> "Broadcast".
 
 %% @private
-run_gnuplot(InputFiles, Titles, EvalId, EvalNumber) ->
-    PlotDir = root_plot_dir() ++ "/"
-           ++ EvalId ++ "/"
-           ++ EvalNumber,
+run_gnuplot(InputFiles, Titles, OutputFile) ->
     Bin = case os:getenv("MESOS_TASK_ID", "false") of
         "false" ->
             "gnuplot";
@@ -420,7 +411,7 @@ run_gnuplot(InputFiles, Titles, EvalId, EvalNumber) ->
             "/usr/bin/gnuplot"
     end,
     Command = Bin ++ " -e \""
-                  ++ "outputname='" ++ output_file(PlotDir) ++ "'; "
+                  ++ "outputname='" ++ OutputFile ++ "'; "
                   ++ "inputnames='" ++ join_filenames(InputFiles) ++ "'; "
                   ++ "titles='" ++  join_titles(Titles) ++ "'\" " ++ plot_file(),
     os:cmd(Command).

@@ -478,14 +478,27 @@ orset_test(_Config) ->
 membership_test(Config) ->
     Nodes = proplists:get_value(nodes, Config),
     lager:info("Nodes: ~p", [Nodes]),
+    Sorted = lists:usort(Nodes),
 
     lager:info("Waiting for cluster to stabilize."),
     timer:sleep(10000),
 
     lists:foreach(fun(Node) ->
-                        {ok, {state, Myself, Active, Passive, _, _, _}} = rpc:call(Node, ?PEER_SERVICE, state, []),
-                        lager:info("~p; active: ~p", [Myself, sets:to_list(Active)]),
-                        lager:info("~p; passive: ~p", [Myself, sets:to_list(Passive)])
+                        {ok, {state, _Myself, Active, Passive, _, _, _}} = rpc:call(Node, ?PEER_SERVICE, state, []),
+
+                        case lists:usort([Name || {Name, _, _} <- sets:to_list(Active)]) of
+                            Sorted ->
+                                ok;
+                            _ ->
+                                ct:fail("Incorrect nodes!")
+                        end,
+
+                        case sets:to_list(Passive) of
+                            [] ->
+                                ok;
+                            _ ->
+                                ct:fail("Incorrect nodes!")
+                        end
                   end, Nodes),
 
     ok.

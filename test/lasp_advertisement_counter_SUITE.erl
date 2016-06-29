@@ -88,7 +88,7 @@ all() ->
 %% tests
 %% ===================================================================
 
--define(EVAL_NUMBER, 3).
+-define(EVAL_NUMBER, 1).
 -define(EVAL_TIME, 2000).
 
 default_test(_Config) ->
@@ -146,15 +146,6 @@ configure(Config, Options) ->
     lager:info("Enabling ad server simulation on local node."),
     ok = lasp_config:set(ad_counter_simulation_server, true),
 
-    %% Enabling instrumentation
-    lager:info("Enabling instrumentation locally."),
-    ok = lasp_config:set(instrumentation, true),
-
-    lager:info("Enabling instrumentation on all nodes."),
-    lists:foreach(fun(Node) ->
-                        ok = rpc:call(Node, lasp_config, set,
-                                      [instrumentation, true])
-                  end, Nodes),
 
     %% Setting mode
     Mode = proplists:get_value(mode, Options),
@@ -205,6 +196,17 @@ configure(Config, Options) ->
     lists:foreach(fun(Node) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [evaluation_number, EvalNumber])
+                  end, Nodes),
+
+
+    %% Enabling instrumentation
+    lager:info("Enabling instrumentation locally."),
+    ok = lasp_config:set(instrumentation, true),
+
+    lager:info("Enabling instrumentation on all nodes."),
+    lists:foreach(fun(Node) ->
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [instrumentation, true])
                   end, Nodes),
 
 

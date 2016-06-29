@@ -161,7 +161,6 @@ create_dir() ->
         ++ atom_to_list(EvalIdentifier) ++ "/"
         ++ integer_to_list(EvalNumber) ++ "/",
     filelib:ensure_dir(Path),
-    Filename = io_lib:format("~s.csv", [node()]),
     Path ++ Filename.
 
 %% @private

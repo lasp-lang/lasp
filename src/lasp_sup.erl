@@ -168,7 +168,7 @@ configure_defaults() ->
                                            BroadcastDefault),
     lasp_config:set(broadcast, BroadcastEnabled),
 
-    EvaluationDefault = list_to_atom(os:getenv("EVAL_ID", "false")),
+    EvaluationDefault = list_to_atom(os:getenv("EVAL_ID", "undefined")),
     EvaluationEnabled = application:get_env(?APP,
                                            evaluation_identifier,
                                            EvaluationDefault),

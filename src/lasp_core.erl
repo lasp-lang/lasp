@@ -846,21 +846,22 @@ reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
             StillWaiting0 ++ [H]
     end,
     reply_to_all(T, SW, Result);
-%% @todo
-%reply_to_all([{delta, From}|T], StillWaiting, {ok, {delta, Value}}=Result) ->
-%    case From of
-%        {server, undefined, {Address, Ref}} ->
-%            gen_server:reply({Address, Ref}, {ok, {delta, Value}});
-%        {fsm, undefined, Address} ->
-%            gen_fsm:send_event(Address,
-%                               {ok, undefined, {delta, Value}});
-%        {Address, Ref} ->
-%            gen_server:reply({Address, Ref}, {ok, {delta, Value}});
-%        _ ->
-%            From ! Result
-%    end,
-%    %% After notifying, no need to keep the information.
-%    reply_to_all(T, StillWaiting, Result);
+reply_to_all([{delta, From}|T],
+             StillWaiting,
+             {ok, {Id, Type, Metadata, Value}}=Result) ->
+    case From of
+        {server, undefined, {Address, Ref}} ->
+            gen_server:reply({Address, Ref}, {ok, {Id, Type, Metadata, Value}});
+        {fsm, undefined, Address} ->
+            gen_fsm:send_event(Address,
+                               {ok, undefined, {Id, Type, Metadata, Value}});
+        {Address, Ref} ->
+            gen_server:reply({Address, Ref}, {ok, {Id, Type, Metadata, Value}});
+        _ ->
+            From ! Result
+    end,
+    %% After notifying, no need to keep the information.
+    reply_to_all(T, StillWaiting, Result);
 reply_to_all([From|T], StillWaiting, Result) ->
     case From of
         {server, undefined, {Address, Ref}} ->

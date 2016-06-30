@@ -100,15 +100,16 @@ handle_info(log, #state{impressions=Impressions}=State) ->
     schedule_logging(),
 
     {noreply, State};
-handle_info(view, #state{actor=Actor, impressions=Impressions}=State0) ->
+
+handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
     %% Get current value of the list of advertisements.
     {ok, Ads} = lasp:query({?ADS_WITH_CONTRACTS, ?SET_TYPE}),
 
     %% Make sure we have ads...
-    State = case sets:size(Ads) of
+    Impressions1 = case sets:size(Ads) of
         0 ->
             %% Do nothing.
-            State0;
+            Impressions0;
         Size ->
             %% Select random.
             Random = lasp_support:puniform(Size),
@@ -121,13 +122,19 @@ handle_info(view, #state{actor=Actor, impressions=Impressions}=State0) ->
             {ok, _} = lasp:update(Counter, increment, Actor),
 
             %% Increment impressions.
-            State0#state{impressions=Impressions+1}
+            Impressions0 + 1
     end,
 
     %% Schedule advertisement counter impression.
-    schedule_impression(),
+    case Impressions1 < max_impressions() of
+        true ->
+            schedule_impression();
+        false ->
+            lager:info("Max number of impressions reached. Node: ~p", [node()])
+    end,
 
-    {noreply, State};
+    {noreply, State#state{impressions=Impressions1}};
+
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
@@ -155,3 +162,7 @@ schedule_impression() ->
 %% @private
 schedule_logging() ->
     erlang:send_after(?LOG_INTERVAL, self(), log).
+
+%% @private
+max_impressions() ->
+    lasp_config:get(simulation_event_number, 30).

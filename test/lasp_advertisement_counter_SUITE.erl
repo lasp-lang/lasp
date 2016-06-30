@@ -89,7 +89,8 @@ all() ->
 %% ===================================================================
 
 -define(EVAL_NUMBER, 1).
--define(EVAL_TIME, 2000).
+-define(EVAL_TIME, 30000).
+-define(IMPRESSION_NUMBER, 30).
 
 default_test(_Config) ->
     ok.
@@ -111,6 +112,7 @@ delta_based_with_aae_test(Config) ->
                  {broadcast, false},
                  {evaluation_identifier, delta_based_with_aae}]),
     ok.
+
 
 %% ===================================================================
 %% Internal functions
@@ -141,6 +143,13 @@ configure(Config, Options) ->
     lists:foreach(fun(Node) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [ad_counter_simulation_client, true])
+                  end, Nodes),
+
+    %% Setting number of impressions
+    lager:info("Setting the number of impressions: ~p", [?IMPRESSION_NUMBER]),
+    lists:foreach(fun(Node) ->
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [simulation_event_number, ?IMPRESSION_NUMBER])
                   end, Nodes),
 
     lager:info("Enabling ad server simulation on local node."),

@@ -34,7 +34,9 @@
 
 types() ->
     [
+        {boolean, {state_boolean, undefined}},
         {gcounter, {state_gcounter, undefined}},
+        {gmap, {state_gmap, undefined}},
         {gset, {state_gset, undefined}},
         {ivar, {state_ivar, undefined}},
         {orset, {state_orset, undefined}},

@@ -71,23 +71,14 @@ generate_plot(EvalDir, EvalId, EvalNumber) ->
     Map1 = assume_unknown_logs(Types, Times, Map0),
     lager:info("Unknown logs assumed!"),
 
-    %% Do the average of `Map1`
-    TypeToTimeAndBytes = average(Types, Times, Map1),
-    lager:info("Average computed!"),
-
     %% Write average in files (one file per type) to `PlotDir`
     PlotDir = root_plot_dir() ++ "/"
            ++ atom_to_list(EvalId) ++ "/"
            ++ EvalNumber ++ "/",
-    lager:info("Will write average .csv files and plot in directory: ~p", [PlotDir]),
+    filelib:ensure_dir(PlotDir),
 
-    InputFiles = write_to_files(TypeToTimeAndBytes, PlotDir),
-    Titles = get_titles(Types),
-    OutputFile = output_file(PlotDir),
-    lager:info("Wrote average to files: ~p", [InputFiles]),
-
-    Result = run_gnuplot(InputFiles, Titles, OutputFile),
-    lager:info("Generating plot ~p. Output: ~p", [OutputFile, Result]),
+    generate_per_node_plot(Map1, PlotDir),
+    generate_average_plot(Types, Times, Map1, PlotDir),
     ok.
 
 %% @private
@@ -111,8 +102,8 @@ plot_file() ->
     root_plot_dir("transmission.gnuplot").
 
 %% @private
-output_file(PlotDir) ->
-    PlotDir ++ "plot.pdf".
+output_file(PlotDir, Name) ->
+    PlotDir ++ Name ++ ".pdf".
 
 %% @private
 only_dirs(Dir) ->
@@ -196,6 +187,11 @@ read_lines(FilePath, FileDescriptor) ->
     end.
 
 %% @private
+append_to_file(InputFile, Time, Bytes) ->
+    Line = io_lib:format("~w,~w\n", [Time, Bytes]),
+    file:write_file(InputFile, Line, [append]).
+
+%% @private
 %% If in the logs of one node, we don't find some reference to some
 %% time, for every type of log, assume the last known value
 assume_unknown_logs(Types, Times, Map) ->
@@ -211,6 +207,8 @@ assume_unknown_logs(Types, Times, Map) ->
 
 %% @private
 assume_per_node(TimeToLogsIn, LastKnownIn, Times) ->
+    TimeZero = lists:min(Times),
+
     {TimeToLogs, _} = lists:foldl(
         fun(Time, {TimeToLogsAcc, LastKnownAcc}) ->
             {Logs1, LastKnownAcc1} = case orddict:find(Time, TimeToLogsIn) of
@@ -244,7 +242,8 @@ assume_per_node(TimeToLogsIn, LastKnownIn, Times) ->
                     {revert_tuple_order(LastKnownAcc), LastKnownAcc}
             end,
 
-            TimeToLogsAcc1 = orddict:store(Time, Logs1, TimeToLogsAcc),
+            %% Store `Time` minus `TimeZero`
+            TimeToLogsAcc1 = orddict:store(Time - TimeZero, Logs1, TimeToLogsAcc),
             {TimeToLogsAcc1, LastKnownAcc1}
         end,
         {orddict:new(), LastKnownIn},
@@ -271,6 +270,74 @@ revert_tuple_order(LastKnown) ->
         [],
         LastKnown
     ).
+
+%% @private
+generate_per_node_plot(Map, PlotDir) ->
+    {Titles, InputFiles} = write_per_node_to_files(Map, PlotDir),
+    OutputFile = output_file(PlotDir, "per_node"),
+    Result = run_gnuplot(InputFiles, Titles, OutputFile),
+    lager:info("Generating per node plot ~p. Output: ~p", [OutputFile, Result]).
+
+%% @private
+write_per_node_to_files(Map, PlotDir) ->
+	InputFileToTitle = orddict:fold(
+        fun(FileLogPath, TimeToLogs, InputFileToTitle0) ->
+            NodeName = node_name(FileLogPath),
+
+            orddict:fold(
+                fun(Time, Logs, InputFileToTitle1) ->
+                    lists:foldl(
+                        fun({Bytes, Type}, InputFileToTitle2) ->
+                            Title = Type ++ "_" ++ NodeName,
+                            InputFile = PlotDir ++ Title ++ ".csv",
+                            append_to_file(InputFile, Time, Bytes),
+
+                            case orddict:find(InputFile, InputFileToTitle2) of
+                                {ok, _} ->
+                                    InputFileToTitle2;
+                                error ->
+                                    orddict:store(InputFile, Title, InputFileToTitle2)
+                            end
+                        end,
+                        InputFileToTitle1,
+                        Logs
+                    )
+                end,
+                InputFileToTitle0,
+                TimeToLogs
+            )
+        end,
+        orddict:new(),
+        Map
+    ),
+
+    {Titles, InputFiles} = orddict:fold(
+        fun(InputFile, Title, {Titles0, InputFiles0}) ->
+            {[Title | Titles0], [InputFile | InputFiles0]}
+        end,
+        {[], []},
+        InputFileToTitle
+    ), 
+    {Titles, InputFiles}.
+
+%% @private
+node_name(FileLogPath) ->
+    Tokens = string:tokens(FileLogPath, "\/\."),
+    NodeName = lists:nth(length(Tokens) - 1, Tokens),
+    re:replace(NodeName, "@", "_", [global, {return, list}]).
+
+%% @private
+generate_average_plot(Types, Times, Map, PlotDir) ->
+    %% Do the average of `Map1`
+    TypeToTimeAndBytes = average(Types, Times, Map),
+    lager:info("Average computed!"),
+    
+    InputFiles = write_average_to_files(TypeToTimeAndBytes, PlotDir),
+    Titles = get_titles(Types),
+    OutputFile = output_file(PlotDir, "average"),
+    Result = run_gnuplot(InputFiles, Titles, OutputFile),
+    lager:info("Generating average plot ~p. Output: ~p", [OutputFile, Result]).
+
 
 %% @private
 %% Do the average of all logs.
@@ -307,20 +374,18 @@ average(Types, Times, Map) ->
         Map
     ),
 
-    TimeZero = lists:min(Times),
     NodesNumber = orddict:size(Map),
 
     %% Divide each sum by the number of nodes
-    %% Also subtract `TimeZero` to all times
     orddict:map(
         fun(_Type, List) ->
             lists:map(
                 fun({Time, Sum}) ->
                     case Sum == 0 of
                         true ->
-                            {Time - TimeZero, Sum};
+                            {Time, Sum};
                         false ->
-                            {Time - TimeZero, Sum / NodesNumber}
+                            {Time, Sum / NodesNumber}
                     end
                 end,
                 List
@@ -331,11 +396,13 @@ average(Types, Times, Map) ->
 
 %% @private
 create_empty_dict_type_to_time_and_bytes(Types, Times) ->
+    TimeZero = lists:min(Times),
+
     lists:foldl(
         fun(Type, Map0) ->
             lists:foldl(
                 fun(Time, Map1) ->
-                    orddict:append(Type, {Time, 0}, Map1)
+                    orddict:append(Type, {Time - TimeZero, 0}, Map1)
                 end,
                 Map0,
                 Times
@@ -366,17 +433,14 @@ update_average_dict(Type, Time, Bytes, Map) ->
 
 %% @private
 %% Write the average to files and return the name of the files.
-write_to_files(TypeToTimeAndBytes, PlotDir) ->
-    filelib:ensure_dir(PlotDir),
-
+write_average_to_files(TypeToTimeAndBytes, PlotDir) ->
     lists:foldl(
         fun({Type, List}, InputFiles) ->
             InputFile = PlotDir ++ Type ++ ".csv",
 
             lists:foreach(
                 fun({Time, Bytes}) ->
-                    Line = io_lib:format("~w,~w\n", [Time, Bytes]),
-                    file:write_file(InputFile, Line, [append])
+                    append_to_file(InputFile, Time, Bytes)
                 end,
                 List
             ),

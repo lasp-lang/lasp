@@ -1115,7 +1115,7 @@ init_aae_sync(Peer, Store) ->
                             %% Ignore: this is a dynamic variable.
                             ok;
                         _ ->
-                            lager:info("*** Sending: ~p", [Id]),
+                            lager:info("*** Sending: ~p: ~p", [Id, lasp_type:query(Type, Value)]),
                             send({aae_send, node(), {Id, Type, Metadata, Value}}, Peer)
                     end,
                     [{ok, {Id, Type, Metadata, Value}}|Acc0]

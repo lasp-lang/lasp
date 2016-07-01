@@ -207,21 +207,19 @@ start(Case, Config, Options) ->
 
     %% Configure Lasp settings.
     ConfigureFun = fun(Node) ->
-                        %% Always enable advertisement clients on the nodes.
-                        ok = rpc:call(Node, lasp_config, set,
-                                      [ad_counter_simulation_client, true]),
-
                         %% Configure number of impressions.
                         ok = rpc:call(Node, lasp_config, set,
                                       [simulation_event_number, ?IMPRESSION_NUMBER]),
 
-                        %% Configure who should be the server.
+                        %% Configure who should be the server and who's
+                        %% the client.
                         case First of
                             Node ->
                                 ok = rpc:call(Node, lasp_config, set,
                                               [ad_counter_simulation_server, true]);
                             _ ->
-                                ok
+                                ok = rpc:call(Node, lasp_config, set,
+                                              [ad_counter_simulation_client, true])
                         end,
 
                         %% Configure the operational mode.

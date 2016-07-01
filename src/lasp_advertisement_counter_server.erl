@@ -40,6 +40,7 @@
 %% Macros.
 -define(MAX_IMPRESSIONS, 100).
 -define(LOG_INTERVAL, 10000).
+-define(ADS, 10).
 
 %% State record.
 -record(state, {actor, ads}).
@@ -132,7 +133,7 @@ create_ads_and_contracts(Ads, Contracts) ->
     AdIds = lists:map(fun(_) ->
                               {ok, Unique} = lasp_unique:unique(),
                               Unique
-                      end, lists:seq(1, 10)),
+                      end, lists:seq(1, ?ADS)),
     lists:map(fun(Id) ->
                 {ok, _} = lasp:update(Contracts,
                                       {add, #contract{id=Id}},

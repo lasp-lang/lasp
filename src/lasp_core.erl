@@ -852,7 +852,7 @@ receive_value(Store, {aae_send, Origin, {Id, Type, Metadata, Value},
                       MetadataFunBind, MetadataFunDeclare}) ->
     case do(get, [Store, Id]) of
         {ok, _Object} ->
-            {ok, _Result} = bind(Origin, Id, Value, MetadataFunBind, Store);
+            {ok, _} = bind(Origin, Id, Value, MetadataFunBind, Store);
         {error, not_found} ->
             {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
             receive_value(Store, {aae_send, Origin, {Id, Type, Metadata, Value},

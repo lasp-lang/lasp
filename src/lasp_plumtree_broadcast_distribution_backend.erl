@@ -748,7 +748,6 @@ handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=St
 
 handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
             #state{store=Store, actor=Actor}=State) ->
-    lager:info("Received incoming state: ~p ~p", [Id, Value]),
     ?CORE:receive_value(Store, {aae_send,
                                 From,
                                {Id, Type, _Metadata, Value},
@@ -1113,15 +1112,14 @@ init_aae_sync(Peer, Store) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
                             %% Ignore: this is a dynamic variable.
-                            ok;
+                            Acc0;
                         _ ->
-                            lager:info("*** Sending: ~p", [Id]),
-                            send({aae_send, node(), {Id, Type, Metadata, Value}}, Peer)
-                    end,
-                    [{ok, {Id, Type, Metadata, Value}}|Acc0]
+                            send({aae_send, node(), {Id, Type, Metadata, Value}}, Peer),
+                            [{ok, {Id, Type, Metadata, Value}}|Acc0]
+                    end
                end,
-    do(fold, [Store, Function, []]),
-    lager:info("Finished AAE synchronization with peer: ~p", [Peer]).
+    {ok, Result} = do(fold, [Store, Function, []]),
+    lager:info("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]).
 
 %% @private
 init_delta_sync(Peer) ->

@@ -47,6 +47,12 @@ types() ->
 get_mode() ->
     lasp_config:get(mode, state_based).
 
+get_type([]) ->
+    [];
+get_type([H | T]) ->
+    [get_type(H) | get_type(T)];
+get_type({T1, T2}) ->
+    {get_type(T1), get_type(T2)};
 get_type(T) ->
     get_type(T, get_mode()).
 
@@ -94,7 +100,7 @@ new(Type) ->
     T = get_type(remove_args(Type)),
     case Type of
         {_T0, Args} ->
-            T:new(Args);
+            T:new(get_type(Args));
         _T0 ->
             T:new()
     end.

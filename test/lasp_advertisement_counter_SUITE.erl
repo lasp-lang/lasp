@@ -143,7 +143,7 @@ start(Case, Config, Options) ->
     end,
 
     %% Three nodes.
-    SlavesToStart = [rita, sue, bob],
+    SlavesToStart = [rita, sue, bob, jerome],
 
     %% Start all three nodes.
     InitializerFun = fun(Name) ->
@@ -272,14 +272,14 @@ start(Case, Config, Options) ->
 
     ct:pal("Lasp fully initialized."),
 
-    ok.
+    Nodes.
 
 %% @private
 stop(Nodes) ->
     StopFun = fun(Node) ->
                       ct_slave:stop(Node)
               end,
-    lists:foreach(StopFun, Nodes),
+    lists:map(StopFun, Nodes),
     ok.
 
 %% @private

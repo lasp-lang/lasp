@@ -45,7 +45,7 @@ set key bottom right
 set datafile missing '0'
 
 # log scale on the y axis
-set logscale y 2
+# set logscale y 2
 # set format y ""
 # set ytics 1e-6, 10, 1
 # set ytics add ("1" 1, ".1" 0.1, ".01" 0.01, "10^-3" 0.001, \

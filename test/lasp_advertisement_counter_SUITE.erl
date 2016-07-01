@@ -54,8 +54,7 @@ end_per_suite(_Config) ->
     _Config.
 
 init_per_testcase(Case, Config) ->
-    ct:pal("Beginning case: ~p", [Case]),
-
+    ct:pal("Beginning case: ~p with config: ~p", [Case, Config]),
     %% Runner must start and stop in between test runs as well, to
     %% ensure that we clear the membership list (otherwise, we could
     %% delete the data on disk, but this is cleaner.)

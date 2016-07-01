@@ -78,6 +78,9 @@ init([]) ->
     %% Initialize triggers.
     launch_triggers(AdList, Ads, Actor),
 
+    %% Create instance for convergence tracking
+    track_convergence(),
+
     {ok, #state{actor=Actor, ads=Ads}}.
 
 %% @private
@@ -180,6 +183,16 @@ build_dag() ->
     ok = lasp:filter(AdsContracts, FilterFun, AdsWithContracts),
 
     {ok, Ads, AdList}.
+
+%% @private
+track_convergence() ->
+    PairType = {?PAIR_TYPE,
+                    [
+                        ?COUNTER_TYPE,
+                        {?GMAP_TYPE, [?BOOLEAN_TYPE]}
+                    ]
+                },
+    {ok, _} = lasp:declare(?CONVERGENCE_TRACKING, PairType).
 
 %% @private
 launch_triggers(AdList, Ads, Actor) ->

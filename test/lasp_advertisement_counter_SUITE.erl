@@ -89,8 +89,8 @@ all() ->
 %% ===================================================================
 
 -define(EVAL_NUMBER, 1).
--define(EVAL_TIME, 30000).
--define(IMPRESSION_NUMBER, 30).
+-define(EVAL_TIME, 60000).
+-define(IMPRESSION_NUMBER, 10).
 
 default_test(_Config) ->
     ok.

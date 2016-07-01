@@ -748,7 +748,6 @@ handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=St
 
 handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
             #state{store=Store, actor=Actor}=State) ->
-    lager:info("Received incoming state: ~p ~p", [Id, Value]),
     ?CORE:receive_value(Store, {aae_send,
                                 From,
                                {Id, Type, _Metadata, Value},

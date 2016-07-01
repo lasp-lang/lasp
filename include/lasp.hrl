@@ -97,5 +97,9 @@
 
 %% Test identifiers.
 -define(ADS_WITH_CONTRACTS, <<"ads_with_contracts">>).
--define(SET_TYPE, orset).
+-define(CONVERGENCE_TRACKING, <<"convergence_tracking">>).
+-define(BOOLEAN_TYPE, boolean).
 -define(COUNTER_TYPE, gcounter).
+-define(GMAP_TYPE, gmap).
+-define(SET_TYPE, orset).
+-define(PAIR_TYPE, pair).

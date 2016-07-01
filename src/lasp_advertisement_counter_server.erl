@@ -40,6 +40,7 @@
 %% Macros.
 -define(MAX_IMPRESSIONS, 100).
 -define(LOG_INTERVAL, 10000).
+-define(ADS, 10).
 
 %% State record.
 -record(state, {actor, ads}).
@@ -77,6 +78,9 @@ init([]) ->
 
     %% Initialize triggers.
     launch_triggers(AdList, Ads, Actor),
+
+    %% Create instance for convergence tracking
+    track_convergence(),
 
     {ok, #state{actor=Actor, ads=Ads}}.
 
@@ -129,7 +133,7 @@ create_ads_and_contracts(Ads, Contracts) ->
     AdIds = lists:map(fun(_) ->
                               {ok, Unique} = lasp_unique:unique(),
                               Unique
-                      end, lists:seq(1, 10)),
+                      end, lists:seq(1, ?ADS)),
     lists:map(fun(Id) ->
                 {ok, _} = lasp:update(Contracts,
                                       {add, #contract{id=Id}},
@@ -180,6 +184,16 @@ build_dag() ->
     ok = lasp:filter(AdsContracts, FilterFun, AdsWithContracts),
 
     {ok, Ads, AdList}.
+
+%% @private
+track_convergence() ->
+    PairType = {?PAIR_TYPE,
+                    [
+                        ?COUNTER_TYPE,
+                        {?GMAP_TYPE, [?BOOLEAN_TYPE]}
+                    ]
+                },
+    {ok, _} = lasp:declare(?CONVERGENCE_TRACKING, PairType).
 
 %% @private
 launch_triggers(AdList, Ads, Actor) ->

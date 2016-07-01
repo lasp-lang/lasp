@@ -39,6 +39,7 @@
 %% Macros.
 -define(IMPRESSION_INTERVAL, 1000).
 -define(LOG_INTERVAL, 10000).
+-define(CONVERGENCE_INTERVAL, 5000).
 
 %% State record.
 -record(state, {actor, impressions}).
@@ -69,6 +70,9 @@ init([]) ->
 
     %% Schedule logging.
     schedule_logging(),
+
+    %% Schedule check convergence
+    schedule_check_convergence(),
 
     {ok, #state{actor=Actor, impressions=0}}.
 
@@ -120,6 +124,8 @@ handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
 
             %% Increment counter.
             {ok, _} = lasp:update(Counter, increment, Actor),
+            %% Update CT instance
+            {ok, _} = lasp:update(convergence_id(), {fst, increment}, Actor),
 
             %% Increment impressions.
             Impressions0 + 1
@@ -134,6 +140,22 @@ handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
     end,
 
     {noreply, State#state{impressions=Impressions1}};
+
+handle_info(check_convergence, #state{actor=Actor}=State) ->
+    MaxEvents = max_impressions() * client_number(),
+    {ok, {TotalEvents, _}} = lasp:query(convergence_id()),
+    lager:info("Total number of events observed so far ~p of ~p", [TotalEvents, MaxEvents]),
+
+    case TotalEvents == MaxEvents of
+        true ->
+            lager:info("Convergence reached on node ~p", [node()]),
+            %% Update CT instance
+            lasp:update(convergence_id(), {snd, {Actor, true}}, Actor);
+        false ->
+            schedule_check_convergence()
+    end,
+
+    {noreply, State};
 
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
@@ -164,5 +186,23 @@ schedule_logging() ->
     erlang:send_after(?LOG_INTERVAL, self(), log).
 
 %% @private
+schedule_check_convergence() ->
+    erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_convergence).
+
+%% @private
 max_impressions() ->
-    lasp_config:get(simulation_event_number, 30).
+    lasp_config:get(simulation_event_number, 10).
+
+%% @private
+client_number() ->
+    ?NUM_NODES.
+
+%% @private
+convergence_id() ->
+    PairType = {?PAIR_TYPE,
+                    [
+                        ?COUNTER_TYPE,
+                        {?GMAP_TYPE, [?BOOLEAN_TYPE]}
+                    ]
+                },
+    {?CONVERGENCE_TRACKING, PairType}.

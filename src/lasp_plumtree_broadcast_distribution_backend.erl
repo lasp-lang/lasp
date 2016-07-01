@@ -88,6 +88,7 @@
 
 -define(MEMORY_INTERVAL, 10000).
 -define(DELTA_INTERVAL, 10000).
+-define(AAE_INTERVAL, 10000).
 -define(DELTA_GC_INTERVAL, 30000).
 
 %% Definitions for the bind/read fun abstraction.
@@ -213,8 +214,20 @@ exchange(Peer) ->
             Pid = spawn_link(fun() -> ok end),
             {ok, Pid};
         state_based ->
-            %% Naive anti-entropy mechanism; re-broadcast all messages.
-            gen_server:call(?MODULE, {exchange, Peer}, infinity)
+            case lasp_config:get(broadcast, false) of
+                true ->
+                    %% Plumtree AAE.
+                    gen_server:call(?MODULE, {exchange, Peer}, infinity);
+                false ->
+                    %% No AAE through this mechanism.
+                    %%
+                    %% Spawn a process that terminates immediately, because the
+                    %% broadcast exchange timer tracks the number of in progress
+                    %% exchanges and bounds it by that limit.
+                    %%
+                    Pid = spawn_link(fun() -> ok end),
+                    {ok, Pid}
+            end
     end.
 
 %%%===================================================================
@@ -455,6 +468,7 @@ init([]) ->
                 erlang:monotonic_time(),
                 erlang:unique_integer()),
 
+    schedule_aae_synchronization(),
     schedule_delta_synchronization(),
     schedule_delta_garbage_collection(),
 
@@ -690,7 +704,7 @@ handle_call(Msg, _From, State) ->
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
-handle_cast({exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) ->
+handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) ->
     lager:info("Exchange starting for ~p", [Peer]),
 
     Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
@@ -729,8 +743,6 @@ handle_cast({exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) -
                        end
                end,
     spawn_link(fun() -> do(fold, [Store, Function, []]) end),
-
-    lager:info("Exchange finished."),
 
     {noreply, State#state{gc_counter=increment_counter(GCCounter)}};
 
@@ -772,15 +784,30 @@ handle_info(memory_report, State) ->
     schedule_memory_report(),
 
     {noreply, State};
+
+handle_info(aae_sync, #state{store=Store} = State) ->
+    lager:info("Beginning AAE synchronization."),
+
+    %% Get the active set from the membership protocol.
+    {ok, Members} = membership(),
+
+    %% Remove ourself.
+    Peers = Members -- [node()],
+
+    lager:info("Beginning sync for peers: ~p", [Peers]),
+
+    %% Ship buffered updates for the fanout value.
+    lists:foreach(fun(Peer) -> init_aae_sync(Peer, Store) end, Peers),
+
+    %% Schedule next synchronization.
+    schedule_aae_synchronization(),
+
+    {noreply, State};
 handle_info(delta_sync, State) ->
     lager:info("Beginning delta synchronization."),
 
     %% Get the active set from the membership protocol.
-    %%
-    %% @todo: If full, this has to be changed to fanout; otherwise,
-    %% fanout is the active set.
-    %%
-    {ok, Members} = lasp_peer_service:members(),
+    {ok, Members} = membership(),
 
     %% Remove ourself.
     Peers = Members -- [node()],
@@ -984,11 +1011,13 @@ schedule_memory_report() ->
 
 %% @private
 memory_report() ->
-    case lasp_config:get(memory_report, false) of
+    case lasp_config:get(memory_report, true) of
         true ->
             PlumtreeBroadcast = erlang:whereis(plumtree_broadcast),
             lager:info("Plumtree message queue: ~p",
                        [process_info(PlumtreeBroadcast, message_queue_len)]),
+            lager:info("Our message queue: ~p",
+                       [process_info(self(), message_queue_len)]),
             ok;
         false ->
             ok
@@ -1035,6 +1064,20 @@ schedule_delta_synchronization() ->
     end.
 
 %% @private
+schedule_aae_synchronization() ->
+    case lasp_config:get(mode, state_based) of
+        delta_based ->
+            ok;
+        state_based ->
+            case lasp_config:get(broadcast, false) of
+                false ->
+                    erlang:send_after(?AAE_INTERVAL, self(), aae_sync);
+                true ->
+                    ok
+            end
+    end.
+
+%% @private
 schedule_delta_garbage_collection() ->
     case lasp_config:get(mode, state_based) of
         delta_based ->
@@ -1048,7 +1091,13 @@ send(Msg, Peer) ->
     log_transmission(extract_type_and_payload(Msg), 1),
     PeerServiceManager = lasp_config:get(peer_service_manager,
                                          partisan_peer_service),
-    PeerServiceManager:forward_message(Peer, ?MODULE, Msg).
+    case PeerServiceManager:forward_message(Peer, ?MODULE, Msg) of
+        ok ->
+            ok;
+        Error ->
+            lager:error("Failed send to ~p for reason ~p while sending message: ~p", [Peer, Error, Msg]),
+            ok
+    end.
 
 %% @private
 extract_type_and_payload({Type, _From, Payload}) ->
@@ -1057,6 +1106,26 @@ extract_type_and_payload({Type, _From, Payload, _Count}) ->
     {Type, Payload}.
 
 %% @private
+init_aae_sync(Peer, Store) ->
+    lager:info("Initializing AAE synchronization with peer: ~p", [Peer]),
+    Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
+                    case orddict:find(dynamic, Metadata) of
+                        {ok, true} ->
+                            %% Ignore: this is a dynamic variable.
+                            Acc0;
+                        _ ->
+                            send({aae_send, node(), {Id, Type, Metadata, Value}}, Peer),
+                            [{ok, {Id, Type, Metadata, Value}}|Acc0]
+                    end
+               end,
+    {ok, Result} = do(fold, [Store, Function, []]),
+    lager:info("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]).
+
+%% @private
 init_delta_sync(Peer) ->
     lager:info("Initializing delta synchronization with peer: ~p", [Peer]),
-    gen_server:cast(?MODULE, {exchange, Peer}).
+    gen_server:cast(?MODULE, {delta_exchange, Peer}).
+
+%% @private
+membership() ->
+    lasp_peer_service:members().

@@ -30,6 +30,11 @@ set style line 1 lc rgb "#A00000" lw 2 pt 7 ps 0.5
 set style line 2 lc rgb "#00A000" lw 2 pt 7 ps 0.5
 set style line 3 lc rgb "#5060D0" lw 2 pt 7 ps 0.5
 set style line 4 lc rgb "#F25900" lw 2 pt 7 ps 0.5
+# Let gnuplot decide the color, if more than 4 lines
+set style line 5 lw 2 pt 7 ps 0.5
+set style line 6 lw 2 pt 7 ps 0.5
+set style line 7 lw 2 pt 7 ps 0.5
+set style line 8 lw 2 pt 7 ps 0.5
 
 set output outputname
 set xlabel "Time in Seconds"

@@ -95,6 +95,9 @@ ads:
 		rm -rf priv/logs/*_with_aae*; \
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE
 
+logs:
+	tail -f priv/lager/*/log/*.log
+
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 
 include tools.mk

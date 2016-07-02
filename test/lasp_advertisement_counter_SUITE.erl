@@ -74,7 +74,7 @@ all() ->
 %% ===================================================================
 
 -define(EVAL_NUMBER, 1).
--define(EVAL_TIME, 60000).
+-define(EVAL_TIME, 5000).
 -define(IMPRESSION_NUMBER, 10).
 
 default_test(_Config) ->
@@ -124,7 +124,7 @@ run(Case, Config, Options) ->
     ),
 
     %% Generate transmission plot.
-    lasp_plot_gen:generate_plots(Options),
+    %% lasp_plot_gen:generate_plots(Options),
 
     ok.
 
@@ -213,8 +213,8 @@ start(Case, Config, Options) ->
 
                         %% Configure who should be the server and who's
                         %% the client.
-                        case First of
-                            Node ->
+                        case Node of
+                            First ->
                                 ok = rpc:call(Node, lasp_config, set,
                                               [ad_counter_simulation_server, true]);
                             _ ->
@@ -272,13 +272,18 @@ start(Case, Config, Options) ->
 
     ct:pal("Lasp fully initialized."),
 
-    Nodes.
+    SlavesToStart.
 
 %% @private
 stop(Nodes) ->
     StopFun = fun(Node) ->
-                      ct_slave:stop(Node)
-              end,
+        case ct_slave:stop(Node) of
+            {ok, _} ->
+                ok;
+            Error ->
+                ct:fail(Error)
+        end
+    end,
     lists:map(StopFun, Nodes),
     ok.
 

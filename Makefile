@@ -93,7 +93,7 @@ ads:
 		clear; \
 		rm -rf priv/plots/*_with_aae*; \
 		rm -rf priv/logs/*_with_aae*; \
-		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE --case=state_based_with_aae_test
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE
 
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 

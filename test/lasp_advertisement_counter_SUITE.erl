@@ -124,12 +124,12 @@ run(Case, Config, Options) ->
     ),
 
     %% Generate transmission plot.
-    %% lasp_plot_gen:generate_plots(Options),
+    lasp_plot_gen:generate_plots(Options),
 
     ok.
 
 %% @private
-start(Case, Config, Options) ->
+start(Case, _Config, Options) ->
     %% Launch distribution for the test runner.
     ct:pal("Launching Erlang distribution..."),
 
@@ -165,8 +165,8 @@ start(Case, Config, Options) ->
     LoaderFun = fun(Node) ->
                             ct:pal("Loading lasp on node: ~p", [Node]),
 
-                            PrivDir = proplists:get_value(priv_dir, Config),
-                            NodeDir = filename:join([PrivDir, Node, Case]),
+                            PrivDir = code:priv_dir(?APP),
+                            NodeDir = filename:join([PrivDir, "lager", Case, Node]),
 
                             %% Manually force sasl loading, and disable the logger.
                             ok = rpc:call(Node, application, load, [sasl]),

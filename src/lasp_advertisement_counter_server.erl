@@ -40,6 +40,7 @@
 %% Macros.
 -define(MAX_IMPRESSIONS, 100).
 -define(LOG_INTERVAL, 10000).
+-define(CONVERGENCE_INTERVAL, 5000).
 -define(ADS, 10).
 
 %% State record.
@@ -80,6 +81,7 @@ init([]) ->
     launch_triggers(AdList, Ads, Actor),
 
     %% Create instance for convergence tracking
+    %% Also schedule check convergence
     track_convergence(),
 
     {ok, #state{actor=Actor, ads=Ads}}.
@@ -110,6 +112,26 @@ handle_info(log, #state{ads=Ads}=State) ->
     schedule_logging(),
 
     {noreply, State};
+
+handle_info(check_convergence, #state{}=State) ->
+    {ok, {_, Convergence}} = lasp:query(convergence_id()),
+
+    NodesWithAllEvents = lists:filter(
+        fun({_Node, AllEvents}) ->
+            AllEvents
+        end,
+        Convergence
+    ),
+
+    case length(NodesWithAllEvents) == client_number() of
+        true ->
+            lager:info("Convergence reached on all clients");
+        false ->
+            schedule_check_convergence()
+    end,
+
+    {noreply, State};
+
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
@@ -186,16 +208,6 @@ build_dag() ->
     {ok, Ads, AdList}.
 
 %% @private
-track_convergence() ->
-    PairType = {?PAIR_TYPE,
-                    [
-                        ?COUNTER_TYPE,
-                        {?GMAP_TYPE, [?BOOLEAN_TYPE]}
-                    ]
-                },
-    {ok, _} = lasp:declare(?CONVERGENCE_TRACKING, PairType).
-
-%% @private
 launch_triggers(AdList, Ads, Actor) ->
     lists:map(fun(Ad) ->
                       spawn_link(fun() ->
@@ -215,6 +227,30 @@ trigger(#ad{counter=CounterId} = Ad, Ads, Actor) ->
     {ok, _} = lasp:update(Ads, {rmv, Ad}, Actor),
 
     ok.
+
+%% @private
+client_number() ->
+    ?NUM_NODES.
+
+%% @private
+convergence_id() ->
+    PairType = {?PAIR_TYPE,
+                    [
+                        ?COUNTER_TYPE,
+                        {?GMAP_TYPE, [?BOOLEAN_TYPE]}
+                    ]
+                },
+    {?CONVERGENCE_TRACKING, PairType}.
+
+%% @private
+track_convergence() ->
+    {Id, Type} = convergence_id(),
+    {ok, _} = lasp:declare(Id, Type),
+    schedule_check_convergence().
+
+%% @private
+schedule_check_convergence() ->
+    erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_convergence).
 
 %% @private
 schedule_logging() ->

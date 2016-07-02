@@ -74,7 +74,7 @@ all() ->
 %% ===================================================================
 
 -define(EVAL_NUMBER, 1).
--define(EVAL_TIME, 5000).
+-define(EVAL_TIME, 50000).
 -define(IMPRESSION_NUMBER, 10).
 
 default_test(_Config) ->

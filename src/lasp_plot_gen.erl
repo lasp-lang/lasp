@@ -280,7 +280,7 @@ generate_per_node_plot(Map, PlotDir) ->
 
 %% @private
 write_per_node_to_files(Map, PlotDir) ->
-	InputFileToTitle = orddict:fold(
+    InputFileToTitle = orddict:fold(
         fun(FileLogPath, TimeToLogs, InputFileToTitle0) ->
             NodeName = node_name(FileLogPath),
 
@@ -317,7 +317,7 @@ write_per_node_to_files(Map, PlotDir) ->
         end,
         {[], []},
         InputFileToTitle
-    ), 
+    ),
     {Titles, InputFiles}.
 
 %% @private
@@ -331,7 +331,7 @@ generate_average_plot(Types, Times, Map, PlotDir) ->
     %% Do the average of `Map1`
     TypeToTimeAndBytes = average(Types, Times, Map),
     lager:info("Average computed!"),
-    
+
     InputFiles = write_average_to_files(TypeToTimeAndBytes, PlotDir),
     Titles = get_titles(Types),
     OutputFile = output_file(PlotDir, "average"),

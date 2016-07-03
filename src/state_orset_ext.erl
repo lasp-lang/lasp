@@ -50,20 +50,20 @@ product({state_oorset_ps, {{ElemDataStoreL, EventDataStoreL},
     {ProductElemDataStore, ProductEventDataStore} =
         orddict:fold(
           fun(ElemL, ProvenanceL, AccProductDataStore0) ->
-                  case subtract_removed(ProvenanceL, ValidEventsL1) of
+                  case state_oorset_ps:subtract_removed(ProvenanceL, ValidEventsL1) of
                       [] ->
                           AccProductDataStore0;
                       RestProvenanceL ->
                           orddict:fold(
                             fun(ElemR, ProvenanceR, AccProductDataStore1) ->
-                                    case subtract_removed(ProvenanceR,
-                                                          ValidEventsR1) of
+                                    case state_oorset_ps:subtract_removed(
+                                           ProvenanceR, ValidEventsR1) of
                                         [] ->
                                             AccProductDataStore1;
                                         RestProvenanceR ->
                                             ProductElem = {ElemL, ElemR},
                                             ProductProvenance =
-                                                cross_provenance(
+                                                state_oorset_ps:cross_provenance(
                                                   RestProvenanceL, RestProvenanceR),
                                             ordsets:fold(
                                               fun(Dot, AccProductDataStore2) ->
@@ -108,14 +108,14 @@ intersect({state_oorset_ps, {{ElemDataStoreL, EventDataStoreL},
     {IntersectElemDataStore, IntersectEventDataStore} =
         orddict:fold(
           fun(ElemL, ProvenanceL, AccIntersectDataStore0) ->
-                  case subtract_removed(ProvenanceL, ValidEventsL1) of
+                  case state_oorset_ps:subtract_removed(ProvenanceL, ValidEventsL1) of
                       [] ->
                           AccIntersectDataStore0;
                       RestProvenanceL ->
                           orddict:fold(
                             fun(ElemR, ProvenanceR, AccIntersectDataStore1) ->
-                                    case subtract_removed(ProvenanceR,
-                                                          ValidEventsR1) of
+                                    case state_oorset_ps:subtract_removed(
+                                           ProvenanceR, ValidEventsR1) of
                                         [] ->
                                             AccIntersectDataStore1;
                                         RestProvenanceR ->
@@ -126,7 +126,7 @@ intersect({state_oorset_ps, {{ElemDataStoreL, EventDataStoreL},
                                                     IntersectElem =
                                                         get_inter_elem(ElemL, ElemR),
                                                     IntersectProvenance =
-                                                        cross_provenance(
+                                                        state_oorset_ps:cross_provenance(
                                                           RestProvenanceL,
                                                           RestProvenanceR),
                                                     ordsets:fold(
@@ -245,29 +245,6 @@ filter(Function, {state_orset, V}) ->
                         end
                 end,
     lists:foldl(FolderFun, new(), V).
-
-%% @private
-cross_provenance(ProvenanceL, ProvenanceR) ->
-    ordsets:fold(
-      fun(DotL, AccCrossProvenance0) ->
-              ordsets:fold(
-                fun(DotR, AccCrossProvenance1) ->
-                        CrossDot = ordsets:union(DotL, DotR),
-                        ordsets:add_element(CrossDot, AccCrossProvenance1)
-                end, AccCrossProvenance0, ProvenanceR)
-      end, ordsets:new(), ProvenanceL).
-
-%% @private
-subtract_removed(Provenance, ValidEvents) ->
-    ordsets:fold(
-      fun(Dot, AccNewProvenance0) ->
-              case ordsets:intersection(Dot, ValidEvents) of
-                  Dot ->
-                      ordsets:add_element(Dot, AccNewProvenance0);
-                  _ ->
-                      AccNewProvenance0
-              end
-      end, ordsets:new(), Provenance).
 
 %% @private
 join_all_events({vclock, AllEventsA}, {vclock, AllEventsB}) ->

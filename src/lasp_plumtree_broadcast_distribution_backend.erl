@@ -583,7 +583,8 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 %%
 handle_call({update, Id, Operation, CRDTActor}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor), Store),
+    Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
+                           ?CLOCK_INIT(Actor), Store),
     {ok, Result} = declare_if_not_found(Result0, Id, State, ?CORE, update,
                                         [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
     {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};

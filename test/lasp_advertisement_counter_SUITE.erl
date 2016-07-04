@@ -40,6 +40,7 @@
 -include_lib("kernel/include/inet.hrl").
 
 -define(EXCHANGE_TIMER, 120).
+-define(CT_SLAVES, [rita, sue, bob, jerome]).
 
 %% ===================================================================
 %% common_test callbacks
@@ -142,9 +143,6 @@ start(_Case, _Config, Options) ->
             ok
     end,
 
-    %% Three nodes.
-    SlavesToStart = [rita, sue, bob, jerome],
-
     %% Start all three nodes.
     InitializerFun = fun(Name) ->
                             ct:pal("Starting node: ~p", [Name]),
@@ -159,7 +157,7 @@ start(_Case, _Config, Options) ->
                                     ct:fail(Error)
                             end
                      end,
-    [First|_] = Nodes = lists:map(InitializerFun, SlavesToStart),
+    [First|_] = Nodes = lists:map(InitializerFun, ?CT_SLAVES),
 
     %% Load Lasp on all of the nodes.
     LoaderFun = fun(Node) ->
@@ -272,10 +270,10 @@ start(_Case, _Config, Options) ->
 
     ct:pal("Lasp fully initialized."),
 
-    SlavesToStart.
+    Nodes.
 
 %% @private
-stop(Nodes) ->
+stop(_Nodes) ->
     StopFun = fun(Node) ->
         case ct_slave:stop(Node) of
             {ok, _} ->
@@ -284,12 +282,21 @@ stop(Nodes) ->
                 ct:fail(Error)
         end
     end,
-    lists:map(StopFun, Nodes),
+    lists:map(StopFun, ?CT_SLAVES),
     ok.
 
 %% @private
-wait_for_completion(_Nodes) ->
-    timer:sleep(?EVAL_TIME).
+wait_for_completion([Server | _] = _Nodes) ->
+    case lasp_support:wait_until(fun() ->
+                Convergence = rpc:call(Server, lasp_config, get, [convergence, false]),
+                ct:pal("Waiting for convergence: ~p", [Convergence]),
+                Convergence == true
+        end, 60*2, ?EVAL_TIME) of
+        ok ->
+            ct:pal("Convergence reached!");
+        Error ->
+            ct:fail("Convergence not reached: ~p", [Error])
+    end.
 
 %% @private
 codepath() ->

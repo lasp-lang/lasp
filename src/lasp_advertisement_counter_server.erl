@@ -68,6 +68,9 @@ start_link() ->
 init([]) ->
     lager:info("Advertisement counter server initialized."),
 
+    %% Track whether convergence is reached or not.
+    lasp_config:set(convergence, false),
+
     %% Generate actor identifier.
     Actor = self(),
 
@@ -125,7 +128,8 @@ handle_info(check_convergence, #state{}=State) ->
 
     case length(NodesWithAllEvents) == client_number() of
         true ->
-            lager:info("Convergence reached on all clients");
+            lager:info("Convergence reached on all clients"),
+            lasp_config:set(convergence, true);
         false ->
             schedule_check_convergence()
     end,

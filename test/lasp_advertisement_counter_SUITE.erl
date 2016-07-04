@@ -144,6 +144,16 @@ start(_Case, _Config, Options) ->
             ok
     end,
 
+    %% Load sasl.
+    application:load(sasl),
+    ok = application:set_env(sasl,
+                             sasl_error_logger,
+                             false),
+    application:start(sasl),
+
+    %% Load lager.
+    {ok, _} = application:ensure_all_started(lager),
+
     %% Start all three nodes.
     InitializerFun = fun(Name) ->
                             ct:pal("Starting node: ~p", [Name]),

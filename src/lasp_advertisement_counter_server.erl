@@ -129,7 +129,8 @@ handle_info(check_convergence, #state{}=State) ->
     case length(NodesWithAllEvents) == client_number() of
         true ->
             lager:info("Convergence reached on all clients"),
-            lasp_config:set(convergence, true);
+            lasp_config:set(convergence, true),
+            lasp_transmission_instrumentation:convergence();
         false ->
             schedule_check_convergence()
     end,

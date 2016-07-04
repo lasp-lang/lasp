@@ -144,13 +144,14 @@ handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
 handle_info(check_convergence, #state{actor=Actor}=State) ->
     MaxEvents = max_impressions() * client_number(),
     {ok, {TotalEvents, _}} = lasp:query(convergence_id()),
-    lager:info("Total number of events observed so far ~p of ~p", [TotalEvents, MaxEvents]),
+    %lager:info("Total number of events observed so far ~p of ~p", [TotalEvents, MaxEvents]),
 
     case TotalEvents == MaxEvents of
         true ->
             lager:info("Convergence reached on node ~p", [node()]),
             %% Update CT instance
-            lasp:update(convergence_id(), {snd, {Actor, true}}, Actor);
+            lasp:update(convergence_id(), {snd, {Actor, true}}, Actor),
+            lasp_transmission_instrumentation:convergence();
         false ->
             schedule_check_convergence()
     end,

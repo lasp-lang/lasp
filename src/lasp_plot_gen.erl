@@ -146,7 +146,7 @@ load_to_map(FilePath, Map) ->
         fun(Line, {Map0, Types0, Times0}) ->
             %% Parse log line
             [Type, Time, Bytes] = string:tokens(Line, ",\n"),
-            {TimeF, _} = string:to_integer(Time),
+            {TimeI, _} = string:to_integer(Time),
             {BytesF, _} = string:to_float(Bytes),
 
             %% Get dictionary that maps time to logs of this file
@@ -158,15 +158,15 @@ load_to_map(FilePath, Map) ->
             end,
 
             %% Update dictionary `TimeToLogs0` adding new pair log to
-            %% the list of logs mapped to time `TimeF`
-            TimeToLogs1 = orddict:append(TimeF, {BytesF, Type}, TimeToLogs0),
+            %% the list of logs mapped to time `TimeI`
+            TimeToLogs1 = orddict:append(TimeI, {BytesF, Type}, TimeToLogs0),
 
             %% Update dictionary `Map0` with new value `TimeToLogs1`
             Map1 = orddict:store(FilePath, TimeToLogs1, Map0),
             %% Update set of types
             Types1 = ordsets:add_element(Type, Types0),
             %% Update set of times
-            Times1 = ordsets:add_element(TimeF, Times0),
+            Times1 = ordsets:add_element(TimeI, Times0),
 
             {Map1, Types1, Times1}
         end,

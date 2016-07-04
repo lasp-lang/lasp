@@ -125,6 +125,7 @@ run(Case, Config, Options) ->
     ),
 
     %% Generate transmission plot.
+    ct:pal("Will generate plots for all executions of ~p", [Case]),
     lasp_plot_gen:generate_plots(Options),
 
     ok.

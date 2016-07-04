@@ -26,6 +26,7 @@
 %% API
 -export([start_link/0,
          log/3,
+         convergence/0,
          stop/0]).
 
 %% gen_server callbacks
@@ -59,6 +60,10 @@ start_link() ->
 -spec log(term(), term(), pos_integer()) -> ok | error().
 log(Type, Payload, PeerCount) ->
     gen_server:call(?MODULE, {log, Type, Payload, PeerCount}, infinity).
+
+-spec convergence() -> ok | error().
+convergence() ->
+    gen_server:call(?MODULE, convergence, infinity).
 
 -spec stop() -> ok | error().
 stop() ->
@@ -95,6 +100,10 @@ handle_call({log, Type, Payload, PeerCount}, _From, #state{size_per_type=Map0}=S
     end,
     Map = orddict:store(Type, Current + Size, Map0),
     {reply, ok, State#state{size_per_type=Map}};
+
+handle_call(convergence, _From, #state{filename=Filename}=State) ->
+    record_convergence(Filename),
+    {reply, ok, State};
 
 handle_call(stop, _From, #state{lines=Lines0, size_per_type=Map,
                                 filename=Filename, tref=TRef}=State) ->
@@ -174,17 +183,29 @@ record(Map, Filename, Lines0) ->
     Timestamp = timestamp(),
     Lines = orddict:fold(
         fun(Type, Size, Acc) ->
-            Line = io_lib:format(
-                "~w,~w,~w\n",
-                [Type, Timestamp, megasize(Size)]
-            ),
-            Acc ++ Line
+            Acc ++ get_line(Type, Timestamp, Size)
         end,
         Lines0,
         Map
     ),
-    ok = file:write_file(Filename, Lines),
+    append_to_file(Filename, Lines),
     {ok, Lines}.
+
+record_convergence(Filename) ->
+    Timestamp = timestamp(),
+    Line = get_line(convergence, Timestamp, 0),
+    append_to_file(Filename, Line).
+
+%% @private
+get_line(Type, Timestamp, Size) ->
+    io_lib:format(
+        "~w,~w,~w\n",
+        [Type, Timestamp, megasize(Size)]
+    ).
+
+append_to_file(Filename, Line) ->
+    ok = file:write_file(Filename, Line, [append]),
+    ok.
 
 timestamp() ->
     {Mega, Sec, _Micro} = erlang:timestamp(),

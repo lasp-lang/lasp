@@ -46,29 +46,37 @@ generate_plot(EvalDir, EvalId, EvalNumber) ->
     LogFiles = only_csv_files(EvalDir),
     lager:info("Will analyse the following logs: ~p", [LogFiles]),
 
-    {Map0, Types, Times} = lists:foldl(
-        fun(File, {Map0, Types0, Times0}) ->
+    {Map, Types, Times, ConvergenceTimes} = lists:foldl(
+        fun(File, {Map0, Types0, Times0, ConvergenceTimes0}) ->
             FilePath = EvalDir ++ "/" ++ File,
 
             %% Load this file to the map
             %% Also get the types and times found on that log file
-            {Map1, Types1, Times1} = load_to_map(FilePath, Map0),
+            {Map1, Types1, Times1, ConvergenceTimes1} = load_to_map(FilePath, Map0),
 
             %% Update set of types
             Types2 = ordsets:union(Types0, Types1),
             %% Update set of times
             Times2 = ordsets:union(Times0, Times1),
+            %% Update set of convergence times
+            ConvergenceTimes2 = ordsets:union(ConvergenceTimes0, ConvergenceTimes1),
 
-            {Map1, Types2, Times2}
+            {Map1, Types2, Times2, ConvergenceTimes2}
         end,
-        {orddict:new(), ordsets:new(), ordsets:new()},
+        {orddict:new(), ordsets:new(), ordsets:new(), ordsets:new()},
         LogFiles
     ),
 
-    lager:info("Types found: ~p", [Types]),
+    Types1 = lists:delete(convergence, Types),
+    lager:info("Types found: ~p", [Types1]),
+
+    %% `ConvergenceTime` is the max of all `ConvergenceTimes`
+    TimeZero = lists:min(Times),
+    ConvergenceTime = lists:max(ConvergenceTimes) - TimeZero,
+    lager:info("Convergence time: ~p", [ConvergenceTime]),
 
     %% Assume unknown logs with last known values
-    Map1 = assume_unknown_logs(Types, Times, Map0),
+    Map1 = assume_unknown_logs(Types1, Times, TimeZero, Map),
     lager:info("Unknown logs assumed!"),
 
     %% Write average in files (one file per type) to `PlotDir`
@@ -78,7 +86,7 @@ generate_plot(EvalDir, EvalId, EvalNumber) ->
     filelib:ensure_dir(PlotDir),
 
     generate_per_node_plot(Map1, PlotDir),
-    generate_average_plot(Types, Times, Map1, PlotDir),
+    generate_average_plot(Types1, Times, Map1, ConvergenceTime, PlotDir),
     ok.
 
 %% @private
@@ -143,34 +151,43 @@ load_to_map(FilePath, Map) ->
     [_ | Lines] = read_lines(FilePath, FileDescriptor),
 
     lists:foldl(
-        fun(Line, {Map0, Types0, Times0}) ->
+        fun(Line, {Map0, Types0, Times0, ConvergenceTimes0}) ->
             %% Parse log line
-            [Type, Time, Bytes] = string:tokens(Line, ",\n"),
-            {TimeI, _} = string:to_integer(Time),
-            {BytesF, _} = string:to_float(Bytes),
+            [Type0, Time0, Bytes0] = string:tokens(Line, ",\n"),
+            TypeA = list_to_atom(Type0),
+            {TimeI, _} = string:to_integer(Time0),
+            {BytesF, _} = string:to_float(Bytes0),
 
-            %% Get dictionary that maps time to logs of this file
-            TimeToLogs0 = case orddict:find(FilePath, Map0) of
-                {ok, Value} ->
-                    Value;
-                error ->
-                    orddict:new()
+            {Map2, ConvergenceTimes2} = case TypeA of
+                convergence ->
+                    ConvergenceTimes1 = ordsets:add_element(TimeI, ConvergenceTimes0),
+                    {Map0, ConvergenceTimes1};
+                _ ->
+                    %% Get dictionary that maps time to logs of this file
+                    TimeToLogs0 = case orddict:find(FilePath, Map0) of
+                        {ok, Value} ->
+                            Value;
+                        error ->
+                            orddict:new()
+                    end,
+
+                    %% Update dictionary `TimeToLogs0` adding new pair log to
+                    %% the list of logs mapped to time `TimeI`
+                    TimeToLogs1 = orddict:append(TimeI, {BytesF, TypeA}, TimeToLogs0),
+
+                    %% Update dictionary `Map0` with new value `TimeToLogs1`
+                    Map1 = orddict:store(FilePath, TimeToLogs1, Map0),
+                    {Map1, ConvergenceTimes0}
             end,
 
-            %% Update dictionary `TimeToLogs0` adding new pair log to
-            %% the list of logs mapped to time `TimeI`
-            TimeToLogs1 = orddict:append(TimeI, {BytesF, Type}, TimeToLogs0),
-
-            %% Update dictionary `Map0` with new value `TimeToLogs1`
-            Map1 = orddict:store(FilePath, TimeToLogs1, Map0),
             %% Update set of types
-            Types1 = ordsets:add_element(Type, Types0),
+            Types1 = ordsets:add_element(TypeA, Types0),
             %% Update set of times
             Times1 = ordsets:add_element(TimeI, Times0),
 
-            {Map1, Types1, Times1}
+            {Map2, Types1, Times1, ConvergenceTimes2}
         end,
-        {Map, ordsets:new(), ordsets:new()},
+        {Map, ordsets:new(), ordsets:new(), ordsets:new()},
         Lines
     ).
 
@@ -194,11 +211,11 @@ append_to_file(InputFile, Time, Bytes) ->
 %% @private
 %% If in the logs of one node, we don't find some reference to some
 %% time, for every type of log, assume the last known value
-assume_unknown_logs(Types, Times, Map) ->
+assume_unknown_logs(Types, Times, TimeZero, Map) ->
     orddict:fold(
         fun(Node, TimeToLogs0, MapAcc) ->
             LastKnown = create_empty_last_known(Types),
-            TimeToLogs1 = assume_per_node(TimeToLogs0, LastKnown, Times),
+            TimeToLogs1 = assume_per_node(TimeToLogs0, LastKnown, Times, TimeZero),
             orddict:store(Node, TimeToLogs1, MapAcc)
         end,
         orddict:new(),
@@ -206,9 +223,7 @@ assume_unknown_logs(Types, Times, Map) ->
     ).
 
 %% @private
-assume_per_node(TimeToLogsIn, LastKnownIn, Times) ->
-    TimeZero = lists:min(Times),
-
+assume_per_node(TimeToLogsIn, LastKnownIn, Times, TimeZero) ->
     {TimeToLogs, _} = lists:foldl(
         fun(Time, {TimeToLogsAcc, LastKnownAcc}) ->
             {Logs1, LastKnownAcc1} = case orddict:find(Time, TimeToLogsIn) of
@@ -288,7 +303,7 @@ write_per_node_to_files(Map, PlotDir) ->
                 fun(Time, Logs, InputFileToTitle1) ->
                     lists:foldl(
                         fun({Bytes, Type}, InputFileToTitle2) ->
-                            Title = Type ++ "_" ++ NodeName,
+                            Title = atom_to_list(Type) ++ "_" ++ NodeName,
                             InputFile = PlotDir ++ Title ++ ".csv",
                             append_to_file(InputFile, Time, Bytes),
 
@@ -327,7 +342,7 @@ node_name(FileLogPath) ->
     re:replace(NodeName, "@", "_", [global, {return, list}]).
 
 %% @private
-generate_average_plot(Types, Times, Map, PlotDir) ->
+generate_average_plot(Types, Times, Map, _ConvergenceTime, PlotDir) ->
     %% Do the average of `Map1`
     TypeToTimeAndBytes = average(Types, Times, Map),
     lager:info("Average computed!"),
@@ -436,7 +451,7 @@ update_average_dict(Type, Time, Bytes, Map) ->
 write_average_to_files(TypeToTimeAndBytes, PlotDir) ->
     lists:foldl(
         fun({Type, List}, InputFiles) ->
-            InputFile = PlotDir ++ Type ++ ".csv",
+            InputFile = PlotDir ++ atom_to_list(Type) ++ ".csv",
 
             lists:foreach(
                 fun({Time, Bytes}) ->
@@ -454,7 +469,7 @@ write_average_to_files(TypeToTimeAndBytes, PlotDir) ->
 get_titles(Types) ->
     lists:map(
         fun(Type) ->
-            get_title(list_to_atom(Type))
+            get_title(Type)
         end,
         Types
     ).

@@ -36,6 +36,9 @@ set style line 6 lw 2 pt 7 ps 0.5
 set style line 7 lw 2 pt 7 ps 0.5
 set style line 8 lw 2 pt 7 ps 0.5
 
+#
+set object circle at first convergence_time,0 radius char 0.8 fillcolor rgb "#ffbf00" fillstyle solid noborder
+
 set output outputname
 set xlabel "Time in Seconds"
 set ylabel "MB Transmitted"

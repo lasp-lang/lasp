@@ -290,7 +290,9 @@ revert_tuple_order(LastKnown) ->
 generate_per_node_plot(Map, PlotDir) ->
     {Titles, InputFiles} = write_per_node_to_files(Map, PlotDir),
     OutputFile = output_file(PlotDir, "per_node"),
-    Result = run_gnuplot(InputFiles, Titles, OutputFile),
+    %% this plot does not show the convergence time per node
+    %% thus the -1
+    Result = run_gnuplot(InputFiles, Titles, OutputFile, -1),
     lager:info("Generating per node plot ~p. Output: ~p", [OutputFile, Result]).
 
 %% @private
@@ -342,7 +344,7 @@ node_name(FileLogPath) ->
     re:replace(NodeName, "@", "_", [global, {return, list}]).
 
 %% @private
-generate_average_plot(Types, Times, Map, _ConvergenceTime, PlotDir) ->
+generate_average_plot(Types, Times, Map, ConvergenceTime, PlotDir) ->
     %% Do the average of `Map1`
     TypeToTimeAndBytes = average(Types, Times, Map),
     lager:info("Average computed!"),
@@ -350,7 +352,7 @@ generate_average_plot(Types, Times, Map, _ConvergenceTime, PlotDir) ->
     InputFiles = write_average_to_files(TypeToTimeAndBytes, PlotDir),
     Titles = get_titles(Types),
     OutputFile = output_file(PlotDir, "average"),
-    Result = run_gnuplot(InputFiles, Titles, OutputFile),
+    Result = run_gnuplot(InputFiles, Titles, OutputFile, ConvergenceTime),
     lager:info("Generating average plot ~p. Output: ~p", [OutputFile, Result]).
 
 
@@ -479,10 +481,9 @@ get_title(aae_send)   -> "AAE Send";
 get_title(delta_ack)  -> "Delta Ack";
 get_title(delta_send) -> "Delta Send";
 get_title(broadcast)  -> "Broadcast";
-get_title(convergence)  -> "Convergence". %% @todo
 
 %% @private
-run_gnuplot(InputFiles, Titles, OutputFile) ->
+run_gnuplot(InputFiles, Titles, OutputFile, ConvergenceTime) ->
     Bin = case os:getenv("MESOS_TASK_ID", "false") of
         "false" ->
             "gnuplot";
@@ -490,6 +491,7 @@ run_gnuplot(InputFiles, Titles, OutputFile) ->
             "/usr/bin/gnuplot"
     end,
     Command = Bin ++ " -e \""
+                  ++ "convergence_time='" ++ integer_to_list(ConvergenceTime) ++ "'; "
                   ++ "outputname='" ++ OutputFile ++ "'; "
                   ++ "inputnames='" ++ join_filenames(InputFiles) ++ "'; "
                   ++ "titles='" ++  join_titles(Titles) ++ "'\" " ++ plot_file(),

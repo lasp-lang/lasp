@@ -77,7 +77,7 @@ stop() ->
 init([]) ->
     Filename = create_dir(),
     Line = io_lib:format("Type,Seconds,MegaBytes\n", []),
-    append_to_file(Filename, Line),
+    write_to_file(Filename, Line),
 
     {ok, TRef} = start_timer(),
 
@@ -203,10 +203,20 @@ get_line(Type, Timestamp, Size) ->
         [Type, Timestamp, megasize(Size)]
     ).
 
+%% @private
+write_to_file(Filename, Line) ->
+    write_file(Filename, Line, write).
+
+%% @private
 append_to_file(Filename, Line) ->
-    ok = file:write_file(Filename, Line, [append]),
+    write_file(Filename, Line, append).
+
+%% @private
+write_file(Filename, Line, Mode) ->
+    ok = file:write_file(Filename, Line, [Mode]),
     ok.
 
+%% @private
 timestamp() ->
     {Mega, Sec, _Micro} = erlang:timestamp(),
     Mega * 1000000 + Sec.

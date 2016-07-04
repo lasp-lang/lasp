@@ -40,7 +40,7 @@
 %% Macros.
 -define(MAX_IMPRESSIONS, 100).
 -define(LOG_INTERVAL, 10000).
--define(CONVERGENCE_INTERVAL, 5000).
+-define(CONVERGENCE_INTERVAL, 1000).
 -define(ADS, 10).
 
 %% State record.

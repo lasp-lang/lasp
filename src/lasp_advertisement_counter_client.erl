@@ -39,7 +39,7 @@
 %% Macros.
 -define(IMPRESSION_INTERVAL, 1000).
 -define(LOG_INTERVAL, 10000).
--define(CONVERGENCE_INTERVAL, 5000).
+-define(CONVERGENCE_INTERVAL, 500).
 
 %% State record.
 -record(state, {actor, impressions}).

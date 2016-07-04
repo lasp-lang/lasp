@@ -463,7 +463,8 @@ get_titles(Types) ->
 get_title(aae_send)   -> "AAE Send";
 get_title(delta_ack)  -> "Delta Ack";
 get_title(delta_send) -> "Delta Send";
-get_title(broadcast)  -> "Broadcast".
+get_title(broadcast)  -> "Broadcast";
+get_title(convergence)  -> "Convergence". %% @todo
 
 %% @private
 run_gnuplot(InputFiles, Titles, OutputFile) ->

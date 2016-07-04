@@ -1095,7 +1095,7 @@ send(Msg, Peer) ->
         ok ->
             ok;
         Error ->
-            lager:error("Failed send to ~p for reason ~p while sending message: ~p", [Peer, Error, Msg]),
+            lager:error("Failed send to ~p for reason ~p", [Peer, Error]),
             ok
     end.
 

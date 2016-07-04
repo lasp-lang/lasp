@@ -25,7 +25,7 @@
 
 %% API
 -export([start_link/0,
-         log/4,
+         log/3,
          stop/0]).
 
 %% gen_server callbacks
@@ -56,9 +56,9 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec log(term(), term(), pos_integer(), node()) -> ok | error().
-log(Type, Payload, PeerCount, Node) ->
-    gen_server:call(?MODULE, {log, Type, Payload, PeerCount, Node}, infinity).
+-spec log(term(), term(), pos_integer()) -> ok | error().
+log(Type, Payload, PeerCount) ->
+    gen_server:call(?MODULE, {log, Type, Payload, PeerCount}, infinity).
 
 -spec stop() -> ok | error().
 stop() ->
@@ -85,7 +85,7 @@ init([]) ->
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({log, Type, Payload, PeerCount, _Node}, _From, #state{size_per_type=Map0}=State) ->
+handle_call({log, Type, Payload, PeerCount}, _From, #state{size_per_type=Map0}=State) ->
     Size = termsize(Payload) * PeerCount,
     Current = case orddict:find(Type, Map0) of
         {ok, Value} ->

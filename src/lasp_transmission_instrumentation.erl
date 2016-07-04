@@ -42,7 +42,6 @@
 %% State record.
 -record(state, {tref,
                 size_per_type=orddict:new(),
-                lines="",
                 status=init,
                 filename}).
 
@@ -78,13 +77,14 @@ stop() ->
 init([]) ->
     Filename = create_dir(),
     Line = io_lib:format("Type,Seconds,MegaBytes\n", []),
+    append_to_file(Filename, Line),
 
     {ok, TRef} = start_timer(),
 
     _ = lager:info("Instrumentation timer enabled!"),
 
     {ok, #state{tref=TRef, filename=Filename, status=running,
-                size_per_type=orddict:new(), lines=Line}}.
+                size_per_type=orddict:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -105,12 +105,12 @@ handle_call(convergence, _From, #state{filename=Filename}=State) ->
     record_convergence(Filename),
     {reply, ok, State};
 
-handle_call(stop, _From, #state{lines=Lines0, size_per_type=Map,
+handle_call(stop, _From, #state{size_per_type=Map,
                                 filename=Filename, tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
-    {ok, Lines} = record(Map, Filename, Lines0),
+    record(Map, Filename),
     _ = lager:info("Instrumentation timer disabled!"),
-    {reply, ok, State#state{tref=undefined, lines=Lines}};
+    {reply, ok, State#state{tref=undefined}};
 
 %% @private
 handle_call(Msg, _From, State) ->
@@ -126,10 +126,10 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(record, #state{filename=Filename, size_per_type=Map,
-                           status=running, lines=Lines0}=State) ->
+                           status=running}=State) ->
     {ok, TRef} = start_timer(),
-    {ok, Lines} = record(Map, Filename, Lines0),
-    {noreply, State#state{tref=TRef, lines=Lines}};
+    record(Map, Filename),
+    {noreply, State#state{tref=TRef}};
 
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -179,18 +179,18 @@ megasize(Size) ->
     MegaSize.
 
 %% @private
-record(Map, Filename, Lines0) ->
+record(Map, Filename) ->
     Timestamp = timestamp(),
     Lines = orddict:fold(
         fun(Type, Size, Acc) ->
             Acc ++ get_line(Type, Timestamp, Size)
         end,
-        Lines0,
+        "",
         Map
     ),
-    append_to_file(Filename, Lines),
-    {ok, Lines}.
+    append_to_file(Filename, Lines).
 
+%% @private
 record_convergence(Filename) ->
     Timestamp = timestamp(),
     Line = get_line(convergence, Timestamp, 0),

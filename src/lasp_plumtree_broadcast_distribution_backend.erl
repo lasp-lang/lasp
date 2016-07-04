@@ -183,8 +183,7 @@ merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
         true ->
             false;
         false ->
-            {Time, {ok, _}} = timer:tc(?MODULE, local_bind, [Id, Type, Metadata, Value]),
-            lager:info("Merge time: ~p", [Time]),
+            {ok, _} = ?MODULE:local_bind(Id, Type, Metadata, Value),
             true
     end.
 

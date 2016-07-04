@@ -75,8 +75,8 @@ all() ->
 %% ===================================================================
 
 -define(EVAL_NUMBER, 1).
--define(EVAL_TIME, 50000).
 -define(IMPRESSION_NUMBER, 10).
+-define(CONVERGENCE_INTERVAL, 10000).
 
 default_test(_Config) ->
     ok.
@@ -291,7 +291,7 @@ wait_for_completion([Server | _] = _Nodes) ->
                 Convergence = rpc:call(Server, lasp_config, get, [convergence, false]),
                 ct:pal("Waiting for convergence: ~p", [Convergence]),
                 Convergence == true
-        end, 60*2, ?EVAL_TIME) of
+        end, 60*2, ?CONVERGENCE_INTERVAL) of
         ok ->
             ct:pal("Convergence reached!");
         Error ->

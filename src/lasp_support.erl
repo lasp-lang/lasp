@@ -42,7 +42,9 @@
          puniform/1,
          join_to/2,
          partition_cluster/2,
-         heal_cluster/2]).
+         heal_cluster/2,
+         load_lasp/3,
+         start_lasp/2]).
 
 -define(EXCHANGE_TIMER, 120).
 
@@ -144,75 +146,9 @@ start_node(Name, Config, Case) ->
     NodeConfig = [ {monitor_master, true},
                    {startup_functions, [ {code, set_path, [CodePath]} ]}],
 
-    case ct_slave:start(Name, NodeConfig) of
-        {ok, Node} ->
-            PrivDir = proplists:get_value(priv_dir, Config),
-            NodeDir = filename:join([PrivDir, Node, Case]),
-
-            %% Manually force sasl loading, and disable the logger.
-            ok = rpc:call(Node, application, load, [sasl]),
-            ok = rpc:call(Node, application, set_env,
-                          [sasl, sasl_error_logger, false]),
-            ok = rpc:call(Node, application, start, [sasl]),
-
-            ok = rpc:call(Node, application, load, [plumtree]),
-            ok = rpc:call(Node, application, load, [partisan]),
-            ok = rpc:call(Node, application, load, [lager]),
-            ok = rpc:call(Node, application, load, [lasp]),
-            ok = rpc:call(Node, application, set_env, [sasl,
-                                                       sasl_error_logger,
-                                                       false]),
-            ok = rpc:call(Node, application, set_env, [lasp,
-                                                       instrumentation,
-                                                       false]),
-            ok = rpc:call(Node, application, set_env, [lager,
-                                                       log_root,
-                                                       NodeDir]),
-            ok = rpc:call(Node, application, set_env, [plumtree,
-                                                       plumtree_data_dir,
-                                                       NodeDir]),
-            ok = rpc:call(Node, application, set_env, [plumtree,
-                                                       peer_service,
-                                                       partisan_peer_service]),
-            ok = rpc:call(Node, application, set_env, [plumtree,
-                                                       broadcast_exchange_timer,
-                                                       ?EXCHANGE_TIMER]),
-            ok = rpc:call(Node, application, set_env, [plumtree,
-                                                       broadcast_mods,
-                                                       [lasp_plumtree_broadcast_distribution_backend]]),
-            ok = rpc:call(Node, application, set_env, [lasp,
-                                                       data_root,
-                                                       NodeDir]),
-            try
-                {ok, _} = rpc:call(Node, application, ensure_all_started, [lasp])
-            catch
-                _:Error ->
-                    lager:info("Node initialization for ~p failed: ~p", [Node, Error]),
-                    lists:foreach(fun(N) ->
-                                          WebPort = rpc:call(N,
-                                                             lasp_config,
-                                                             get,
-                                                             [web_port, undefined]),
-                                          PeerPort = rpc:call(N,
-                                                              lasp_config,
-                                                              get,
-                                                              [peer_port, undefined]),
-                                          lager:info("Node: ~p PeerPort: ~p WebPort ~p", [N, PeerPort, WebPort])
-                                  end, proplists:get_value(started, Config) ++ [Node]),
-                    ct:fail(can_not_initialize_node)
-            end,
-            ok = wait_until(fun() ->
-                            case rpc:call(Node, lasp_peer_service, members, []) of
-                                {ok, _Res} -> true;
-                                _ -> false
-                            end
-                    end, 60, 500),
-            Node;
-        {error, already_started, Node} ->
-            ct_slave:stop(Name),
-            wait_until_offline(Node),
-            start_node(Name, Config, Case)
-    end.
+    Node = start_slave(Name, NodeConfig, Case),
+    load_lasp(Node, Config, Case),
+    start_lasp(Node, Config).
 
 partition_cluster(ANodes, BNodes) ->
     pmap(fun({Node1, Node2}) ->
@@ -323,9 +259,6 @@ start_runner() ->
     ok = application:set_env(plumtree,
                              broadcast_mods,
                              [lasp_plumtree_broadcast_distribution_backend]),
-    ok = application:set_env(lasp,
-                             instrumentation,
-                             true),
 
     {ok, _} = application:ensure_all_started(lasp),
 
@@ -345,3 +278,87 @@ join_to(N, RunnerNode) ->
                   lasp_peer_service,
                   join,
                   [{N, {127, 0, 0, 1}, PeerPort}]).
+
+load_lasp(Node, Config, Case) ->
+    PrivDir = proplists:get_value(priv_dir, Config),
+    NodeDir = filename:join([PrivDir, Node, Case]),
+
+    %% Manually force sasl loading, and disable the logger.
+    ok = rpc:call(Node, application, load, [sasl]),
+    ok = rpc:call(Node, application, set_env,
+                  [sasl, sasl_error_logger, false]),
+    ok = rpc:call(Node, application, start, [sasl]),
+
+    ok = rpc:call(Node, application, load, [plumtree]),
+    ok = rpc:call(Node, application, load, [partisan]),
+    ok = rpc:call(Node, application, load, [lager]),
+    ok = rpc:call(Node, application, load, [lasp]),
+    ok = rpc:call(Node, application, set_env, [sasl,
+                                               sasl_error_logger,
+                                               false]),
+    ok = rpc:call(Node, application, set_env, [lasp,
+                                               instrumentation,
+                                               false]),
+    ok = rpc:call(Node, application, set_env, [lager,
+                                               log_root,
+                                               NodeDir]),
+    ok = rpc:call(Node, application, set_env, [plumtree,
+                                               plumtree_data_dir,
+                                               NodeDir]),
+    ok = rpc:call(Node, application, set_env, [plumtree,
+                                               peer_service,
+                                               partisan_peer_service]),
+    ok = rpc:call(Node, application, set_env, [plumtree,
+                                               broadcast_exchange_timer,
+                                               ?EXCHANGE_TIMER]),
+    ok = rpc:call(Node, application, set_env, [plumtree,
+                                               broadcast_mods,
+                                               [lasp_plumtree_broadcast_distribution_backend]]),
+    ok = rpc:call(Node, application, set_env, [lasp,
+                                               data_root,
+                                               NodeDir]).
+
+start_lasp(Node, Config) ->
+    try
+        {ok, _} = rpc:call(Node, application, ensure_all_started, [lasp])
+    catch
+        _:Error ->
+            lager:info("Node initialization for ~p failed: ~p", [Node, Error]),
+            lists:foreach(fun(N) ->
+                                  WebPort = rpc:call(N,
+                                                     lasp_config,
+                                                     get,
+                                                     [web_port, undefined]),
+                                  PeerPort = rpc:call(N,
+                                                      lasp_config,
+                                                      get,
+                                                      [peer_port, undefined]),
+                                  lager:info("Node: ~p PeerPort: ~p WebPort ~p", [N, PeerPort, WebPort])
+                          end, proplists:get_value(started, Config) ++ [Node]),
+            ct:fail(can_not_initialize_node)
+    end,
+    ok = wait_until(fun() ->
+                    case rpc:call(Node, lasp_peer_service, members, []) of
+                        {ok, _Res} -> true;
+                        _ -> false
+                    end
+            end, 60, 500),
+    Node.
+
+start_slave(Name, NodeConfig, _Case) ->
+    case ct_slave:start(Name, NodeConfig) of
+        {ok, Node} ->
+            Node;
+        {error, already_started, _Node} ->
+            case ct_slave:stop(Name) of
+                {ok, _} ->
+                    case ct_slave:start(Name, NodeConfig) of
+                        {ok, Node} ->
+                            Node;
+                        Error ->
+                            ct:fail(Error)
+                    end;
+                Error ->
+                    ct:fail(Error)
+            end
+    end.

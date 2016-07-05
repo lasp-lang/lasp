@@ -39,6 +39,7 @@
 %% Macros.
 -define(IMPRESSION_INTERVAL, 1000).
 -define(LOG_INTERVAL, 10000).
+-define(CONVERGENCE_INTERVAL, 500).
 
 %% State record.
 -record(state, {actor, impressions}).
@@ -70,6 +71,9 @@ init([]) ->
     %% Schedule logging.
     schedule_logging(),
 
+    %% Schedule check convergence
+    schedule_check_convergence(),
+
     {ok, #state{actor=Actor, impressions=0}}.
 
 %% @private
@@ -100,15 +104,16 @@ handle_info(log, #state{impressions=Impressions}=State) ->
     schedule_logging(),
 
     {noreply, State};
-handle_info(view, #state{actor=Actor, impressions=Impressions}=State0) ->
+
+handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
     %% Get current value of the list of advertisements.
     {ok, Ads} = lasp:query({?ADS_WITH_CONTRACTS, ?SET_TYPE}),
 
     %% Make sure we have ads...
-    State = case sets:size(Ads) of
+    Impressions1 = case sets:size(Ads) of
         0 ->
             %% Do nothing.
-            State0;
+            Impressions0;
         Size ->
             %% Select random.
             Random = lasp_support:puniform(Size),
@@ -119,15 +124,40 @@ handle_info(view, #state{actor=Actor, impressions=Impressions}=State0) ->
 
             %% Increment counter.
             {ok, _} = lasp:update(Counter, increment, Actor),
+            %% Update CT instance
+            {ok, _} = lasp:update(convergence_id(), {fst, increment}, Actor),
 
             %% Increment impressions.
-            State0#state{impressions=Impressions+1}
+            Impressions0 + 1
     end,
 
     %% Schedule advertisement counter impression.
-    schedule_impression(),
+    case Impressions1 < max_impressions() of
+        true ->
+            schedule_impression();
+        false ->
+            lager:info("Max number of impressions reached. Node: ~p", [node()])
+    end,
+
+    {noreply, State#state{impressions=Impressions1}};
+
+handle_info(check_convergence, #state{actor=Actor}=State) ->
+    MaxEvents = max_impressions() * client_number(),
+    {ok, {TotalEvents, _}} = lasp:query(convergence_id()),
+    %lager:info("Total number of events observed so far ~p of ~p", [TotalEvents, MaxEvents]),
+
+    case TotalEvents == MaxEvents of
+        true ->
+            lager:info("Convergence reached on node ~p", [node()]),
+            %% Update CT instance
+            lasp:update(convergence_id(), {snd, {Actor, true}}, Actor),
+            lasp_transmission_instrumentation:convergence();
+        false ->
+            schedule_check_convergence()
+    end,
 
     {noreply, State};
+
 handle_info(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
@@ -155,3 +185,25 @@ schedule_impression() ->
 %% @private
 schedule_logging() ->
     erlang:send_after(?LOG_INTERVAL, self(), log).
+
+%% @private
+schedule_check_convergence() ->
+    erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_convergence).
+
+%% @private
+max_impressions() ->
+    lasp_config:get(simulation_event_number, 10).
+
+%% @private
+client_number() ->
+    ?NUM_NODES.
+
+%% @private
+convergence_id() ->
+    PairType = {?PAIR_TYPE,
+                    [
+                        ?COUNTER_TYPE,
+                        {?GMAP_TYPE, [?BOOLEAN_TYPE]}
+                    ]
+                },
+    {?CONVERGENCE_TRACKING, PairType}.

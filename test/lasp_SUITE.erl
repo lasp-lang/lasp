@@ -37,6 +37,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/inet.hrl").
 
+-define(PEER_SERVICE, partisan_hyparview_peer_service_manager).
+
 %% ===================================================================
 %% common_test callbacks
 %% ===================================================================
@@ -87,7 +89,8 @@ all() ->
      filter_test,
      union_test,
      product_test,
-     intersection_test
+     intersection_test,
+     membership_test
     ].
 
 %% ===================================================================
@@ -472,6 +475,35 @@ orset_test(_Config) ->
 
     ok.
 
+%% @doc Membership test.
+membership_test(Config) ->
+    Nodes = proplists:get_value(nodes, Config),
+    lager:info("Nodes: ~p", [Nodes]),
+    Sorted = lists:usort(Nodes),
+
+    lager:info("Waiting for cluster to stabilize."),
+    timer:sleep(10000),
+
+    lists:foreach(fun(Node) ->
+                        {ok, {state, _Myself, Active, Passive, _, _, _}} = rpc:call(Node, ?PEER_SERVICE, state, []),
+
+                        case lists:usort([Name || {Name, _, _} <- sets:to_list(Active)]) of
+                            Sorted ->
+                                ok;
+                            _ ->
+                                ct:fail("Incorrect nodes!")
+                        end,
+
+                        case sets:to_list(Passive) of
+                            [] ->
+                                ok;
+                            _ ->
+                                ct:fail("Incorrect nodes!")
+                        end
+                  end, Nodes),
+
+    ok.
+
 %% @doc Test of the optimised orset.
 oorset_test(_Config) ->
     {ok, {L1, _, _, _}} = lasp:declare(oorset),
@@ -531,6 +563,4 @@ oorset_test(_Config) ->
     receive
         read_any ->
             ok
-    end,
-
-    ok.
+    end.

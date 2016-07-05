@@ -33,102 +33,282 @@
 %% tests
 -compile([export_all]).
 
+-include("lasp.hrl").
+
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/inet.hrl").
+
+-define(EXCHANGE_TIMER, 120).
+-define(CT_SLAVES, [rita, sue, bob, jerome]).
 
 %% ===================================================================
 %% common_test callbacks
 %% ===================================================================
 
 init_per_suite(_Config) ->
-    %% Start Lasp on the runner and enable instrumentation.
-    lasp_support:start_runner(),
-
     _Config.
 
 end_per_suite(_Config) ->
-    %% Stop Lasp on the runner.
-    lasp_support:stop_runner(),
+    _Config.
+
+init_per_testcase(Case, _Config) ->
+    ct:pal("Beginning test case ~p", [Case]),
 
     _Config.
 
-init_per_testcase(Case, Config) ->
-    %% Runner must start and stop in between test runs as well, to
-    %% ensure that we clear the membership list (otherwise, we could
-    %% delete the data on disk, but this is cleaner.)
-    lasp_support:start_runner(),
+end_per_testcase(Case, _Config) ->
+    ct:pal("Ending test case ~p", [Case]),
 
-    Nodes = lasp_support:start_nodes(Case, Config),
-
-    [{nodes, Nodes}|Config].
-
-end_per_testcase(Case, Config) ->
-    lasp_support:stop_nodes(Case, Config),
-
-    %% Runner must start and stop in between test runs as well, to
-    %% ensure that we clear the membership list (otherwise, we could
-    %% delete the data on disk, but this is cleaner.)
-    lasp_support:stop_runner().
+    _Config.
 
 all() ->
     [
-        setup_test,
-        minimal_test,
-        minimal_delta_test
+     state_based_with_aae_test,
+     state_based_with_aae_and_tree_test,
+     delta_based_with_aae_test,
+     default_test
     ].
 
 %% ===================================================================
 %% tests
 %% ===================================================================
 
-pause_test(Config) ->
-    lager:info("Running the pause test..."),
-    Nodes = proplists:get_value(nodes, Config),
+-define(EVAL_NUMBER, 1).
+-define(IMPRESSION_NUMBER, 10).
+-define(CONVERGENCE_INTERVAL, 10000).
 
-    lager:info("Enabling ad client simulation on all nodes."),
-    lists:foreach(fun(Node) ->
+default_test(_Config) ->
+    ok.
+
+state_based_with_aae_test(Config) ->
+    run(state_based_with_aae_test,
+        Config,
+        [{mode, state_based},
+         {broadcast, false},
+         {evaluation_identifier, state_based_with_aae}]),
+    ok.
+
+state_based_with_aae_and_tree_test(Config) ->
+    run(state_based_with_aae_and_tree_test,
+        Config,
+        [{mode, state_based},
+         {broadcast, true},
+         {evaluation_identifier, state_based_with_aae_and_tree}]),
+    ok.
+
+delta_based_with_aae_test(Config) ->
+    run(delta_based_with_aae_test,
+        Config,
+        [{mode, delta_based},
+         {broadcast, false},
+         {evaluation_identifier, delta_based_with_aae}]),
+    ok.
+
+
+%% ===================================================================
+%% Internal functions
+%% ===================================================================
+
+run(Case, Config, Options) ->
+    lists:foreach(
+        fun(EvalNumber) ->
+            Nodes = start(
+              Case,
+              Config,
+              [{evaluation_number, EvalNumber} | Options]
+            ),
+            wait_for_completion(Nodes),
+            stop(Nodes)
+        end,
+        lists:seq(1, ?EVAL_NUMBER)
+    ),
+
+    %% Generate transmission plot.
+    ct:pal("Will generate plots for all executions of ~p", [Case]),
+    lasp_plot_gen:generate_plots(Options),
+
+    ok.
+
+%% @private
+start(_Case, _Config, Options) ->
+    %% Launch distribution for the test runner.
+    ct:pal("Launching Erlang distribution..."),
+
+    os:cmd(os:find_executable("epmd") ++ " -daemon"),
+    {ok, Hostname} = inet:gethostname(),
+    case net_kernel:start([list_to_atom("runner@" ++ Hostname), shortnames]) of
+        {ok, _} ->
+            ok;
+        {error, {already_started, _}} ->
+            ok
+    end,
+
+    %% Load sasl.
+    application:load(sasl),
+    ok = application:set_env(sasl,
+                             sasl_error_logger,
+                             false),
+    application:start(sasl),
+
+    %% Load lager.
+    {ok, _} = application:ensure_all_started(lager),
+
+    %% Start all three nodes.
+    InitializerFun = fun(Name) ->
+                            ct:pal("Starting node: ~p", [Name]),
+
+                            NodeConfig = [{monitor_master, true},
+                                          {startup_functions, [{code, set_path, [codepath()]}]}],
+
+                            case ct_slave:start(Name, NodeConfig) of
+                                {ok, Node} ->
+                                    Node;
+                                Error ->
+                                    ct:fail(Error)
+                            end
+                     end,
+    [First|_] = Nodes = lists:map(InitializerFun, ?CT_SLAVES),
+
+    %% Load Lasp on all of the nodes.
+    LoaderFun = fun(Node) ->
+                            ct:pal("Loading lasp on node: ~p", [Node]),
+
+                            PrivDir = code:priv_dir(?APP),
+                            NodeDir = filename:join([PrivDir, "lager", Node]),
+
+                            %% Manually force sasl loading, and disable the logger.
+                            ok = rpc:call(Node, application, load, [sasl]),
+                            ok = rpc:call(Node, application, set_env,
+                                          [sasl, sasl_error_logger, false]),
+                            ok = rpc:call(Node, application, start, [sasl]),
+
+                            ok = rpc:call(Node, application, load, [plumtree]),
+                            ok = rpc:call(Node, application, load, [partisan]),
+                            ok = rpc:call(Node, application, load, [lager]),
+                            ok = rpc:call(Node, application, load, [lasp]),
+                            ok = rpc:call(Node, application, set_env, [sasl,
+                                                                       sasl_error_logger,
+                                                                       false]),
+                            ok = rpc:call(Node, application, set_env, [lasp,
+                                                                       instrumentation,
+                                                                       false]),
+                            ok = rpc:call(Node, application, set_env, [lager,
+                                                                       log_root,
+                                                                       NodeDir]),
+                            ok = rpc:call(Node, application, set_env, [plumtree,
+                                                                       plumtree_data_dir,
+                                                                       NodeDir]),
+                            ok = rpc:call(Node, application, set_env, [plumtree,
+                                                                       peer_service,
+                                                                       partisan_peer_service]),
+                            ok = rpc:call(Node, application, set_env, [plumtree,
+                                                                       broadcast_exchange_timer,
+                                                                       ?EXCHANGE_TIMER]),
+                            ok = rpc:call(Node, application, set_env, [plumtree,
+                                                                       broadcast_mods,
+                                                                       [lasp_plumtree_broadcast_distribution_backend]]),
+                            ok = rpc:call(Node, application, set_env, [lasp,
+                                                                       data_root,
+                                                                       NodeDir])
+                     end,
+    lists:map(LoaderFun, Nodes),
+
+    %% Configure Lasp settings.
+    ConfigureFun = fun(Node) ->
+                        %% Configure number of impressions.
                         ok = rpc:call(Node, lasp_config, set,
-                                      [ad_counter_simulation_client, true])
-                  end, Nodes),
+                                      [simulation_event_number, ?IMPRESSION_NUMBER]),
 
-    lager:info("Enabling ad server simulation on local node."),
-    ok = lasp_config:set(ad_counter_simulation_server, true),
+                        %% Configure who should be the server and who's
+                        %% the client.
+                        case Node of
+                            First ->
+                                ok = rpc:call(Node, lasp_config, set,
+                                              [ad_counter_simulation_server, true]);
+                            _ ->
+                                ok = rpc:call(Node, lasp_config, set,
+                                              [ad_counter_simulation_client, true])
+                        end,
 
-    lager:info("Restarting Lasp on all nodes."),
-    lists:foreach(fun(Node) ->
-                        lager:info("Restarting ~p and re-joining...", [Node]),
-                        ok = rpc:call(Node, application, stop, [lasp]),
-                        {ok, _} = rpc:call(Node, application, ensure_all_started,
-                                           [lasp]),
-                        RunnerNode = lasp_support:runner_node(),
-                        lasp_support:join_to(Node, RunnerNode),
-                        timer:sleep(4000),
-                        {ok, Members} = rpc:call(Node, lasp_peer_service, members, []),
-                        {ok, LocalMembers} = lasp_peer_service:members(),
-                        lager:info("* Members; ~p", [Members]),
-                        lager:info("* LocalMembers; ~p", [LocalMembers])
-                  end, Nodes),
+                        %% Configure the operational mode.
+                        Mode = proplists:get_value(mode, Options),
+                        ok = rpc:call(Node, lasp_config, set, [mode, Mode]),
 
-    timer:sleep(20000),
+                        %% Configure broadcast settings.
+                        Broadcast = proplists:get_value(broadcast, Options),
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [broadcast, Broadcast]),
+
+                        %% Configure evaluation identifier.
+                        EvalIdentifier = proplists:get_value(evaluation_identifier, Options),
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [evaluation_identifier, EvalIdentifier]),
+
+                        %% Configure evaluation number.
+                        EvalNumber = proplists:get_value(evaluation_number, Options),
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [evaluation_number, EvalNumber]),
+
+                        %% Configure instrumentation.
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [instrumentation, true])
+                   end,
+    lists:map(ConfigureFun, Nodes),
+
+    ct:pal("Starting lasp."),
+
+    StartFun = fun(Node) ->
+                        %% Start lasp.
+                        {ok, _} = rpc:call(Node, application, ensure_all_started, [lasp])
+                   end,
+    lists:map(StartFun, Nodes),
+
+    ct:pal("Custering nodes..."),
+    ClusterFun = fun(Node) ->
+                        PeerPort = rpc:call(Node,
+                                            partisan_config,
+                                            get,
+                                            [peer_port, ?PEER_PORT]),
+                        ct:pal("Joining node: ~p to ~p at port ~p",
+                               [Node, First, PeerPort]),
+                        ok = rpc:call(First,
+                                      lasp_peer_service,
+                                      join,
+                                      [{Node, {127, 0, 0, 1}, PeerPort}])
+                   end,
+    lists:map(ClusterFun, Nodes),
+
+    ct:pal("Lasp fully initialized."),
+
+    Nodes.
+
+%% @private
+stop(_Nodes) ->
+    StopFun = fun(Node) ->
+        case ct_slave:stop(Node) of
+            {ok, _} ->
+                ok;
+            Error ->
+                ct:fail(Error)
+        end
+    end,
+    lists:map(StopFun, ?CT_SLAVES),
     ok.
 
-setup_test(_Config) ->
-    timer:sleep(2000),
-    ok.
+%% @private
+wait_for_completion([Server | _] = _Nodes) ->
+    case lasp_support:wait_until(fun() ->
+                Convergence = rpc:call(Server, lasp_config, get, [convergence, false]),
+                ct:pal("Waiting for convergence: ~p", [Convergence]),
+                Convergence == true
+        end, 60*2, ?CONVERGENCE_INTERVAL) of
+        ok ->
+            ct:pal("Convergence reached!");
+        Error ->
+            ct:fail("Convergence not reached: ~p", [Error])
+    end.
 
-minimal_test(Config) ->
-    Nodes = proplists:get_value(nodes, Config),
-    {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
-                                  [Nodes, state_based, orset, gcounter, 100, 100, 10]),
-    ok.
-
-minimal_delta_test(Config) ->
-    Nodes = proplists:get_value(nodes, Config),
-    %% Set the delta_mode to true for all nodes.
-    lists:foreach(fun(Node) ->
-                        ok = rpc:call(Node, lasp_config, set, [mode, delta_based])
-                  end, Nodes),
-    {ok, _} = lasp_simulation:run(lasp_advertisement_counter,
-                                  [Nodes, delta_based, orset, gcounter, 100, 100, 10]),
-    ok.
+%% @private
+codepath() ->
+    lists:filter(fun filelib:is_dir/1, code:get_path()).

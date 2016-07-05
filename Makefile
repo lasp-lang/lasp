@@ -85,6 +85,19 @@ shell:
 dcos:
 	bin/dcos-deploy.sh
 
+##
+## Evaluation related targets
+##
+ads:
+	pkill -9 beam.smp; \
+		clear; \
+		rm -rf priv/plots/*_with_aae*; \
+		rm -rf priv/lager/; \
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE
+
+logs:
+	tail -F priv/lager/*/log/*.log
+
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 
 include tools.mk

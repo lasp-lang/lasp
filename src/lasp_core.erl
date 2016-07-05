@@ -40,7 +40,7 @@
          query/2,
          stream/3,
          update/4,
-         update/5,
+         update/6,
          thread/4,
          filter/4,
          map/4,
@@ -355,14 +355,20 @@ wait_needed(Id, Threshold, Store) ->
     {ok, var()} | not_found().
 update(Id, Operation, Actor, Store) ->
     MetadataFun = fun(X) -> X end,
-    update(Id, Operation, Actor, MetadataFun, Store).
+    MetadataFunDeclare = fun(X) -> X end,
+    update(Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store).
 
--spec update(id(), operation(), actor(), function(), store()) ->
+-spec update(id(), operation(), actor(), function(), function(), store()) ->
     {ok, var()} | not_found().
-update(Id, Operation, Actor, MetadataFun, Store) ->
-    {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
-    {ok, Value} = lasp_type:update(Type, Operation, {Id, Actor}, Value0),
-    bind(Id, Value, MetadataFun, Store).
+update({_, Type} = Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store) ->
+    case do(get, [Store, Id]) of
+        {ok, #dv{value=Value0, type=Type}} ->
+            {ok, Value} = lasp_type:update(Type, Operation, Actor, Value0),
+            bind(Id, Value, MetadataFun, Store);
+        {error, not_found} ->
+            {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
+            update(Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store)
+    end.
 
 %% @doc Define a dataflow variable to be bound a value.
 -spec bind(id(), value(), store()) -> {ok, var()} | not_found().
@@ -852,7 +858,7 @@ receive_value(Store, {aae_send, Origin, {Id, Type, Metadata, Value},
                       MetadataFunBind, MetadataFunDeclare}) ->
     case do(get, [Store, Id]) of
         {ok, _Object} ->
-            {ok, _Result} = bind(Origin, Id, Value, MetadataFunBind, Store);
+            {ok, _} = bind(Origin, Id, Value, MetadataFunBind, Store);
         {error, not_found} ->
             {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
             receive_value(Store, {aae_send, Origin, {Id, Type, Metadata, Value},

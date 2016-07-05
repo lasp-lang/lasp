@@ -28,14 +28,12 @@
          filter/2]).
 
 union({Type, LValue}, {Type, RValue}) ->
-    lager:info("union"),
     Type:merge({Type, LValue}, {Type, RValue}).
 
 product({state_oorset_ps, {{ElemDataStoreL, EventDataStoreL},
                            FilteredOutEventsL, AllEventsAnyL}=_ORSetL},
         {state_oorset_ps, {{ElemDataStoreR, EventDataStoreR},
                            FilteredOutEventsR, AllEventsAnyR}=_ORSetR}) ->
-    lager:info("product"),
     %% Remove the removed events of the other set first (optimisation)
     ValidEventsL = ordsets:union(
                      ordsets:from_list(orddict:fetch_keys(EventDataStoreL)),
@@ -93,7 +91,6 @@ intersect({state_oorset_ps, {{ElemDataStoreL, EventDataStoreL},
                              FilteredOutEventsL, AllEventsAnyL}=_ORSetL},
           {state_oorset_ps, {{ElemDataStoreR, EventDataStoreR},
                              FilteredOutEventsR, AllEventsAnyR}=_ORSetR}) ->
-    lager:info("intersect"),
     %% Remove the removed events of the other set first (optimisation)
     ValidEventsL = ordsets:union(
                      ordsets:from_list(orddict:fetch_keys(EventDataStoreL)),
@@ -168,7 +165,6 @@ intersect_folder({state_orset, RValue}) ->
 
 map(Function, {state_oorset_ps, {{ElemDataStore, EventDataStore},
                                  FilteredOutEvents, AllEvents}}) ->
-    lager:info("map"),
     MapElemDataStore =
         orddict:fold(
           fun(Elem, Provenance, MapElemDataStore0) ->
@@ -198,7 +194,6 @@ map(Function, {state_orset, V}) ->
 
 filter(Function, {state_oorset_ps, {{ElemDataStore, EventDataStore},
                                     FilteredOutEvents, AllEvents}}) ->
-    lager:info("filter"),
     {FilterElemDataStore, FilterFilteredOutEvents} =
         orddict:fold(
           fun(Elem, Provenance, {FilterElemDataStore0, FilterFilteredOutEvents0}) ->

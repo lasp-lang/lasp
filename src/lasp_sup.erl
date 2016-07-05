@@ -109,24 +109,13 @@ init(_Args) ->
 
     Children0 = case InstrEnabled of
         true ->
-            ClientTrans = {lasp_client_transmission_instrumentation,
-                           {lasp_transmission_instrumentation, start_link, [client]},
-                            permanent, 5000, worker,
-                            [lasp_transmission_instrumentation]},
+            lager:info("Instrumentation is enabled!"),
+            Transmission = {lasp_transmission_instrumentation,
+                            {lasp_transmission_instrumentation, start_link, []},
+                             permanent, 5000, worker,
+                             [lasp_transmission_instrumentation]},
 
-            ServerTrans = {lasp_server_transmission_instrumentation,
-                           {lasp_transmission_instrumentation, start_link, [server]},
-                            permanent, 5000, worker,
-                            [lasp_transmission_instrumentation]},
-
-            Divergence = {lasp_divergence_instrumentation,
-                          {lasp_divergence_instrumentation, start_link, []},
-                           permanent, 5000, worker,
-                           [lasp_divergence_instrumentation]},
-
-            BaseSpecs ++ [ClientTrans,
-                          ServerTrans,
-                          Divergence];
+            BaseSpecs ++ [Transmission];
         false ->
             BaseSpecs
     end,
@@ -172,6 +161,24 @@ configure_defaults() ->
                                          profile,
                                          ProfileDefault),
     lasp_config:set(profile, ProfileEnabled),
+
+    BroadcastDefault = list_to_atom(os:getenv("BROADCAST", "false")),
+    BroadcastEnabled = application:get_env(?APP,
+                                           broadcast,
+                                           BroadcastDefault),
+    lasp_config:set(broadcast, BroadcastEnabled),
+
+    EvaluationIdDefault = list_to_atom(os:getenv("EVAL_ID", "undefined")),
+    EvaluationIdEnabled = application:get_env(?APP,
+                                              evaluation_identifier,
+                                              EvaluationIdDefault),
+    lasp_config:set(evaluation_identifier, EvaluationIdEnabled),
+
+    EvaluationNumberDefault = list_to_integer(os:getenv("EVAL_NUMBER", "0")),
+    EvaluationNumberEnabled = application:get_env(?APP,
+                                                  evaluation_number,
+                                                  EvaluationNumberDefault),
+    lasp_config:set(evaluation_number, EvaluationNumberEnabled),
 
     %% Operation mode.
     ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),

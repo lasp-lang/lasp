@@ -65,6 +65,7 @@ end_per_testcase(Case, _Config) ->
 all() ->
     [
      state_based_with_aae_test,
+     state_based_with_aae_and_tree_test,
      delta_based_with_aae_test,
      default_test
     ].

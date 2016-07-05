@@ -37,6 +37,7 @@ types() ->
         {gcounter, {state_gcounter, undefined}},
         {gset, {state_gset, undefined}},
         {ivar, {state_ivar, undefined}},
+        {oorset, {state_oorset_ps, undefined}},
         {orset, {state_orset, undefined}},
         {pair, {state_pair, undefined}},
         {pncounter, {state_pncounter, undefined}}
@@ -101,14 +102,23 @@ new(Type) ->
 update(Type, Operation, Actor, Value) ->
     Mode = get_mode(),
     T = get_type(remove_args(Type), Mode),
+    RealActor = get_actor(T, Actor),
     case Mode of
         delta_based ->
-            T:delta_mutate(Operation, Actor, Value);
+            T:delta_mutate(Operation, RealActor, Value);
         state_based ->
-            T:mutate(Operation, Actor, Value);
+            T:mutate(Operation, RealActor, Value);
         pure_op_based ->
             ok %% @todo
     end.
+
+%% @private
+get_actor(state_oorset_ps, {{StorageId, _TypeId}, Actor}) ->
+    {StorageId, Actor};
+get_actor(_Type, {_Id, Actor}) ->
+    Actor;
+get_actor(_Type, Actor) ->
+    Actor.
 
 %% @doc Call the correct merge function for a given type.
 merge(Type, Value0, Value) ->

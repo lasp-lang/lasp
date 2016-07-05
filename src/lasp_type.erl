@@ -112,7 +112,7 @@ update(Type, Operation, Actor, Value) ->
             ok %% @todo
     end.
 
-%%private
+%% @private
 get_actor(state_oorset_ps, {{StorageId, _TypeId}, Actor}) ->
     {StorageId, Actor};
 get_actor(_Type, {_Id, Actor}) ->

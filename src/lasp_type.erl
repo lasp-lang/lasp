@@ -39,7 +39,7 @@ types() ->
         {gmap, {state_gmap, undefined}},
         {gset, {state_gset, undefined}},
         {ivar, {state_ivar, undefined}},
-        {oorset, {state_oorset_ps, undefined}},
+        {oorset_ps, {state_oorset_ps, undefined}},
         {orset, {state_orset, undefined}},
         {pair, {state_pair, undefined}},
         {pncounter, {state_pncounter, undefined}}

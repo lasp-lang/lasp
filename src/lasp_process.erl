@@ -94,17 +94,17 @@ read(#state{read_funs=ReadFuns0}=State) ->
 
 %% @doc Computation to execute when inputs change.
 process(Args, #state{trans_fun=Function, write_fun=WriteFunction}=State) ->
-    case lists:any(fun(X) -> X =:= undefined end, Args) of
-        true ->
-            ok;
+    Processed = case lists:any(fun(X) -> X =:= undefined end, Args) of
+        true -> false;
         false ->
             case WriteFunction of
                 undefined -> erlang:apply(Function, Args);
                 {AccId, WFun} ->
                     WFun(AccId, erlang:apply(Function, Args))
-            end
+            end,
+            true
     end,
-    {ok, State}.
+    {ok, {Processed, State}}.
 
 %%%===================================================================
 %%% Internal functions

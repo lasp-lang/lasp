@@ -89,7 +89,7 @@ dcos:
 ## Evaluation related targets
 ##
 ads: SHELL:=/bin/bash
-ads: GIT_SSH=ssh/wrapper
+ads: GIT_SSH:=ssh/wrapper
 ads:
 	pkill -9 beam.smp; \
   	clear; \

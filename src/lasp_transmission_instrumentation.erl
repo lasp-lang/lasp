@@ -164,11 +164,11 @@ log_dir() ->
 %% @private
 create_dir() ->
     EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
-    EvalNumber = lasp_config:get(evaluation_number, 0),
+    EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     Filename = io_lib:format("~s.csv", [node()]),
     Path = log_dir() ++ "/"
         ++ atom_to_list(EvalIdentifier) ++ "/"
-        ++ integer_to_list(EvalNumber) ++ "/",
+        ++ integer_to_list(EvalTimestamp) ++ "/",
     filelib:ensure_dir(Path),
     Path ++ Filename.
 

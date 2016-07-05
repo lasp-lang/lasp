@@ -174,11 +174,11 @@ configure_defaults() ->
                                               EvaluationIdDefault),
     lasp_config:set(evaluation_identifier, EvaluationIdEnabled),
 
-    EvaluationNumberDefault = list_to_integer(os:getenv("EVAL_NUMBER", "0")),
-    EvaluationNumberEnabled = application:get_env(?APP,
-                                                  evaluation_number,
-                                                  EvaluationNumberDefault),
-    lasp_config:set(evaluation_number, EvaluationNumberEnabled),
+    EvaluationTimestampDefault = list_to_integer(os:getenv("EVAL_TIMESTAMP", "0")),
+    EvaluationTimestampEnabled = application:get_env(?APP,
+                                                  evaluation_timestamp,
+                                                  EvaluationTimestampDefault),
+    lasp_config:set(evaluation_timstamp, EvaluationTimestampEnabled),
 
     %% Operation mode.
     ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),

@@ -29,18 +29,18 @@
 generate_plots(Options) ->
     EvalId = proplists:get_value(evaluation_identifier, Options),
     EvalIdDir = root_log_dir() ++ "/" ++ atom_to_list(EvalId),
-    EvalNumbers = only_dirs(EvalIdDir),
+    EvalTimestamps = only_dirs(EvalIdDir),
 
     lists:foreach(
-        fun(EvalNumber) ->
-            EvalDir = EvalIdDir ++ "/" ++ EvalNumber,
-            generate_plot(EvalDir, EvalId, EvalNumber)
+        fun(EvalTimestamp) ->
+            EvalDir = EvalIdDir ++ "/" ++ EvalTimestamp,
+            generate_plot(EvalDir, EvalId, EvalTimestamp)
         end,
-        EvalNumbers
+        EvalTimestamps
     ).
 
 %% @private
-generate_plot(EvalDir, EvalId, EvalNumber) ->
+generate_plot(EvalDir, EvalId, EvalTimestamp) ->
     lager:info("Will analyse the following directory: ~p", [EvalDir]),
 
     LogFiles = only_csv_files(EvalDir),
@@ -82,7 +82,7 @@ generate_plot(EvalDir, EvalId, EvalNumber) ->
     %% Write average in files (one file per type) to `PlotDir`
     PlotDir = root_plot_dir() ++ "/"
            ++ atom_to_list(EvalId) ++ "/"
-           ++ EvalNumber ++ "/",
+           ++ EvalTimestamp ++ "/",
     filelib:ensure_dir(PlotDir),
 
     generate_per_node_plot(Map1, PlotDir),

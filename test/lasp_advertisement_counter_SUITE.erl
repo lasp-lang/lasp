@@ -144,11 +144,11 @@ delta_based_ps_with_aae_test(Config) ->
 
 run(Case, Config, Options) ->
     lists:foreach(
-        fun(EvalNumber) ->
+        fun(_EvalNumber) ->
             Nodes = start(
               Case,
               Config,
-              [{evaluation_number, EvalNumber} | Options]
+              [{evaluation_timestamp, timestamp()} | Options]
             ),
             wait_for_completion(Nodes),
             stop(Nodes)
@@ -281,10 +281,10 @@ start(_Case, _Config, Options) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [evaluation_identifier, EvalIdentifier]),
 
-                        %% Configure evaluation number.
-                        EvalNumber = proplists:get_value(evaluation_number, Options),
+                        %% Configure evaluation timestamp.
+                        EvalTimestamp = proplists:get_value(evaluation_timestamp, Options),
                         ok = rpc:call(Node, lasp_config, set,
-                                      [evaluation_number, EvalNumber]),
+                                      [evaluation_timestamp, EvalTimestamp]),
 
                         %% Configure instrumentation.
                         ok = rpc:call(Node, lasp_config, set,
@@ -348,3 +348,8 @@ wait_for_completion([Server | _] = _Nodes) ->
 %% @private
 codepath() ->
     lists:filter(fun filelib:is_dir/1, code:get_path()).
+
+%% @private
+timestamp() ->
+    {Mega, Sec, _Micro} = erlang:timestamp(),
+    Mega * 1000000 + Sec.

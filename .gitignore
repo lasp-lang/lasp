@@ -32,3 +32,4 @@ priv/logs
 priv/plots/*.csv
 priv/plots/*.pdf
 priv/plots/*_with_aae*
+ssh/

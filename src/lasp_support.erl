@@ -350,5 +350,15 @@ start_slave(Name, NodeConfig, _Case) ->
         {ok, Node} ->
             Node;
         {error, already_started, _Node} ->
-            ct_slave:stop(Name)
+            case ct_slave:stop(Name) of
+                {ok, _} ->
+                    case ct_slave:start(Name, NodeConfig) of
+                        {ok, Node} ->
+                            Node;
+                        Error ->
+                            ct:fail(Error)
+                    end;
+                Error ->
+                    ct:fail(Error)
+            end
     end.

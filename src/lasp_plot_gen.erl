@@ -90,8 +90,12 @@ generate_plot(EvalDir, EvalId, EvalTimestamp) ->
     ok.
 
 %% @private
+priv_dir() ->
+    code:priv_dir(?APP).
+
+%% @private
 eval_dir() ->
-    code:priv_dir(?APP) ++ "/evaluation".
+    priv_dir() ++ "/evaluation".
 
 %% @private
 root_log_dir() ->
@@ -102,12 +106,8 @@ root_plot_dir() ->
     eval_dir() ++ "/plots".
 
 %% @private
-root_plot_dir(File) ->
-    root_plot_dir() ++ "/" ++ File.
-
-%% @private
-plot_file() ->
-    root_plot_dir("transmission.gnuplot").
+gnuplot_file() ->
+    priv_dir() ++ "/gnuplot_scripts/transmission.gnuplot".
 
 %% @private
 output_file(PlotDir, Name) ->
@@ -494,7 +494,7 @@ run_gnuplot(InputFiles, Titles, OutputFile, ConvergenceTime) ->
                   ++ "convergence_time='" ++ integer_to_list(ConvergenceTime) ++ "'; "
                   ++ "outputname='" ++ OutputFile ++ "'; "
                   ++ "inputnames='" ++ join_filenames(InputFiles) ++ "'; "
-                  ++ "titles='" ++  join_titles(Titles) ++ "'\" " ++ plot_file(),
+                  ++ "titles='" ++  join_titles(Titles) ++ "'\" " ++ gnuplot_file(),
     lager:info("~p", [Command]),
     os:cmd(Command).
 

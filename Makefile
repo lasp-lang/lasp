@@ -88,11 +88,15 @@ dcos:
 ##
 ## Evaluation related targets
 ##
+ads: SHELL:=/bin/bash
+ads: GIT_SSH=ssh/wrapper
 ads:
 	pkill -9 beam.smp; \
-		clear; \
-		rm -rf priv/lager/; \
-		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE
+  	clear;
+		rm -rf priv/evaluation; \
+		( cd priv ; GIT_SSH=$(GIT_SSH) git clone git@github.com:cmeiklejohn/evaluation.git ); \
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE; \
+		( cd priv ; GIT_SSH=$(GIT_SSH) git add . && GIT_SSH=$(GIT_SSH) git commit -m 'Adding evaluation data.' && GIT_SSH=$(GIT_SSH) git push )
 
 logs:
 	tail -F priv/lager/*/log/*.log

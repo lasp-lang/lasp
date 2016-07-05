@@ -32,4 +32,5 @@ priv/evaluation/logs
 priv/evaluation/plots/*.csv
 priv/evaluation/plots/*.pdf
 priv/evaluation/plots/*_with_aae*
-ssh/
+priv/ssh/*id_rsa*
+priv/evaluation

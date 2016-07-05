@@ -363,7 +363,7 @@ update(Id, Operation, Actor, Store) ->
 update({_, Type} = Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store) ->
     case do(get, [Store, Id]) of
         {ok, #dv{value=Value0, type=Type}} ->
-            {ok, Value} = lasp_type:update(Type, Operation, Actor, Value0),
+            {ok, Value} = lasp_type:update(Type, Operation, {Id, Actor}, Value0),
             bind(Id, Value, MetadataFun, Store);
         {error, not_found} ->
             {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),

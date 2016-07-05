@@ -91,7 +91,6 @@ dcos:
 ads:
 	pkill -9 beam.smp; \
 		clear; \
-		rm -rf priv/plots/*_with_aae*; \
 		rm -rf priv/lager/; \
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE
 

@@ -90,16 +90,16 @@ generate_plot(EvalDir, EvalId, EvalTimestamp) ->
     ok.
 
 %% @private
-priv_dir() ->
-    code:priv_dir(?APP).
+eval_dir() ->
+    code:priv_dir(?APP) ++ "/evaluation".
 
 %% @private
 root_log_dir() ->
-    priv_dir() ++ "/logs".
+    eval_dir() ++ "/logs".
 
 %% @private
 root_plot_dir() ->
-    priv_dir() ++ "/plots".
+    eval_dir() ++ "/plots".
 
 %% @private
 root_plot_dir(File) ->

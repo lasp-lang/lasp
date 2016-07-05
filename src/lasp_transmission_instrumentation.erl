@@ -158,8 +158,12 @@ start_timer() ->
     timer:send_after(?INTERVAL, record).
 
 %% @private
+eval_dir() ->
+    code:priv_dir(?APP) ++ "/evaluation".
+
+%% @private
 log_dir() ->
-    code:priv_dir(?APP) ++ "/logs".
+    eval_dir() ++ "/logs".
 
 %% @private
 create_dir() ->

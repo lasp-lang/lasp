@@ -96,7 +96,9 @@ ads:
 		rm -rf priv/evaluation; \
 		( cd priv ; GIT_SSH=$(GIT_SSH) git clone git@github.com:cmeiklejohn/evaluation.git ); \
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE; \
-		( cd priv ; GIT_SSH=$(GIT_SSH) git add . && GIT_SSH=$(GIT_SSH) git commit -m 'Adding evaluation data.' && GIT_SSH=$(GIT_SSH) git push )
+		( cd priv/evaluation ; git add . ); \
+		( cd priv/evaluation ; git commit -m 'Adding evaluation data.' ); \
+		( cd priv/evaluation ; GIT_SSH=../$(GIT_SSH) git push -u origin)
 
 logs:
 	tail -F priv/lager/*/log/*.log

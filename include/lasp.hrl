@@ -101,5 +101,5 @@
 -define(BOOLEAN_TYPE, boolean).
 -define(COUNTER_TYPE, gcounter).
 -define(GMAP_TYPE, gmap).
--define(SET_TYPE, orset).
+-define(SET_TYPE, lasp_config:get(set, orset)).
 -define(PAIR_TYPE, pair).

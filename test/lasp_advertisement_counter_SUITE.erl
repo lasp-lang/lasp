@@ -85,6 +85,7 @@ state_based_with_aae_test(Config) ->
     run(state_based_with_aae_test,
         Config,
         [{mode, state_based},
+         {set, orset},
          {broadcast, false},
          {evaluation_identifier, state_based_with_aae}]),
     ok.
@@ -93,6 +94,7 @@ state_based_with_aae_and_tree_test(Config) ->
     run(state_based_with_aae_and_tree_test,
         Config,
         [{mode, state_based},
+         {set, orset},
          {broadcast, true},
          {evaluation_identifier, state_based_with_aae_and_tree}]),
     ok.
@@ -101,8 +103,18 @@ delta_based_with_aae_test(Config) ->
     run(delta_based_with_aae_test,
         Config,
         [{mode, delta_based},
+         {set, orset},
          {broadcast, false},
          {evaluation_identifier, delta_based_with_aae}]),
+    ok.
+
+state_based_ps_with_aae_test(Config) ->
+    run(state_based_ps_with_aae_test,
+        Config,
+        [{mode, state_based},
+         {set, oorset_ps},
+         {broadcast, false},
+         {evaluation_identifier, state_based_ps_with_aae_test}]),
     ok.
 
 
@@ -239,6 +251,10 @@ start(_Case, _Config, Options) ->
                         Broadcast = proplists:get_value(broadcast, Options),
                         ok = rpc:call(Node, lasp_config, set,
                                       [broadcast, Broadcast]),
+
+                        %% Configure broadcast settings.
+                        Set = proplists:get_value(set, Options),
+                        ok = rpc:call(Node, lasp_config, set, [set, Set]),
 
                         %% Configure evaluation identifier.
                         EvalIdentifier = proplists:get_value(evaluation_identifier, Options),

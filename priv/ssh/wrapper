@@ -1,3 +1,8 @@
 #!/bin/bash
 
-ssh -i ssh/id_rsa $1 $2
+if [ -f ssh/id_rsa ];
+then
+  ssh -i ssh/id_rsa $1 $2
+else
+  ssh -i ../ssh/id_rsa $1 $2
+fi

@@ -82,6 +82,7 @@ all() ->
      query_test,
      ivar_test,
      orset_test,
+     oorset_test,
      dynamic_ivar_test,
      monotonic_read_test,
      map_test,
@@ -502,3 +503,64 @@ membership_test(Config) ->
                   end, Nodes),
 
     ok.
+
+%% @doc Test of the optimised orset.
+oorset_test(_Config) ->
+    {ok, {L1, _, _, _}} = lasp:declare(oorset),
+    {ok, {L2, _, _, _}} = lasp:declare(oorset),
+    {ok, {L3, _, _, _}} = lasp:declare(oorset),
+
+    %% Attempt pre, and post- dataflow variable bind operations.
+    ?assertMatch(ok, lasp:bind_to(L2, L1)),
+    {ok, {_, _, _, S2}} = lasp:update(L1, {add, 1}, a),
+    ?assertMatch(ok, lasp:bind_to(L3, L1)),
+
+    timer:sleep(4000),
+
+    %% Verify the same value is contained by all.
+    {ok, {_, _, _, S1}} = lasp:read(L3, {strict, undefined}),
+    {ok, {_, _, _, S1}} = lasp:read(L2, {strict, undefined}),
+    {ok, {_, _, _, S1}} = lasp:read(L1, {strict, undefined}),
+
+    Self = self(),
+
+    spawn_link(fun() ->
+                  {ok, _} = lasp:wait_needed(L1, {strict, S1}),
+                  Self ! threshold_met
+               end),
+
+    ?assertMatch({ok, _}, lasp:bind(L1, S2)),
+
+    timer:sleep(4000),
+
+    %% Verify the same value is contained by all.
+    {ok, {_, _, _, S2L3}} = lasp:read(L3, {strict, undefined}),
+    ?assertEqual(S2L3, lasp_type:merge(oorset, S2, S2L3)),
+    {ok, {_, _, _, S2L2}} = lasp:read(L2, {strict, undefined}),
+    ?assertEqual(S2L2, lasp_type:merge(oorset, S2, S2L2)),
+    {ok, {_, _, _, S2L1}} = lasp:read(L1, {strict, undefined}),
+    ?assertEqual(S2L1, lasp_type:merge(oorset, S2, S2L1)),
+
+    %% Read at the S2 threshold level.
+    {ok, {_, _, _, _}} = lasp:read(L1, S2),
+
+    %% Wait for wait_needed to unblock.
+    receive
+        threshold_met ->
+            ok
+    end,
+
+    {ok, {L5, _, _, _}} = lasp:declare(oorset),
+    {ok, {L6, _, _, _}} = lasp:declare(oorset),
+
+    spawn_link(fun() ->
+                {ok, _} = lasp:read_any([{L5, {strict, undefined}}, {L6, {strict, undefined}}]),
+                Self ! read_any
+        end),
+
+    {ok, _} = lasp:update(L5, {add, 1}, a),
+
+    receive
+        read_any ->
+            ok
+    end.

@@ -94,7 +94,7 @@ ads:
 	pkill -9 beam.smp; \
   	clear; \
 		rm -rf priv/evaluation; \
-		( cd priv ; GIT_SSH=$(GIT_SSH) git clone git@github.com:cmeiklejohn/evaluation.git ); \
+		( cd priv ; GIT_SSH=$(GIT_SSH) git clone git@github.com:lasp-lang/evaluation.git ); \
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE; \
 		( cd priv/evaluation ; git add . ); \
 		( cd priv/evaluation ; git commit -m 'Adding evaluation data.' ); \

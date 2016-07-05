@@ -30,10 +30,10 @@
 union({Type, LValue}, {Type, RValue}) ->
     Type:merge({Type, LValue}, {Type, RValue}).
 
-product({state_oorset_ps, {{ElemDataStoreL, EventDataStoreL},
-                           FilteredOutEventsL, AllEventsAnyL}=_ORSetL},
-        {state_oorset_ps, {{ElemDataStoreR, EventDataStoreR},
-                           FilteredOutEventsR, AllEventsAnyR}=_ORSetR}) ->
+product({state_awset_ps, {{ElemDataStoreL, EventDataStoreL},
+                          FilteredOutEventsL, AllEventsAnyL}=_ORSetL},
+        {state_awset_ps, {{ElemDataStoreR, EventDataStoreR},
+                          FilteredOutEventsR, AllEventsAnyR}=_ORSetR}) ->
     %% Remove the removed events of the other set first (optimisation)
     ValidEventsL = ordsets:union(
                      ordsets:from_list(orddict:fetch_keys(EventDataStoreL)),
@@ -41,31 +41,31 @@ product({state_oorset_ps, {{ElemDataStoreL, EventDataStoreL},
     ValidEventsR = ordsets:union(
                      ordsets:from_list(orddict:fetch_keys(EventDataStoreR)),
                      FilteredOutEventsR),
-    RemovedL = state_oorset_ps:subtract_all_events(AllEventsAnyL, ValidEventsL),
-    RemovedR = state_oorset_ps:subtract_all_events(AllEventsAnyR, ValidEventsR),
+    RemovedL = state_awset_ps:subtract_all_events(AllEventsAnyL, ValidEventsL),
+    RemovedR = state_awset_ps:subtract_all_events(AllEventsAnyR, ValidEventsR),
     ValidEventsL1 = ordsets:subtract(ValidEventsL, RemovedR),
     ValidEventsR1 = ordsets:subtract(ValidEventsR, RemovedL),
     {ProductElemDataStore, ProductEventDataStore} =
         orddict:fold(
           fun(ElemL, ProvenanceL, AccProductDataStore0) ->
-                  case state_oorset_ps:subtract_removed(ProvenanceL, ValidEventsL1) of
+                  case state_awset_ps:subtract_removed(ProvenanceL, ValidEventsL1) of
                       [] ->
                           AccProductDataStore0;
                       RestProvenanceL ->
                           orddict:fold(
                             fun(ElemR, ProvenanceR, AccProductDataStore1) ->
-                                    case state_oorset_ps:subtract_removed(
+                                    case state_awset_ps:subtract_removed(
                                            ProvenanceR, ValidEventsR1) of
                                         [] ->
                                             AccProductDataStore1;
                                         RestProvenanceR ->
                                             ProductElem = {ElemL, ElemR},
                                             ProductProvenance =
-                                                state_oorset_ps:cross_provenance(
+                                                state_awset_ps:cross_provenance(
                                                   RestProvenanceL, RestProvenanceR),
                                             ordsets:fold(
                                               fun(Dot, AccProductDataStore2) ->
-                                                      state_oorset_ps:add_elem_with_dot(
+                                                      state_awset_ps:add_elem_with_dot(
                                                         ProductElem,
                                                         Dot,
                                                         AccProductDataStore2)
@@ -76,7 +76,7 @@ product({state_oorset_ps, {{ElemDataStoreL, EventDataStoreL},
                             end, AccProductDataStore0, ElemDataStoreR)
                   end
           end, {orddict:new(), orddict:new()}, ElemDataStoreL),
-    {state_oorset_ps,
+    {state_awset_ps,
      {{ProductElemDataStore, ProductEventDataStore},
       ordsets:subtract(ordsets:union(FilteredOutEventsL, FilteredOutEventsR),
                        ordsets:from_list(orddict:fetch_keys(ProductEventDataStore))),
@@ -87,10 +87,10 @@ product({state_orset, LValue}, {state_orset, RValue}) ->
     end,
     lists:foldl(FolderFun, new(), LValue).
 
-intersect({state_oorset_ps, {{ElemDataStoreL, EventDataStoreL},
-                             FilteredOutEventsL, AllEventsAnyL}=_ORSetL},
-          {state_oorset_ps, {{ElemDataStoreR, EventDataStoreR},
-                             FilteredOutEventsR, AllEventsAnyR}=_ORSetR}) ->
+intersect({state_awset_ps, {{ElemDataStoreL, EventDataStoreL},
+                            FilteredOutEventsL, AllEventsAnyL}=_ORSetL},
+          {state_awset_ps, {{ElemDataStoreR, EventDataStoreR},
+                            FilteredOutEventsR, AllEventsAnyR}=_ORSetR}) ->
     %% Remove the removed events of the other set first (optimisation)
     ValidEventsL = ordsets:union(
                      ordsets:from_list(orddict:fetch_keys(EventDataStoreL)),
@@ -98,20 +98,20 @@ intersect({state_oorset_ps, {{ElemDataStoreL, EventDataStoreL},
     ValidEventsR = ordsets:union(
                      ordsets:from_list(orddict:fetch_keys(EventDataStoreR)),
                      FilteredOutEventsR),
-    RemovedL = state_oorset_ps:subtract_all_events(AllEventsAnyL, ValidEventsL),
-    RemovedR = state_oorset_ps:subtract_all_events(AllEventsAnyR, ValidEventsR),
+    RemovedL = state_awset_ps:subtract_all_events(AllEventsAnyL, ValidEventsL),
+    RemovedR = state_awset_ps:subtract_all_events(AllEventsAnyR, ValidEventsR),
     ValidEventsL1 = ordsets:subtract(ValidEventsL, RemovedR),
     ValidEventsR1 = ordsets:subtract(ValidEventsR, RemovedL),
     {IntersectElemDataStore, IntersectEventDataStore} =
         orddict:fold(
           fun(ElemL, ProvenanceL, AccIntersectDataStore0) ->
-                  case state_oorset_ps:subtract_removed(ProvenanceL, ValidEventsL1) of
+                  case state_awset_ps:subtract_removed(ProvenanceL, ValidEventsL1) of
                       [] ->
                           AccIntersectDataStore0;
                       RestProvenanceL ->
                           orddict:fold(
                             fun(ElemR, ProvenanceR, AccIntersectDataStore1) ->
-                                    case state_oorset_ps:subtract_removed(
+                                    case state_awset_ps:subtract_removed(
                                            ProvenanceR, ValidEventsR1) of
                                         [] ->
                                             AccIntersectDataStore1;
@@ -123,13 +123,13 @@ intersect({state_oorset_ps, {{ElemDataStoreL, EventDataStoreL},
                                                     IntersectElem =
                                                         get_inter_elem(ElemL, ElemR),
                                                     IntersectProvenance =
-                                                        state_oorset_ps:cross_provenance(
+                                                        state_awset_ps:cross_provenance(
                                                           RestProvenanceL,
                                                           RestProvenanceR),
                                                     ordsets:fold(
                                                       fun(Dot,
                                                           AccIntersectDataStore2) ->
-                                                              state_oorset_ps:add_elem_with_dot(
+                                                              state_awset_ps:add_elem_with_dot(
                                                                 IntersectElem,
                                                                 Dot,
                                                                 AccIntersectDataStore2)
@@ -142,9 +142,9 @@ intersect({state_oorset_ps, {{ElemDataStoreL, EventDataStoreL},
                   end
           end, {orddict:new(), orddict:new()}, ElemDataStoreL),
     IntersectAllEvents = join_all_events(AllEventsAnyL, AllEventsAnyR),
-    {state_oorset_ps,
+    {state_awset_ps,
      {{IntersectElemDataStore, IntersectEventDataStore},
-      state_oorset_ps:subtract_all_events(
+      state_awset_ps:subtract_all_events(
         IntersectAllEvents,
         ordsets:from_list(orddict:fetch_keys(IntersectEventDataStore))),
       IntersectAllEvents}};
@@ -163,8 +163,8 @@ intersect_folder({state_orset, RValue}) ->
             {state_orset, Acc ++ Values}
     end.
 
-map(Function, {state_oorset_ps, {{ElemDataStore, EventDataStore},
-                                 FilteredOutEvents, AllEvents}}) ->
+map(Function, {state_awset_ps, {{ElemDataStore, EventDataStore},
+                                FilteredOutEvents, AllEvents}}) ->
     MapElemDataStore =
         orddict:fold(
           fun(Elem, Provenance, MapElemDataStore0) ->
@@ -184,16 +184,16 @@ map(Function, {state_oorset_ps, {{ElemDataStore, EventDataStore},
                                end, ordsets:new(), Elems),
                   orddict:store(Event, NewElems, MapEventDataStore0)
           end, orddict:new(), EventDataStore),
-    {state_oorset_ps, {{MapElemDataStore, MapEventDataStore},
-                       FilteredOutEvents, AllEvents}};
+    {state_awset_ps, {{MapElemDataStore, MapEventDataStore},
+                      FilteredOutEvents, AllEvents}};
 map(Function, {state_orset, V}) ->
     FolderFun = fun({X, Causality}, {state_orset, Acc}) ->
                         {state_orset, Acc ++ [{Function(X), Causality}]}
                 end,
     lists:foldl(FolderFun, new(), V).
 
-filter(Function, {state_oorset_ps, {{ElemDataStore, EventDataStore},
-                                    FilteredOutEvents, AllEvents}}) ->
+filter(Function, {state_awset_ps, {{ElemDataStore, EventDataStore},
+                                   FilteredOutEvents, AllEvents}}) ->
     {FilterElemDataStore, FilterFilteredOutEvents} =
         orddict:fold(
           fun(Elem, Provenance, {FilterElemDataStore0, FilterFilteredOutEvents0}) ->
@@ -202,7 +202,7 @@ filter(Function, {state_oorset_ps, {{ElemDataStore, EventDataStore},
                         {orddict:store(Elem, Provenance, FilterElemDataStore0),
                          FilterFilteredOutEvents0};
                     false ->
-                        FOEvents = state_oorset_ps:get_events_from_provenance(
+                        FOEvents = state_awset_ps:get_events_from_provenance(
                                      Provenance),
                         {FilterElemDataStore0,
                          ordsets:union(FilterFilteredOutEvents0, FOEvents)}
@@ -227,9 +227,9 @@ filter(Function, {state_oorset_ps, {{ElemDataStore, EventDataStore},
                           FilterEventDataStore0 ++ [{Event, NewElems}]
                   end
           end, orddict:new(), EventDataStore),
-    {state_oorset_ps, {{FilterElemDataStore, FilterEventDataStore},
-                       FilterFilteredOutEvents,
-                       AllEvents}};
+    {state_awset_ps, {{FilterElemDataStore, FilterEventDataStore},
+                      FilterFilteredOutEvents,
+                      AllEvents}};
 filter(Function, {state_orset, V}) ->
     FolderFun = fun({X, Causality}, {state_orset, Acc}) ->
                         case Function(X) of
@@ -256,7 +256,7 @@ join_all_events({vclock, AllEventsA}, {vclock, AllEventsB}) ->
           end, {[], AllEventsB}, AllEventsA),
     {vclock, JoinedAllEvents ++ RestB};
 join_all_events({vclock, AllEventsA}, AllEventsB) ->
-    SetAllEventsA = state_oorset_ps:subtract_all_events(
+    SetAllEventsA = state_awset_ps:subtract_all_events(
                       {vclock, AllEventsA}, ordsets:new()),
     ordsets:union(SetAllEventsA, AllEventsB);
 join_all_events(AllEventsA, {vclock, AllEventsB}) ->

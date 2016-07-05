@@ -34,12 +34,12 @@
 
 types() ->
     [
+        {awset_ps, {state_awset_ps, undefined}},
         {boolean, {state_boolean, undefined}},
         {gcounter, {state_gcounter, undefined}},
         {gmap, {state_gmap, undefined}},
         {gset, {state_gset, undefined}},
         {ivar, {state_ivar, undefined}},
-        {oorset_ps, {state_oorset_ps, undefined}},
         {orset, {state_orset, undefined}},
         {pair, {state_pair, undefined}},
         {pncounter, {state_pncounter, undefined}}
@@ -121,7 +121,7 @@ update(Type, Operation, Actor, Value) ->
     end.
 
 %% @private
-get_actor(state_oorset_ps, {{StorageId, _TypeId}, Actor}) ->
+get_actor(state_awset_ps, {{StorageId, _TypeId}, Actor}) ->
     {StorageId, Actor};
 get_actor(_Type, {_Id, Actor}) ->
     Actor;

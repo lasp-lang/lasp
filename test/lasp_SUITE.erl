@@ -82,7 +82,7 @@ all() ->
      query_test,
      ivar_test,
      orset_test,
-     oorset_test,
+     awset_test,
      dynamic_ivar_test,
      monotonic_read_test,
      map_test,
@@ -98,6 +98,7 @@ all() ->
 %% ===================================================================
 
 -define(SET, orset).
+-define(AWSET, awset_ps).
 -define(COUNTER, pncounter).
 
 -define(ID, <<"myidentifier">>).
@@ -504,11 +505,11 @@ membership_test(Config) ->
 
     ok.
 
-%% @doc Test of the optimised orset.
-oorset_test(_Config) ->
-    {ok, {L1, _, _, _}} = lasp:declare(oorset),
-    {ok, {L2, _, _, _}} = lasp:declare(oorset),
-    {ok, {L3, _, _, _}} = lasp:declare(oorset),
+%% @doc Test of the add-wins set.
+awset_test(_Config) ->
+    {ok, {L1, _, _, _}} = lasp:declare(?AWSET),
+    {ok, {L2, _, _, _}} = lasp:declare(?AWSET),
+    {ok, {L3, _, _, _}} = lasp:declare(?AWSET),
 
     %% Attempt pre, and post- dataflow variable bind operations.
     ?assertMatch(ok, lasp:bind_to(L2, L1)),
@@ -535,11 +536,11 @@ oorset_test(_Config) ->
 
     %% Verify the same value is contained by all.
     {ok, {_, _, _, S2L3}} = lasp:read(L3, {strict, undefined}),
-    ?assertEqual(S2L3, lasp_type:merge(oorset, S2, S2L3)),
+    ?assertEqual(S2L3, lasp_type:merge(?AWSET, S2, S2L3)),
     {ok, {_, _, _, S2L2}} = lasp:read(L2, {strict, undefined}),
-    ?assertEqual(S2L2, lasp_type:merge(oorset, S2, S2L2)),
+    ?assertEqual(S2L2, lasp_type:merge(?AWSET, S2, S2L2)),
     {ok, {_, _, _, S2L1}} = lasp:read(L1, {strict, undefined}),
-    ?assertEqual(S2L1, lasp_type:merge(oorset, S2, S2L1)),
+    ?assertEqual(S2L1, lasp_type:merge(?AWSET, S2, S2L1)),
 
     %% Read at the S2 threshold level.
     {ok, {_, _, _, _}} = lasp:read(L1, S2),
@@ -550,8 +551,8 @@ oorset_test(_Config) ->
             ok
     end,
 
-    {ok, {L5, _, _, _}} = lasp:declare(oorset),
-    {ok, {L6, _, _, _}} = lasp:declare(oorset),
+    {ok, {L5, _, _, _}} = lasp:declare(?AWSET),
+    {ok, {L6, _, _, _}} = lasp:declare(?AWSET),
 
     spawn_link(fun() ->
                 {ok, _} = lasp:read_any([{L5, {strict, undefined}}, {L6, {strict, undefined}}]),

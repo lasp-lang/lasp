@@ -14,3 +14,6 @@ chmod 400 /tmp/evaluation_private_key
 
 echo "Adding key to agent."
 ./add_key.sh
+
+echo "After adding key, agent now contains the following"
+ssh-add -l

@@ -1,6 +1,6 @@
 #!/usr/bin/expect -f
 
-spawn ssh-add /tmp/evaluation_private_key
-expect "Enter passphrase for /tmp/evaluation_private_key:"
-send "evaluation\n";
+spawn ssh-add "$env(PWD)/ssh/evaluation"
+expect "Enter passphrase for $env(PWD)/ssh/evaluation:"
+send "$env(EVALUATION_PASSPHRASE)\n";
 interact

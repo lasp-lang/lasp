@@ -9,7 +9,7 @@ echo $SSH_AUTH_SOCK
 echo "Changing permission on keys."
 chmod 400 ssh/evaluation
 
-echo "Passphrase"
+echo "Passphrase is set."
 echo $EVALUATION_PASSPHRASE
 
 echo "Adding key to agent."

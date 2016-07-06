@@ -1,5 +1,3 @@
 #!/bin/bash
 
-eval `ssh-agent -s`
-
-ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -v $1 $2
+eval `ssh-agent -s`; ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -v $1 $2

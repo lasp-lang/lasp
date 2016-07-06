@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Starting agent."
-ssh-agent
+eval `ssh-agent -s`
 
 echo "Removing existing key."
 rm -f /tmp/evaluation_private_key

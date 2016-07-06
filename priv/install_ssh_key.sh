@@ -12,8 +12,14 @@ echo $EVALUATION_PRIVATE_KEY > /tmp/evaluation_private_key
 echo "Changing permissions."
 chmod 400 /tmp/evaluation_private_key
 
+echo "Current SSH_AUTH_SOCK:"
+echo $SSH_AUTH_SOCK
+
 echo "Adding key to agent."
 ./add_key.sh
+
+echo "Now SSH_AUTH_SOCK:"
+echo $SSH_AUTH_SOCK
 
 echo "After adding key, agent now contains the following"
 ssh-add -l

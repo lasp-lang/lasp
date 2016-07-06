@@ -5,7 +5,6 @@ result=${PWD##*/}
 # Flush key to disk from environment.
 if [ ! -f $PWD/ssh/id_rsa ];
 then
-  echo "Key not set, flushing."
   echo $SSH_KEY > $PWD/ssh/id_rsa
 fi
 

@@ -90,7 +90,11 @@ dcos:
 ##
 ads: SHELL:=/bin/bash
 ads:
-		priv/evaluate.sh
+	priv/ads.sh
+
+docker-ads: SHELL:=/bin/bash
+docker-ads:
+	priv/docker-ads.sh
 
 logs:
 	tail -F priv/lager/*/log/*.log

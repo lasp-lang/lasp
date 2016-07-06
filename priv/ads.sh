@@ -18,7 +18,7 @@ echo "Authentication socket."
 echo $SSH_AUTH_SOCK
 
 echo "Cloning evaluation code."
-( cd priv; SSH_AUTH_SOCK=$(SSH_AUTH_SOCK) GIT_SSH=$GIT_SSH git clone git@github.com:lasp-lang/evaluation.git )
+( cd priv; SSH_AUTH_SOCK=$SSH_AUTH_SOCK GIT_SSH=$GIT_SSH git clone git@github.com:lasp-lang/evaluation.git )
 
 echo "Terminating old instances."
 pkill -9 beam.smp

@@ -6,8 +6,11 @@ eval `ssh-agent -s`
 echo "Current SSH_AUTH_SOCK:"
 echo $SSH_AUTH_SOCK
 
+echo "Installing key."
+cp ssh/evaluation /tmp/evaluation
+
 echo "Changing permission on keys."
-chmod 400 ssh/evaluation
+chmod 400 /tmp/evaluation
 
 echo "Passphrase is set."
 echo $EVALUATION_PASSPHRASE

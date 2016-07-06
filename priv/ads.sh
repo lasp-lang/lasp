@@ -20,6 +20,9 @@ pkill -9 beam.smp
 echo "Running evaluation."
 ./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE
 
+echo "Evaluating agent."
+eval `ssh-agent -s`
+
 echo "Checking in results."
 ( cd priv/evaluation ; git add . )
 ( cd priv/evaluation ; git commit -m 'Adding evaluation data.' )

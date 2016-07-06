@@ -29,7 +29,8 @@
 
 %% API
 -export([start_link/1,
-         start_dag_link/1]).
+         start_dag_link/1,
+         start_single_fire_process/1]).
 
 %% Callbacks
 -export([init/1, read/1, process/2]).
@@ -51,12 +52,24 @@ start_link(Args) ->
     lasp_process_sup:start_child(Args).
 
 %% @todo rename to start_link once all functions are tracked
-start_dag_link([ReadFuns, TransFun, {To, _}=WriteFun]) ->
+start_dag_link(Args) ->
+    start_tracked_process(undefined, Args).
+
+%% @doc Starts a single-fire lasp process.
+start_single_fire_process(Args) ->
+    start_tracked_process(1, Args).
+
+%% @doc Starts a lasp process, tracked by the dependency graph module.
+%%
+%%      EventCount specifies the maximum number of iterations
+%%      that it will perform.
+%%
+start_tracked_process(EventCount, [ReadFuns, TransFun, {To, _}=WriteFun]) ->
     From = [Id || {Id, _} <- ReadFuns],
     case lasp_config:get(dag_enabled, false) of
-        false -> lasp_process_sup:start_child([ReadFuns, TransFun, WriteFun]);
+        false -> lasp_process_sup:start_child(EventCount, [ReadFuns, TransFun, WriteFun]);
         true -> case lasp_dependence_dag:will_form_cycle(From, To) of
-            false -> lasp_process_sup:start_child([ReadFuns, TransFun, WriteFun]);
+            false -> lasp_process_sup:start_child(EventCount, [ReadFuns, TransFun, WriteFun]);
             true ->
                 %% @todo propagate errors
                 {ok, ignore}

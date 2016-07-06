@@ -1,5 +1,3 @@
 #!/bin/bash
 
-KEY=/tmp/evaluation_private_key
-
-ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -v -i $KEY $1 $2
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -v $1 $2

@@ -89,16 +89,8 @@ dcos:
 ## Evaluation related targets
 ##
 ads: SHELL:=/bin/bash
-ads: GIT_SSH:=ssh/wrapper
 ads:
-	pkill -9 beam.smp; \
-  	clear; \
-		rm -rf priv/evaluation; \
-		( cd priv ; GIT_SSH=$(GIT_SSH) git clone git@github.com:lasp-lang/evaluation.git ); \
-		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE; \
-		( cd priv/evaluation ; git add . ); \
-		( cd priv/evaluation ; git commit -m 'Adding evaluation data.' ); \
-		( cd priv/evaluation ; GIT_SSH=../$(GIT_SSH) git push -u origin)
+		priv/evaluate.sh
 
 logs:
 	tail -F priv/lager/*/log/*.log

@@ -9,7 +9,7 @@ then
   chmod 400 $PWD/ssh/id_rsa
 fi
 
-# Perform work from either priv/ or priv/evaluation/
+# Perform work from either priv or priv/evaluation.
 if [ -f $PWD/ssh/id_rsa ];
 then
   # Cloning.

@@ -4,7 +4,7 @@ result=${PWD##*/}
 
 if [ -f ssh/id_rsa ];
 then
-  ssh -v -i $PWD/ssh/id_rsa $1 $2
+  ssh -o StrictHostKeyChecking=no -v -i $PWD/ssh/id_rsa $1 $2
 else
-  ssh -v -i $PWD/../ssh/id_rsa $1 $2
+  ssh -o StrictHostKeyChecking=no -v -i $PWD/../ssh/id_rsa $1 $2
 fi

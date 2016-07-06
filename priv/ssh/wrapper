@@ -2,9 +2,20 @@
 
 result=${PWD##*/}
 
-if [ -f ssh/id_rsa ];
+# Flush key to disk from environment.
+if [ ! -f $PWD/ssh/id_rsa ];
 then
+  echo "Key not set, flushing."
+  echo $SSH_KEY > $PWD/ssh/id_rsa
+fi
+
+# Perform work from either priv/ or priv/evaluation/
+if [ -f $PWD/ssh/id_rsa ];
+then
+  # Cloning.
+  echo $SSH_KEY > $PWD/ssh/id_rsa
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -v -i $PWD/ssh/id_rsa $1 $2
 else
+  # Pushing.
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -v -i $PWD/../ssh/id_rsa $1 $2
 fi

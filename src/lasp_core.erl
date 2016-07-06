@@ -620,14 +620,19 @@ fold_internal(orset, Value, Function, AccType, AccValue) ->
 -spec product(id(), id(), id(), store(), function(), function(),
               function()) -> {ok, pid()}.
 product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    TransFun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
+    TransFun = fun({_, T, _, LValue}, {_, T, _, RValue}) ->
             case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    state_orset_ext:product(LValue, RValue)
+                    case lasp_type:get_type(T) of
+                        state_orset ->
+                            state_orset_ext:product(LValue, RValue);
+                        state_awset_ps ->
+                            state_awset_ps_ext:product(LValue, RValue)
+                    end
             end
     end,
     lasp_process:start_dag_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
@@ -645,14 +650,19 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec intersection(id(), id(), id(), store(), function(), function(),
                    function()) -> {ok, pid()}.
 intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    TransFun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
+    TransFun = fun({_, T, _, LValue}, {_, T, _, RValue}) ->
             case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    state_orset_ext:intersect(LValue, RValue)
+                    case lasp_type:get_type(T) of
+                        state_orset ->
+                            state_orset_ext:intersect(LValue, RValue);
+                        state_awset_ps ->
+                            state_awset_ps_ext:intersect(LValue, RValue)
+                    end
             end
     end,
     lasp_process:start_dag_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
@@ -670,14 +680,19 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec union(id(), id(), id(), store(), function(), function(),
             function()) -> {ok, pid()}.
 union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    TransFun = fun({_, _, _, LValue}, {_, _, _, RValue}) ->
+    TransFun = fun({_, T, _, LValue}, {_, T, _, RValue}) ->
         case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    state_orset_ext:union(LValue, RValue)
+                    case lasp_type:get_type(T) of
+                        state_orset ->
+                            state_orset_ext:union(LValue, RValue);
+                        state_awset_ps ->
+                            state_awset_ps_ext:union(LValue, RValue)
+                    end
             end
     end,
     lasp_process:start_dag_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
@@ -696,8 +711,13 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec map(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    TransFun = fun({_, _, _, V}) ->
-            state_orset_ext:map(Function, V)
+    TransFun = fun({_, T, _, V}) ->
+            case lasp_type:get_type(T) of
+                state_orset ->
+                    state_orset_ext:map(Function, V);
+                state_awset_ps ->
+                    state_awset_ps_ext:map(Function, V)
+            end
     end,
     lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
 
@@ -714,8 +734,13 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 -spec filter(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    TransFun = fun({_, _, _, V}) ->
-        state_orset_ext:filter(Function, V)
+    TransFun = fun({_, T, _, V}) ->
+        case lasp_type:get_type(T) of
+            state_orset ->
+                state_orset_ext:filter(Function, V);
+            state_awset_ps ->
+                state_awset_ps_ext:filter(Function, V)
+        end
     end,
     lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
 

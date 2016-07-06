@@ -30,7 +30,8 @@
          is_inflation/3,
          is_bottom/2,
          is_strict_inflation/3,
-         query/2]).
+         query/2,
+         get_type/1]).
 
 types() ->
     [
@@ -48,6 +49,7 @@ types() ->
 get_mode() ->
     lasp_config:get(mode, state_based).
 
+%% @doc Return the internal type.
 get_type([]) ->
     [];
 get_type([H | T]) ->

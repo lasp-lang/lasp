@@ -26,6 +26,7 @@
 %% API
 -export([start_link/0,
          start_child/1,
+         start_child/2,
          terminate/0,
          terminate_child/2]).
 
@@ -49,6 +50,9 @@ terminate() ->
 %% @doc Start a child.
 start_child(Args) ->
     supervisor:start_child(?MODULE, [Args]).
+
+start_child(EventCount, Args) ->
+    supervisor:start_child(?MODULE, [EventCount, Args]).
 
 %% @doc Stop a child immediately
 terminate_child(Supervisor, Pid) ->

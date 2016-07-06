@@ -1,20 +1,5 @@
 #!/bin/bash
 
-result=${PWD##*/}
+KEY=/tmp/evaluation_private_key
 
-# Flush key to disk from environment.
-if [ ! -f $PWD/ssh/id_rsa ];
-then
-  echo $SSH_KEY > $PWD/ssh/id_rsa
-  chmod 400 $PWD/ssh/id_rsa
-fi
-
-# Perform work from either priv or priv/evaluation.
-if [ -f $PWD/ssh/id_rsa ];
-then
-  # Cloning.
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -v -i $PWD/ssh/id_rsa $1 $2
-else
-  # Pushing.
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -v -i $PWD/../ssh/id_rsa $1 $2
-fi
+ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -v -i $KEY $1 $2

@@ -4,7 +4,7 @@ echo "Removing old code."
 rm -rf priv/evaluation
 
 echo "Installing SSH key."
-( cd priv ; ./install_ssh_key.sh ); \
+( cd priv ; ./install_ssh_key.sh )
 
 GIT_SSH=ssh/wrapper
 echo -n "Using the following wrapper: "
@@ -13,6 +13,9 @@ echo
 
 echo "Evaluating agent."
 eval `ssh-agent -s`
+
+echo "Authentication socket."
+echo $SSH_AUTH_SOCK
 
 echo "Cloning evaluation code."
 ( cd priv; GIT_SSH=$GIT_SSH git clone git@github.com:lasp-lang/evaluation.git )

@@ -34,3 +34,6 @@ priv/evaluation/plots/*.pdf
 priv/evaluation/plots/*_with_aae*
 priv/ssh/*id_rsa*
 priv/evaluation
+priv/plots
+priv/logs
+priv/lager

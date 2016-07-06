@@ -2,6 +2,7 @@ language: erlang
 otp_release:
   - 18.1
 install:
+  - ulimit -n 65534
   - make
   - ./rebar3 update
 script:
@@ -15,4 +16,4 @@ notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D
   irc: "irc.freenode.org#lasp-lang"
-sudo: false
+sudo: required

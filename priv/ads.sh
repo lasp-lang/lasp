@@ -10,7 +10,7 @@ echo "Current SSH_AUTH_SOCK:"
 echo $SSH_AUTH_SOCK
 
 echo "Installing key."
-cp ssh/evaluation /tmp/evaluation
+cp priv/ssh/evaluation /tmp/evaluation
 
 echo "Changing permission on keys."
 chmod 400 /tmp/evaluation

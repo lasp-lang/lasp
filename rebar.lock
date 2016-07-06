@@ -56,5 +56,5 @@
   0},
  {<<"webmachine">>,
   {git,"https://github.com/webmachine/webmachine.git",
-       {ref,"c4bf1a6119c1f983cc06462c4b1c09dcbcd64195"}},
+       {ref,"b4758b51c05e8f4e8898a70b7a14514a8c150ffa"}},
   0}].

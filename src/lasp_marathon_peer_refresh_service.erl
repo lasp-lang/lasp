@@ -104,7 +104,7 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
     %% Randomly get information from the orchestrator nodes and the
     %% regular nodes.
     %%
-    Task = case random:uniform(10) rem 2 == 0 of
+    Task = case rand_compat:uniform(10) rem 2 == 0 of
         true ->
             "lasp-orchestrator";
         false ->

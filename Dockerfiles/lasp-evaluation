@@ -1,4 +1,4 @@
-FROM ubuntu:trusty
+FROM ubuntu:xenial
 
 MAINTAINER Christopher Meiklejohn <christopher.meiklejohn@gmail.com>
 
@@ -8,9 +8,9 @@ RUN cd /tmp && \
     wget http://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb && \
     dpkg -i erlang-solutions_1.0_all.deb && \
     apt-get update && \
-    apt-get -y install erlang
+    apt-get -y install erlang=1:18.3-1
 
-CMD cd /opt && \
+CMD /bin/bash && cd /opt && \
     git clone https://github.com/lasp-lang/lasp.git -b unstable && \
     cd lasp && \
     make ads

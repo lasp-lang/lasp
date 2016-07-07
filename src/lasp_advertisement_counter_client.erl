@@ -179,7 +179,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 schedule_impression() ->
     %% Add random jitter.
-    Jitter = random:uniform(?IMPRESSION_INTERVAL),
+    Jitter = rand_compat:uniform(?IMPRESSION_INTERVAL),
     erlang:send_after(?IMPRESSION_INTERVAL + Jitter, self(), view).
 
 %% @private

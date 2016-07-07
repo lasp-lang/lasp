@@ -38,7 +38,7 @@ content_types_provided(Req, Ctx) ->
 -ifdef(TEST).
 
 to_json(ReqData, State) ->
-    NumNodes = random:uniform(2),
+    NumNodes = rand_compat:uniform(2),
     NodeList = lists:seq(0, NumNodes),
     Nodes = [#{id => Name, group => 1} || Name <- NodeList],
     Links = lists:flatten(generate_links(NodeList)),

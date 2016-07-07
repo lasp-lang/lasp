@@ -2,7 +2,6 @@ language: erlang
 otp_release:
   - 18.1
 install:
-  - sudo ulimit -n 65534
   - make
   - ./rebar3 update
 script:

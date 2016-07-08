@@ -92,6 +92,7 @@ instrumentation:
 	pkill -9 beam.smp; \
 	  clear; \
 		rm -rf priv/lager/; \
+		rm -rf priv/evaluation/; \
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE
 
 ads: SHELL:=/bin/bash

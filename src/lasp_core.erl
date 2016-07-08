@@ -556,45 +556,23 @@ read_var(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
 %% @doc Perform a read (or monotonic read) for a series of particular
 %%      identifiers.
 %%
-%%      @todo track in dag
 %%
 -spec read_any([{id(), value()}], pid(), store()) ->
     {ok, var()} | {ok, not_available_yet}.
 read_any(Reads, Self, Store) ->
-    Found = lists:foldl(fun({Id, Threshold0}, AlreadyFound) ->
+    Found = lists:foldl(fun({Id, Threshold}, AlreadyFound) ->
         case AlreadyFound of
             false ->
-                Mutator = fun(#dv{type=Type, value=Value, metadata=Metadata, lazy_threads=LT}=Object) ->
-                    %% When no threshold is specified, use the bottom
-                    %% value for the given lattice.
-                    %%
-                    Threshold = case Threshold0 of
-                        undefined ->
-                            lasp_type:new(Type);
-                        {strict, undefined} ->
-                            {strict, lasp_type:new(Type)};
-                        Threshold0 ->
-                            Threshold0
-                    end,
-
-                    %% Notify all lazy processes of this read.
-                    {ok, SL} = reply_to_all(LT, {ok, Threshold}),
-
-                    %% Satisfy read if threshold is met.
-                    case lasp_type:threshold_met(Type, Value, Threshold) of
-                        true ->
-                            {Object, {ok, {Id, Type, Metadata, Value}}};
-                        false ->
-                            WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
-                            {Object#dv{waiting_threads=WT, lazy_threads=SL}, error}
-                    end
+                ReplyFun = fun
+                    ({error, _}) ->
+                        false;
+                    ({_Id, _Type, _Metadata, _Value}=FoundValue) ->
+                        {ok, FoundValue}
                 end,
-
-                case do(update, [Store, Id, Mutator]) of
-                    {ok, {Id, Type, Metadata, Value}} ->
-                        {ok, {Id, Type, Metadata, Value}};
-                    error ->
-                        false
+                case read(Id, Threshold, Store, Self, ReplyFun, fun() -> false end) of
+                    {ok, {_Id, _Type, _Metadata, _Value}=Value} ->
+                        {ok, Value};
+                    _ -> false
                 end;
             Result ->
                 Result

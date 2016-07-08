@@ -66,10 +66,10 @@ all() ->
     [
      default_test,
      state_based_with_aae_test,
-     state_based_with_aae_and_tree_test,
+     %state_based_with_aae_and_tree_test,
      delta_based_with_aae_test,
      state_based_ps_with_aae_test,
-     state_based_ps_with_aae_and_tree_test,
+     %state_based_ps_with_aae_and_tree_test,
      delta_based_ps_with_aae_test
     ].
 

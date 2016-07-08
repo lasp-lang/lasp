@@ -3,8 +3,8 @@ otp_release: 18.1
 install: sudo sh -c "ulimit -n 795197 && exec sudo -u travis bash -c 'source $HOME/otp/18.1/activate'"
 env: PATH=$PATH:. MODE=state_based
 script: rebar3 update && make compile ct
-# notifications:
-#   email: christopher.meiklejohn@gmail.com
-#   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D
-#   irc: "irc.freenode.org#lasp-lang"
+notifications:
+  email: christopher.meiklejohn@gmail.com
+  slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D
+  irc: "irc.freenode.org#lasp-lang"
 sudo: required

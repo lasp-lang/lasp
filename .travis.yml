@@ -5,10 +5,10 @@ install:
   - make
   - ./rebar3 update
 script:
-  - make eunit
   - make xref
   - make dialyzer
   - make lint
+  - make eunit
   - MODE=state_based make ct
   - MODE=delta_based make ct
 notifications:

@@ -88,6 +88,12 @@ dcos:
 ##
 ## Evaluation related targets
 ##
+instrumentation:
+	pkill -9 beam.smp; \
+	  clear; \
+		rm -rf priv/lager/; \
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE
+
 ads: SHELL:=/bin/bash
 ads:
 	priv/ads.sh

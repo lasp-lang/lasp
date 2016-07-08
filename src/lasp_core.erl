@@ -556,56 +556,57 @@ read_var(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
 %% @doc Perform a read (or monotonic read) for a series of particular
 %%      identifiers.
 %%
+%%      @todo track in dag
+%%
 -spec read_any([{id(), value()}], pid(), store()) ->
     {ok, var()} | {ok, not_available_yet}.
 read_any(Reads, Self, Store) ->
-    Found = lists:foldl(
-            fun({Id, Threshold0}, AlreadyFound) ->
-                    case AlreadyFound of
+    Found = lists:foldl(fun({Id, Threshold0}, AlreadyFound) ->
+        case AlreadyFound of
+            false ->
+                Mutator = fun(#dv{type=Type, value=Value, metadata=Metadata, lazy_threads=LT}=Object) ->
+                    %% When no threshold is specified, use the bottom
+                    %% value for the given lattice.
+                    %%
+                    Threshold = case Threshold0 of
+                        undefined ->
+                            lasp_type:new(Type);
+                        {strict, undefined} ->
+                            {strict, lasp_type:new(Type)};
+                        Threshold0 ->
+                            Threshold0
+                    end,
+
+                    %% Notify all lazy processes of this read.
+                    {ok, SL} = reply_to_all(LT, {ok, Threshold}),
+
+                    %% Satisfy read if threshold is met.
+                    case lasp_type:threshold_met(Type, Value, Threshold) of
+                        true ->
+                            {Object, {ok, {Id, Type, Metadata, Value}}};
                         false ->
-                            Mutator = fun(#dv{type=Type, value=Value, metadata=Metadata, lazy_threads=LT}=Object) ->
-                                    %% When no threshold is specified, use the bottom
-                                    %% value for the given lattice.
-                                    %%
-                                    Threshold = case Threshold0 of
-                                        undefined ->
-                                            lasp_type:new(Type);
-                                        {strict, undefined} ->
-                                            {strict, lasp_type:new(Type)};
-                                        Threshold0 ->
-                                            Threshold0
-                                    end,
+                            WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
+                            {Object#dv{waiting_threads=WT, lazy_threads=SL}, error}
+                    end
+                end,
 
-                                    %% Notify all lazy processes of this read.
-                                    {ok, SL} = reply_to_all(LT, {ok, Threshold}),
+                case do(update, [Store, Id, Mutator]) of
+                    {ok, {Id, Type, Metadata, Value}} ->
+                        {ok, {Id, Type, Metadata, Value}};
+                    error ->
+                        false
+                end;
+            Result ->
+                Result
+        end
+    end, false, Reads),
 
-                                    %% Satisfy read if threshold is met.
-                                    case lasp_type:threshold_met(Type, Value, Threshold) of
-                                        true ->
-                                            {Object, {ok, {Id, Type, Metadata, Value}}};
-                                        false ->
-                                            WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
-                                            {Object#dv{waiting_threads=WT, lazy_threads=SL}, error}
-                                    end
-                            end,
-
-                            case do(update, [Store, Id, Mutator]) of
-                                {ok, {Id, Type, Metadata, Value}} ->
-                                    {ok, {Id, Type, Metadata, Value}};
-                                error ->
-                                    false
-                            end;
-                        Result ->
-                            Result
-                        end
-                    end, false, Reads),
-
-                    case Found of
-                        false ->
-                            {ok, not_available_yet};
-                        Value ->
-                            Value
-                    end.
+    case Found of
+        false ->
+            {ok, not_available_yet};
+        Value ->
+            Value
+    end.
 
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.

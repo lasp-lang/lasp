@@ -104,7 +104,7 @@
                end).
 
 -define(READ, fun(_Id, _Threshold) ->
-                ?CORE:read(_Id, _Threshold, Store)
+                ?CORE:read_var(_Id, _Threshold, Store)
               end).
 
 -define(BLOCKING, fun() -> {noreply, State} end).

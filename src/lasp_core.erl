@@ -69,8 +69,10 @@
          intersection/7,
          fold/6]).
 
-%% Non-tracked versions of write
--export([bind_var/3]).
+%% Non-tracked versions of read / write
+%% @todo remove these, use only tracked versions
+-export([bind_var/3,
+         read_var/3]).
 
 %% Administrative controls.
 -export([storage_backend_reset/1]).
@@ -87,7 +89,7 @@
                end).
 
 -define(READ, fun(_Id, _Threshold) ->
-                ?MODULE:read(_Id, _Threshold, Store)
+                ?MODULE:read_var(_Id, _Threshold, Store)
               end).
 
 %% @doc Initialize the storage backend.
@@ -467,6 +469,35 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
 
 %% @doc Perform a read (or monotonic read) for a particular identifier.
 %%
+%%      Same as read_var, but tracked in the dag.
+%%
+-spec read(id(), value(), store(), pid(), function(), function()) ->
+    {ok, var()} | not_found().
+read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
+    lasp_process:single_fire_function(Id, read,
+                                      fun read_var/6, [Id,
+                                                       Threshold,
+                                                       Store,
+                                                       Self,
+                                                       ReplyFun,
+                                                       BlockingFun]).
+
+read_var(Id, Threshold, Store) ->
+    Self = self(),
+    ReplyFun = fun({Id1, Type, Metadata, Value}) ->
+        {ok, {Id1, Type, Metadata, Value}}
+    end,
+    BlockingFun = fun() ->
+        receive
+          X ->
+              X
+        end
+    end,
+    read_var(Id, Threshold, Store, Self, ReplyFun, BlockingFun).
+
+
+%% @doc Perform a read (or monotonic read) for a particular identifier.
+%%
 %%      Given an `Id', perform a blocking read until the variable is
 %%      bound.
 %%
@@ -480,9 +511,9 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
 %%      or it will have to wait for the notification, in the event the
 %%      variable is unbound or has not met the threshold yet.
 %%
--spec read(id(), value(), store(), pid(), function(), function()) ->
+-spec read_var(id(), value(), store(), pid(), function(), function()) ->
     {ok, var()} | not_found().
-read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
+read_var(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
     Mutator = fun(#dv{type=Type, value=Value, metadata=Metadata, lazy_threads=LT}=Object) ->
             %% When no threshold is specified, use the bottom value for the
             %% given lattice.

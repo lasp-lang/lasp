@@ -3,7 +3,8 @@
 -author("Vitor Enes Duarte <vitorenesduarte@gmail.com>").
 
 main(_) ->
-  ct:pal("hello"),
+  %% delete plot directory
+  os:cmd("rm -rf " ++ root_plot_dir()),
   generate_plots().
 
 %% @doc Generate plots.
@@ -276,10 +277,18 @@ revert_tuple_order(LastKnown) ->
 generate_per_node_plot(Map, PlotDir) ->
     {Titles, InputFiles} = write_per_node_to_files(Map, PlotDir),
     OutputFile = output_file(PlotDir, "per_node"),
-    %% this plot does not show the convergence time per node
+    %% This plot does not show the convergence time per node,
     %% thus the -1
     Result = run_gnuplot(InputFiles, Titles, OutputFile, -1),
-    ct:pal("Generating per node plot ~p. Output: ~p", [OutputFile, Result]).
+    ct:pal("Generating per node plot ~p. Output: ~p", [OutputFile, Result]),
+
+    %% Remove input files of per node plot
+    lists:foreach(
+      fun(File) ->
+        ok = file:delete(File)
+      end,
+      InputFiles
+    ).
 
 %% @private
 write_per_node_to_files(Map, PlotDir) ->

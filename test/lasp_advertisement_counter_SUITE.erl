@@ -94,13 +94,19 @@ state_based_with_aae_test(Config) ->
     ok.
 
 state_based_with_aae_and_tree_test(Config) ->
-    run(state_based_with_aae_and_tree_test,
-        Config,
-        [{mode, state_based},
-         {set, orset},
-         {broadcast, true},
-         {evaluation_identifier, state_based_with_aae_and_tree}]),
-    ok.
+    case os:getenv("OMIT_HIGH_ULIMIT", "false") of
+        "false" ->
+            run(state_based_with_aae_and_tree_test,
+                Config,
+                [{mode, state_based},
+                 {set, orset},
+                 {broadcast, true},
+                 {evaluation_identifier, state_based_with_aae_and_tree}]),
+            ok;
+        _ ->
+            %% Omit.
+            ok
+    end.
 
 delta_based_with_aae_test(Config) ->
     run(delta_based_with_aae_test,

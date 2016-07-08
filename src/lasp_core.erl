@@ -277,9 +277,18 @@ declare_dynamic(Id, Type, MetadataFun0, Store) ->
     declare(Id, Type, MetadataFun, Store).
 
 %% @doc Return the current value of a CRDT.
-%% @todo Why isn't this using the ReadFun?
+%%
+%%      Same as query_var, but tracked in the dag.
+%%
 -spec query(id(), store()) -> {ok, term()}.
-query({_, Type}=Id, Store) ->
+query(Id, Store) ->
+    lasp_process:single_fire_function(Id, query,
+                                      fun query_var/2, [Id, Store]).
+
+%% @doc Return the current value of a CRDT.
+%% @todo Why isn't this using the ReadFun?
+-spec query_var(id(), store()) -> {ok, term()}.
+query_var({_, Type}=Id, Store) ->
     Value = case do(get, [Store, Id]) of
         {ok, #dv{value=Value0, type=Type}} ->
             Value0;

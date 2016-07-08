@@ -69,6 +69,9 @@
          intersection/7,
          fold/6]).
 
+%% Non-tracked versions of write
+-export([bind_var/3]).
+
 %% Administrative controls.
 -export([storage_backend_reset/1]).
 
@@ -79,7 +82,7 @@
 
 -define(WRITE, fun(_Store) ->
                  fun(_AccId, _AccValue) ->
-                   {ok, _} = ?MODULE:bind(_AccId, _AccValue, _Store)
+                   {ok, _} = ?MODULE:bind_var(_AccId, _AccValue, _Store)
                  end
                end).
 
@@ -389,9 +392,29 @@ bind(Id, Value, MetadataFun, Store) ->
     bind(node(), Id, Value, MetadataFun, Store).
 
 %% @doc Define a dataflow variable to be bound a value.
+%%
+%%      Same as bind_var, but tracked in the dag.
 -spec bind(node(), id(), value(), function(), store()) ->
     {ok, var()} | not_found().
 bind(Origin, Id, Value, MetadataFun, Store) ->
+    lasp_process:single_fire_function(bind, Id,
+                                      fun bind_var/5, [Origin,
+                                                       Id,
+                                                       Value,
+                                                       MetadataFun,
+                                                       Store]).
+
+bind_var(Id, Value, Store) ->
+    MetadataFun = fun(X) -> X end,
+    bind_var(Id, Value, MetadataFun, Store).
+
+bind_var(Id, Value, MetadataFun, Store) ->
+    bind_var(node(), Id, Value, MetadataFun, Store).
+
+%% @doc Define a dataflow variable to be bound a value.
+-spec bind_var(node(), id(), value(), function(), store()) ->
+    {ok, var()} | not_found().
+bind_var(Origin, Id, Value, MetadataFun, Store) ->
     Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
                       waiting_delta_threads=WDT, waiting_threads=WT,
                       delta_counter=Counter0, delta_map=DeltaMap0,

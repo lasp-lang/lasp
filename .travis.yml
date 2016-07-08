@@ -5,7 +5,7 @@ install:
   - make
   - ./rebar3 update
 script:
-  - travis_wait sudo sh -c "ulimit -n 795197 && exec sudo -u travis bash -c 'source $HOME/otp/18.1/activate && MODE=state_based ulimit'"
+  - travis_wait sudo sh -c "ulimit -n 795197 && exec sudo -u travis bash -c 'source $HOME/otp/18.1/activate && ulimit -n'"
   - travis_wait sudo sh -c "ulimit -n 795197 && exec sudo -u travis bash -c 'source $HOME/otp/18.1/activate && MODE=state_based make ct'"
   - travis_wait sudo sh -c "ulimit -n 795197 && exec sudo -u travis bash -c 'source $HOME/otp/18.1/activate && MODE=delta_based make ct'"
   - make test

@@ -30,6 +30,7 @@
 %% API
 -export([start_link/1,
          start_dag_link/1,
+         single_fire_function/4,
          start_single_fire_process/1]).
 
 %% Callbacks
@@ -75,6 +76,40 @@ start_tracked_process(EventCount, [ReadFuns, TransFun, {To, _}=WriteFun]) ->
                 {ok, ignore}
         end
     end.
+
+%% @doc Track a function in the dag.
+%%
+%%      Given the input and output variables, and a function,
+%%      create a single-fire lasp process representing the dataflow
+%%      computation.
+%%
+%%      This function is synchronous, as it waits for a value to
+%%      be returned.
+%%
+single_fire_function(From, To, Fn, Args) ->
+    Self = self(),
+    %% Unique reference, ignore any other messages.
+    %% @todo Remove?
+    Ref = erlang:make_ref(),
+
+    %% We don't care for the input.
+    ReadFun = [{From, fun(_, _) ->
+        {ok, ignore}
+    end}],
+
+    %% The process function just executes the given function
+    TransFun = fun(_) ->
+        erlang:apply(Fn, Args)
+    end,
+
+    %% The write function "returns" the value by sending a message.
+    WriteFun = {To, fun(_, Res) ->
+        Self ! {Ref, Res}
+    end},
+
+    {ok, _Pid} = start_single_fire_process([ReadFun, TransFun, WriteFun]),
+
+    receive {Ref, Result} -> Result end.
 
 %%%===================================================================
 %%% Callbacks

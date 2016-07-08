@@ -66,10 +66,10 @@ all() ->
     [
      default_test,
      state_based_with_aae_test,
-     state_based_with_aae_and_tree_test,
+     %state_based_with_aae_and_tree_test,
      delta_based_with_aae_test,
      state_based_ps_with_aae_test,
-     state_based_ps_with_aae_and_tree_test,
+     %state_based_ps_with_aae_and_tree_test,
      delta_based_ps_with_aae_test
     ].
 
@@ -154,13 +154,7 @@ run(Case, Config, Options) ->
             stop(Nodes)
         end,
         lists:seq(1, ?EVAL_NUMBER)
-    ),
-
-    %% Generate transmission plot.
-    ct:pal("Will generate plots for all executions of ~p", [Case]),
-    lasp_plot_gen:generate_plots(Options),
-
-    ok.
+    ).
 
 %% @private
 start(_Case, _Config, Options) ->

@@ -5,7 +5,7 @@ install:
   - make
   - ./rebar3 update
 script:
-  - sudo sh -c "ulimit -n 795197 && exec sudo -u travis bash -c 'source $HOME/otp/18.1/activate && ulimit'"
+  - sudo sh -c "ulimit -n 795197 && exec sudo -u travis bash -c 'source $HOME/otp/18.1/activate && ulimit -n'"
 notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D

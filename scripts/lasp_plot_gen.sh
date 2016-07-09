@@ -36,7 +36,7 @@ generate_plots(EvalIds) ->
                 EvalTimestamps
             ),
 
-            average_plot(T, EvalId)
+            generate_executions_average_plot(T, EvalId)
         end,
         EvalIds
     ).
@@ -479,7 +479,7 @@ write_average_to_files(TypeToTimeAndBytes, PlotDir) ->
         TypeToTimeAndBytes
     ).
 
-
+%% @private
 get_times(TypeToTimesAndBytes) ->
     lists:foldl(
         fun({Type, TimesAndBytes}, Acc) ->
@@ -496,7 +496,7 @@ get_times(TypeToTimesAndBytes) ->
     ).
 
 %% @doc Average all executions
-average_plot({Types, Times, ToAverage}, EvalId) ->
+generate_executions_average_plot({Types, Times, ToAverage}, EvalId) ->
     Empty = create_empty_dict_type_to_time_and_bytes(Types, Times),
     TimestampToLastKnown = lists:foldl(
         fun(Timestamp, Acc) ->
@@ -506,7 +506,7 @@ average_plot({Types, Times, ToAverage}, EvalId) ->
         orddict:fetch_keys(ToAverage)
     ),
 
-    {Map, _, ConvergenceTimes} = lists:foldl(
+    {Map0, _, ConvergenceTimes} = lists:foldl(
         %% For all the times
         fun(Time, Triple0) ->
             orddict:fold(
@@ -529,12 +529,27 @@ average_plot({Types, Times, ToAverage}, EvalId) ->
         Times
     ),
 
+    %% Divide bytes by the number of executions
+    NumberOfExecutions = length(orddict:fetch_keys(ToAverage)),
+    Map1 = orddict:map(
+        fun(_Type, TimesAndBytes) ->
+            orddict:map(
+                fun(_Time, Bytes) ->
+                    Bytes / NumberOfExecutions
+                end,
+                TimesAndBytes
+            )
+        end,
+        Map0
+    ),
+
+    %% Compute average convergence time
     AverageConvergenceTime = round(lists:sum(ConvergenceTimes) / length(ConvergenceTimes)),
 
     PlotDir = root_plot_dir() ++ "/" ++ EvalId ++ "/average/",
     filelib:ensure_dir(PlotDir),
 
-    InputFiles = write_average_to_files(Map, PlotDir),
+    InputFiles = write_average_to_files(Map1, PlotDir),
     Titles = get_titles(Types),
     OutputFile = output_file(PlotDir, "average"),
     Result = run_gnuplot(InputFiles, Titles, OutputFile, AverageConvergenceTime),

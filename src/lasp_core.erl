@@ -69,11 +69,6 @@
          intersection/7,
          fold/6]).
 
-%% Non-tracked versions of read / write
-%% @todo remove these, use only tracked versions
--export([bind_var/3,
-         read_var/3]).
-
 %% Administrative controls.
 -export([storage_backend_reset/1]).
 
@@ -84,12 +79,12 @@
 
 -define(WRITE, fun(_Store) ->
                  fun(_AccId, _AccValue) ->
-                   {ok, _} = ?MODULE:bind_var(_AccId, _AccValue, _Store)
+                   {ok, _} = ?MODULE:bind(_AccId, _AccValue, _Store)
                  end
                end).
 
 -define(READ, fun(_Id, _Threshold) ->
-                ?MODULE:read_var(_Id, _Threshold, Store)
+                ?MODULE:read(_Id, _Threshold, Store)
               end).
 
 %% @doc Initialize the storage backend.
@@ -190,17 +185,16 @@ read(Id, Store) ->
 %%
 -spec read(id(), value(), store()) -> {ok, var()}.
 read(Id, Threshold, Store) ->
-    Self = self(),
-    ReplyFun = fun({Id1, Type, Metadata, Value}) ->
-                       {ok, {Id1, Type, Metadata, Value}}
-               end,
-    BlockingFun = fun() ->
-                receive
-                    X ->
-                        X
-                end
-            end,
-    read(Id, Threshold, Store, Self, ReplyFun, BlockingFun).
+    ReplyFun = fun
+        ({error, _}) -> error;
+        ({_Id, _Type, _Metadata, _Value}=Found) ->
+            {ok, Found}
+    end,
+    BlockingFun = fun() -> block end,
+    case read(Id, Threshold, Store, self(), ReplyFun, BlockingFun) of
+        {ok, FoundValue} -> {ok, FoundValue};
+        _ -> receive X -> X end
+    end.
 
 %% @doc Perform a monotonic read for a series of given idenfitiers --
 %%      first response wins.
@@ -406,13 +400,6 @@ bind(Origin, Id, Value, MetadataFun, Store) ->
                                                        MetadataFun,
                                                        Store]).
 
-bind_var(Id, Value, Store) ->
-    MetadataFun = fun(X) -> X end,
-    bind_var(Id, Value, MetadataFun, Store).
-
-bind_var(Id, Value, MetadataFun, Store) ->
-    bind_var(node(), Id, Value, MetadataFun, Store).
-
 %% @doc Define a dataflow variable to be bound a value.
 -spec bind_var(node(), id(), value(), function(), store()) ->
     {ok, var()} | not_found().
@@ -481,19 +468,6 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                                                        Self,
                                                        ReplyFun,
                                                        BlockingFun]).
-
-read_var(Id, Threshold, Store) ->
-    Self = self(),
-    ReplyFun = fun({Id1, Type, Metadata, Value}) ->
-        {ok, {Id1, Type, Metadata, Value}}
-    end,
-    BlockingFun = fun() ->
-        receive
-          X ->
-              X
-        end
-    end,
-    read_var(Id, Threshold, Store, Self, ReplyFun, BlockingFun).
 
 
 %% @doc Perform a read (or monotonic read) for a particular identifier.

@@ -93,7 +93,8 @@ instrumentation:
 	  clear; \
 		rm -rf priv/lager/; \
 		rm -rf priv/evaluation/; \
-		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE; \
+		cd scripts/ && ./lasp_plot_gen.sh
 
 ads: SHELL:=/bin/bash
 ads:

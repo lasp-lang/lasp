@@ -3,28 +3,43 @@
 -author("Vitor Enes Duarte <vitorenesduarte@gmail.com>").
 
 main(_) ->
-  %% delete plot directory
-  os:cmd("rm -rf " ++ root_plot_dir()),
-  generate_plots().
+    %% Delete plot directory
+    os:cmd("rm -rf " ++ root_plot_dir()),
+
+    %% Generate plots
+    EvalIds = only_dirs(root_log_dir()),
+    generate_plots(EvalIds).
 
 %% @doc Generate plots.
-generate_plots() ->
-  EvalIds = only_dirs(root_log_dir()),
+generate_plots(EvalIds) ->
+    lists:foreach(
+        fun(EvalId) ->
+            EvalIdDir = root_log_dir() ++ "/" ++ EvalId,
+            EvalTimestamps = only_dirs(EvalIdDir),
 
-  lists:foreach(
-    fun(EvalId) ->
-      EvalIdDir = root_log_dir() ++ "/" ++ EvalId,
-      EvalTimestamps = only_dirs(EvalIdDir),
-      lists:foreach(
-        fun(EvalTimestamp) ->
-          EvalDir = EvalIdDir ++ "/" ++ EvalTimestamp,
-          generate_plot(EvalDir, EvalId, EvalTimestamp)
+            T = lists:foldl(
+                fun(EvalTimestamp, {_Types0, Times0, ToAverage0}) ->
+                    EvalDir = EvalIdDir ++ "/" ++ EvalTimestamp,
+                    {Types1, TypeToTimesAndBytes, ConvergenceTime}
+                        = generate_plot(EvalDir, EvalId, EvalTimestamp),
+
+                    Times2 = ordsets:union(Times0, get_times(TypeToTimesAndBytes)),
+                    ToAverage1 = orddict:store(
+                        EvalTimestamp,
+                        {TypeToTimesAndBytes, ConvergenceTime},
+                        ToAverage0
+                    ),
+                    {Types1, Times2, ToAverage1}
+
+                end,
+                {ordsets:new(), ordsets:new(), orddict:new()},
+                EvalTimestamps
+            ),
+
+            average_plot(T, EvalId)
         end,
-        EvalTimestamps
-      )
-    end,
-    EvalIds
-  ).
+        EvalIds
+    ).
 
 %% @private
 generate_plot(EvalDir, EvalId, EvalTimestamp) ->
@@ -73,8 +88,9 @@ generate_plot(EvalDir, EvalId, EvalTimestamp) ->
     filelib:ensure_dir(PlotDir),
 
     generate_per_node_plot(Map1, PlotDir),
-    generate_average_plot(Types1, Times, Map1, ConvergenceTime, PlotDir),
-    ok.
+    TypeToTimesAndBytes = generate_average_plot(Types1, Times, Map1, ConvergenceTime, PlotDir),
+
+    {Types1, TypeToTimesAndBytes, ConvergenceTime}.
 
 %% @private
 priv_dir() ->
@@ -282,13 +298,8 @@ generate_per_node_plot(Map, PlotDir) ->
     Result = run_gnuplot(InputFiles, Titles, OutputFile, -1),
     ct:pal("Generating per node plot ~p. Output: ~p", [OutputFile, Result]),
 
-    %% Remove input files of per node plot
-    lists:foreach(
-      fun(File) ->
-        ok = file:delete(File)
-      end,
-      InputFiles
-    ).
+    %% Remove input files
+    delete_files(InputFiles).
 
 %% @private
 write_per_node_to_files(Map, PlotDir) ->
@@ -348,8 +359,12 @@ generate_average_plot(Types, Times, Map, ConvergenceTime, PlotDir) ->
     Titles = get_titles(Types),
     OutputFile = output_file(PlotDir, "average"),
     Result = run_gnuplot(InputFiles, Titles, OutputFile, ConvergenceTime),
-    ct:pal("Generating average plot ~p. Output: ~p", [OutputFile, Result]).
+    ct:pal("Generating average plot ~p. Output: ~p", [OutputFile, Result]),
 
+    %% Remove input files
+    delete_files(InputFiles),
+
+    TypeToTimeAndBytes.
 
 %% @private
 %% Do the average of all logs.
@@ -361,7 +376,11 @@ generate_average_plot(Types, Times, Map, ConvergenceTime, PlotDir) ->
 %% - Produces a dictionary that maps types to a list of
 %%   pairs {time, bytes}
 average(Types, Times, Map) ->
-    Empty = create_empty_dict_type_to_time_and_bytes(Types, Times),
+    TimeZero = lists:min(Times),
+    Empty = create_empty_dict_type_to_time_and_bytes(
+        Types,
+        lists:map(fun(Time) -> Time - TimeZero end, Times)
+    ),
 
     %% Create dictionary the maps types to a lists of
     %% pairs {time, bytes}
@@ -408,13 +427,11 @@ average(Types, Times, Map) ->
 
 %% @private
 create_empty_dict_type_to_time_and_bytes(Types, Times) ->
-    TimeZero = lists:min(Times),
-
     lists:foldl(
         fun(Type, Map0) ->
             lists:foldl(
                 fun(Time, Map1) ->
-                    orddict:append(Type, {Time - TimeZero, 0}, Map1)
+                    orddict:append(Type, {Time, 0}, Map1)
                 end,
                 Map0,
                 Times
@@ -462,6 +479,104 @@ write_average_to_files(TypeToTimeAndBytes, PlotDir) ->
         TypeToTimeAndBytes
     ).
 
+
+get_times(TypeToTimesAndBytes) ->
+    lists:foldl(
+        fun({Type, TimesAndBytes}, Acc) ->
+            lists:foldl(
+                fun({Time, _Bytes}, Acc1) ->
+                    ordsets:add_element(Time, Acc1)
+                end,
+                Acc,
+                TimesAndBytes
+            )
+        end,
+        ordsets:new(),
+        TypeToTimesAndBytes
+    ).
+
+%% @doc Average all executions
+average_plot({Types, Times, ToAverage}, EvalId) ->
+    Empty = create_empty_dict_type_to_time_and_bytes(Types, Times),
+    TimestampToLastKnown = lists:foldl(
+        fun(Timestamp, Acc) ->
+            orddict:store(Timestamp, create_empty_last_known(Types), Acc)
+        end,
+        orddict:new(),
+        orddict:fetch_keys(ToAverage)
+    ),
+
+    {Map, _} = lists:foldl(
+        %% For all the times
+        fun(Time, Pair0) ->
+            orddict:fold(
+                %% For all the executions
+                fun(Timestamp, {TypeToTimesAndBytes, _ConvergenceTime}, Pair1) ->
+                    lists:foldl(
+                        %% For all the types
+                        fun(Type, Pair2) ->
+                            update_map(Time, Type, TypeToTimesAndBytes, Timestamp, Pair2)
+                        end,
+                        Pair1,
+                        Types
+                    )
+                end,
+                Pair0,
+                ToAverage
+            )
+        end,
+        {Empty, TimestampToLastKnown},
+        Times
+    ),
+
+        PlotDir = root_plot_dir() ++ "/" ++ EvalId ++ "/average/",
+    filelib:ensure_dir(PlotDir),
+
+    InputFiles = write_average_to_files(Map, PlotDir),
+    Titles = get_titles(Types),
+    OutputFile = output_file(PlotDir, "average"),
+    Result = run_gnuplot(InputFiles, Titles, OutputFile, 0),
+    ct:pal("Generating average plot of all executions ~p. Output: ~p", [OutputFile, Result]),
+
+    %% Remove input files
+    delete_files(InputFiles).
+
+%% @private
+update_map(Time, Type, TypeToTimesAndBytes, Timestamp, {Map, TimestampToLastKnown}) ->
+    TimesAndBytes = orddict:fetch(Type, TypeToTimesAndBytes),
+    case orddict:find(Time, TimesAndBytes) of
+        %% If exits, use it
+        {ok, Bytes} ->
+            {
+                update_entry(Time, Type, Bytes, Map),
+                update_last_known_value(Type, Timestamp, TimestampToLastKnown, Bytes)
+            };
+        %% If not, use last known value
+        error ->
+            Bytes = get_latest_value(Type, Timestamp, TimestampToLastKnown),
+            {
+                update_entry(Time, Type, Bytes, Map),
+                TimestampToLastKnown
+            }
+    end.
+
+%% @private
+update_entry(Time, Type, Bytes, Map) ->
+    TimesAndBytes0 = orddict:fetch(Type, Map),
+    CurrentBytes = orddict:fetch(Time, TimesAndBytes0),
+    TimesAndBytes1 = orddict:store(Time, CurrentBytes + Bytes, TimesAndBytes0),
+    orddict:store(Type, TimesAndBytes1, Map).
+
+%% @private
+get_latest_value(Type, Timestamp, TimestampToLastKnown) ->
+    LastKnown = orddict:fetch(Timestamp, TimestampToLastKnown),
+    orddict:fetch(Type, LastKnown).
+
+update_last_known_value(Type, Timestamp, TimestampToLastKnown, Bytes) ->
+    LastKnown0 = orddict:fetch(Timestamp, TimestampToLastKnown),
+    LastKnown1 = orddict:store(Type, Bytes, LastKnown0),
+    orddict:store(Timestamp, LastKnown1, TimestampToLastKnown).
+
 %% @private
 get_titles(Types) ->
     lists:map(
@@ -490,7 +605,7 @@ run_gnuplot(InputFiles, Titles, OutputFile, ConvergenceTime) ->
                   ++ "outputname='" ++ OutputFile ++ "'; "
                   ++ "inputnames='" ++ join_filenames(InputFiles) ++ "'; "
                   ++ "titles='" ++  join_titles(Titles) ++ "'\" " ++ gnuplot_file(),
-    ct:pal("~p", [Command]),
+    %ct:pal("~p", [Command]),
     os:cmd(Command).
 
 %% @private
@@ -518,3 +633,13 @@ join_titles(Titles) ->
         Titles
     ),
     string:strip(Line).
+
+%% @private
+delete_files(Files) ->
+    lists:foreach(
+      fun(File) ->
+        ok = file:delete(File)
+      end,
+      Files
+    ).
+

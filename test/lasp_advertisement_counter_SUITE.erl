@@ -66,10 +66,10 @@ all() ->
     [
      default_test,
      state_based_with_aae_test,
-     state_based_with_aae_and_tree_test,
+%     state_based_with_aae_and_tree_test,
      delta_based_with_aae_test,
      state_based_ps_with_aae_test,
-     state_based_ps_with_aae_and_tree_test,
+%     state_based_ps_with_aae_and_tree_test,
      delta_based_ps_with_aae_test
     ].
 
@@ -77,7 +77,7 @@ all() ->
 %% tests
 %% ===================================================================
 
--define(EVAL_NUMBER, 1).
+-define(EVAL_NUMBER, 2).
 -define(IMPRESSION_NUMBER, 10).
 -define(CONVERGENCE_INTERVAL, 10000).
 

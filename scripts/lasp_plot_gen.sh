@@ -12,8 +12,8 @@ main(_) ->
 
 %% @doc Generate plots.
 generate_plots(EvalIds) ->
-    lists:foreach(
-        fun(EvalId) ->
+    TitlesToInputFiles = lists:foldl(
+        fun(EvalId, Acc) ->
             EvalIdDir = root_log_dir() ++ "/" ++ EvalId,
             EvalTimestamps = only_dirs(EvalIdDir),
 
@@ -36,10 +36,54 @@ generate_plots(EvalIds) ->
                 EvalTimestamps
             ),
 
-            generate_executions_average_plot(T, EvalId)
+            TitlesToInputFiles = generate_executions_average_plot(T, EvalId),
+            lists:append(Acc, TitlesToInputFiles)
+
         end,
+        orddict:new(),
         EvalIds
-    ).
+    ),
+
+    {{Titles, InputFiles}, {TitlesPS, InputFilesPS}} = orddict:fold(
+				fun(Title, InputFile, {{Titles0, InputFiles0}, {TitlesPS0, InputFilesPS0}}) ->
+            case re:run(InputFile, ".*based_ps.*") of
+                {match, _} ->
+                    {
+                        {Titles0, InputFiles0},
+                        {
+                            lists:append(TitlesPS0, [Title]),
+                            lists:append(InputFilesPS0, [InputFile])
+                        }
+                    };
+                nomatch ->
+                    {
+                        {
+                            lists:append(Titles0, [Title]),
+                            lists:append(InputFiles0, [InputFile])
+                        },
+                        {TitlesPS0, InputFilesPS0}
+                    }
+            end
+        end,
+        {{[], []}, {[], []}},
+        TitlesToInputFiles
+    ),
+    
+    PlotDir = root_plot_dir() ++ "/",
+
+    OutputFile = output_file(PlotDir, "multi-mode"),
+    %% Convergence time not supported yet on multi-mode plot
+    Result = run_gnuplot(InputFiles, Titles, OutputFile, -1),
+    ct:pal("Generating multi-mode plot ~p. Output: ~p", [OutputFile, Result]),
+
+    OutputFilePS = output_file(PlotDir, "multi-mode-ps"),
+    %% Convergence time not supported yet on multi-mode plot
+    ResultPS = run_gnuplot(InputFilesPS, TitlesPS, OutputFilePS, -1),
+    ct:pal("Generating multi-mode-ps plot ~p. Output: ~p", [OutputFilePS, ResultPS]),
+
+    %% Remove input files
+    delete_files(InputFiles),
+    delete_files(InputFilesPS).
 
 %% @private
 generate_plot(EvalDir, EvalId, EvalTimestamp) ->
@@ -555,8 +599,16 @@ generate_executions_average_plot({Types, Times, ToAverage}, EvalId) ->
     Result = run_gnuplot(InputFiles, Titles, OutputFile, AverageConvergenceTime),
     ct:pal("Generating average plot of all executions ~p. Output: ~p", [OutputFile, Result]),
 
-    %% Remove input files
-    delete_files(InputFiles).
+    lists:foldl(
+        fun(N, TitlesToInputFiles) ->
+            Type = lists:nth(N, Types),
+            InputFile = lists:nth(N, InputFiles),
+            Title = get_title(list_to_atom(EvalId)) ++ " - " ++ get_title(Type),
+            orddict:store(Title, InputFile, TitlesToInputFiles)
+        end,
+        orddict:new(),
+        lists:seq(1, length(Types))
+    ).
 
 %% @private
 update_triple(Type, Time, TypeToTimesAndBytes, Timestamp, ConvergenceTime, {Map, TimestampToLastKnown, ConvergenceTimes0}) ->
@@ -611,7 +663,13 @@ get_titles(Types) ->
 get_title(aae_send)   -> "AAE Send";
 get_title(delta_ack)  -> "Delta Ack";
 get_title(delta_send) -> "Delta Send";
-get_title(broadcast)  -> "Broadcast".
+get_title(broadcast)  -> "Broadcast";
+get_title(state_based_with_aae)             -> "State Based";
+get_title(state_based_with_aae_and_tree)    -> "State Based + tree";
+get_title(delta_based_with_aae)             -> "Delta based";
+get_title(state_based_ps_with_aae)          -> "State Based PS";
+get_title(state_based_ps_with_aae_and_tree) -> "State Based PS + tree";
+get_title(delta_based_ps_with_aae)          -> "Delta based PS".
 
 %% @private
 run_gnuplot(InputFiles, Titles, OutputFile, ConvergenceTime) ->

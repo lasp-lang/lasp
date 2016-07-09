@@ -88,7 +88,7 @@ generate_plot(EvalDir, EvalId, EvalTimestamp) ->
     filelib:ensure_dir(PlotDir),
 
     generate_per_node_plot(Map1, PlotDir),
-    TypeToTimesAndBytes = generate_average_plot(Types1, Times, Map1, ConvergenceTime, PlotDir),
+    TypeToTimesAndBytes = generate_nodes_average_plot(Types1, Times, Map1, ConvergenceTime, PlotDir),
 
     {Types1, TypeToTimesAndBytes, ConvergenceTime}.
 
@@ -350,9 +350,9 @@ node_name(FileLogPath) ->
     re:replace(NodeName, "@", "_", [global, {return, list}]).
 
 %% @private
-generate_average_plot(Types, Times, Map, ConvergenceTime, PlotDir) ->
+generate_nodes_average_plot(Types, Times, Map, ConvergenceTime, PlotDir) ->
     %% Do the average of `Map1`
-    TypeToTimeAndBytes = average(Types, Times, Map),
+    TypeToTimeAndBytes = nodes_average(Types, Times, Map),
     ct:pal("Average computed!"),
 
     InputFiles = write_average_to_files(TypeToTimeAndBytes, PlotDir),
@@ -375,7 +375,7 @@ generate_average_plot(Types, Times, Map, ConvergenceTime, PlotDir) ->
 %%     (from times to pairs {bytes, type})
 %% - Produces a dictionary that maps types to a list of
 %%   pairs {time, bytes}
-average(Types, Times, Map) ->
+nodes_average(Types, Times, Map) ->
     TimeZero = lists:min(Times),
     Empty = create_empty_dict_type_to_time_and_bytes(
         Types,
@@ -506,62 +506,68 @@ average_plot({Types, Times, ToAverage}, EvalId) ->
         orddict:fetch_keys(ToAverage)
     ),
 
-    {Map, _} = lists:foldl(
+    {Map, _, ConvergenceTimes} = lists:foldl(
         %% For all the times
-        fun(Time, Pair0) ->
+        fun(Time, Triple0) ->
             orddict:fold(
                 %% For all the executions
-                fun(Timestamp, {TypeToTimesAndBytes, _ConvergenceTime}, Pair1) ->
+                fun(Timestamp, {TypeToTimesAndBytes, ConvergenceTime}, Triple1) ->
                     lists:foldl(
                         %% For all the types
-                        fun(Type, Pair2) ->
-                            update_map(Time, Type, TypeToTimesAndBytes, Timestamp, Pair2)
+                        fun(Type, Triple2) ->
+                            update_triple(Type, Time, TypeToTimesAndBytes, Timestamp, ConvergenceTime, Triple2)
                         end,
-                        Pair1,
+                        Triple1,
                         Types
                     )
                 end,
-                Pair0,
+                Triple0,
                 ToAverage
             )
         end,
-        {Empty, TimestampToLastKnown},
+        {Empty, TimestampToLastKnown, []},
         Times
     ),
 
-        PlotDir = root_plot_dir() ++ "/" ++ EvalId ++ "/average/",
+    AverageConvergenceTime = round(lists:sum(ConvergenceTimes) / length(ConvergenceTimes)),
+
+    PlotDir = root_plot_dir() ++ "/" ++ EvalId ++ "/average/",
     filelib:ensure_dir(PlotDir),
 
     InputFiles = write_average_to_files(Map, PlotDir),
     Titles = get_titles(Types),
     OutputFile = output_file(PlotDir, "average"),
-    Result = run_gnuplot(InputFiles, Titles, OutputFile, 0),
+    Result = run_gnuplot(InputFiles, Titles, OutputFile, AverageConvergenceTime),
     ct:pal("Generating average plot of all executions ~p. Output: ~p", [OutputFile, Result]),
 
     %% Remove input files
     delete_files(InputFiles).
 
 %% @private
-update_map(Time, Type, TypeToTimesAndBytes, Timestamp, {Map, TimestampToLastKnown}) ->
+update_triple(Type, Time, TypeToTimesAndBytes, Timestamp, ConvergenceTime, {Map, TimestampToLastKnown, ConvergenceTimes0}) ->
     TimesAndBytes = orddict:fetch(Type, TypeToTimesAndBytes),
+    ConvergenceTimes1 = [ConvergenceTime | ConvergenceTimes0],
+
     case orddict:find(Time, TimesAndBytes) of
         %% If exits, use it
         {ok, Bytes} ->
             {
-                update_entry(Time, Type, Bytes, Map),
-                update_last_known_value(Type, Timestamp, TimestampToLastKnown, Bytes)
+                update_entry(Type, Time, Bytes, Map),
+                update_last_known_value(Type, Timestamp, TimestampToLastKnown, Bytes),
+                ConvergenceTimes1
             };
         %% If not, use last known value
         error ->
             Bytes = get_latest_value(Type, Timestamp, TimestampToLastKnown),
             {
-                update_entry(Time, Type, Bytes, Map),
-                TimestampToLastKnown
+                update_entry(Type, Time, Bytes, Map),
+                TimestampToLastKnown,
+                ConvergenceTimes1
             }
     end.
 
 %% @private
-update_entry(Time, Type, Bytes, Map) ->
+update_entry(Type, Time, Bytes, Map) ->
     TimesAndBytes0 = orddict:fetch(Type, Map),
     CurrentBytes = orddict:fetch(Time, TimesAndBytes0),
     TimesAndBytes1 = orddict:store(Time, CurrentBytes + Bytes, TimesAndBytes0),

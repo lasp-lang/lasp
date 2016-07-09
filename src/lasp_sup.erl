@@ -156,6 +156,16 @@ web_specs() ->
 
 %% @private
 configure_defaults() ->
+    ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),
+    Mode = application:get_env(?APP, mode, ModeDefault),
+    lager:info("Setting operation mode: ~p", [Mode]),
+    lasp_config:set(mode, Mode),
+
+    SetDefault = list_to_atom(os:getenv("SET", "orset")),
+    Set = application:get_env(?APP, set, SetDefault),
+    lager:info("Setting set type: ~p", [Set]),
+    lasp_config:set(set, Set),
+
     ProfileDefault = list_to_atom(os:getenv("PROFILE", "false")),
     ProfileEnabled = application:get_env(?APP,
                                          profile,
@@ -179,12 +189,6 @@ configure_defaults() ->
                                                   evaluation_timestamp,
                                                   EvaluationTimestampDefault),
     lasp_config:set(evaluation_timstamp, EvaluationTimestampEnabled),
-
-    %% Operation mode.
-    ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),
-    Mode = application:get_env(?APP, mode, ModeDefault),
-    lager:info("Setting operation mode: ~p", [Mode]),
-    lasp_config:set(mode, Mode),
 
     %% Peer service.
     PeerService = application:get_env(plumtree,

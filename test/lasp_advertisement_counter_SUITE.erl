@@ -123,7 +123,7 @@ state_based_ps_with_aae_test(Config) ->
         [{mode, state_based},
          {set, awset_ps},
          {broadcast, false},
-         {evaluation_identifier, state_based_ps_with_aae_test}]),
+         {evaluation_identifier, state_based_ps_with_aae}]),
     ok.
 
 state_based_ps_with_aae_and_tree_test(Config) ->

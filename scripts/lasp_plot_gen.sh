@@ -526,7 +526,7 @@ write_average_to_files(TypeToTimeAndBytes, PlotDir) ->
 %% @private
 get_times(TypeToTimesAndBytes) ->
     lists:foldl(
-        fun({Type, TimesAndBytes}, Acc) ->
+        fun({_Type, TimesAndBytes}, Acc) ->
             lists:foldl(
                 fun({Time, _Bytes}, Acc1) ->
                     ordsets:add_element(Time, Acc1)

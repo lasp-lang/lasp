@@ -182,6 +182,10 @@ read(Id, Store) ->
 %%      bound.
 %%
 %%      This operation blocks until `Threshold' has been reached.
+%%      As read/6 runs inside a lasp process, we have to block
+%%      outside, or else it may get killed when used in combination
+%%      with other lasp processes (for example, when used as the read
+%%      function of another lasp process).
 %%
 -spec read(id(), value(), store()) -> {ok, var()}.
 read(Id, Threshold, Store) ->

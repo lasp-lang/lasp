@@ -44,6 +44,9 @@ pkill -9 beam.smp
 echo "Running evaluation."
 ./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE
 
+echo "Generating plots."
+( cd priv/evaluation ; ./lasp_plot_gen.sh )
+
 echo "Configuring git."
 git config --global user.email "christopher.meiklejohn+lasp-lang-evaluator@gmail.com"
 git config --global user.name "Lasp Language Evaluation Bot"

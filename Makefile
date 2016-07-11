@@ -94,7 +94,7 @@ plots:
 		rm -rf priv/lager/ priv/evaluation; \
 		(cd priv/ && git clone https://github.com/lasp-lang/evaluation); \
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE; \
-		cd priv/ && ./lasp_plot_gen.sh
+		cd priv/evaluation && ./lasp_plot_gen.sh
 
 ads: SHELL:=/bin/bash
 ads:

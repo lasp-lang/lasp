@@ -75,9 +75,10 @@ init([]) ->
     schedule_check_convergence(),
 
     %% Declare a bunch of counters.
-    Identifiers = lists:foreach(fun(N) ->
-                    lasp:declare(N, ?COUNTER_TYPE),
-                    N
+    Identifiers = lists:map(fun(N) ->
+                    Id = {N, ?COUNTER_TYPE},
+                    {ok, _} = lasp:declare(Id, ?COUNTER_TYPE),
+                    Id
             end, identifiers()),
 
     {ok, #state{actor=Actor, votes=0, identifiers=Identifiers}}.
@@ -133,7 +134,7 @@ handle_info(vote, #state{actor=Actor, votes=Votes0, identifiers=Identifiers0}=St
                 true ->
                     schedule_voting();
                 false ->
-                    lager:info("Max number of impressions reached. Node: ~p", [node()])
+                    lager:info("Max number of votes reached. Node: ~p", [node()])
             end,
 
             {noreply, State#state{votes=Votes, identifiers=Identifiers}}

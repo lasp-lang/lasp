@@ -205,7 +205,7 @@ read(Id, Threshold, Store) ->
             {error, Reason};
 
         block -> receive
-            X -> X
+            {ok, {_Id, _Type, _Metadata, _Value}}=Res -> Res
         end
     end.
 

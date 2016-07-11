@@ -472,7 +472,7 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
 %%      Same as read_var, but tracked in the dag.
 %%
 -spec read(id(), value(), store(), pid(), function(), function()) ->
-    {ok, var()} | not_found().
+    {ok, var()} | not_found() | atom().
 read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
     lasp_process:single_fire_function(Id, read,
                                       fun read_var/6, [Id,
@@ -499,7 +499,7 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
 %%      variable is unbound or has not met the threshold yet.
 %%
 -spec read_var(id(), value(), store(), pid(), function(), function()) ->
-    {ok, var()} | not_found().
+    {ok, var()} | not_found() | atom().
 read_var(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
     Mutator = fun(#dv{type=Type, value=Value, metadata=Metadata, lazy_threads=LT}=Object) ->
             %% When no threshold is specified, use the bottom value for the

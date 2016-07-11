@@ -190,14 +190,23 @@ read(Id, Store) ->
 -spec read(id(), value(), store()) -> {ok, var()}.
 read(Id, Threshold, Store) ->
     ReplyFun = fun
-        ({error, _}) -> error;
         ({_Id, _Type, _Metadata, _Value}=Found) ->
-            {ok, Found}
+            {ok, Found};
+
+        ({error, _}=Error) ->
+            Error
     end,
     BlockingFun = fun() -> block end,
     case read(Id, Threshold, Store, self(), ReplyFun, BlockingFun) of
-        {ok, FoundValue} -> {ok, FoundValue};
-        _ -> receive X -> X end
+        {ok, FoundValue} ->
+            {ok, FoundValue};
+
+        {error, Reason} ->
+            {error, Reason};
+
+        block -> receive
+            X -> X
+        end
     end.
 
 %% @doc Perform a monotonic read for a series of given idenfitiers --

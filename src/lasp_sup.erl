@@ -122,7 +122,11 @@ init(_Args) ->
 
     %% Setup the advertisement counter example, if necessary.
     AdSpecs = advertisement_counter_child_specs(),
-    Children = Children0 ++ AdSpecs,
+
+    %% Setup the music festival example, if necessary.
+    MusicSpecs = music_festival_child_specs(),
+
+    Children = Children0 ++ AdSpecs ++ MusicSpecs,
 
     %% Configure defaults.
     configure_defaults(),
@@ -156,6 +160,16 @@ web_specs() ->
 
 %% @private
 configure_defaults() ->
+    ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),
+    Mode = application:get_env(?APP, mode, ModeDefault),
+    lager:info("Setting operation mode: ~p", [Mode]),
+    lasp_config:set(mode, Mode),
+
+    SetDefault = list_to_atom(os:getenv("SET", "orset")),
+    Set = application:get_env(?APP, set, SetDefault),
+    lager:info("Setting set type: ~p", [Set]),
+    lasp_config:set(set, Set),
+
     ProfileDefault = list_to_atom(os:getenv("PROFILE", "false")),
     ProfileEnabled = application:get_env(?APP,
                                          profile,
@@ -179,12 +193,6 @@ configure_defaults() ->
                                                   evaluation_timestamp,
                                                   EvaluationTimestampDefault),
     lasp_config:set(evaluation_timstamp, EvaluationTimestampEnabled),
-
-    %% Operation mode.
-    ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),
-    Mode = application:get_env(?APP, mode, ModeDefault),
-    lager:info("Setting operation mode: ~p", [Mode]),
-    lasp_config:set(mode, Mode),
 
     %% Peer service.
     PeerService = application:get_env(plumtree,
@@ -226,6 +234,50 @@ configure_defaults() ->
                                incremental_computation_mode,
                                false),
     lasp_config:set(incremental_computation_mode, IncrementalComputation).
+
+%% @private
+music_festival_child_specs() ->
+    %% Figure out who is acting as the client.
+    MusicClientDefault = list_to_atom(os:getenv("MUSIC_FESTIVAL_SIM_CLIENT", "false")),
+    MusicClientEnabled = application:get_env(?APP,
+                                             music_festival_client,
+                                             MusicClientDefault),
+    lasp_config:set(music_festival_client, MusicClientEnabled),
+    lager:info("MusicClientEnabled: ~p", [MusicClientEnabled]),
+
+    ClientSpecs = case MusicClientEnabled of
+        true ->
+            %% Start one advertisement counter client process per node.
+            MusicFestivalClient = {lasp_music_festival_client,
+                                   {lasp_music_festival_client, start_link, []},
+                                    permanent, 5000, worker,
+                                    [lasp_music_festival_client]},
+
+            [MusicFestivalClient];
+        false ->
+            []
+    end,
+
+    %% Figure out who is acting as the server.
+    MusicServerDefault = list_to_atom(os:getenv("MUSIC_FESTIVAL_SIM_SERVER", "false")),
+    MusicServerEnabled = application:get_env(?APP,
+                                             music_festival_server,
+                                             MusicServerDefault),
+    lasp_config:set(music_festival_server, MusicServerEnabled),
+    lager:info("MusicServerEnabled: ~p", [MusicServerEnabled]),
+
+    ServerSpecs = case MusicServerEnabled of
+        true ->
+            MusicFestivalServer = {lasp_music_festival_server,
+                                   {lasp_music_festival_server, start_link, []},
+                                    permanent, 5000, worker,
+                                    [lasp_music_festival_server]},
+            [MusicFestivalServer];
+        false ->
+            []
+    end,
+
+    ClientSpecs ++ ServerSpecs.
 
 %% @private
 advertisement_counter_child_specs() ->

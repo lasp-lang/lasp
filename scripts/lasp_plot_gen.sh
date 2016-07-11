@@ -1,50 +1,96 @@
-%% -------------------------------------------------------------------
-%%
-%% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
-%%
-%% This file is provided to you under the Apache License,
-%% Version 2.0 (the "License"); you may not use this file
-%% except in compliance with the License.  You may obtain
-%% a copy of the License at
-%%
-%%   http://www.apache.org/licenses/LICENSE-2.0
-%%
-%% Unless required by applicable law or agreed to in writing,
-%% software distributed under the License is distributed on an
-%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-%% KIND, either express or implied.  See the License for the
-%% specific language governing permissions and limitations
-%% under the License.
-%%
-%% -------------------------------------------------------------------
+#!/usr/bin/env escript
 
--module(lasp_plot_gen).
 -author("Vitor Enes Duarte <vitorenesduarte@gmail.com>").
 
--export([generate_plots/1]).
+main(_) ->
+    %% Delete plot directory
+    os:cmd("rm -rf " ++ root_plot_dir()),
 
--include("lasp.hrl").
+    %% Generate plots
+    EvalIds = only_dirs(root_log_dir()),
+    generate_plots(EvalIds).
 
 %% @doc Generate plots.
-generate_plots(Options) ->
-    EvalId = proplists:get_value(evaluation_identifier, Options),
-    EvalIdDir = root_log_dir() ++ "/" ++ atom_to_list(EvalId),
-    EvalTimestamps = only_dirs(EvalIdDir),
+generate_plots(EvalIds) ->
+    TitlesToInputFiles = lists:foldl(
+        fun(EvalId, Acc) ->
+            EvalIdDir = root_log_dir() ++ "/" ++ EvalId,
+            EvalTimestamps = only_dirs(EvalIdDir),
 
-    lists:foreach(
-        fun(EvalTimestamp) ->
-            EvalDir = EvalIdDir ++ "/" ++ EvalTimestamp,
-            generate_plot(EvalDir, EvalId, EvalTimestamp)
+            T = lists:foldl(
+                fun(EvalTimestamp, {_Types0, Times0, ToAverage0}) ->
+                    EvalDir = EvalIdDir ++ "/" ++ EvalTimestamp,
+                    {Types1, TypeToTimesAndBytes, ConvergenceTime}
+                        = generate_plot(EvalDir, EvalId, EvalTimestamp),
+
+                    Times2 = ordsets:union(Times0, get_times(TypeToTimesAndBytes)),
+                    ToAverage1 = orddict:store(
+                        EvalTimestamp,
+                        {TypeToTimesAndBytes, ConvergenceTime},
+                        ToAverage0
+                    ),
+                    {Types1, Times2, ToAverage1}
+
+                end,
+                {ordsets:new(), ordsets:new(), orddict:new()},
+                EvalTimestamps
+            ),
+
+            TitlesToInputFiles = generate_executions_average_plot(T, EvalId),
+            lists:append(Acc, TitlesToInputFiles)
+
         end,
-        EvalTimestamps
-    ).
+        orddict:new(),
+        EvalIds
+    ),
+
+    {{Titles, InputFiles}, {TitlesPS, InputFilesPS}} = orddict:fold(
+				fun(Title, InputFile, {{Titles0, InputFiles0}, {TitlesPS0, InputFilesPS0}}) ->
+            case re:run(InputFile, ".*based_ps.*") of
+                {match, _} ->
+                    {
+                        {Titles0, InputFiles0},
+                        {
+                            lists:append(TitlesPS0, [Title]),
+                            lists:append(InputFilesPS0, [InputFile])
+                        }
+                    };
+                nomatch ->
+                    {
+                        {
+                            lists:append(Titles0, [Title]),
+                            lists:append(InputFiles0, [InputFile])
+                        },
+                        {TitlesPS0, InputFilesPS0}
+                    }
+            end
+        end,
+        {{[], []}, {[], []}},
+        TitlesToInputFiles
+    ),
+    
+    PlotDir = root_plot_dir() ++ "/",
+
+    OutputFile = output_file(PlotDir, "multi-mode"),
+    %% Convergence time not supported yet on multi-mode plot
+    Result = run_gnuplot(InputFiles, Titles, OutputFile, -1),
+    ct:pal("Generating multi-mode plot ~p. Output: ~p", [OutputFile, Result]),
+
+    OutputFilePS = output_file(PlotDir, "multi-mode-ps"),
+    %% Convergence time not supported yet on multi-mode plot
+    ResultPS = run_gnuplot(InputFilesPS, TitlesPS, OutputFilePS, -1),
+    ct:pal("Generating multi-mode-ps plot ~p. Output: ~p", [OutputFilePS, ResultPS]),
+
+    %% Remove input files
+    delete_files(InputFiles),
+    delete_files(InputFilesPS).
 
 %% @private
 generate_plot(EvalDir, EvalId, EvalTimestamp) ->
-    lager:info("Will analyse the following directory: ~p", [EvalDir]),
+    ct:pal("Will analyse the following directory: ~p", [EvalDir]),
 
     LogFiles = only_csv_files(EvalDir),
-    lager:info("Will analyse the following logs: ~p", [LogFiles]),
+    ct:pal("Will analyse the following logs: ~p", [LogFiles]),
 
     {Map, Types, Times, ConvergenceTimes} = lists:foldl(
         fun(File, {Map0, Types0, Times0, ConvergenceTimes0}) ->
@@ -68,30 +114,31 @@ generate_plot(EvalDir, EvalId, EvalTimestamp) ->
     ),
 
     Types1 = lists:delete(convergence, Types),
-    lager:info("Types found: ~p", [Types1]),
+    ct:pal("Types found: ~p", [Types1]),
 
     %% `ConvergenceTime` is the max of all `ConvergenceTimes`
     TimeZero = lists:min(Times),
     ConvergenceTime = lists:max(ConvergenceTimes) - TimeZero,
-    lager:info("Convergence time: ~p", [ConvergenceTime]),
+    ct:pal("Convergence time: ~p", [ConvergenceTime]),
 
     %% Assume unknown logs with last known values
     Map1 = assume_unknown_logs(Types1, Times, TimeZero, Map),
-    lager:info("Unknown logs assumed!"),
+    ct:pal("Unknown logs assumed!"),
 
     %% Write average in files (one file per type) to `PlotDir`
     PlotDir = root_plot_dir() ++ "/"
-           ++ atom_to_list(EvalId) ++ "/"
+           ++ EvalId ++ "/"
            ++ EvalTimestamp ++ "/",
     filelib:ensure_dir(PlotDir),
 
     generate_per_node_plot(Map1, PlotDir),
-    generate_average_plot(Types1, Times, Map1, ConvergenceTime, PlotDir),
-    ok.
+    TypeToTimesAndBytes = generate_nodes_average_plot(Types1, Times, Map1, ConvergenceTime, PlotDir),
+
+    {Types1, TypeToTimesAndBytes, ConvergenceTime}.
 
 %% @private
 priv_dir() ->
-    code:priv_dir(?APP).
+    "../priv".
 
 %% @private
 eval_dir() ->
@@ -290,10 +337,13 @@ revert_tuple_order(LastKnown) ->
 generate_per_node_plot(Map, PlotDir) ->
     {Titles, InputFiles} = write_per_node_to_files(Map, PlotDir),
     OutputFile = output_file(PlotDir, "per_node"),
-    %% this plot does not show the convergence time per node
+    %% This plot does not show the convergence time per node,
     %% thus the -1
     Result = run_gnuplot(InputFiles, Titles, OutputFile, -1),
-    lager:info("Generating per node plot ~p. Output: ~p", [OutputFile, Result]).
+    ct:pal("Generating per node plot ~p. Output: ~p", [OutputFile, Result]),
+
+    %% Remove input files
+    delete_files(InputFiles).
 
 %% @private
 write_per_node_to_files(Map, PlotDir) ->
@@ -344,17 +394,21 @@ node_name(FileLogPath) ->
     re:replace(NodeName, "@", "_", [global, {return, list}]).
 
 %% @private
-generate_average_plot(Types, Times, Map, ConvergenceTime, PlotDir) ->
+generate_nodes_average_plot(Types, Times, Map, ConvergenceTime, PlotDir) ->
     %% Do the average of `Map1`
-    TypeToTimeAndBytes = average(Types, Times, Map),
-    lager:info("Average computed!"),
+    TypeToTimeAndBytes = nodes_average(Types, Times, Map),
+    ct:pal("Average computed!"),
 
     InputFiles = write_average_to_files(TypeToTimeAndBytes, PlotDir),
     Titles = get_titles(Types),
     OutputFile = output_file(PlotDir, "average"),
     Result = run_gnuplot(InputFiles, Titles, OutputFile, ConvergenceTime),
-    lager:info("Generating average plot ~p. Output: ~p", [OutputFile, Result]).
+    ct:pal("Generating average plot ~p. Output: ~p", [OutputFile, Result]),
 
+    %% Remove input files
+    delete_files(InputFiles),
+
+    TypeToTimeAndBytes.
 
 %% @private
 %% Do the average of all logs.
@@ -365,8 +419,12 @@ generate_average_plot(Types, Times, Map, ConvergenceTime, PlotDir) ->
 %%     (from times to pairs {bytes, type})
 %% - Produces a dictionary that maps types to a list of
 %%   pairs {time, bytes}
-average(Types, Times, Map) ->
-    Empty = create_empty_dict_type_to_time_and_bytes(Types, Times),
+nodes_average(Types, Times, Map) ->
+    TimeZero = lists:min(Times),
+    Empty = create_empty_dict_type_to_time_and_bytes(
+        Types,
+        lists:map(fun(Time) -> Time - TimeZero end, Times)
+    ),
 
     %% Create dictionary the maps types to a lists of
     %% pairs {time, bytes}
@@ -413,13 +471,11 @@ average(Types, Times, Map) ->
 
 %% @private
 create_empty_dict_type_to_time_and_bytes(Types, Times) ->
-    TimeZero = lists:min(Times),
-
     lists:foldl(
         fun(Type, Map0) ->
             lists:foldl(
                 fun(Time, Map1) ->
-                    orddict:append(Type, {Time - TimeZero, 0}, Map1)
+                    orddict:append(Type, {Time, 0}, Map1)
                 end,
                 Map0,
                 Times
@@ -468,6 +524,133 @@ write_average_to_files(TypeToTimeAndBytes, PlotDir) ->
     ).
 
 %% @private
+get_times(TypeToTimesAndBytes) ->
+    lists:foldl(
+        fun({_Type, TimesAndBytes}, Acc) ->
+            lists:foldl(
+                fun({Time, _Bytes}, Acc1) ->
+                    ordsets:add_element(Time, Acc1)
+                end,
+                Acc,
+                TimesAndBytes
+            )
+        end,
+        ordsets:new(),
+        TypeToTimesAndBytes
+    ).
+
+%% @doc Average all executions
+generate_executions_average_plot({Types, Times, ToAverage}, EvalId) ->
+    Empty = create_empty_dict_type_to_time_and_bytes(Types, Times),
+    TimestampToLastKnown = lists:foldl(
+        fun(Timestamp, Acc) ->
+            orddict:store(Timestamp, create_empty_last_known(Types), Acc)
+        end,
+        orddict:new(),
+        orddict:fetch_keys(ToAverage)
+    ),
+
+    {Map0, _, ConvergenceTimes} = lists:foldl(
+        %% For all the times
+        fun(Time, Triple0) ->
+            orddict:fold(
+                %% For all the executions
+                fun(Timestamp, {TypeToTimesAndBytes, ConvergenceTime}, Triple1) ->
+                    lists:foldl(
+                        %% For all the types
+                        fun(Type, Triple2) ->
+                            update_triple(Type, Time, TypeToTimesAndBytes, Timestamp, ConvergenceTime, Triple2)
+                        end,
+                        Triple1,
+                        Types
+                    )
+                end,
+                Triple0,
+                ToAverage
+            )
+        end,
+        {Empty, TimestampToLastKnown, []},
+        Times
+    ),
+
+    %% Divide bytes by the number of executions
+    NumberOfExecutions = length(orddict:fetch_keys(ToAverage)),
+    Map1 = orddict:map(
+        fun(_Type, TimesAndBytes) ->
+            orddict:map(
+                fun(_Time, Bytes) ->
+                    Bytes / NumberOfExecutions
+                end,
+                TimesAndBytes
+            )
+        end,
+        Map0
+    ),
+
+    %% Compute average convergence time
+    AverageConvergenceTime = round(lists:sum(ConvergenceTimes) / length(ConvergenceTimes)),
+
+    PlotDir = root_plot_dir() ++ "/" ++ EvalId ++ "/average/",
+    filelib:ensure_dir(PlotDir),
+
+    InputFiles = write_average_to_files(Map1, PlotDir),
+    Titles = get_titles(Types),
+    OutputFile = output_file(PlotDir, "average"),
+    Result = run_gnuplot(InputFiles, Titles, OutputFile, AverageConvergenceTime),
+    ct:pal("Generating average plot of all executions ~p. Output: ~p", [OutputFile, Result]),
+
+    lists:foldl(
+        fun(N, TitlesToInputFiles) ->
+            Type = lists:nth(N, Types),
+            InputFile = lists:nth(N, InputFiles),
+            Title = get_title(list_to_atom(EvalId)) ++ " - " ++ get_title(Type),
+            orddict:store(Title, InputFile, TitlesToInputFiles)
+        end,
+        orddict:new(),
+        lists:seq(1, length(Types))
+    ).
+
+%% @private
+update_triple(Type, Time, TypeToTimesAndBytes, Timestamp, ConvergenceTime, {Map, TimestampToLastKnown, ConvergenceTimes0}) ->
+    TimesAndBytes = orddict:fetch(Type, TypeToTimesAndBytes),
+    ConvergenceTimes1 = [ConvergenceTime | ConvergenceTimes0],
+
+    case orddict:find(Time, TimesAndBytes) of
+        %% If exits, use it
+        {ok, Bytes} ->
+            {
+                update_entry(Type, Time, Bytes, Map),
+                update_last_known_value(Type, Timestamp, TimestampToLastKnown, Bytes),
+                ConvergenceTimes1
+            };
+        %% If not, use last known value
+        error ->
+            Bytes = get_latest_value(Type, Timestamp, TimestampToLastKnown),
+            {
+                update_entry(Type, Time, Bytes, Map),
+                TimestampToLastKnown,
+                ConvergenceTimes1
+            }
+    end.
+
+%% @private
+update_entry(Type, Time, Bytes, Map) ->
+    TimesAndBytes0 = orddict:fetch(Type, Map),
+    CurrentBytes = orddict:fetch(Time, TimesAndBytes0),
+    TimesAndBytes1 = orddict:store(Time, CurrentBytes + Bytes, TimesAndBytes0),
+    orddict:store(Type, TimesAndBytes1, Map).
+
+%% @private
+get_latest_value(Type, Timestamp, TimestampToLastKnown) ->
+    LastKnown = orddict:fetch(Timestamp, TimestampToLastKnown),
+    orddict:fetch(Type, LastKnown).
+
+update_last_known_value(Type, Timestamp, TimestampToLastKnown, Bytes) ->
+    LastKnown0 = orddict:fetch(Timestamp, TimestampToLastKnown),
+    LastKnown1 = orddict:store(Type, Bytes, LastKnown0),
+    orddict:store(Timestamp, LastKnown1, TimestampToLastKnown).
+
+%% @private
 get_titles(Types) ->
     lists:map(
         fun(Type) ->
@@ -480,7 +663,13 @@ get_titles(Types) ->
 get_title(aae_send)   -> "AAE Send";
 get_title(delta_ack)  -> "Delta Ack";
 get_title(delta_send) -> "Delta Send";
-get_title(broadcast)  -> "Broadcast".
+get_title(broadcast)  -> "Broadcast";
+get_title(state_based_with_aae)             -> "State Based";
+get_title(state_based_with_aae_and_tree)    -> "State Based + tree";
+get_title(delta_based_with_aae)             -> "Delta based";
+get_title(state_based_ps_with_aae)          -> "State Based PS";
+get_title(state_based_ps_with_aae_and_tree) -> "State Based PS + tree";
+get_title(delta_based_ps_with_aae)          -> "Delta based PS".
 
 %% @private
 run_gnuplot(InputFiles, Titles, OutputFile, ConvergenceTime) ->
@@ -495,7 +684,7 @@ run_gnuplot(InputFiles, Titles, OutputFile, ConvergenceTime) ->
                   ++ "outputname='" ++ OutputFile ++ "'; "
                   ++ "inputnames='" ++ join_filenames(InputFiles) ++ "'; "
                   ++ "titles='" ++  join_titles(Titles) ++ "'\" " ++ gnuplot_file(),
-    lager:info("~p", [Command]),
+    %ct:pal("~p", [Command]),
     os:cmd(Command).
 
 %% @private
@@ -523,3 +712,13 @@ join_titles(Titles) ->
         Titles
     ),
     string:strip(Line).
+
+%% @private
+delete_files(Files) ->
+    lists:foreach(
+      fun(File) ->
+        ok = file:delete(File)
+      end,
+      Files
+    ).
+

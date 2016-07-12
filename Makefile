@@ -5,7 +5,7 @@ ERLANG_BIN       = $(shell dirname $(shell which erl))
 REBAR            = $(shell pwd)/rebar3
 MAKE						 = make
 
-.PHONY: rel deps test eqc plots
+.PHONY: rel deps test eqc plots dcos
 
 all: compile
 
@@ -81,6 +81,31 @@ publish:
 
 shell:
 	${REBAR} shell --apps lasp
+
+dcos:
+	bin/dcos-deploy.sh
+
+##
+## Evaluation related targets
+##
+plots:
+	pkill -9 beam.smp; \
+	  clear; \
+		rm -rf priv/lager/ priv/evaluation; \
+		(cd priv/ && git clone https://github.com/lasp-lang/evaluation); \
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE; \
+		cd priv/evaluation && ./lasp_plot_gen.sh
+
+ads: SHELL:=/bin/bash
+ads:
+	priv/ads.sh
+
+docker-ads: SHELL:=/bin/bash
+docker-ads:
+	priv/docker-ads.sh
+
+logs:
+	tail -F priv/lager/*/log/*.log
 
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 

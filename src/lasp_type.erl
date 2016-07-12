@@ -23,60 +23,119 @@
 
 -include("lasp.hrl").
 
--export([new/1, update/4, merge/3, value/2, query/2]).
+-export([new/1,
+         update/4,
+         merge/3,
+         threshold_met/3,
+         is_inflation/3,
+         is_bottom/2,
+         is_strict_inflation/3,
+         query/2,
+         get_type/1]).
+
+types() ->
+    [
+        {awset_ps, {state_awset_ps, undefined}},
+        {boolean, {state_boolean, undefined}},
+        {gcounter, {state_gcounter, undefined}},
+        {gmap, {state_gmap, undefined}},
+        {gset, {state_gset, undefined}},
+        {ivar, {state_ivar, undefined}},
+        {orset, {state_orset, undefined}},
+        {pair, {state_pair, undefined}},
+        {pncounter, {state_pncounter, undefined}}
+    ].
+
+get_mode() ->
+    lasp_config:get(mode, state_based).
+
+%% @doc Return the internal type.
+get_type([]) ->
+    [];
+get_type([H | T]) ->
+    [get_type(H) | get_type(T)];
+get_type({T1, T2}) ->
+    {get_type(T1), get_type(T2)};
+get_type(T) ->
+    get_type(T, get_mode()).
+
+get_type(T, Mode) ->
+    {ok, {StateType, PureOpType}} = orddict:find(T, types()),
+    case Mode of
+        delta_based ->
+            StateType;
+        state_based ->
+            StateType;
+        pure_op_based ->
+            PureOpType
+    end.
+
+remove_args({T, _Args}) ->
+    T;
+remove_args(T) ->
+    T.
+
+%% @doc Is bottom?
+is_bottom(Type, Value) ->
+    T = get_type(remove_args(Type)),
+    T:is_bottom(Value).
+
+%% @doc Is strict inflation?
+is_strict_inflation(Type, Previous, Current) ->
+    T = get_type(remove_args(Type)),
+    T:is_strict_inflation(Previous, Current).
+
+%% @doc Is inflation?
+is_inflation(Type, Previous, Current) ->
+    T = get_type(remove_args(Type)),
+    T:is_inflation(Previous, Current).
+
+%% @doc Determine if a threshold is met.
+threshold_met(Type, Value, {strict, Threshold}) ->
+    T = get_type(remove_args(Type)),
+    T:is_strict_inflation(Threshold, Value);
+threshold_met(Type, Value, Threshold) ->
+    T = get_type(remove_args(Type)),
+    T:is_inflation(Threshold, Value).
 
 %% @doc Initialize a new variable for a given type.
 new(Type) ->
+    T = get_type(remove_args(Type)),
     case Type of
-        {T, Args} ->
-            T:new(Args);
-        T ->
+        {_T0, Args} ->
+            T:new(get_type(Args));
+        _T0 ->
             T:new()
     end.
 
 %% @doc Use the proper type for performing an update.
 update(Type, Operation, Actor, Value) ->
-    case Type of
-        {T, _Args} ->
-            case lasp_config:get(delta_mode, false) of
-                true ->
-                    T:update_delta(Operation, Actor, Value);
-                false ->
-                    T:update(Operation, Actor, Value)
-            end;
-        T ->
-            case lasp_config:get(delta_mode, false) of
-                true ->
-                    T:update_delta(Operation, Actor, Value);
-                false ->
-                    T:update(Operation, Actor, Value)
-            end
+    Mode = get_mode(),
+    T = get_type(remove_args(Type), Mode),
+    RealActor = get_actor(T, Actor),
+    case Mode of
+        delta_based ->
+            T:delta_mutate(Operation, RealActor, Value);
+        state_based ->
+            T:mutate(Operation, RealActor, Value);
+        pure_op_based ->
+            ok %% @todo
     end.
+
+%% @private
+get_actor(state_awset_ps, {{StorageId, _TypeId}, Actor}) ->
+    {StorageId, Actor};
+get_actor(_Type, {_Id, Actor}) ->
+    Actor;
+get_actor(_Type, Actor) ->
+    Actor.
 
 %% @doc Call the correct merge function for a given type.
 merge(Type, Value0, Value) ->
-    case Type of
-        {T, _Args} ->
-            T:merge(Value0, Value);
-        T ->
-            T:merge(Value0, Value)
-    end.
+    T = get_type(remove_args(Type)),
+    T:merge(Value0, Value).
 
 %% @doc Return the value of a CRDT.
-value(Type, Value) ->
-    case Type of
-        {T, _Args} ->
-            T:value(Value);
-        T ->
-            T:value(Value)
-    end.
-
-%% @doc Return the current value of a CRDT.
-query(Type, Id) ->
-    {ok, {_, _, _, Value}} = lasp:read(Id, undefined),
-    case Type of
-        {T, _Args} ->
-            T:value(Value);
-        T ->
-            T:value(Value)
-    end.
+query(Type, Value) ->
+    T = get_type(remove_args(Type)),
+    T:query(Value).

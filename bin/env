@@ -26,6 +26,9 @@ if [ ! -z "$MESOS_TASK_ID" ]; then
   # The running port should be used as the name, given this is the
   # only identifier that is available via service discovery.
   export WEB_PORT=${PORT0}
+
+  # Peer port
+  export PEER_PORT=${PORT1}
 fi
 
 # Assume 127.0.0.1 as bind host.

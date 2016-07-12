@@ -26,6 +26,7 @@
 %% API
 -export([start_link/0,
          start_child/1,
+         start_child/2,
          terminate/0,
          terminate_child/2]).
 
@@ -43,13 +44,15 @@ start_link() ->
 %% @doc Terminate all children.
 terminate() ->
     Children = supervisor:which_children(?MODULE),
-    lager:info("Terminating: ~p", [Children]),
     [terminate_child(?MODULE, Child)
      || {_Id, Child, _Type, _Modules} <- Children].
 
 %% @doc Start a child.
 start_child(Args) ->
     supervisor:start_child(?MODULE, [Args]).
+
+start_child(EventCount, Args) ->
+    supervisor:start_child(?MODULE, [EventCount, Args]).
 
 %% @doc Stop a child immediately
 terminate_child(Supervisor, Pid) ->

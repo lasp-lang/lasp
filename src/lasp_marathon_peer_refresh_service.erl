@@ -75,7 +75,7 @@ init([]) ->
         false ->
             ok;
         _ ->
-            %% @todo Stall messages, because Plumtree has a race on startup, again.
+            %% Stall messages; Plumtree has a race on startup, again.
             timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
             timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE)
     end,
@@ -87,13 +87,13 @@ init([]) ->
 
 %% @private
 handle_call(Msg, _From, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
 
 %% @private
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 handle_cast(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
@@ -101,12 +101,22 @@ handle_cast(Msg, State) ->
 handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
     timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE),
 
-    Nodes = case request() of
+    %% Randomly get information from the orchestrator nodes and the
+    %% regular nodes.
+    %%
+    Task = case rand_compat:uniform(10) rem 2 == 0 of
+        true ->
+            "lasp-orchestrator";
+        false ->
+            "lasp"
+    end,
+
+    Nodes = case request(Task) of
         {ok, Response} ->
             Nodes1 = generate_nodes(Response),
             Nodes1;
         Other ->
-            lager:info("Invalid Marathon response: ~p", [Other]),
+            _ = lager:info("Invalid Marathon response: ~p", [Other]),
             SeenNodes
     end,
 
@@ -115,14 +125,12 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
 
     {noreply, State#state{nodes=ConnectedNodes}};
 handle_info(?NODES_MESSAGE, State) ->
+    {ok, Nodes} = lasp_peer_service:members(),
+    _ = lager:info("Currently connected nodes via peer service: ~p", [Nodes]),
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
-    lager:info("Currently connected nodes via distributed erlang: ~p",
-               [nodes()]),
-    lager:info("Currently connected nodes via Lasp peer service: ~p",
-               [lasp_peer_service:members()]),
     {noreply, State};
 handle_info(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
@@ -142,63 +150,63 @@ code_change(_OldVsn, State, _Extra) ->
 %% @doc Generate a list of Erlang node names.
 generate_nodes(#{<<"app">> := App}) ->
     #{<<"tasks">> := Tasks} = App,
-    [generate_node(Host, Port)
-     || #{<<"host">> := Host, <<"ports">> := [Port]} <- Tasks].
+    lists:map(fun(Task) ->
+                #{<<"host">> := Host,
+                  <<"ports">> := [EPMDPort, PeerPort]} = Task,
+        generate_node(Host, EPMDPort, PeerPort)
+        end, Tasks).
 
 %% @doc Generate a single Erlang node name.
-generate_node(Host, Port) ->
-    Name = "lasp-" ++ integer_to_list(Port) ++ "@" ++ binary_to_list(Host),
-    list_to_atom(Name).
+generate_node(Host, EPMDPort, PeerPort) ->
+    Name = "lasp-" ++ integer_to_list(EPMDPort) ++ "@" ++ binary_to_list(Host),
+    {ok, IPAddress} = inet_parse:address(binary_to_list(Host)),
+    Node = {list_to_atom(Name), IPAddress, PeerPort},
+    Node.
 
-%% @doc Attempt to connect disconnected nodes.
 %% @private
 maybe_connect(Nodes, SeenNodes) ->
-    ToConnect = Nodes -- (SeenNodes ++ [node()]),
+    %% If this is the first time you've seen the node, attempt to
+    %% connect; only attempt to connect once, because node might be
+    %% migrated to a passive view of the membership.
+    %%
+    ToConnect = Nodes -- SeenNodes,
 
-    %% Attempt connection.
-    Attempted = case ToConnect of
+    %% Attempt connection to any new nodes.
+    case ToConnect of
         [] ->
             [];
         _ ->
             lists:map(fun connect/1, ToConnect)
     end,
 
-    %% Log the output of the attempt.
-    case Attempted of
-        [] ->
-            ok;
-        _ ->
-            lager:info("Attempted to connect: ~p", [Attempted])
-    end,
-
-    %% Return list of connected nodes.
-    nodes().
+    %% Return list of seen nodes with the new node.
+    SeenNodes ++ Nodes.
 
 %% @private
 connect(Node) ->
-    Ping = net_adm:ping(Node),
-    case Ping of
-        pang ->
-            ok;
-        pong ->
-            lasp_peer_service:join(Node)
-    end,
-    {Node, Ping}.
+    lasp_peer_service:join(Node).
 
 %% @private
-request() ->
+request(Task) ->
     IP = os:getenv("IP", "127.0.0.1"),
     DCOS = os:getenv("DCOS", "false"),
+    Headers = case DCOS of
+                "false" ->
+                    [];
+                _ ->
+                    Token = os:getenv("TOKEN", "undefined"),
+                    [{"Authorization", "token=" ++ Token}]
+    end,
     Url = case DCOS of
               "false" ->
-                "http://" ++ IP ++ ":8080/v2/apps/lasp?embed=app.taskStats";
+                "http://" ++ IP ++ ":8080/v2/apps/" ++ Task ++ "?embed=app.taskStats";
               _ ->
-                DCOS ++ "/marathon/v2/apps/lasp?embed=app.taskStats"
+                DCOS ++ "/marathon/v2/apps/" ++ Task ++ "?embed=app.taskStats"
           end,
-    case httpc:request(get, {Url, []}, [], [{body_format, binary}]) of
+    case httpc:request(get, {Url, Headers}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, Body}} ->
             {ok, jsx:decode(Body, [return_maps])};
         Other ->
-            lager:info("Request failed; ~p", [Other]),
+            _ = lager:info("Request failed; ~p", [Other]),
             {error, invalid}
     end.

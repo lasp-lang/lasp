@@ -1,15 +1,20 @@
+%% General timeout value.
 -define(TIMEOUT, 100000).
 
+%% Application information.
 -define(APP, lasp).
 
-%% Number of nodes to run for the test suite.
--define(NUM_NODES, 5).
+%% Peer service port.
+-define(PEER_PORT, 9000).
+
+%% Number of additional nodes to run for the test suite.
+-define(NUM_NODES, 3).
 
 %% Code which connects the storage backends to the implementation.
 -define(CORE, lasp_core).
 
 %% Default set implementation for Lasp internal state tracking.
--define(SET, lasp_orset).
+-define(SET, orset).
 
 -record(read, {id :: id(),
                type :: type(),
@@ -17,13 +22,15 @@
                read_fun :: function()}).
 
 -record(dv, {value :: value(),
+             waiting_delta_threads = [] :: list(pending_threshold()),
              waiting_threads = [] :: list(pending_threshold()),
              lazy_threads = [] :: list(pending_threshold()),
              type :: type(),
              metadata :: metadata(),
              delta_counter :: non_neg_integer(),
              delta_map :: orddict:orddict(),
-             delta_ack_map :: orddict:orddict()}).
+             delta_ack_map :: orddict:orddict(),
+             delta_eager_map = [] :: list(crdt())}).
 
 -type variable() :: #dv{}.
 
@@ -54,15 +61,9 @@
 -type registration() :: preflist | global.
 -type id() :: binary() | {binary(), type()}.
 -type idx() :: term().
+-type not_found() :: {error, not_found}.
 -type result() :: term().
--type type() :: lasp_ivar
-              | lasp_orset
-              | lasp_orset_gbtree
-              | {lasp_top_k_set, [any()]}
-              | {lasp_pair, [type()]}
-              | riak_dt_gcounter
-              | lasp_pncounter
-              | lasp_gcounter.
+-type type() :: term().
 -type value() :: term().
 -type func() :: atom().
 -type args() :: list().
@@ -72,7 +73,7 @@
 -type store() :: ets:tid() | atom() | reference() | pid().
 -type threshold() :: value() | {strict, value()}.
 -type pending_threshold() :: {threshold, read | wait, pid(), type(), threshold()}.
--type operation() :: {atom(), value()} | {atom(), value(), value()}.
+-type operation() :: {atom(), value()} | {atom(), value(), value()} | atom().
 -type operations() :: list(operation()).
 -type actor() :: term().
 -type error() :: {error, atom()}.
@@ -82,7 +83,7 @@
 -type var() :: {id(), type(), metadata(), value()}.
 
 %% @doc Only CRDTs are able to be processed.
--type crdt() :: riak_dt:crdt().
+-type crdt() :: type:crdt().
 
 %% @doc Output of program must be a CRDT.
 -type output() :: crdt().
@@ -93,3 +94,12 @@
 
 %% @doc The type of objects that we can be notified about.
 -type object() :: crdt().
+
+%% Test identifiers.
+-define(ADS_WITH_CONTRACTS, <<"ads_with_contracts">>).
+-define(CONVERGENCE_TRACKING, <<"convergence_tracking">>).
+-define(BOOLEAN_TYPE, boolean).
+-define(COUNTER_TYPE, gcounter).
+-define(GMAP_TYPE, gmap).
+-define(SET_TYPE, lasp_config:get(set, orset)).
+-define(PAIR_TYPE, pair).

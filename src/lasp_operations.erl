@@ -23,5 +23,5 @@
 
 -export([inverse/2]).
 
-inverse(lasp_pncounter, {increment, X}) ->
+inverse(pncounter, {increment, X}) ->
     {decrement, X}.

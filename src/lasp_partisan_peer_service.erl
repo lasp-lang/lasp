@@ -18,21 +18,21 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_plumtree_peer_service).
+-module(lasp_partisan_peer_service).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -include("lasp.hrl").
 
 -behaviour(lasp_peer_service).
 
--define(PEER_SERVICE, plumtree_peer_service).
--define(PEER_SERVICE_MANAGER, plumtree_peer_service_manager).
+-define(PEER_SERVICE, partisan_peer_service).
 
 -export([join/1,
          join/2,
          join/3,
          leave/0,
          members/0,
+         manager/0,
          stop/0,
          stop/1]).
 
@@ -48,6 +48,8 @@ join(Node) ->
 join(NodeStr, Auto) when is_list(NodeStr) ->
     do(join, [NodeStr, Auto]);
 join(Node, Auto) when is_atom(Node) ->
+    do(join, [Node, Auto]);
+join({_Name, _IPAddress, _Port} = Node, Auto) ->
     do(join, [Node, Auto]).
 
 %% @doc Initiate join. Nodes cannot join themselves.
@@ -60,7 +62,11 @@ leave() ->
 
 %% @doc Leave the cluster.
 members() ->
-    do(?PEER_SERVICE_MANAGER, members, []).
+    do(?PEER_SERVICE, members, []).
+
+%% @doc Leave the cluster.
+manager() ->
+    do(?PEER_SERVICE, manager, []).
 
 %% @doc Stop node.
 stop() ->
@@ -75,6 +81,8 @@ stop(Reason) ->
 %%%===================================================================
 
 %% @doc Execute call to the proper backend.
+do(join, Args) ->
+    erlang:apply(?PEER_SERVICE, join, Args);
 do(Function, Args) ->
     erlang:apply(?PEER_SERVICE, Function, Args).
 

@@ -41,7 +41,7 @@ dispatch() ->
         {["api", "logs"],       lasp_logs_resource,         undefined},
         {["api", "health"],     lasp_health_check_resource, undefined},
         {["api", "status"],     lasp_status_resource,       undefined},
-        {["api", "simulate"],   lasp_simulate_resource,     undefined},
+        {["api", "dag"],        lasp_dag_resource,          undefined},
         {[],                    lasp_gui_resource,          index},
         {['*'],                 lasp_gui_resource,          undefined}
     ]).
@@ -49,18 +49,13 @@ dispatch() ->
 web_config() ->
     {ok, App} = application:get_application(?MODULE),
     {ok, Ip} = application:get_env(App, web_ip),
-    DCOS = os:getenv("DCOS", "false"),
-    Port = case DCOS of
-              "false" ->
-                DefaultPort = application:get_env(App, web_port, 8080),
-                list_to_integer(os:getenv("WEB_PORT", integer_to_list(DefaultPort)));
-              _ ->
-                80
-          end,
-    lager:info("Port override: ~p", [Port]),
-    [
+    Port = lasp_config:get(web_port, 8080),
+    Config = [
         {ip, Ip},
         {port, Port},
         {log_dir, "priv/log"},
         {dispatch, dispatch()}
-    ].
+    ],
+    Node = node(),
+    lager:info("Node ~p enabling web configuration: ~p", [Node, Config]),
+    Config.

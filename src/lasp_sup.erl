@@ -1,6 +1,7 @@
 %% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
+%% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -43,14 +44,34 @@ start_link() ->
 %% ===================================================================
 
 init(_Args) ->
+    DepDag = {lasp_dependence_dag,
+              {lasp_dependence_dag, start_link, []},
+               permanent, 5000, worker, [lasp_dependence_dag]},
+
     Process = {lasp_process_sup,
                {lasp_process_sup, start_link, []},
                 permanent, infinity, supervisor, [lasp_process_sup]},
 
     Unique = {lasp_unique,
-                {lasp_unique, start_link, []},
-                 permanent, 5000, worker,
-                 [lasp_unique]},
+              {lasp_unique, start_link, []},
+               permanent, 5000, worker,
+               [lasp_unique]},
+
+    %% Before initializing the partisan backend, be sure to configure it
+    %% to use the proper ports.
+    %%
+    case os:getenv("PEER_PORT", "false") of
+        "false" ->
+            partisan_config:set(peer_port, random_port()),
+            ok;
+        PeerPort ->
+            partisan_config:set(peer_port, list_to_integer(PeerPort)),
+            ok
+    end,
+
+    Partisan = {partisan_sup,
+                {partisan_sup, start_link, []},
+                 permanent, infinity, supervisor, [partisan_sup]},
 
     PlumtreeBackend = {lasp_plumtree_broadcast_distribution_backend,
                        {lasp_plumtree_broadcast_distribution_backend, start_link, []},
@@ -61,69 +82,93 @@ init(_Args) ->
                 {plumtree_sup, start_link, []},
                  permanent, infinity, supervisor, [plumtree_sup]},
 
-    Web = {webmachine_mochiweb,
-           {webmachine_mochiweb, start, [lasp_config:web_config()]},
-            permanent, 5000, worker,
-            [mochiweb_socket_server]},
-
     MarathonPeerRefresh = {lasp_marathon_peer_refresh_service,
                            {lasp_marathon_peer_refresh_service, start_link, []},
                             permanent, 5000, worker,
                             [lasp_marathon_peer_refresh_service]},
 
-    BaseSpecs = [Unique,
-                 PlumtreeBackend,
-                 Plumtree,
-                 MarathonPeerRefresh,
-                 Process],
+    WebSpecs = web_specs(),
+
+    BaseSpecs0 = [Unique,
+                  Partisan,
+                  PlumtreeBackend,
+                  Plumtree,
+                  MarathonPeerRefresh,
+                  Process] ++ WebSpecs,
+
+    DagEnabled = application:get_env(?APP, dag_enabled, false),
+    lasp_config:set(dag_enabled, DagEnabled),
+    BaseSpecs = case DagEnabled of
+        true -> [DepDag | BaseSpecs0];
+        false -> BaseSpecs0
+    end,
 
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
     InstrEnabled = application:get_env(?APP, instrumentation, InstrDefault),
+    lasp_config:set(instrumentation, InstrEnabled),
 
-    Children = case InstrEnabled of
+    Children0 = case InstrEnabled of
         true ->
-            ok = application:set_env(?APP, instrumentation, InstrEnabled),
-            lager:info("Instrumentation: ~p", [InstrEnabled]),
+            lager:info("Instrumentation is enabled!"),
+            Transmission = {lasp_transmission_instrumentation,
+                            {lasp_transmission_instrumentation, start_link, []},
+                             permanent, 5000, worker,
+                             [lasp_transmission_instrumentation]},
 
-            ClientTrans = {lasp_client_transmission_instrumentation,
-                           {lasp_transmission_instrumentation, start_link, [client]},
-                            permanent, 5000, worker,
-                            [lasp_transmission_instrumentation]},
-
-            ServerTrans = {lasp_server_transmission_instrumentation,
-                           {lasp_transmission_instrumentation, start_link, [server]},
-                            permanent, 5000, worker,
-                            [lasp_transmission_instrumentation]},
-
-            Divergence = {lasp_divergence_instrumentation,
-                          {lasp_divergence_instrumentation, start_link, []},
-                           permanent, 5000, worker,
-                           [lasp_divergence_instrumentation]},
-
-            BaseSpecs ++ [ClientTrans,
-                          ServerTrans,
-                          Divergence,
-                          Web];
+            BaseSpecs ++ [Transmission];
         false ->
-            ok = application:set_env(?APP, instrumentation, InstrEnabled),
             BaseSpecs
     end,
 
-    SimDefault = list_to_atom(os:getenv("AD_COUNTER_SIM", "false")),
-    SimEnabled = application:get_env(?APP,
-                                     ad_counter_simulation_on_boot,
-                                     SimDefault),
+    %% Setup the advertisement counter example, if necessary.
+    AdSpecs = advertisement_counter_child_specs(),
 
-    %% Run local simulations if instrumentation is enabled.
-    case SimEnabled of
-        true ->
-            spawn(fun() ->
-                        timer:sleep(10000),
-                        lasp_simulate_resource:run()
-                  end);
-        false ->
+    %% Setup the music festival example, if necessary.
+    MusicSpecs = music_festival_child_specs(),
+
+    Children = Children0 ++ AdSpecs ++ MusicSpecs,
+
+    %% Configure defaults.
+    configure_defaults(),
+
+    {ok, {{one_for_one, 5, 10}, Children}}.
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
+
+%% @private
+web_specs() ->
+    %% Before initializing the web backend, configure it using the
+    %% proper ports.
+    %%
+    case os:getenv("WEB_PORT", "false") of
+        "false" ->
+            lasp_config:set(web_port, random_port()),
+            ok;
+        WebPort ->
+            lasp_config:set(web_port, list_to_integer(WebPort)),
             ok
     end,
+
+    Web = {webmachine_mochiweb,
+           {webmachine_mochiweb, start, [lasp_config:web_config()]},
+            permanent, 5000, worker,
+            [mochiweb_socket_server]},
+
+    [Web].
+
+%% @private
+configure_defaults() ->
+    ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),
+    Mode = application:get_env(?APP, mode, ModeDefault),
+    lager:info("Setting operation mode: ~p", [Mode]),
+    lasp_config:set(mode, Mode),
+
+    SetDefault = list_to_atom(os:getenv("SET", "orset")),
+    Set = application:get_env(?APP, set, SetDefault),
+    lager:info("Setting set type: ~p", [Set]),
+    lasp_config:set(set, Set),
 
     ProfileDefault = list_to_atom(os:getenv("PROFILE", "false")),
     ProfileEnabled = application:get_env(?APP,
@@ -131,10 +176,42 @@ init(_Args) ->
                                          ProfileDefault),
     lasp_config:set(profile, ProfileEnabled),
 
-    %% Cache values with lasp_config to help out on the performance.
-    Delta = application:get_env(?APP, delta_mode, false),
-    lasp_config:set(delta_mode, Delta),
+    BroadcastDefault = list_to_atom(os:getenv("BROADCAST", "false")),
+    BroadcastEnabled = application:get_env(?APP,
+                                           broadcast,
+                                           BroadcastDefault),
+    lasp_config:set(broadcast, BroadcastEnabled),
 
+    EvaluationIdDefault = list_to_atom(os:getenv("EVAL_ID", "undefined")),
+    EvaluationIdEnabled = application:get_env(?APP,
+                                              evaluation_identifier,
+                                              EvaluationIdDefault),
+    lasp_config:set(evaluation_identifier, EvaluationIdEnabled),
+
+    EvaluationTimestampDefault = list_to_integer(os:getenv("EVAL_TIMESTAMP", "0")),
+    EvaluationTimestampEnabled = application:get_env(?APP,
+                                                  evaluation_timestamp,
+                                                  EvaluationTimestampDefault),
+    lasp_config:set(evaluation_timstamp, EvaluationTimestampEnabled),
+
+    %% Peer service.
+    PeerService = application:get_env(plumtree,
+                                      peer_service,
+                                      partisan_peer_service),
+    PeerServiceManager = PeerService:manager(),
+    lasp_config:set(peer_service_manager, PeerServiceManager),
+
+    %% Exchange mode.
+    case Mode of
+        delta_based ->
+            application:set_env(plumtree, exchange_selection,
+                                optimized);
+        _ ->
+            application:set_env(plumtree, exchange_selection,
+                                normal)
+    end,
+
+    %% Backend configurations.
     StorageBackend = application:get_env(
                        ?APP,
                        storage_backend,
@@ -147,12 +224,109 @@ init(_Args) ->
                             lasp_plumtree_broadcast_distribution_backend),
     lasp_config:set(distribution_backend, DistributionBackend),
 
-    MaxDeltaSlots = application:get_env(?APP, delta_mode_max_slots, 10),
-    lasp_config:set(delta_mode_max_slots, MaxDeltaSlots),
-
+    %% Delta specific configuration values.
     MaxGCCounter = application:get_env(?APP, delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
     lasp_config:set(delta_mode_max_gc_counter, MaxGCCounter),
 
-    lasp_config:set(instrumentation, InstrEnabled),
+    %% Incremental computation.
+    IncrementalComputation = application:get_env(
+                               ?APP,
+                               incremental_computation_mode,
+                               false),
+    lasp_config:set(incremental_computation_mode, IncrementalComputation).
 
-    {ok, {{one_for_one, 5, 10}, Children}}.
+%% @private
+music_festival_child_specs() ->
+    %% Figure out who is acting as the client.
+    MusicClientDefault = list_to_atom(os:getenv("MUSIC_FESTIVAL_SIM_CLIENT", "false")),
+    MusicClientEnabled = application:get_env(?APP,
+                                             music_festival_client,
+                                             MusicClientDefault),
+    lasp_config:set(music_festival_client, MusicClientEnabled),
+    lager:info("MusicClientEnabled: ~p", [MusicClientEnabled]),
+
+    ClientSpecs = case MusicClientEnabled of
+        true ->
+            %% Start one advertisement counter client process per node.
+            MusicFestivalClient = {lasp_music_festival_client,
+                                   {lasp_music_festival_client, start_link, []},
+                                    permanent, 5000, worker,
+                                    [lasp_music_festival_client]},
+
+            [MusicFestivalClient];
+        false ->
+            []
+    end,
+
+    %% Figure out who is acting as the server.
+    MusicServerDefault = list_to_atom(os:getenv("MUSIC_FESTIVAL_SIM_SERVER", "false")),
+    MusicServerEnabled = application:get_env(?APP,
+                                             music_festival_server,
+                                             MusicServerDefault),
+    lasp_config:set(music_festival_server, MusicServerEnabled),
+    lager:info("MusicServerEnabled: ~p", [MusicServerEnabled]),
+
+    ServerSpecs = case MusicServerEnabled of
+        true ->
+            MusicFestivalServer = {lasp_music_festival_server,
+                                   {lasp_music_festival_server, start_link, []},
+                                    permanent, 5000, worker,
+                                    [lasp_music_festival_server]},
+            [MusicFestivalServer];
+        false ->
+            []
+    end,
+
+    ClientSpecs ++ ServerSpecs.
+
+%% @private
+advertisement_counter_child_specs() ->
+    %% Figure out who is acting as the client.
+    AdClientDefault = list_to_atom(os:getenv("AD_COUNTER_SIM_CLIENT", "false")),
+    AdClientEnabled = application:get_env(?APP,
+                                          ad_counter_simulation_client,
+                                          AdClientDefault),
+    lasp_config:set(ad_counter_simulation_client, AdClientEnabled),
+    lager:info("AdClientEnabled: ~p", [AdClientEnabled]),
+
+    ClientSpecs = case AdClientEnabled of
+        true ->
+            %% Start one advertisement counter client process per node.
+            AdCounterClient = {lasp_advertisement_counter_client,
+                               {lasp_advertisement_counter_client, start_link, []},
+                                permanent, 5000, worker,
+                                [lasp_advertisement_counter_client]},
+
+
+            [AdCounterClient];
+        false ->
+            []
+    end,
+
+    %% Figure out who is acting as the server.
+    AdServerDefault = list_to_atom(os:getenv("AD_COUNTER_SIM_SERVER", "false")),
+    AdServerEnabled = application:get_env(?APP,
+                                          ad_counter_simulation_server,
+                                          AdServerDefault),
+    lasp_config:set(ad_counter_simulation_server, AdServerEnabled),
+    lager:info("AdServerEnabled: ~p", [AdServerEnabled]),
+
+    ServerSpecs = case AdServerEnabled of
+        true ->
+            AdCounterServer = {lasp_advertisement_counter_server,
+                               {lasp_advertisement_counter_server, start_link, []},
+                                permanent, 5000, worker,
+                                [lasp_advertisement_counter_server]},
+            [AdCounterServer];
+        false ->
+            []
+    end,
+
+    ClientSpecs ++ ServerSpecs.
+
+%% @private
+random_port() ->
+    {ok, Socket} = gen_tcp:listen(0, []),
+    {ok, {_, Port}} = inet:sockname(Socket),
+    ok = gen_tcp:close(Socket),
+    Port.

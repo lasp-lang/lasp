@@ -5,12 +5,17 @@ install:
   - make
   - ./rebar3 update
 script:
-  - make test
+  - make eunit
   - make xref
   - make dialyzer
   - make lint
+  - MODE=state_based make ct
+  - MODE=delta_based make ct
 notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D
   irc: "irc.freenode.org#lasp-lang"
-sudo: false
+sudo: required
+env:
+  global:
+    - OMIT_HIGH_ULIMIT=true

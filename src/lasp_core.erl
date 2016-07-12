@@ -38,8 +38,9 @@
          declare/5,
          declare_dynamic/4,
          query/2,
+         stream/3,
          update/4,
-         update/5,
+         update/6,
          thread/4,
          filter/4,
          map/4,
@@ -51,6 +52,7 @@
          wait_needed/3,
          reply_to_all/2,
          reply_to_all/3,
+         receive_value/2,
          receive_delta/2]).
 
 %% Exported functions for vnode integration, where callback behavior is
@@ -75,6 +77,12 @@
                 ?MODULE:bind(_AccId, AccValue, _Store)
               end).
 
+-define(WRITE, fun(_Store) ->
+                 fun(_AccId, _AccValue) ->
+                   {ok, _} = ?MODULE:bind(_AccId, _AccValue, _Store)
+                 end
+               end).
+
 -define(READ, fun(_Id, _Threshold) ->
                 ?MODULE:read(_Id, _Threshold, Store)
               end).
@@ -92,7 +100,7 @@ start(Identifier) ->
 %%
 -spec filter(id(), function(), id(), store()) -> {ok, pid()}.
 filter(Id, Function, AccId, Store) ->
-    filter(Id, Function, AccId, Store, ?BIND, ?READ).
+    filter(Id, Function, AccId, Store, ?WRITE, ?READ).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -112,7 +120,7 @@ fold(Id, Function, AccId, Store) ->
 %%
 -spec map(id(), function(), id(), store()) -> {ok, pid()}.
 map(Id, Function, AccId, Store) ->
-    map(Id, Function, AccId, Store, ?BIND, ?READ).
+    map(Id, Function, AccId, Store, ?WRITE, ?READ).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -127,7 +135,7 @@ intersection(Left, Right, Intersection, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read(_Right, _Threshold, _Variables)
     end,
-    intersection(Left, Right, Intersection, Store, ?BIND, ReadLeftFun, ReadRightFun).
+    intersection(Left, Right, Intersection, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Compute the union of two sets.
 %%
@@ -142,7 +150,7 @@ union(Left, Right, Union, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read(_Right, _Threshold, _Variables)
     end,
-    union(Left, Right, Union, Store, ?BIND, ReadLeftFun, ReadRightFun).
+    union(Left, Right, Union, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -157,7 +165,7 @@ product(Left, Right, Product, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read(_Right, _Threshold, _Variables)
     end,
-    product(Left, Right, Product, Store, ?BIND, ReadLeftFun, ReadRightFun).
+    product(Left, Right, Product, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Perform a read for a particular identifier.
 %%
@@ -208,7 +216,7 @@ read_any(Reads, Store) ->
 %% @doc Declare a dataflow variable in a provided by identifer.
 -spec declare(store()) -> {ok, var()}.
 declare(Store) ->
-    declare(lasp_ivar, Store).
+    declare(ivar, Store).
 
 %% @doc Declare a dataflow variable, as a given type.
 -spec declare(type(), store()) -> {ok, var()}.
@@ -233,21 +241,31 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
     case do(get, [Store, Id]) of
         {ok, #dv{value=Value, metadata=Metadata}} ->
             %% Do nothing; make declare idempotent at each replica.
-            {ok, {{Id, Type}, Type, Metadata, Value}};
+            {ok, {Id, Type, Metadata, Value}};
         _ ->
+            case lasp_config:get(dag_enabled, false) of
+                true -> lasp_dependence_dag:add_vertex({Id, Type});
+                false -> ok
+            end,
             Value = lasp_type:new(Type),
             Metadata = MetadataFun(MetadataNew),
             Counter0 = 0,
             DeltaMap0 = orddict:new(),
             AckMap = orddict:new(),
-            DeltaMap = orddict:store(Counter0, Value, DeltaMap0),
-            ok = do(put, [Store, {Id, Type}, #dv{value=Value,
-                                                 type=Type,
-                                                 metadata=Metadata,
-                                                 delta_counter=increment_counter(Counter0),
-                                                 delta_map=DeltaMap,
-                                                 delta_ack_map=AckMap}]),
-            {ok, {{Id, Type}, Type, Metadata, Value}}
+            NewId = case Id of
+                        {_, Type} ->
+                            Id;
+                        _ ->
+                            {Id, Type}
+                    end,
+            DeltaMap = orddict:store(Counter0, {node(), Value}, DeltaMap0),
+            ok = do(put, [Store, NewId, #dv{value=Value,
+                                            type=Type,
+                                            metadata=Metadata,
+                                            delta_counter=increment_counter(Counter0),
+                                            delta_map=DeltaMap,
+                                            delta_ack_map=AckMap}]),
+            {ok, {NewId, Type, Metadata, Value}}
     end.
 
 %% @doc Declare a dynamic variable in a provided by identifer.
@@ -259,19 +277,23 @@ declare_dynamic(Id, Type, MetadataFun0, Store) ->
     declare(Id, Type, MetadataFun, Store).
 
 %% @doc Return the current value of a CRDT.
-%%
+%% @todo Why isn't this using the ReadFun?
 -spec query(id(), store()) -> {ok, term()}.
-query(Id, Store) ->
-    {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
-    Value = lasp_type:value(Type, Value0),
-    {ok, Value}.
+query({_, Type}=Id, Store) ->
+    Value = case do(get, [Store, Id]) of
+        {ok, #dv{value=Value0, type=Type}} ->
+            Value0;
+        {error, not_found} ->
+            lasp_type:new(Type)
+    end,
+    {ok, lasp_type:query(Type, Value)}.
 
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.
 %%
 -spec bind_to(id(), id(), store()) -> {ok, pid()}.
 bind_to(AccId, Id, Store) ->
-    bind_to(AccId, Id, Store, ?BIND, ?READ).
+    bind_to(AccId, Id, Store, ?WRITE, ?READ).
 
 %% @doc Spawn a function.
 %%
@@ -329,90 +351,84 @@ wait_needed(Id, Threshold, Store) ->
 %%      `Operation', which should be valid for the type of CRDT stored
 %%      at the given `Id'.
 %%
--spec update(id(), operation(), actor(), store()) -> {ok, var()}.
+-spec update(id(), operation(), actor(), store()) ->
+    {ok, var()} | not_found().
 update(Id, Operation, Actor, Store) ->
     MetadataFun = fun(X) -> X end,
-    update(Id, Operation, Actor, MetadataFun, Store).
+    MetadataFunDeclare = fun(X) -> X end,
+    update(Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store).
 
--spec update(id(), operation(), actor(), function(), store()) -> {ok, var()}.
-update(Id, Operation, Actor, MetadataFun, Store) ->
-    {ok, #dv{value=Value0, type=Type}} = do(get, [Store, Id]),
-    {ok, Value} = lasp_type:update(Type, Operation, Actor, Value0),
-    bind(Id, Value, MetadataFun, Store).
+-spec update(id(), operation(), actor(), function(), function(), store()) ->
+    {ok, var()} | not_found().
+update({_, Type} = Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store) ->
+    case do(get, [Store, Id]) of
+        {ok, #dv{value=Value0, type=Type}} ->
+            {ok, Value} = lasp_type:update(Type, Operation, {Id, Actor}, Value0),
+            bind(Id, Value, MetadataFun, Store);
+        {error, not_found} ->
+            {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
+            update(Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store)
+    end.
 
 %% @doc Define a dataflow variable to be bound a value.
--spec bind(id(), value(), store()) -> {ok, var()}.
+-spec bind(id(), value(), store()) -> {ok, var()} | not_found().
 bind(Id, Value, Store) ->
     MetadataFun = fun(X) -> X end,
     bind(Id, Value, MetadataFun, Store).
 
-%% @doc Define a dataflow variable to be bound a value.
--spec bind(id(), value(), function(), store()) -> {ok, var()}.
-bind(Id, {delta, Value}, MetadataFun, Store) ->
-    Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
-                      waiting_threads=WT, delta_counter=Counter0,
-                      delta_map=DeltaMap0, delta_ack_map=AckMap}=Object) ->
-            Metadata = MetadataFun(Metadata0),
-            %% Merge may throw for invalid types.
-            try
-                Merged = lasp_type:merge(Type, Value0, Value),
-                {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
-                case lasp_lattice:is_strict_inflation(Type, Value0, Merged) of
-                    true ->
-                        DeltaMap = store_delta(Type, Counter0, Value, DeltaMap0),
-                        NewObject = #dv{type=Type, metadata=Metadata, value=Merged,
-                                        waiting_threads=SW,
-                                        delta_counter=increment_counter(Counter0),
-                                        delta_map=DeltaMap, delta_ack_map=AckMap},
-                        %% Return value is a delta state.
-                        {NewObject, {ok, {Id, Type, Metadata, {delta, Merged}}}};
-                    false ->
-                        %% Given delta state is already merged, no delta info update.
-                        {Object#dv{waiting_threads=SW},
-                         {ok, {Id, Type, Metadata, {delta, Merged}}}}
-                end
-            catch
-                _:Reason ->
-                    %% Merge threw.
-                    lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
-                                    [Type, Reason, Value0, Value]),
-                    {Object, {ok, {Id, Type, Metadata, Value0}}}
-            end
-    end,
-    do(update, [Store, Id, Mutator]);
 bind(Id, Value, MetadataFun, Store) ->
+    bind(node(), Id, Value, MetadataFun, Store).
+
+%% @doc Define a dataflow variable to be bound a value.
+-spec bind(node(), id(), value(), function(), store()) ->
+    {ok, var()} | not_found().
+bind(Origin, Id, Value, MetadataFun, Store) ->
     Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
-                      waiting_threads=WT, delta_counter=Counter,
-                      delta_map=DeltaMap, delta_ack_map=AckMap}=Object) ->
+                      waiting_delta_threads=WDT, waiting_threads=WT,
+                      delta_counter=Counter0, delta_map=DeltaMap0,
+                      delta_eager_map=DeltaEagerMap0,
+                      delta_ack_map=AckMap}=Object) ->
             Metadata = MetadataFun(Metadata0),
             case Value0 of
                 Value ->
-                    %% Bind to current value.
                     {Object, {ok, {Id, Type, Metadata, Value}}};
                 _ ->
-                    %% Merge may throw for invalid types.
-                    try
-                        Merged = lasp_type:merge(Type, Value0, Value),
-                        case lasp_lattice:is_inflation(Type, Value0, Merged) of
-                            true ->
-                                {ok, SW} = reply_to_all(WT, [], {ok, {Id, Type, Metadata, Merged}}),
-                                NewObject = #dv{type=Type, metadata=Metadata,
-                                                value=Merged, waiting_threads=SW,
-                                                delta_counter=Counter,
-                                                delta_map=DeltaMap,
-                                                delta_ack_map=AckMap},
-                                {NewObject, {ok, {Id, Type, Metadata, Merged}}};
-                            false ->
-                                %% Value is old.
-                                {Object, {ok, {Id, Type, Metadata, Value0}}}
-                        end
-                    catch
-                        _:Reason ->
-                            %% Merge threw.
-                            lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
-                                          [Type, Reason, Value0, Value]),
-                            {Object, {ok, {Id, Type, Metadata, Value0}}}
+                %% Merge may throw for invalid types.
+                try
+                    Merged = lasp_type:merge(Type, Value0, Value),
+                    case lasp_type:is_strict_inflation(Type, Value0, Merged) of
+                        true ->
+                            {ok, SW} = reply_to_all(WT, [],
+                                                    {ok, {Id, Type, Metadata, Merged}}),
+
+                            {ok, SWD, Counter, DeltaMap, DeltaEagerMap} = case lasp_config:get(mode, state_based) of
+                                state_based ->
+                                    {ok, WDT, Counter0, DeltaMap0, DeltaEagerMap0};
+                                delta_based ->
+                                    {ok, SWD1} = reply_to_all(WDT, [],
+                                                              {ok, {Id, Type, Metadata, Value}}),
+                                    DeltaMap1 = store_delta(Origin, Counter0, Value, DeltaMap0),
+                                    DeltaEagerMap1 = DeltaEagerMap0 ++ [Value],
+                                    {ok, SWD1, increment_counter(Counter0), DeltaMap1, DeltaEagerMap1}
+                            end,
+                            NewObject = #dv{type=Type, metadata=Metadata, value=Merged,
+                                            waiting_delta_threads=SWD, waiting_threads=SW,
+                                            delta_counter=Counter,
+                                            delta_eager_map=DeltaEagerMap,
+                                            delta_map=DeltaMap, delta_ack_map=AckMap},
+                            %% Return value is a delta state.
+                            {NewObject, {ok, {Id, Type, Metadata, Merged}}};
+                        false ->
+                            %% Given state is already merged, no update.
+                            {Object, {ok, {Id, Type, Metadata, Merged}}}
                     end
+                catch
+                    _:Reason ->
+                        %% Merge threw.
+                        _ = lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
+                                          [Type, Reason, Value0, Value]),
+                        {Object, {ok, {Id, Type, Metadata, Value0}}}
+                end
             end
     end,
     do(update, [Store, Id, Mutator]).
@@ -433,7 +449,7 @@ bind(Id, Value, MetadataFun, Store) ->
 %%      variable is unbound or has not met the threshold yet.
 %%
 -spec read(id(), value(), store(), pid(), function(), function()) ->
-    {ok, var()}.
+    {ok, var()} | not_found().
 read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
     Mutator = fun(#dv{type=Type, value=Value, metadata=Metadata, lazy_threads=LT}=Object) ->
             %% When no threshold is specified, use the bottom value for the
@@ -452,7 +468,7 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
             {ok, SL} = reply_to_all(LT, {ok, Threshold}),
 
             %% Satisfy read if threshold is met.
-            case lasp_lattice:threshold_met(Type, Value, Threshold) of
+            case lasp_type:threshold_met(Type, Value, Threshold) of
                 true ->
                     {Object#dv{lazy_threads=SL}, {ok, {Id, Type, Metadata, Value}}};
                 false ->
@@ -501,7 +517,7 @@ read_any(Reads, Self, Store) ->
                                     {ok, SL} = reply_to_all(LT, {ok, Threshold}),
 
                                     %% Satisfy read if threshold is met.
-                                    case lasp_lattice:threshold_met(Type, Value, Threshold) of
+                                    case lasp_type:threshold_met(Type, Value, Threshold) of
                                         true ->
                                             {Object, {ok, {Id, Type, Metadata, Value}}};
                                         false ->
@@ -545,10 +561,8 @@ bind_to(AccId, Id, Store, BindFun) ->
     bind_to(AccId, Id, Store, BindFun, ?READ).
 
 bind_to(AccId, Id, Store, BindFun, ReadFun) ->
-    Fun = fun({_, _, _, V}) ->
-        {ok, _} = BindFun(AccId, V, Store)
-    end,
-    lasp_process:start_link([[{Id, ReadFun}], Fun]).
+    TransFun = fun({_, _, _, V}) -> V end,
+    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -560,6 +574,8 @@ bind_to(AccId, Id, Store, BindFun, ReadFun) ->
 %%      function for the `BindFun', which is responsible for binding the
 %%      result, for instance, when it's located in another table.
 %%
+%%      @todo track in dag
+%%
 -spec fold(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
@@ -570,7 +586,7 @@ fold(Id, Function, AccId, Store, BindFun, ReadFun) ->
     end,
     lasp_process:start_link([[{Id, ReadFun}], Fun]).
 
-fold_internal(lasp_orset, Value, Function, AccType, AccValue) ->
+fold_internal(orset, Value, Function, AccType, AccValue) ->
     lists:foldl(fun({X, Causality}, AccValue1) ->
         lists:foldl(fun({Actor, Deleted}, AccValue2) ->
                             %% Execute the fold function for the current
@@ -579,11 +595,11 @@ fold_internal(lasp_orset, Value, Function, AccType, AccValue) ->
 
                             %% Apply all operations to the accumulator.
                             lists:foldl(fun(Op, Acc) ->
-                                                {ok, A} = AccType:update(Op, Actor, Acc),
+                                                {ok, A} = lasp_type:update(AccType, Op, Actor, Acc),
                                                 case Deleted of
                                                     true ->
                                                         InverseOp = lasp_operations:inverse(AccType, Op),
-                                                        {ok, B} = AccType:update(InverseOp, Actor, A),
+                                                        {ok, B} = lasp_type:update(AccType, InverseOp, Actor, A),
                                                         B;
                                                     false ->
                                                         A
@@ -604,35 +620,23 @@ fold_internal(lasp_orset, Value, Function, AccType, AccValue) ->
 -spec product(id(), id(), id(), store(), function(), function(),
               function()) -> {ok, pid()}.
 product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, T, _, LValue}, {_, _, _, RValue}) ->
+    TransFun = fun({_, T, _, LValue}, {_, T, _, RValue}) ->
             case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    AccValue = case T of
-                        lasp_orset_gbtree ->
-                            FolderFun = fun(X, XCausality, XAcc) ->
-                                    InnerFoldFun = fun(Y, YCausality, YAcc) ->
-                                            gb_trees:enter({X, Y},
-                                                           lasp_lattice:causal_product(T, XCausality, YCausality),
-                                                           YAcc)
-                                    end,
-                                    gb_trees_ext:foldl(InnerFoldFun, XAcc, RValue)
-                            end,
-                            gb_trees_ext:foldl(FolderFun, T:new(), LValue);
-                        lasp_orset ->
-                            FolderFun = fun({X, XCausality}, Acc) ->
-                                    Acc ++ [{{X, Y}, lasp_lattice:causal_product(T, XCausality, YCausality)} || {Y, YCausality} <- RValue]
-                            end,
-                            lists:foldl(FolderFun, T:new(), LValue)
-                    end,
-                    {ok, _} = BindFun(AccId, AccValue, Store)
+                    case lasp_type:get_type(T) of
+                        state_orset ->
+                            state_orset_ext:product(LValue, RValue);
+                        state_awset_ps ->
+                            state_awset_ps_ext:product(LValue, RValue)
+                    end
             end
     end,
-    lasp_process:start_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
-                            Fun]).
+    lasp_process:start_dag_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
+                                TransFun, {AccId, BindFun(Store)}]).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -646,24 +650,23 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec intersection(id(), id(), id(), store(), function(), function(),
                    function()) -> {ok, pid()}.
 intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, T, _, LValue}, {_, _, _, RValue}) ->
+    TransFun = fun({_, T, _, LValue}, {_, T, _, RValue}) ->
             case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    AccValue = case T of
-                                   lasp_orset_gbtree ->
-                                       lasp_orset_gbtree:intersect(LValue, RValue);
-                                   lasp_orset ->
-                                       lasp_orset:intersect(LValue, RValue)
-                               end,
-                    {ok, _} = BindFun(AccId, AccValue, Store)
+                    case lasp_type:get_type(T) of
+                        state_orset ->
+                            state_orset_ext:intersect(LValue, RValue);
+                        state_awset_ps ->
+                            state_awset_ps_ext:intersect(LValue, RValue)
+                    end
             end
     end,
-    lasp_process:start_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
-                             Fun]).
+    lasp_process:start_dag_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
+                                TransFun, {AccId, BindFun(Store)}]).
 
 %% @doc Compute the union of two sets.
 %%
@@ -677,24 +680,23 @@ intersection(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec union(id(), id(), id(), store(), function(), function(),
             function()) -> {ok, pid()}.
 union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    Fun = fun({_, T, _, LValue}, {_, _, _, RValue}) ->
+    TransFun = fun({_, T, _, LValue}, {_, T, _, RValue}) ->
         case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    AccValue = case T of
-                        lasp_orset_gbtree ->
-                            lasp_orset_gbtree:merge(LValue, RValue);
-                        lasp_orset ->
-                            lasp_orset:merge(LValue, RValue)
-                    end,
-                    {ok, _} = BindFun(AccId, AccValue, Store)
+                    case lasp_type:get_type(T) of
+                        state_orset ->
+                            state_orset_ext:union(LValue, RValue);
+                        state_awset_ps ->
+                            state_awset_ps_ext:union(LValue, RValue)
+                    end
             end
     end,
-    lasp_process:start_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
-                             Fun]).
+    lasp_process:start_dag_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
+                                TransFun, {AccId, BindFun(Store)}]).
 
 %% @doc Lap values from one lattice into another.
 %%
@@ -709,16 +711,15 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
 -spec map(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun({_, T, _, V}) ->
-                  AccValue = case T of
-                                 lasp_orset_gbtree ->
-                                     lasp_orset_gbtree:map(Function, V);
-                                 lasp_orset ->
-                                     lasp_orset:map(Function, V)
-                             end,
-                  {ok, _} = BindFun(AccId, AccValue, Store)
-          end,
-    lasp_process:start_link([[{Id, ReadFun}], Fun]).
+    TransFun = fun({_, T, _, V}) ->
+            case lasp_type:get_type(T) of
+                state_orset ->
+                    state_orset_ext:map(Function, V);
+                state_awset_ps ->
+                    state_awset_ps_ext:map(Function, V)
+            end
+    end,
+    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -733,14 +734,31 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
 -spec filter(id(), function(), id(), store(), function(), function()) ->
     {ok, pid()}.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
-    Fun = fun({_, T, _, V}) ->
-            AccValue = case T of
-                lasp_orset_gbtree -> lasp_orset_gbtree:filter(Function, V);
-                lasp_orset -> lasp_orset:filter(Function, V)
-            end,
-            {ok, _} = BindFun(AccId, AccValue, Store)
+    TransFun = fun({_, T, _, V}) ->
+        case lasp_type:get_type(T) of
+            state_orset ->
+                state_orset_ext:filter(Function, V);
+            state_awset_ps ->
+                state_awset_ps_ext:filter(Function, V)
+        end
     end,
-    lasp_process:start_link([[{Id, ReadFun}], Fun]).
+    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
+
+%% @doc Stream values out of the Lasp system; using the values from this
+%%      stream can result in observable nondeterminism.
+%%
+stream(Id, Function, Store) ->
+    stream(Id, Function, Store, ?READ).
+
+%% @doc Stream values out of the Lasp system; using the values from this
+%%      stream can result in observable nondeterminism.
+%%
+stream(Id, Function, _Store, ReadFun) ->
+    TransFun = fun({_, T, _, V}) ->
+        Function(lasp_type:query(T, V))
+    end,
+    WriteFun = fun(_, X) -> X end,
+    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {stream, WriteFun}]).
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
 %%      change the reply and blocking replies.
@@ -763,7 +781,7 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
              type=Type,
              value=Value,
              lazy_threads=LazyThreads0}} = do(get, [Store, Id]),
-    case lasp_lattice:threshold_met(Type, Value, Threshold) of
+    case lasp_type:threshold_met(Type, Value, Threshold) of
         true ->
             ReplyFun(Threshold);
         false ->
@@ -802,7 +820,7 @@ reply_to_all(List, Result) ->
 reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, {Id, Type, Metadata, Value}}=Result) ->
-    SW = case lasp_lattice:threshold_met(Type, Value, Threshold) of
+    SW = case lasp_type:threshold_met(Type, Value, Threshold) of
         true ->
             case From of
                 {server, undefined, {Address, Ref}} ->
@@ -826,7 +844,7 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
 reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, RThreshold}=Result) ->
-    SW = case lasp_lattice:threshold_met(Type, Threshold, RThreshold) of
+    SW = case lasp_type:threshold_met(Type, Threshold, RThreshold) of
         true ->
             case From of
                 {server, undefined, {Address, Ref}} ->
@@ -853,27 +871,40 @@ reply_to_all([From|T], StillWaiting, Result) ->
         {Address, Ref} ->
             gen_server:reply({Address, Ref}, Result);
         _ ->
-            lager:info("Result: ~p", [Result]),
             From ! Result
     end,
     reply_to_all(T, StillWaiting, Result);
 reply_to_all([], StillWaiting, _Result) ->
     {ok, StillWaiting}.
 
-%% @doc When the delta interval is arrived, bind it with the existing object.
-%%      If the object does not exist, declare it.
-%%
--spec receive_delta(store(), {delta_send, value(), function(), function()} |
-                             {delta_ack, id(), node(), non_neg_integer()}) ->
-    ok | error.
-receive_delta(Store, {delta_send, {Id, Type, Metadata, Deltas},
+-spec receive_value(store(), {aae_send, node(), value(), function(),
+                              function()}) -> ok | error.
+receive_value(Store, {aae_send, Origin, {Id, Type, Metadata, Value},
                       MetadataFunBind, MetadataFunDeclare}) ->
     case do(get, [Store, Id]) of
         {ok, _Object} ->
-            {ok, _Result} = bind(Id, Deltas, MetadataFunBind, Store);
+            {ok, _} = bind(Origin, Id, Value, MetadataFunBind, Store);
         {error, not_found} ->
-            {ok, _Result} = declare(Id, Type, MetadataFunDeclare, Store),
-            receive_delta(Store, {delta_send, {Id, Type, Metadata, Deltas},
+            {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
+            receive_value(Store, {aae_send, Origin, {Id, Type, Metadata, Value},
+                                  MetadataFunBind, MetadataFunDeclare})
+    end,
+    ok.
+
+%% @doc When the delta interval is arrived, bind it with the existing object.
+%%      If the object does not exist, declare it.
+%%
+-spec receive_delta(store(), {delta_send, node(), value(), function(), function()} |
+                             {delta_ack, id(), node(), non_neg_integer()}) ->
+    ok | error.
+receive_delta(Store, {delta_send, Origin, {Id, Type, Metadata, Deltas},
+                      MetadataFunBind, MetadataFunDeclare}) ->
+    case do(get, [Store, Id]) of
+        {ok, _Object} ->
+            {ok, _Result} = bind(Origin, Id, Deltas, MetadataFunBind, Store);
+        {error, not_found} ->
+            {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
+            receive_delta(Store, {delta_send, Origin, {Id, Type, Metadata, Deltas},
                                   MetadataFunBind, MetadataFunDeclare})
     end,
     ok;
@@ -923,28 +954,8 @@ increment_counter(Counter) ->
     Counter + 1.
 
 %% @private
-store_delta(Type, Counter, Delta, DeltaMap0) ->
-    MaxDeltaSlots = lasp_config:get(delta_mode_max_slots, 10),
-    %% Check the space of the DeltaMap
-    case orddict:size(DeltaMap0) < MaxDeltaSlots of
-        true ->
-            %% Store a new delta.
-            orddict:store(Counter, Delta, DeltaMap0);
-        false ->
-            %% Find the minimum and 2nd minimum counters & those deltas.
-            [{MinCounter0, MinCounterDelta0}, {MinCounter1, MinCounterDelta1} | _Rest] =
-                orddict:to_list(DeltaMap0),
-            %% Merge them.
-            Merged = lasp_type:merge(Type,
-                                     MinCounterDelta0,
-                                     MinCounterDelta1),
-            %% Store the merged delta (minimum + 2nd minimum).
-            DeltaMap1 = orddict:store(MinCounter0, Merged, DeltaMap0),
-            %% Remove the 2nd minimum delta.
-            DeltaMap2 = orddict:erase(MinCounter1, DeltaMap1),
-            %% Store a new delta.
-            orddict:store(Counter, Delta, DeltaMap2)
-    end.
+store_delta(Origin, Counter, Delta, DeltaMap0) ->
+    orddict:store(Counter, {Origin, Delta}, DeltaMap0).
 
 -ifdef(TEST).
 
@@ -960,6 +971,5 @@ do(Function, Args) ->
                                   storage_backend,
                                   lasp_ets_storage_backend),
     erlang:apply(Backend, Function, Args).
-
 
 -endif.

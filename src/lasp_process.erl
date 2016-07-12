@@ -28,16 +28,21 @@
 -endif.
 
 %% API
--export([start_link/1]).
+-export([start_link/1,
+         start_dag_link/1,
+         start_single_fire_process/1]).
 
 %% Callbacks
 -export([init/1, read/1, process/2]).
 
 %% Types
 -type read_fun() :: {atom(), function()}.
+-type write_fun() :: {atom(), function()}.
 
 %% Records
--record(state, {read_funs :: [read_fun()], function :: function()}).
+-record(state, {read_funs :: [read_fun()],
+                trans_fun :: function(),
+                write_fun :: write_fun()}).
 
 %%%===================================================================
 %%% API
@@ -46,13 +51,54 @@
 start_link(Args) ->
     lasp_process_sup:start_child(Args).
 
+%% @todo rename to start_link once all functions are tracked
+start_dag_link(Args) ->
+    start_tracked_process(undefined, Args).
+
+%% @doc Starts a single-fire lasp process.
+start_single_fire_process(Args) ->
+    start_tracked_process(1, Args).
+
+%% @doc Starts a lasp process, tracked by the dependency graph module.
+%%
+%%      EventCount specifies the maximum number of iterations
+%%      that it will perform.
+%%
+start_tracked_process(EventCount, [ReadFuns, TransFun, {To, _}=WriteFun]) ->
+    From = [Id || {Id, _} <- ReadFuns],
+    case lasp_config:get(dag_enabled, false) of
+        false -> lasp_process_sup:start_child(EventCount, [ReadFuns, TransFun, WriteFun]);
+        true -> case lasp_dependence_dag:will_form_cycle(From, To) of
+            false -> lasp_process_sup:start_child(EventCount, [ReadFuns, TransFun, WriteFun]);
+            true ->
+                %% @todo propagate errors
+                {ok, ignore}
+        end
+    end.
+
 %%%===================================================================
 %%% Callbacks
 %%%===================================================================
 
 %% @doc Initialize state.
 init([ReadFuns, Function]) ->
-    {ok, #state{read_funs=ReadFuns, function=Function}}.
+    {ok, #state{read_funs=ReadFuns,
+                trans_fun=Function,
+                write_fun=undefined}};
+
+init([ReadFuns, TransFun, {To, _}=WriteFun]) ->
+    From = [Id || {Id, _} <- ReadFuns],
+    case lasp_config:get(dag_enabled, false) of
+        false -> ok;
+        true ->
+            ok = lasp_dependence_dag:add_edges(From, To, self(),
+                                               ReadFuns,
+                                               TransFun,
+                                               WriteFun)
+    end,
+    {ok, #state{read_funs=ReadFuns,
+                trans_fun=TransFun,
+                write_fun=WriteFun}}.
 
 %% @doc Return list of read functions.
 read(#state{read_funs=ReadFuns0}=State) ->
@@ -60,14 +106,22 @@ read(#state{read_funs=ReadFuns0}=State) ->
     {ok, ReadFuns, State}.
 
 %% @doc Computation to execute when inputs change.
-process(Args, #state{function=Function}=State) ->
-    case lists:any(fun(X) -> X =:= undefined end, Args) of
-        true ->
-            ok;
+process(Args, #state{trans_fun=Function, write_fun=WriteFunction}=State) ->
+    Processed = case lists:any(fun(X) -> X =:= undefined end, Args) of
+        true -> false;
         false ->
-            erlang:apply(Function, Args)
+            case WriteFunction of
+                undefined -> erlang:apply(Function, Args);
+                {AccId, WFun} ->
+                    WFun(AccId, erlang:apply(Function, Args))
+            end,
+            true
     end,
-    {ok, State}.
+    {ok, {Processed, State}}.
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
 
 %% @doc Generate ReadFun.
 gen_read_fun(Id, ReadFun) ->
@@ -78,6 +132,10 @@ gen_read_fun(Id, ReadFun) ->
                     {_, _, _, V} ->
                         V
                 end,
-                {ok, NewValue} = ReadFun(Id, {strict, Value}),
-                NewValue
+                case ReadFun(Id, {strict, Value}) of
+                    {ok, NewValue} ->
+                        NewValue;
+                    {error, not_found} ->
+                        exit({lasp_process, not_found})
+                end
         end.

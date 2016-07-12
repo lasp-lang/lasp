@@ -24,10 +24,10 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/1,
-         start/3,
-         stop/1,
-         log/3]).
+-export([start_link/0,
+         log/3,
+         convergence/0,
+         stop/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -40,37 +40,33 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {type,
-                tref,
-                size=0,
-                clients=0,
-                lines="",
-                clock=0,
+-record(state, {tref,
+                size_per_type=orddict:new(),
                 status=init,
                 filename}).
 
--define(INTERVAL, 10000). %% 10 seconds.
+-define(INTERVAL, 1000). %% 1 second.
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
 %% @doc Start and link to calling process.
--spec start_link(list(term()))-> {ok, pid()} | ignore | {error, term()}.
-start_link(Type) ->
-    gen_server:start_link({global, {?MODULE, Type}}, ?MODULE, [Type], []).
+-spec start_link()-> {ok, pid()} | ignore | {error, term()}.
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec log(term(), term(), node()) -> ok | error().
-log(Type, Term, Node) ->
-    gen_server:call({global, {?MODULE, Type}}, {log, Term, Node}, infinity).
+-spec log(term(), term(), pos_integer()) -> ok | error().
+log(Type, Payload, PeerCount) ->
+    gen_server:call(?MODULE, {log, Type, Payload, PeerCount}, infinity).
 
--spec start(term(), list(), pos_integer()) -> ok | error().
-start(Type, Filename, Clients) ->
-    gen_server:call({global, {?MODULE, Type}}, {start, Filename, Clients}, infinity).
+-spec convergence() -> ok | error().
+convergence() ->
+    gen_server:call(?MODULE, convergence, infinity).
 
--spec stop(term()) -> ok | error().
-stop(Type) ->
-    gen_server:call({global, {?MODULE, Type}}, stop, infinity).
+-spec stop() -> ok | error().
+stop() ->
+    gen_server:call(?MODULE, stop, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -78,57 +74,65 @@ stop(Type) ->
 
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
-init([Type]) ->
-    Line = io_lib:format("Seconds,MegaBytes,MeanMegaBytesPerClient\n", []),
-    Line2 = io_lib:format("0,0,0\n", []),
-    {ok, #state{type=Type, lines=Line ++ Line2}}.
+init([]) ->
+    Filename = create_dir(),
+    Line = io_lib:format("Type,Seconds,MegaBytes\n", []),
+    write_to_file(Filename, Line),
+
+    {ok, TRef} = start_timer(),
+
+    _ = lager:info("Instrumentation timer enabled!"),
+
+    {ok, #state{tref=TRef, filename=Filename, status=running,
+                size_per_type=orddict:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({log, Term, _Node}, _From, #state{type=_Type, size=Size0}=State) ->
-    Size = termsize(Term),
-    %% lager:info("Instrumentation: type ~p received ~p bytes from node ~p", [Type, Size, Node]),
-    {reply, ok, State#state{size=Size0 + Size}};
+handle_call({log, Type, Payload, PeerCount}, _From, #state{size_per_type=Map0}=State) ->
+    Size = termsize(Payload) * PeerCount,
+    Current = case orddict:find(Type, Map0) of
+        {ok, Value} ->
+            Value;
+        error ->
+            0
+    end,
+    Map = orddict:store(Type, Current + Size, Map0),
+    {reply, ok, State#state{size_per_type=Map}};
 
-handle_call({start, Filename, Clients}, _From, #state{type=Type}=State) ->
-    {ok, TRef} = start_timer(),
-    lager:info("Instrumentation timer for ~p enabled!", [Type]),
-    {reply, ok, State#state{tref=TRef, clock=0, clients=Clients,
-                            filename=Filename, status=running, size=0,
-                            lines = []}};
+handle_call(convergence, _From, #state{filename=Filename}=State) ->
+    record_convergence(Filename),
+    {reply, ok, State};
 
-handle_call(stop, _From, #state{type=Type, lines=Lines, clock=Clock,
-                                clients=Clients, size=Size,
+handle_call(stop, _From, #state{size_per_type=Map,
                                 filename=Filename, tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
-    record(Clock, Size, Clients, Filename, Lines),
-    lager:info("Instrumentation timer for ~p disabled!", [Type]),
+    record(Map, Filename),
+    _ = lager:info("Instrumentation timer disabled!"),
     {reply, ok, State#state{tref=undefined}};
 
 %% @private
 handle_call(Msg, _From, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
 
 %% @private
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 handle_cast(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(record, #state{filename=Filename, clients=Clients,
-                           size=Size, clock=Clock0, status=running,
-                           lines=Lines0}=State) ->
+handle_info(record, #state{filename=Filename, size_per_type=Map,
+                           status=running}=State) ->
     {ok, TRef} = start_timer(),
-    {ok, Clock, Lines} = record(Clock0, Size, Clients, Filename, Lines0),
-    {noreply, State#state{tref=TRef, clock=Clock, lines=Lines}};
+    record(Map, Filename),
+    {noreply, State#state{tref=TRef}};
 
 handle_info(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
@@ -154,9 +158,23 @@ start_timer() ->
     timer:send_after(?INTERVAL, record).
 
 %% @private
-filename(Filename) ->
-    Root = code:priv_dir(?APP),
-    Root ++ "/logs/" ++ Filename.
+eval_dir() ->
+    code:priv_dir(?APP) ++ "/evaluation".
+
+%% @private
+log_dir() ->
+    eval_dir() ++ "/logs".
+
+%% @private
+create_dir() ->
+    EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
+    EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
+    Filename = io_lib:format("~s.csv", [node()]),
+    Path = log_dir() ++ "/"
+        ++ atom_to_list(EvalIdentifier) ++ "/"
+        ++ integer_to_list(EvalTimestamp) ++ "/",
+    filelib:ensure_dir(Path),
+    Path ++ Filename.
 
 %% @private
 megasize(Size) ->
@@ -165,17 +183,44 @@ megasize(Size) ->
     MegaSize.
 
 %% @private
-clock(Clock) ->
-    Clock / 1000.
+record(Map, Filename) ->
+    Timestamp = timestamp(),
+    Lines = orddict:fold(
+        fun(Type, Size, Acc) ->
+            Acc ++ get_line(Type, Timestamp, Size)
+        end,
+        "",
+        Map
+    ),
+    append_to_file(Filename, Lines).
 
 %% @private
-record(Clock0, Size, Clients, Filename, Lines0) ->
-    Clock = Clock0 + ?INTERVAL,
-    Line = io_lib:format("~w,~w,~w\n",
-                         [clock(Clock),
-                          megasize(Size),
-                          megasize(Size) / Clients]),
-    Lines = Lines0 ++ Line,
-    ok = file:write_file(filename(Filename), Lines),
-    {ok, Clock, Lines}.
+record_convergence(Filename) ->
+    Timestamp = timestamp(),
+    Line = get_line(convergence, Timestamp, 0),
+    append_to_file(Filename, Line).
 
+%% @private
+get_line(Type, Timestamp, Size) ->
+    io_lib:format(
+        "~w,~w,~w\n",
+        [Type, Timestamp, megasize(Size)]
+    ).
+
+%% @private
+write_to_file(Filename, Line) ->
+    write_file(Filename, Line, write).
+
+%% @private
+append_to_file(Filename, Line) ->
+    write_file(Filename, Line, append).
+
+%% @private
+write_file(Filename, Line, Mode) ->
+    ok = file:write_file(Filename, Line, [Mode]),
+    ok.
+
+%% @private
+timestamp() ->
+    {Mega, Sec, _Micro} = erlang:timestamp(),
+    Mega * 1000000 + Sec.

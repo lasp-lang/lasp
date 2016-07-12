@@ -31,38 +31,19 @@
          all/0]).
 
 %% tests
--export([ivar_test/1,
-         orset_test/1,
-         dynamic_ivar_test/1,
-         dynamic_fold_test/1,
-         leaderboard_test/1,
-         monotonic_read_test/1,
-         map_test/1,
-         filter_test/1,
-         fold_test/1,
-         union_test/1,
-         product_test/1,
-         intersection_test/1]).
+-compile([export_all]).
 
 -include_lib("common_test/include/ct.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/inet.hrl").
+
+-define(PEER_SERVICE, partisan_hyparview_peer_service_manager).
 
 %% ===================================================================
 %% common_test callbacks
 %% ===================================================================
 
 init_per_suite(_Config) ->
-    lager:start(),
-    %% this might help, might not...
-    os:cmd(os:find_executable("epmd")++" -daemon"),
-    {ok, Hostname} = inet:gethostname(),
-    case net_kernel:start([list_to_atom("runner@"++Hostname), shortnames]) of
-        {ok, _} -> ok;
-        {error, {already_started, _}} -> ok
-    end,
-    lager:info("node name ~p", [node()]),
-
     %% Start Lasp on the runner and enable instrumentation.
     lasp_support:start_runner(),
 
@@ -75,58 +56,126 @@ end_per_suite(_Config) ->
     _Config.
 
 init_per_testcase(Case, Config) ->
+    ct:pal("Beginning case: ~p", [Case]),
+
+    %% Runner must start and stop in between test runs as well, to
+    %% ensure that we clear the membership list (otherwise, we could
+    %% delete the data on disk, but this is cleaner.)
+    lasp_support:start_runner(),
+
     Nodes = lasp_support:start_nodes(Case, Config),
     [{nodes, Nodes}|Config].
 
 end_per_testcase(Case, Config) ->
-    lasp_support:stop_nodes(Case, Config).
+    ct:pal("Case finished: ~p", [Case]),
+
+    lasp_support:stop_nodes(Case, Config),
+
+    %% Runner must start and stop in between test runs as well, to
+    %% ensure that we clear the membership list (otherwise, we could
+    %% delete the data on disk, but this is cleaner.)
+    lasp_support:stop_runner().
 
 all() ->
     [
+     stream_test,
+     query_test,
      ivar_test,
      orset_test,
+     awset_ps_test,
      dynamic_ivar_test,
-     dynamic_fold_test,
-     leaderboard_test,
      monotonic_read_test,
      map_test,
      filter_test,
-     fold_test,
      union_test,
      product_test,
-     intersection_test
+     intersection_test,
+     membership_test
     ].
 
 %% ===================================================================
 %% tests
 %% ===================================================================
 
--define(SET, lasp_orset).
--define(COUNTER, lasp_pncounter).
+-define(SET, orset).
+-define(AWSET_PS, awset_ps).
+-define(COUNTER, pncounter).
+
 -define(ID, <<"myidentifier">>).
+
+%% @doc Increment counter and test stream behaviour.
+stream_test(_Config) ->
+    %% Declare a variable.
+    {ok, {C1, _, _, _}} = lasp:declare(?COUNTER),
+
+    %% Stream results.
+    Self = self(),
+    Function = fun(V) ->
+                       Self ! {ok, V}
+               end,
+    ?assertMatch(ok, lasp:stream(C1, Function)),
+
+    %% Increment.
+    ?assertMatch({ok, _}, lasp:update(C1, increment, a)),
+
+    %% Wait for message.
+    receive
+        {ok, 1} ->
+            ok
+    after
+        300 ->
+            ct:fail(missing_first_message)
+    end,
+
+    %% Increment again.
+    ?assertMatch({ok, _}, lasp:update(C1, increment, b)),
+
+    %% Wait for message.
+    receive
+        {ok, 2} ->
+            ok
+    after
+        300 ->
+            ct:fail(missing_second_message)
+    end.
+
+%% @doc Test query functionality.
+query_test(_Config) ->
+    %% Declare a variable.
+    {ok, {I1, _, _, _}} = lasp:declare(ivar),
+
+    %% Change it's value.
+    ?assertMatch({ok, _}, lasp:update(I1, {set, 2}, a)),
+
+    %% Threshold read just to create a synchronization point for the
+    %% value to change.
+    {ok, _} = lasp:read(I1, {strict, undefined}),
+
+    %% Query it.
+    ?assertMatch({ok, 2}, lasp:query(I1)),
+
+    ok.
 
 %% @doc Single-assignment variable test.
 ivar_test(_Config) ->
     %% Single-assignment variables.
-    {ok, {I1, _, _, _}} = lasp:declare(lasp_ivar),
-    {ok, {I2, _, _, _}} = lasp:declare(lasp_ivar),
-    {ok, {I3, _, _, _}} = lasp:declare(lasp_ivar),
+    {ok, {I1, _, _, _}} = lasp:declare(ivar),
+    {ok, {I2, _, _, _}} = lasp:declare(ivar),
+    {ok, {I3, _, _, _}} = lasp:declare(ivar),
 
     V1 = 1,
 
     %% Attempt pre, and post- dataflow variable bind operations.
     ?assertMatch(ok, lasp:bind_to(I2, I1)),
-    ?assertMatch({ok, _}, lasp:bind(I1, V1)),
+    ?assertMatch({ok, _}, lasp:update(I1, {set, V1}, a)),
     ?assertMatch(ok, lasp:bind_to(I3, I1)),
 
-    %% Perform invalid bind; won't return error, just will have no
-    %% effect.
-    ?assertMatch({ok, _}, lasp:bind(I1, 2)),
+    timer:sleep(4000),
 
     %% Verify the same value is contained by all.
-    ?assertMatch({ok, {_, _, _, V1}}, lasp:read(I3, {strict, undefined})),
-    ?assertMatch({ok, {_, _, _, V1}}, lasp:read(I2, {strict, undefined})),
-    ?assertMatch({ok, {_, _, _, V1}}, lasp:read(I1, {strict, undefined})),
+    ?assertMatch({ok, {_, _, _, {_, V1}}}, lasp:read(I3, {strict, undefined})),
+    ?assertMatch({ok, {_, _, _, {_, V1}}}, lasp:read(I2, {strict, undefined})),
+    ?assertMatch({ok, {_, _, _, {_, V1}}}, lasp:read(I1, {strict, undefined})),
 
     ok.
 
@@ -159,8 +208,8 @@ map_test(_Config) ->
     %% Read resulting value.
     {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
 
-    ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6,8,10,12]},
-                 {ok, ?SET:value(S1V4), ?SET:value(S2V1)}),
+    ?assertEqual({ok, sets:from_list([1,2,3,4,5,6]), sets:from_list([2,4,6,8,10,12])},
+                 {ok, lasp_type:query(?SET, S1V4), lasp_type:query(?SET, S2V1)}),
 
     ok.
 
@@ -193,51 +242,8 @@ filter_test(_Config) ->
     %% Read resulting value.
     {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
 
-    ?assertEqual({ok, [1,2,3,4,5,6], [2,4,6]},
-                 {ok, ?SET:value(S1V4), ?SET:value(S2V1)}),
-
-    ok.
-
-%% @doc Fold operation test.
-fold_test(_Config) ->
-    %% Create initial set.
-    {ok, {S1, _, _, _}} = lasp:declare(?SET),
-
-    %% Perform some operations.
-    ?assertMatch({ok, _},
-                 lasp:update(S1, {add_all, [1,2,3]}, a)),
-    ?assertMatch({ok, _},
-                 lasp:update(S1, {remove_all, [2,3]}, b)),
-    ?assertMatch({ok, _},
-                 lasp:update(S1, {add, 2}, c)),
-
-    %% Create second set.
-    {ok, {S2, _, _, _}} = lasp:declare(?COUNTER),
-
-    %% Define the fold function.
-    FoldFun = fun(X, _Acc) ->
-                      case (X band 1) == 0 of
-                          true ->
-                              [{increment, 1}];
-                          false ->
-                              []
-                      end
-              end,
-
-    %% Apply fold.
-    ?assertMatch(ok, lasp:fold(S1, FoldFun, S2)),
-
-    %% Wait.
-    timer:sleep(4000),
-
-    %% Read resulting value.
-    {ok, {_, _, _, S1V4}} = lasp:read(S1, {strict, undefined}),
-
-    %% Read resulting value.
-    {ok, {_, _, _, S2V1}} = lasp:read(S2, {strict, undefined}),
-
-    ?assertEqual({ok, [1,2], 1},
-                 {ok, ?SET:value(S1V4), ?COUNTER:value(S2V1)}),
+    ?assertEqual({ok, sets:from_list([1,2,3,4,5,6]), sets:from_list([2,4,6])},
+                 {ok, lasp_type:query(?SET, S1V4), lasp_type:query(?SET, S2V1)}),
 
     ok.
 
@@ -264,9 +270,9 @@ union_test(_Config) ->
     {ok, {_, _, _, Union0}} = lasp:read(S3, undefined),
 
     %% Read union value.
-    Union = ?SET:value(Union0),
+    Union = lasp_type:query(?SET, Union0),
 
-    ?assertEqual({ok, [1,2,3,a,b,c]}, {ok, Union}),
+    ?assertEqual({ok, sets:from_list([1,2,3,a,b,c])}, {ok, Union}),
 
     ok.
 
@@ -293,9 +299,9 @@ intersection_test(_Config) ->
     {ok, {_, _, _, Intersection0}} = lasp:read(S3, undefined),
 
     %% Read intersection value.
-    Intersection = ?SET:value(Intersection0),
+    Intersection = lasp_type:query(?SET, Intersection0),
 
-    ?assertEqual({ok, [3]}, {ok, Intersection}),
+    ?assertEqual({ok, sets:from_list([3])}, {ok, Intersection}),
 
     ok.
 
@@ -322,9 +328,9 @@ product_test(_Config) ->
     {ok, {_, _, _, Product0}} = lasp:read(S3, undefined),
 
     %% Read product value.
-    Product = ?SET:value(Product0),
+    Product = lasp_type:query(?SET, Product0),
 
-    ?assertEqual({ok,[{1,3},{1,a},{1,b},{2,3},{2,a},{2,b},{3,3},{3,a},{3,b}]}, {ok, Product}),
+    ?assertEqual({ok,sets:from_list([{1,3},{1,a},{1,b},{2,3},{2,a},{2,b},{3,3},{3,a},{3,b}])}, {ok, Product}),
 
     ok.
 
@@ -353,7 +359,7 @@ monotonic_read_test(_Config) ->
     %% Ensure we receive [1, 2, 3].
     Set1 = receive
         {I1, {ok, {_, _, _, X}}} ->
-            ?SET:value(X)
+            lasp_type:query(?SET, X)
     end,
 
     %% Perform more inflations.
@@ -369,10 +375,11 @@ monotonic_read_test(_Config) ->
     %% Ensure we receive [1, 2, 3, 4].
     Set2 = receive
         {I2, {ok, {_, _, _, Y}}} ->
-            ?SET:value(Y)
+            lasp_type:query(?SET, Y)
     end,
 
-    ?assertMatch({[1,2,3], [1,2,3,4,5]}, {Set1, Set2}),
+    ?assertEqual({sets:from_list([1,2,3]), sets:from_list([1,2,3,4,5])},
+                 {Set1, Set2}),
 
     ok.
 
@@ -381,66 +388,32 @@ dynamic_ivar_test(Config) ->
     [Node1, Node2 | _Nodes] = proplists:get_value(nodes, Config),
 
     %% Setup a dynamic variable.
-    {ok, {Id, _, _, Value}} = rpc:call(Node1, lasp, declare_dynamic, [?ID, lasp_ivar]),
+    {ok, {Id, _, _, Value}} = rpc:call(Node1, lasp, declare_dynamic,
+                                       [?ID, ivar]),
 
     %% Now, the following action should be idempotent.
-    {ok, {Id, _, _, Value}} = rpc:call(Node2, lasp, declare_dynamic, [?ID, lasp_ivar]),
+    {ok, {Id, _, _, Value}} = rpc:call(Node2, lasp, declare_dynamic,
+                                       [?ID, ivar]),
 
     %% Bind node 1's name to the value on node 1: this should not
     %% trigger a broadcast message because the variable is dynamic.
-    {ok, {Id, _, _, Node1}} = rpc:call(Node1, lasp, bind, [{?ID, lasp_ivar}, Node1]),
+    ?assertMatch({ok, {Id, _, _, {_, Node1}}},
+                 rpc:call(Node1, lasp, bind, [{?ID, ivar}, {state_ivar, Node1}])),
 
     %% Bind node 2's name to the value on node 2: this should not
     %% trigger a broadcast message because the variable is dynamic.
-    {ok, {Id, _, _, Node2}} = rpc:call(Node2, lasp, bind, [{?ID, lasp_ivar}, Node2]),
+    ?assertMatch({ok, {Id, _, _, {_, Node2}}},
+                 rpc:call(Node2, lasp, bind, [{?ID, ivar}, {state_ivar, Node2}])),
 
     %% Verify variable has the correct value.
-    {ok, Node1} = rpc:call(Node1, lasp, query, [{?ID, lasp_ivar}]),
+    {ok, Node1} = rpc:call(Node1, lasp, query, [{?ID, ivar}]),
 
     %% Verify variable has the correct value.
-    {ok, Node2} = rpc:call(Node2, lasp, query, [{?ID, lasp_ivar}]),
+    {ok, Node2} = rpc:call(Node2, lasp, query, [{?ID, ivar}]),
 
     ok.
 
-%% @doc Dynamic fold test; incomplete.
-%% @todo
-dynamic_fold_test(Config) ->
-    [Node1 | _Nodes] = proplists:get_value(nodes, Config),
-
-    %% Define a pair of counters to store the global average.
-    {ok, {_GA, _, _, _}} = rpc:call(Node1, lasp, declare,
-                                    [global,
-                                     {lasp_pair, [lasp_pncounter, lasp_pncounter]}]),
-
-    %% Declare a set for local samples.
-    {ok, {_S, _, _, _}} = rpc:call(Node1, lasp, declare_dynamic,
-                                   [{lasp_top_k_set, [2]}]),
-
-    %% Define a local average; this will be computed from the local samples.
-    {ok, {_LA, _, _, _}} = rpc:call(Node1, lasp, declare_dynamic,
-                                    [{lasp_pair, [lasp_pncounter, lasp_pncounter]}]),
-
-    ok.
-
-% %% Register an event handler with the sensor 
-% %% that is triggered each time an event X is 
-% %% triggered at a given timestamp T.
-% EventHandler = fun({X, T} ->
-%     lasp:update(Samples, {add, x, t}, Actor)
-% end,
-% register_event_handler(EventHandler),
-    
-% %% Fold the samples using the binary function 
-% %% `avg' into a local average.
-% lasp:fold(Samples, fun avg/2, LocalAverage)
-    
-% %% Fold the local average using the binary 
-% %% function `avg' into a global average.
-% lasp:fold_dynamic(LocalAverage, 
-%                         fun sum_pairs/2, 
-%                         GlobalAverage)
-
-%% @doc Test of the lasp_orset.
+%% @doc Test of the orset.
 orset_test(_Config) ->
     {ok, {L1, _, _, _}} = lasp:declare(?SET),
     {ok, {L2, _, _, _}} = lasp:declare(?SET),
@@ -448,7 +421,7 @@ orset_test(_Config) ->
 
     %% Attempt pre, and post- dataflow variable bind operations.
     ?assertMatch(ok, lasp:bind_to(L2, L1)),
-    ?assertMatch({ok, _}, lasp:update(L1, {add, 1}, a)),
+    {ok, {_, _, _, S2}} = lasp:update(L1, {add, 1}, a),
     ?assertMatch(ok, lasp:bind_to(L3, L1)),
 
     timer:sleep(4000),
@@ -457,9 +430,6 @@ orset_test(_Config) ->
     {ok, {_, _, _, S1}} = lasp:read(L3, {strict, undefined}),
     {ok, {_, _, _, S1}} = lasp:read(L2, {strict, undefined}),
     {ok, {_, _, _, S1}} = lasp:read(L1, {strict, undefined}),
-
-    %% Test inflations.
-    {ok, S2} = ?SET:update({add, 2}, a, S1),
 
     Self = self(),
 
@@ -473,12 +443,15 @@ orset_test(_Config) ->
     timer:sleep(4000),
 
     %% Verify the same value is contained by all.
-    ?assertMatch({ok, {_, _, _, S2}}, lasp:read(L3, {strict, undefined})),
-    ?assertMatch({ok, {_, _, _, S2}}, lasp:read(L2, {strict, undefined})),
-    ?assertMatch({ok, {_, _, _, S2}}, lasp:read(L1, {strict, undefined})),
+    {ok, {_, _, _, S2L3}} = lasp:read(L3, {strict, undefined}),
+    ?assertEqual(S2L3, lasp_type:merge(?SET, S2, S2L3)),
+    {ok, {_, _, _, S2L2}} = lasp:read(L2, {strict, undefined}),
+    ?assertEqual(S2L2, lasp_type:merge(?SET, S2, S2L2)),
+    {ok, {_, _, _, S2L1}} = lasp:read(L1, {strict, undefined}),
+    ?assertEqual(S2L1, lasp_type:merge(?SET, S2, S2L1)),
 
     %% Read at the S2 threshold level.
-    {ok, {_, _, _, S2}} = lasp:read(L1, S2),
+    {ok, {_, _, _, _}} = lasp:read(L1, S2),
 
     %% Wait for wait_needed to unblock.
     receive
@@ -503,6 +476,92 @@ orset_test(_Config) ->
 
     ok.
 
-%% @doc Run the leaderboard simulation.
-leaderboard_test(_Config) ->
-    lasp_leaderboard:run([]).
+%% @doc Membership test.
+membership_test(Config) ->
+    Nodes = proplists:get_value(nodes, Config),
+    lager:info("Nodes: ~p", [Nodes]),
+    Sorted = lists:usort(Nodes),
+
+    lager:info("Waiting for cluster to stabilize."),
+    timer:sleep(10000),
+
+    lists:foreach(fun(Node) ->
+                        {ok, {state, _Myself, Active, Passive, _, _, _}} = rpc:call(Node, ?PEER_SERVICE, state, []),
+
+                        case lists:usort([Name || {Name, _, _} <- sets:to_list(Active)]) of
+                            Sorted ->
+                                ok;
+                            _ ->
+                                ct:fail("Incorrect nodes!")
+                        end,
+
+                        case sets:to_list(Passive) of
+                            [] ->
+                                ok;
+                            _ ->
+                                ct:fail("Incorrect nodes!")
+                        end
+                  end, Nodes),
+
+    ok.
+
+%% @doc Test of the add-wins set.
+awset_ps_test(_Config) ->
+    {ok, {L1, _, _, _}} = lasp:declare(?AWSET_PS),
+    {ok, {L2, _, _, _}} = lasp:declare(?AWSET_PS),
+    {ok, {L3, _, _, _}} = lasp:declare(?AWSET_PS),
+
+    %% Attempt pre, and post- dataflow variable bind operations.
+    ?assertMatch(ok, lasp:bind_to(L2, L1)),
+    {ok, {_, _, _, S2}} = lasp:update(L1, {add, 1}, a),
+    ?assertMatch(ok, lasp:bind_to(L3, L1)),
+
+    timer:sleep(4000),
+
+    %% Verify the same value is contained by all.
+    {ok, {_, _, _, S1}} = lasp:read(L3, {strict, undefined}),
+    {ok, {_, _, _, S1}} = lasp:read(L2, {strict, undefined}),
+    {ok, {_, _, _, S1}} = lasp:read(L1, {strict, undefined}),
+
+    Self = self(),
+
+    spawn_link(fun() ->
+                  {ok, _} = lasp:wait_needed(L1, {strict, S1}),
+                  Self ! threshold_met
+               end),
+
+    ?assertMatch({ok, _}, lasp:bind(L1, S2)),
+
+    timer:sleep(4000),
+
+    %% Verify the same value is contained by all.
+    {ok, {_, _, _, S2L3}} = lasp:read(L3, {strict, undefined}),
+    ?assertEqual(S2L3, lasp_type:merge(?AWSET_PS, S2, S2L3)),
+    {ok, {_, _, _, S2L2}} = lasp:read(L2, {strict, undefined}),
+    ?assertEqual(S2L2, lasp_type:merge(?AWSET_PS, S2, S2L2)),
+    {ok, {_, _, _, S2L1}} = lasp:read(L1, {strict, undefined}),
+    ?assertEqual(S2L1, lasp_type:merge(?AWSET_PS, S2, S2L1)),
+
+    %% Read at the S2 threshold level.
+    {ok, {_, _, _, _}} = lasp:read(L1, S2),
+
+    %% Wait for wait_needed to unblock.
+    receive
+        threshold_met ->
+            ok
+    end,
+
+    {ok, {L5, _, _, _}} = lasp:declare(?AWSET_PS),
+    {ok, {L6, _, _, _}} = lasp:declare(?AWSET_PS),
+
+    spawn_link(fun() ->
+                {ok, _} = lasp:read_any([{L5, {strict, undefined}}, {L6, {strict, undefined}}]),
+                Self ! read_any
+        end),
+
+    {ok, _} = lasp:update(L5, {add, 1}, a),
+
+    receive
+        read_any ->
+            ok
+    end.

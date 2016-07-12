@@ -31,6 +31,10 @@
       stroke-opacity: .6;
     }
 
+    .dag > svg {
+      max-width: 300px;
+    }
+
     svg {
       border: 1px solid #ccc;
       border-radius: 5px;
@@ -91,10 +95,12 @@
         <div class="col-md-4">
           <h3>Topology</h3>
           <div id="topology" class="col-md-12"></div>
+          <h3>Dependency graph</h3>
+          <div class="col-md-12 dag"></div>
         </div>
         <div class="col-md-4">
           <h3>Controls</h3>
-          <ul><li><a href="/api/simulate">Simulate!</a></li></ul>
+          <ul></ul>
           <h3>Logs</h3>
           <ul id="logs"></ul>
         </div>
@@ -108,6 +114,7 @@
       </div>
     </div>
     <script src="//d3js.org/d3.v3.min.js"></script>
+    <script src="js/viz.min.js"></script>
     <script src="js/main.js"></script>
   </body>
 </html>

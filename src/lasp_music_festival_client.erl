@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_advertisement_counter_client).
+-module(lasp_music_festival_client).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).
@@ -37,12 +37,12 @@
 -include("lasp.hrl").
 
 %% Macros.
--define(IMPRESSION_INTERVAL, 1000).
+-define(VOTING_INTERVAL, 1000).
 -define(LOG_INTERVAL, 10000).
 -define(CONVERGENCE_INTERVAL, 500).
 
 %% State record.
--record(state, {actor, impressions}).
+-record(state, {actor, votes, identifiers}).
 
 %%%===================================================================
 %%% API
@@ -60,13 +60,13 @@ start_link() ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([]) ->
-    lager:info("Advertisement counter client initialized."),
+    lager:info("Music festival client initialized."),
 
     %% Generate actor identifier.
     Actor = self(),
 
-    %% Schedule advertisement counter impression.
-    schedule_impression(),
+    %% Schedule voting.
+    schedule_voting(),
 
     %% Schedule logging.
     schedule_logging(),
@@ -74,7 +74,14 @@ init([]) ->
     %% Schedule check convergence
     schedule_check_convergence(),
 
-    {ok, #state{actor=Actor, impressions=0}}.
+    %% Declare a bunch of counters.
+    Identifiers = lists:map(fun(N) ->
+                    Id = {N, ?COUNTER_TYPE},
+                    {ok, _} = lasp:declare(Id, ?COUNTER_TYPE),
+                    Id
+            end, identifiers()),
+
+    {ok, #state{actor=Actor, votes=0, identifiers=Identifiers}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -91,59 +98,50 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(log, #state{impressions=Impressions}=State) ->
-    %% Get current value of the list of advertisements.
-    {ok, Ads} = lasp:query({?ADS_WITH_CONTRACTS, ?SET_TYPE}),
-    AdList = sets:to_list(Ads),
+handle_info(log, #state{votes=Votes}=State) ->
+    lager:info("Votes: ~p", [Votes]),
 
-    lager:info("Impressions: ~p", [Impressions]),
-
-    lager:info("Current advertisement list size: ~p", [length(AdList)]),
-
-    %% Schedule advertisement counter impression.
+    %% Schedule logging.
     schedule_logging(),
 
     {noreply, State};
 
-handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
-    %% Get current value of the list of advertisements.
-    {ok, Ads} = lasp:query({?ADS_WITH_CONTRACTS, ?SET_TYPE}),
+handle_info(vote, #state{actor=Actor, votes=Votes0, identifiers=Identifiers0}=State) ->
+    %% Get number of counters.
+    Size = length(Identifiers0),
 
-    %% Make sure we have ads...
-    Impressions1 = case sets:size(Ads) of
+    case Size of
         0 ->
-            %% Do nothing.
-            Impressions0;
-        Size ->
+            {noreply, State};
+        _ ->
             %% Select random.
             Random = lasp_support:puniform(Size),
 
-            %% @todo Exposes internal details of record.
-            {{ad, _, _, Counter},
-             _Contract} = lists:nth(Random, sets:to_list(Ads)),
+            %% Select random.
+            Identifier = lists:nth(Random, Identifiers0),
 
             %% Increment counter.
-            {ok, _} = lasp:update(Counter, increment, Actor),
+            {ok, _} = lasp:update(Identifier, increment, Actor),
 
-            %% Update CT instance
-            {ok, _} = lasp:update(convergence_id(), {fst, increment}, Actor),
+            %% Remove identifier.
+            Identifiers = Identifiers0 -- [Identifier],
 
-            %% Increment impressions.
-            Impressions0 + 1
-    end,
+            %% Bump votes.
+            Votes = Votes0 + 1,
 
-    %% Schedule advertisement counter impression.
-    case Impressions1 < max_impressions() of
-        true ->
-            schedule_impression();
-        false ->
-            lager:info("Max number of impressions reached. Node: ~p", [node()])
-    end,
+            %% Schedule advertisement counter impression.
+            case Votes < max_votes() of
+                true ->
+                    schedule_voting();
+                false ->
+                    lager:info("Max number of votes reached. Node: ~p", [node()])
+            end,
 
-    {noreply, State#state{impressions=Impressions1}};
+            {noreply, State#state{votes=Votes, identifiers=Identifiers}}
+    end;
 
 handle_info(check_convergence, #state{actor=Actor}=State) ->
-    MaxEvents = max_impressions() * client_number(),
+    MaxEvents = max_votes() * client_number(),
     {ok, {TotalEvents, _}} = lasp:query(convergence_id()),
     %lager:info("Total number of events observed so far ~p of ~p", [TotalEvents, MaxEvents]),
 
@@ -169,7 +167,8 @@ terminate(_Reason, _State) ->
     ok.
 
 %% @private
--spec code_change(term() | {down, term()}, #state{}, term()) -> {ok, #state{}}.
+-spec code_change(term() | {down, term()}, #state{}, term()) ->
+    {ok, #state{}}.
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
@@ -178,10 +177,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-schedule_impression() ->
+schedule_voting() ->
     %% Add random jitter.
-    Jitter = rand_compat:uniform(?IMPRESSION_INTERVAL),
-    erlang:send_after(?IMPRESSION_INTERVAL + Jitter, self(), view).
+    Jitter = rand_compat:uniform(?VOTING_INTERVAL),
+    erlang:send_after(?VOTING_INTERVAL + Jitter, self(), vote).
 
 %% @private
 schedule_logging() ->
@@ -192,7 +191,7 @@ schedule_check_convergence() ->
     erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_convergence).
 
 %% @private
-max_impressions() ->
+max_votes() ->
     lasp_config:get(simulation_event_number, 10).
 
 %% @private
@@ -208,3 +207,9 @@ convergence_id() ->
                     ]
                 },
     {?CONVERGENCE_TRACKING, PairType}.
+
+%% @private
+identifiers() ->
+    lists:map(fun(N) ->
+                term_to_binary({counter, N})
+        end, lists:seq(1, 100)).

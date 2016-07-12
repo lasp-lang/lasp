@@ -39,7 +39,6 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/inet.hrl").
 
--define(EXCHANGE_TIMER, 120).
 -define(CT_SLAVES, [rita, sue, bob, jerome]).
 
 %% ===================================================================
@@ -242,9 +241,6 @@ start(_Case, _Config, Options) ->
                                                                        peer_service,
                                                                        partisan_peer_service]),
                             ok = rpc:call(Node, application, set_env, [plumtree,
-                                                                       broadcast_exchange_timer,
-                                                                       ?EXCHANGE_TIMER]),
-                            ok = rpc:call(Node, application, set_env, [plumtree,
                                                                        broadcast_mods,
                                                                        [lasp_plumtree_broadcast_distribution_backend]]),
                             ok = rpc:call(Node, application, set_env, [lasp,
@@ -261,7 +257,7 @@ start(_Case, _Config, Options) ->
 
                         %% Configure plumtree AAE interval to be the same.
                         ok = rpc:call(Node, application, set_env,
-                                      [broadcast_exchange_timer, ?AAE_INTERVAL]),
+                                      [plumtree, broadcast_exchange_timer, ?AAE_INTERVAL]),
 
                         %% Configure number of impressions.
                         ok = rpc:call(Node, lasp_config, set,

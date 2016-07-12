@@ -164,7 +164,7 @@ start_link(Opts) ->
 -type broadcast_message() :: #broadcast{}.
 -type broadcast_id() :: id().
 -type broadcast_clock() :: clock().
--type broadcast_payload() :: {id(), type(), metadata(), value()}.
+-type broadcast_payload() :: {id(), type(), metadata(), value(), crdt()}.
 
 %% @doc Returns from the broadcast message the identifier and the payload.
 -spec broadcast_data(broadcast_message()) ->

@@ -69,12 +69,16 @@
          intersection/7,
          fold/6]).
 
+%% Tracked versions, used by dataflow functions.
+-export([read_var/3,
+         bind_var/3]).
+
 %% Administrative controls.
 -export([storage_backend_reset/1]).
 
 %% Definitions for the bind/read fun abstraction.
 -define(BIND, fun(_AccId, AccValue, _Store) ->
-                ?MODULE:bind(_AccId, AccValue, _Store)
+                ?MODULE:bind_var(_AccId, AccValue, _Store)
               end).
 
 -define(WRITE, fun(_Store) ->
@@ -84,7 +88,7 @@
                end).
 
 -define(READ, fun(_Id, _Threshold) ->
-                ?MODULE:read(_Id, _Threshold, Store)
+                ?MODULE:read_var(_Id, _Threshold, Store)
               end).
 
 %% @doc Initialize the storage backend.
@@ -130,10 +134,10 @@ map(Id, Function, AccId, Store) ->
 -spec intersection(id(), id(), id(), store()) -> {ok, pid()}.
 intersection(Left, Right, Intersection, Store) ->
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
-            ?MODULE:read(_Left, _Threshold, _Variables)
+            ?MODULE:read_var(_Left, _Threshold, _Variables)
     end,
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
-            ?MODULE:read(_Right, _Threshold, _Variables)
+            ?MODULE:read_var(_Right, _Threshold, _Variables)
     end,
     intersection(Left, Right, Intersection, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
@@ -145,10 +149,10 @@ intersection(Left, Right, Intersection, Store) ->
 -spec union(id(), id(), id(), store()) -> {ok, pid()}.
 union(Left, Right, Union, Store) ->
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
-            ?MODULE:read(_Left, _Threshold, _Variables)
+            ?MODULE:read_var(_Left, _Threshold, _Variables)
     end,
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
-            ?MODULE:read(_Right, _Threshold, _Variables)
+            ?MODULE:read_var(_Right, _Threshold, _Variables)
     end,
     union(Left, Right, Union, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
@@ -160,10 +164,10 @@ union(Left, Right, Union, Store) ->
 -spec product(id(), id(), id(), store()) -> {ok, pid()}.
 product(Left, Right, Product, Store) ->
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
-            ?MODULE:read(_Left, _Threshold, _Variables)
+            ?MODULE:read_var(_Left, _Threshold, _Variables)
     end,
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
-            ?MODULE:read(_Right, _Threshold, _Variables)
+            ?MODULE:read_var(_Right, _Threshold, _Variables)
     end,
     product(Left, Right, Product, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
@@ -208,6 +212,22 @@ read(Id, Threshold, Store) ->
             {ok, {_Id, _Type, _Metadata, _Value}}=Res -> Res
         end
     end.
+
+read_var(Id, Threshold, Store) ->
+    ReplyFun = fun
+        ({_Id, _Type, _Metadata, _Value}=Found) ->
+            {ok, Found};
+
+        ({error, _}=Error) ->
+            Error
+    end,
+    BlockingFun = fun() ->
+        receive
+            {ok, {_Id, _Type, _Metadata, _Value}}=Res -> Res
+        end
+    end,
+    read_var(Id, Threshold, Store, self(), ReplyFun, BlockingFun).
+
 
 %% @doc Perform a monotonic read for a series of given idenfitiers --
 %%      first response wins.
@@ -396,6 +416,10 @@ update({_, Type} = Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store)
 bind(Id, Value, Store) ->
     MetadataFun = fun(X) -> X end,
     bind(Id, Value, MetadataFun, Store).
+
+bind_var(Id, Value, Store) ->
+    MetadataFun = fun(X) -> X end,
+    bind_var(node(), Id, Value, MetadataFun, Store).
 
 bind(Id, Value, MetadataFun, Store) ->
     bind(node(), Id, Value, MetadataFun, Store).

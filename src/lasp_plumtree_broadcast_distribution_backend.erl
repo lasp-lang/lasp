@@ -99,12 +99,12 @@
 
 -define(WRITE, fun(_Store) ->
                  fun(_AccId, _AccValue) ->
-                   {ok, _} = ?CORE:bind(_AccId, _AccValue, _Store)
+                   {ok, _} = ?CORE:bind_var(_AccId, _AccValue, _Store)
                  end
                end).
 
 -define(READ, fun(_Id, _Threshold) ->
-                ?CORE:read(_Id, _Threshold, Store)
+                ?CORE:read_var(_Id, _Threshold, Store)
               end).
 
 -define(BLOCKING, fun() -> {noreply, State} end).

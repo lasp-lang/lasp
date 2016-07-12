@@ -84,7 +84,8 @@
                     type :: type(),
                     clock :: lasp_vclock:vclock(),
                     metadata :: metadata(),
-                    value :: value()}).
+                    value :: value(),
+                    convergence :: crdt()}).
 
 -define(MEMORY_INTERVAL, 10000).
 -define(DELTA_INTERVAL, 10000).
@@ -168,21 +169,27 @@ start_link(Opts) ->
 %% @doc Returns from the broadcast message the identifier and the payload.
 -spec broadcast_data(broadcast_message()) ->
     {{broadcast_id(), broadcast_clock()}, broadcast_payload()}.
-broadcast_data(#broadcast{id=Id, type=Type, clock=Clock,
-                          metadata=Metadata, value=Value}) ->
-    {{Id, Clock}, {Id, Type, Metadata, Value}}.
+broadcast_data(#broadcast{id=Id,
+                          type=Type,
+                          clock=Clock,
+                          metadata=Metadata,
+                          value=Value,
+                          convergence=Convergence}) ->
+    {{Id, Clock}, {Id, Type, Metadata, Value, Convergence}}.
 
 %% @doc Perform a merge of an incoming object with an object in the
 %%      local datastore, as long as we haven't seen a more recent clock
 %%      for the same object.
 -spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) ->
     boolean().
-merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
+merge({Id, Clock}, {Id, Type, Metadata, Value, Convergence}) ->
     case is_stale({Id, Clock}) of
         true ->
             false;
         false ->
+            %% Bind information.
             {ok, _} = ?MODULE:local_bind(Id, Type, Metadata, Value),
+            bind_convergence(Convergence),
             true
     end.
 
@@ -928,12 +935,24 @@ code_change(_OldVsn, State, _Extra) ->
 broadcast({Id, Type, Metadata, Value}=Payload) ->
     case lasp_config:get(broadcast, false) of
         true ->
-            PeerCount = length(plumtree_broadcast:broadcast_members()),
-            log_transmission({broadcast, Payload}, PeerCount),
-            Clock = orddict:fetch(clock, Metadata),
-            Broadcast = #broadcast{id=Id, clock=Clock, type=Type,
-                                   metadata=Metadata, value=Value},
-            plumtree_broadcast:broadcast(Broadcast, ?MODULE);
+            case Id of
+                ?CONVERGENCE_ID ->
+                    %% Don't broadcast the convergence data structure;
+                    %% it gets embedded with the objects that it
+                    %% modifies to ensure causality.
+                    ok;
+                _ ->
+                    PeerCount = length(plumtree_broadcast:broadcast_members()),
+                    log_transmission({broadcast, Payload}, PeerCount),
+                    Clock = orddict:fetch(clock, Metadata),
+                    Broadcast = #broadcast{id=Id,
+                                           clock=Clock,
+                                           type=Type,
+                                           metadata=Metadata,
+                                           value=Value,
+                                           convergence=convergence()},
+                    plumtree_broadcast:broadcast(Broadcast, ?MODULE)
+            end;
         false ->
             ok
     end.
@@ -1129,3 +1148,13 @@ init_delta_sync(Peer) ->
 %% @private
 membership() ->
     lasp_peer_service:members().
+
+%% @private
+convergence() ->
+    {ok, Convergence} = lasp:query(?CONVERGENCE_ID),
+    Convergence.
+
+%% @private
+bind_convergence({Id, Type, Metadata, Value}) ->
+    {ok, Value} = ?MODULE:local_bind(Id, Type, Metadata, Value),
+    {ok, Value}.

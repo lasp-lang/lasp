@@ -486,20 +486,21 @@ membership_test(Config) ->
     timer:sleep(10000),
 
     lists:foreach(fun(Node) ->
-                        {ok, {state, _Myself, Active, Passive, _, _, _}} = rpc:call(Node, ?PEER_SERVICE, state, []),
+                        {ok, Active} = rpc:call(Node, ?PEER_SERVICE, active, []),
+                        {ok, Passive} = rpc:call(Node, ?PEER_SERVICE, passive, []),
 
                         case lists:usort([Name || {Name, _, _} <- sets:to_list(Active)]) of
                             Sorted ->
                                 ok;
-                            _ ->
-                                ct:fail("Incorrect nodes!")
+                            WrongActive ->
+                                ct:fail("Incorrect nodes in active view on node ~p: ~p should be ~p!", [Node, WrongActive, Sorted])
                         end,
 
                         case sets:to_list(Passive) of
                             [] ->
                                 ok;
-                            _ ->
-                                ct:fail("Incorrect nodes!")
+                            WrongPassive ->
+                                ct:fail("Incorrect nodes in passive view: ~p!", [WrongPassive])
                         end
                   end, Nodes),
 

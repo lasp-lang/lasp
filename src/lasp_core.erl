@@ -314,7 +314,8 @@ declare_dynamic(Id, Type, MetadataFun0, Store) ->
 %%
 -spec query(id(), store()) -> {ok, term()}.
 query(Id, Store) ->
-    lasp_process:single_fire_function(Id, query,
+    Self = self(),
+    lasp_process:single_fire_function(Id, Self,
                                       fun query_var/2, [Id, Store]).
 
 %% @doc Return the current value of a CRDT.
@@ -430,7 +431,8 @@ bind(Id, Value, MetadataFun, Store) ->
 -spec bind(node(), id(), value(), function(), store()) ->
     {ok, var()} | not_found().
 bind(Origin, Id, Value, MetadataFun, Store) ->
-    lasp_process:single_fire_function(bind, Id,
+    Self = self(),
+    lasp_process:single_fire_function(Self, Id,
                                       fun bind_var/5, [Origin,
                                                        Id,
                                                        Value,
@@ -498,7 +500,8 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
 -spec read(id(), value(), store(), pid(), function(), function()) ->
     {ok, var()} | not_found() | block.
 read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
-    lasp_process:single_fire_function(Id, read,
+    TrueSelf = self(),
+    lasp_process:single_fire_function(Id, TrueSelf,
                                       fun read_var/6, [Id,
                                                        Threshold,
                                                        Store,
@@ -806,12 +809,16 @@ stream(Id, Function, Store) ->
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.
 %%
+%%      @todo track in dag
+%%      The output vertex should be a process identifier,
+%%      but since it can be the same as the one used in bind,
+%%      it could create a loop in the dag.
+%%
 stream(Id, Function, _Store, ReadFun) ->
-    TransFun = fun({_, T, _, V}) ->
+    Fun = fun({_, T, _, V}) ->
         Function(lasp_type:query(T, V))
     end,
-    WriteFun = fun(_, X) -> X end,
-    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {stream, WriteFun}]).
+    lasp_process:start_link([[{Id, ReadFun}], Fun]).
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
 %%      change the reply and blocking replies.

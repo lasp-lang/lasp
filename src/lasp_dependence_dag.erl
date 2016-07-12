@@ -216,8 +216,8 @@ handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
 
     %% Add vertices only if they are either sources or sinks. (See add_if)
     %% All user-defined variables are tracked through the `declare` function.
-    lists:foreach(fun(V) -> add_if(source, Dag, V) end, Src),
-    add_if(sink, Dag, Dst),
+    lists:foreach(fun(V) -> add_if_pid(Dag, V) end, Src),
+    add_if_pid(Dag, Dst),
 
     %% For all V in Src, make edge (V, Dst) with label {Pid, Read, Trans, Write}
     %% (where {Id, Read} = ReadFuns s.t. Id = V)
@@ -322,34 +322,21 @@ get_direct_edges(G, V1, V2) ->
         end
     end, digraph:out_edges(G, V1)).
 
-%% @doc Add a vertex only if it is top or bottom.
+%% @doc Add a vertex only if it is a pid
 %%
-%%      A top vertex is one that can't have parents.
-%%      Used as the source of updates.
+%%      We only add it if it isn't already present on the dag,
+%%      as adding the same vertex multiple times removes any
+%%      metadata (labels).
 %%
-%%      A bottom vertex is one that can't have chidren.
-%%      Used as the destination of stream and reads.
-%%
-%%     We only add it if it isn't already present on the dag,
-%%     as adding the same vertex multiple times removes any
-%%     metadata (labels).
-%%
--spec add_if(atom(), digraph:graph(), digraph:vertex()) -> ok.
-add_if(Setting, Dag, V) ->
-    Test = case Setting of
-        source -> fun is_source/1;
-        sink -> fun is_sink/1
-    end,
-    case Test(V) andalso (digraph:vertex(Dag, V) =:= false) of
-        true -> digraph:add_vertex(Dag, V);
-        _ -> ok
-    end.
+-spec add_if_pid(digraph:graph(), pid()) -> ok.
+add_if_pid(Dag, Pid) when is_pid(Pid) ->
+   case digraph:vertex(Dag, Pid) of
+      false -> digraph:add_vertex(Dag, Pid);
+      _ -> ok
+   end;
 
-is_sink(V) ->
-    lists:member(V, [stream, read, query]).
-
-is_source(bind) -> true;
-is_source(_) -> false.
+add_if_pid(_, _) ->
+    ok.
 
 to_dot(Graph) ->
     case digraph_utils:topsort(Graph) of
@@ -381,5 +368,5 @@ write_edges(_G, [], _Visited, Result) ->
 v_str({Id, _}) ->
     erlang:integer_to_list(erlang:phash2(Id));
 
-v_str(V) when is_atom(V)->
-    erlang:atom_to_list(V).
+v_str(V) when is_pid(V)->
+    pid_to_list(V).

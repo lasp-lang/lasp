@@ -88,8 +88,6 @@ start_tracked_process(EventCount, [ReadFuns, TransFun, {To, _}=WriteFun]) ->
 %%
 single_fire_function(From, To, Fn, Args) ->
     Self = self(),
-    %% Unique reference, ignore any other messages.
-    %% @todo Remove?
     Ref = erlang:make_ref(),
 
     %% We don't care for the input.

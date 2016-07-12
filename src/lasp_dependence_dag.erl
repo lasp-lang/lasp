@@ -214,10 +214,10 @@ handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag}=State) ->
 handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
             _From, #state{dag=Dag, process_map=Pm}=State) ->
 
-    %% Add vertices only if they are either top or bottom. (See add_if)
+    %% Add vertices only if they are either sources or sinks. (See add_if)
     %% All user-defined variables are tracked through the `declare` function.
-    lists:foreach(fun(V) -> add_if(top, Dag, V) end, Src),
-    add_if(bottom, Dag, Dst),
+    lists:foreach(fun(V) -> add_if(source, Dag, V) end, Src),
+    add_if(sink, Dag, Dst),
 
     %% For all V in Src, make edge (V, Dst) with label {Pid, Read, Trans, Write}
     %% (where {Id, Read} = ReadFuns s.t. Id = V)
@@ -337,19 +337,19 @@ get_direct_edges(G, V1, V2) ->
 -spec add_if(atom(), digraph:graph(), digraph:vertex()) -> ok.
 add_if(Setting, Dag, V) ->
     Test = case Setting of
-        top -> fun is_top_vertex/1;
-        bottom -> fun is_bottom_vertex/1
+        source -> fun is_source/1;
+        sink -> fun is_sink/1
     end,
     case Test(V) andalso (digraph:vertex(Dag, V) =:= false) of
         true -> digraph:add_vertex(Dag, V);
         _ -> ok
     end.
 
-is_bottom_vertex(V) ->
+is_sink(V) ->
     lists:member(V, [stream, read, query]).
 
-is_top_vertex(bind) -> true;
-is_top_vertex(_) -> false.
+is_source(bind) -> true;
+is_source(_) -> false.
 
 to_dot(Graph) ->
     case digraph_utils:topsort(Graph) of

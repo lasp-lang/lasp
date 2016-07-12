@@ -97,9 +97,22 @@
 
 %% Test identifiers.
 -define(ADS_WITH_CONTRACTS, <<"ads_with_contracts">>).
--define(CONVERGENCE_TRACKING, <<"convergence_tracking">>).
 -define(BOOLEAN_TYPE, boolean).
 -define(COUNTER_TYPE, gcounter).
 -define(GMAP_TYPE, gmap).
 -define(SET_TYPE, lasp_config:get(set, orset)).
 -define(PAIR_TYPE, pair).
+
+%% Convergence tracking code.
+-define(CONVERGENCE_TRACKING, <<"convergence_tracking">>).
+
+-define(CONVERGENCE_PAIR,
+        {?PAIR_TYPE,
+        [
+            ?COUNTER_TYPE,
+            {?GMAP_TYPE, [?BOOLEAN_TYPE]}
+        ]
+    }).
+
+-define(CONVERGENCE_ID,
+        {?CONVERGENCE_TRACKING, ?CONVERGENCE_PAIR}).

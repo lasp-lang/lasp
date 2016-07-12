@@ -99,7 +99,7 @@ handle_info(log, State) ->
     {noreply, State};
 
 handle_info(check_convergence, #state{}=State) ->
-    {ok, {_, Convergence}} = lasp:query(convergence_id()),
+    {ok, {_, Convergence}} = lasp:query(?CONVERGENCE_ID),
 
     NodesWithAllEvents = lists:filter(
         fun({_Node, AllEvents}) ->
@@ -142,18 +142,8 @@ client_number() ->
     ?NUM_NODES.
 
 %% @private
-convergence_id() ->
-    PairType = {?PAIR_TYPE,
-                    [
-                        ?COUNTER_TYPE,
-                        {?GMAP_TYPE, [?BOOLEAN_TYPE]}
-                    ]
-                },
-    {?CONVERGENCE_TRACKING, PairType}.
-
-%% @private
 track_convergence() ->
-    {Id, Type} = convergence_id(),
+    {Id, Type} = ?CONVERGENCE_ID,
     {ok, _} = lasp:declare(Id, Type),
     schedule_check_convergence().
 

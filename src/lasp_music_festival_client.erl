@@ -142,14 +142,14 @@ handle_info(vote, #state{actor=Actor, votes=Votes0, identifiers=Identifiers0}=St
 
 handle_info(check_convergence, #state{actor=Actor}=State) ->
     MaxEvents = max_votes() * client_number(),
-    {ok, {TotalEvents, _}} = lasp:query(convergence_id()),
+    {ok, {TotalEvents, _}} = lasp:query(?CONVERGENCE_ID),
     %lager:info("Total number of events observed so far ~p of ~p", [TotalEvents, MaxEvents]),
 
     case TotalEvents == MaxEvents of
         true ->
             lager:info("Convergence reached on node ~p", [node()]),
             %% Update CT instance
-            lasp:update(convergence_id(), {snd, {Actor, true}}, Actor),
+            lasp:update(?CONVERGENCE_ID, {snd, {Actor, true}}, Actor),
             lasp_transmission_instrumentation:convergence();
         false ->
             schedule_check_convergence()
@@ -199,17 +199,5 @@ client_number() ->
     ?NUM_NODES.
 
 %% @private
-convergence_id() ->
-    PairType = {?PAIR_TYPE,
-                    [
-                        ?COUNTER_TYPE,
-                        {?GMAP_TYPE, [?BOOLEAN_TYPE]}
-                    ]
-                },
-    {?CONVERGENCE_TRACKING, PairType}.
-
-%% @private
 identifiers() ->
-    lists:map(fun(N) ->
-                term_to_binary({counter, N})
-        end, lists:seq(1, 100)).
+    lists:map(fun(N) -> term_to_binary({counter, N}) end, lists:seq(1, 100)).

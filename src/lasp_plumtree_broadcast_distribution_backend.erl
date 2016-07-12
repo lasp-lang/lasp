@@ -938,24 +938,16 @@ code_change(_OldVsn, State, _Extra) ->
 broadcast({Id, Type, Metadata, Value}=Payload) ->
     case lasp_config:get(broadcast, false) of
         true ->
-            case Id of
-                ?CONVERGENCE_ID ->
-                    %% Don't broadcast the convergence data structure;
-                    %% it gets embedded with the objects that it
-                    %% modifies to ensure causality.
-                    ok;
-                _ ->
-                    PeerCount = length(plumtree_broadcast:broadcast_members()),
-                    log_transmission({broadcast, Payload}, PeerCount),
-                    Clock = orddict:fetch(clock, Metadata),
-                    Broadcast = #broadcast{id=Id,
-                                           clock=Clock,
-                                           type=Type,
-                                           metadata=Metadata,
-                                           value=Value,
-                                           convergence=convergence()},
-                    plumtree_broadcast:broadcast(Broadcast, ?MODULE)
-            end;
+            PeerCount = length(plumtree_broadcast:broadcast_members()),
+            log_transmission({broadcast, Payload}, PeerCount),
+            Clock = orddict:fetch(clock, Metadata),
+            Broadcast = #broadcast{id=Id,
+                                   clock=Clock,
+                                   type=Type,
+                                   metadata=Metadata,
+                                   value=Value,
+                                   convergence=convergence()},
+            plumtree_broadcast:broadcast(Broadcast, ?MODULE);
         false ->
             ok
     end.

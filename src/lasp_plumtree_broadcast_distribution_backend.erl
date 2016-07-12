@@ -85,7 +85,7 @@
                     clock :: lasp_vclock:vclock(),
                     metadata :: metadata(),
                     value :: value(),
-                    convergence :: crdt()}).
+                    convergence :: var()}).
 
 -define(MEMORY_INTERVAL, 10000).
 -define(DELTA_INTERVAL, 10000).
@@ -164,7 +164,7 @@ start_link(Opts) ->
 -type broadcast_message() :: #broadcast{}.
 -type broadcast_id() :: id().
 -type broadcast_clock() :: clock().
--type broadcast_payload() :: {id(), type(), metadata(), value(), crdt()}.
+-type broadcast_payload() :: {id(), type(), metadata(), value(), var()}.
 
 %% @doc Returns from the broadcast message the identifier and the payload.
 -spec broadcast_data(broadcast_message()) ->
@@ -191,7 +191,10 @@ merge({Id, Clock}, {Id, Type, Metadata, Value, Convergence}) ->
             {ok, _} = ?MODULE:local_bind(Id, Type, Metadata, Value),
             bind_convergence(Convergence),
             true
-    end.
+    end;
+merge({_Id, _Clock}, Payload) ->
+    lager:error("Incoming merge didn't match payload: ~p", [Payload]),
+    false.
 
 %% @doc Use the clock on the object to determine if this message is
 %%      stale or not.
@@ -1151,10 +1154,11 @@ membership() ->
 
 %% @private
 convergence() ->
-    {ok, Convergence} = lasp:query(?CONVERGENCE_ID),
+    {ok, Convergence} = lasp:read(?CONVERGENCE_ID, undefined),
+    lager:info("*** read: ~p", [Convergence]),
     Convergence.
 
 %% @private
 bind_convergence({Id, Type, Metadata, Value}) ->
-    {ok, Value} = ?MODULE:local_bind(Id, Type, Metadata, Value),
-    {ok, Value}.
+    {ok, Result} = ?MODULE:local_bind(Id, Type, Metadata, Value),
+    {ok, Result}.

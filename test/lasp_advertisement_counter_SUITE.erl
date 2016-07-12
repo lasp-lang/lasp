@@ -77,6 +77,7 @@ all() ->
 %% tests
 %% ===================================================================
 
+-define(AAE_INTERVAL, 10000).
 -define(EVAL_NUMBER, 2).
 -define(IMPRESSION_NUMBER, 10).
 -define(CONVERGENCE_INTERVAL, 10000).
@@ -254,6 +255,18 @@ start(_Case, _Config, Options) ->
 
     %% Configure Lasp settings.
     ConfigureFun = fun(Node) ->
+                        %% Configure timers.
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [aae_interval, ?AAE_INTERVAL]),
+
+                        %% Configure plumtree AAE interval to be the same.
+                        ok = rpc:call(Node, application, set_env,
+                                      [broadcast_exchange_timer, ?AAE_INTERVAL]),
+
+                        %% Confgure broadcast
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [aae_interval, ?AAE_INTERVAL]),
+
                         %% Configure number of impressions.
                         ok = rpc:call(Node, lasp_config, set,
                                       [simulation_event_number, ?IMPRESSION_NUMBER]),

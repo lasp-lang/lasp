@@ -88,7 +88,6 @@
 
 -define(MEMORY_INTERVAL, 10000).
 -define(DELTA_INTERVAL, 10000).
--define(AAE_INTERVAL, 10000).
 -define(DELTA_GC_INTERVAL, 30000).
 
 %% Definitions for the bind/read fun abstraction.
@@ -1071,7 +1070,8 @@ schedule_aae_synchronization() ->
         state_based ->
             case lasp_config:get(broadcast, false) of
                 false ->
-                    erlang:send_after(?AAE_INTERVAL, self(), aae_sync);
+                    Interval = lasp_config:get(aae_interval, 10000),
+                    erlang:send_after(Interval, self(), aae_sync);
                 true ->
                     ok
             end

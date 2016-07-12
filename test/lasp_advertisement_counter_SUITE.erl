@@ -263,10 +263,6 @@ start(_Case, _Config, Options) ->
                         ok = rpc:call(Node, application, set_env,
                                       [broadcast_exchange_timer, ?AAE_INTERVAL]),
 
-                        %% Confgure broadcast
-                        ok = rpc:call(Node, lasp_config, set,
-                                      [aae_interval, ?AAE_INTERVAL]),
-
                         %% Configure number of impressions.
                         ok = rpc:call(Node, lasp_config, set,
                                       [simulation_event_number, ?IMPRESSION_NUMBER]),

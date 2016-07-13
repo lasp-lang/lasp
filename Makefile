@@ -96,13 +96,13 @@ plots:
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE; \
 		cd priv/evaluation && ./lasp_plot_gen.sh
 
-setup-evaluation: SHELL:=/bin/bash
-setup-evaluation:
-	priv/setup-evaluation.sh
-
 evaluate-local: SHELL:=/bin/bash
 evaluate-local:
 	priv/evaluate-local.sh
+
+evaluate-docker: SHELL:=/bin/bash
+evaluate-docker:
+	priv/evaluate-docker.sh
 
 logs:
 	tail -F priv/lager/*/log/*.log

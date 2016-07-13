@@ -10,6 +10,8 @@ script:
   - make dialyzer
   - make lint
   - make ct
+  - make ad-counter-simulation
+  - make music-festival-simulation
 notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D

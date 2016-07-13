@@ -29,7 +29,7 @@ packageclean:
 
 check: test xref dialyzer lint
 
-test: ct eunit
+test: ct eunit simulations
 
 lint:
 	${REBAR} as lint lint
@@ -41,7 +41,15 @@ eunit:
 	${REBAR} as test eunit
 
 ct:
-	${REBAR} as test ct
+	${REBAR} as test ct --suite=lasp_SUITE
+
+simulations: ad-counter-simulation music-festival-simulation
+
+ad-counter-simulation:
+	${REBAR} as test ct --suite=lasp_advertisement_counter_SUITE
+
+music-festival-simulation:
+	${REBAR} as test ct --suite=lasp_music_festival_SUITE
 
 ##
 ## Release targets

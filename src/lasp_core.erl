@@ -69,12 +69,16 @@
          intersection/7,
          fold/6]).
 
+%% Tracked versions, used by dataflow functions.
+-export([read_var/3,
+         bind_var/3]).
+
 %% Administrative controls.
 -export([storage_backend_reset/1]).
 
 %% Definitions for the bind/read fun abstraction.
 -define(BIND, fun(_AccId, AccValue, _Store) ->
-                ?MODULE:bind(_AccId, AccValue, _Store)
+                ?MODULE:bind_var(_AccId, AccValue, _Store)
               end).
 
 -define(WRITE, fun(_Store) ->
@@ -84,7 +88,7 @@
                end).
 
 -define(READ, fun(_Id, _Threshold) ->
-                ?MODULE:read(_Id, _Threshold, Store)
+                ?MODULE:read_var(_Id, _Threshold, Store)
               end).
 
 %% @doc Initialize the storage backend.
@@ -130,10 +134,10 @@ map(Id, Function, AccId, Store) ->
 -spec intersection(id(), id(), id(), store()) -> {ok, pid()}.
 intersection(Left, Right, Intersection, Store) ->
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
-            ?MODULE:read(_Left, _Threshold, _Variables)
+            ?MODULE:read_var(_Left, _Threshold, _Variables)
     end,
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
-            ?MODULE:read(_Right, _Threshold, _Variables)
+            ?MODULE:read_var(_Right, _Threshold, _Variables)
     end,
     intersection(Left, Right, Intersection, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
@@ -145,10 +149,10 @@ intersection(Left, Right, Intersection, Store) ->
 -spec union(id(), id(), id(), store()) -> {ok, pid()}.
 union(Left, Right, Union, Store) ->
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
-            ?MODULE:read(_Left, _Threshold, _Variables)
+            ?MODULE:read_var(_Left, _Threshold, _Variables)
     end,
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
-            ?MODULE:read(_Right, _Threshold, _Variables)
+            ?MODULE:read_var(_Right, _Threshold, _Variables)
     end,
     union(Left, Right, Union, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
@@ -160,10 +164,10 @@ union(Left, Right, Union, Store) ->
 -spec product(id(), id(), id(), store()) -> {ok, pid()}.
 product(Left, Right, Product, Store) ->
     ReadLeftFun = fun(_Left, _Threshold, _Variables) ->
-            ?MODULE:read(_Left, _Threshold, _Variables)
+            ?MODULE:read_var(_Left, _Threshold, _Variables)
     end,
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
-            ?MODULE:read(_Right, _Threshold, _Variables)
+            ?MODULE:read_var(_Right, _Threshold, _Variables)
     end,
     product(Left, Right, Product, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
@@ -182,20 +186,48 @@ read(Id, Store) ->
 %%      bound.
 %%
 %%      This operation blocks until `Threshold' has been reached.
+%%      As read/6 runs inside a lasp process, we have to block
+%%      outside, or else it may get killed when used in combination
+%%      with other lasp processes (for example, when used as the read
+%%      function of another lasp process).
 %%
 -spec read(id(), value(), store()) -> {ok, var()}.
 read(Id, Threshold, Store) ->
-    Self = self(),
-    ReplyFun = fun({Id1, Type, Metadata, Value}) ->
-                       {ok, {Id1, Type, Metadata, Value}}
-               end,
+    ReplyFun = fun
+        ({_Id, _Type, _Metadata, _Value}=Found) ->
+            {ok, Found};
+
+        ({error, _}=Error) ->
+            Error
+    end,
+    BlockingFun = fun() -> block end,
+    case read(Id, Threshold, Store, self(), ReplyFun, BlockingFun) of
+        {ok, FoundValue} ->
+            {ok, FoundValue};
+
+        {error, Reason} ->
+            {error, Reason};
+
+        block -> receive
+            {ok, {_Id, _Type, _Metadata, _Value}}=Res -> Res
+        end
+    end.
+
+read_var(Id, Threshold, Store) ->
+    ReplyFun = fun
+        ({_Id, _Type, _Metadata, _Value}=Found) ->
+            {ok, Found};
+
+        ({error, _}=Error) ->
+            Error
+    end,
     BlockingFun = fun() ->
-                receive
-                    X ->
-                        X
-                end
-            end,
-    read(Id, Threshold, Store, Self, ReplyFun, BlockingFun).
+        receive
+            {ok, {_Id, _Type, _Metadata, _Value}}=Res -> Res
+        end
+    end,
+    read_var(Id, Threshold, Store, self(), ReplyFun, BlockingFun).
+
 
 %% @doc Perform a monotonic read for a series of given idenfitiers --
 %%      first response wins.
@@ -277,9 +309,19 @@ declare_dynamic(Id, Type, MetadataFun0, Store) ->
     declare(Id, Type, MetadataFun, Store).
 
 %% @doc Return the current value of a CRDT.
-%% @todo Why isn't this using the ReadFun?
+%%
+%%      Same as query_var, but tracked in the dag.
+%%
 -spec query(id(), store()) -> {ok, term()}.
-query({_, Type}=Id, Store) ->
+query(Id, Store) ->
+    Self = self(),
+    lasp_process:single_fire_function(Id, Self,
+                                      fun query_var/2, [Id, Store]).
+
+%% @doc Return the current value of a CRDT.
+%% @todo Why isn't this using the ReadFun?
+-spec query_var(id(), store()) -> {ok, term()}.
+query_var({_, Type}=Id, Store) ->
     Value = case do(get, [Store, Id]) of
         {ok, #dv{value=Value0, type=Type}} ->
             Value0;
@@ -376,13 +418,31 @@ bind(Id, Value, Store) ->
     MetadataFun = fun(X) -> X end,
     bind(Id, Value, MetadataFun, Store).
 
+bind_var(Id, Value, Store) ->
+    MetadataFun = fun(X) -> X end,
+    bind_var(node(), Id, Value, MetadataFun, Store).
+
 bind(Id, Value, MetadataFun, Store) ->
     bind(node(), Id, Value, MetadataFun, Store).
 
 %% @doc Define a dataflow variable to be bound a value.
+%%
+%%      Same as bind_var, but tracked in the dag.
 -spec bind(node(), id(), value(), function(), store()) ->
     {ok, var()} | not_found().
 bind(Origin, Id, Value, MetadataFun, Store) ->
+    Self = self(),
+    lasp_process:single_fire_function(Self, Id,
+                                      fun bind_var/5, [Origin,
+                                                       Id,
+                                                       Value,
+                                                       MetadataFun,
+                                                       Store]).
+
+%% @doc Define a dataflow variable to be bound a value.
+-spec bind_var(node(), id(), value(), function(), store()) ->
+    {ok, var()} | not_found().
+bind_var(Origin, Id, Value, MetadataFun, Store) ->
     Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
                       waiting_delta_threads=WDT, waiting_threads=WT,
                       delta_counter=Counter0, delta_map=DeltaMap0,
@@ -435,6 +495,23 @@ bind(Origin, Id, Value, MetadataFun, Store) ->
 
 %% @doc Perform a read (or monotonic read) for a particular identifier.
 %%
+%%      Same as read_var, but tracked in the dag.
+%%
+-spec read(id(), value(), store(), pid(), function(), function()) ->
+    {ok, var()} | not_found() | block.
+read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
+    TrueSelf = self(),
+    lasp_process:single_fire_function(Id, TrueSelf,
+                                      fun read_var/6, [Id,
+                                                       Threshold,
+                                                       Store,
+                                                       Self,
+                                                       ReplyFun,
+                                                       BlockingFun]).
+
+
+%% @doc Perform a read (or monotonic read) for a particular identifier.
+%%
 %%      Given an `Id', perform a blocking read until the variable is
 %%      bound.
 %%
@@ -448,9 +525,9 @@ bind(Origin, Id, Value, MetadataFun, Store) ->
 %%      or it will have to wait for the notification, in the event the
 %%      variable is unbound or has not met the threshold yet.
 %%
--spec read(id(), value(), store(), pid(), function(), function()) ->
-    {ok, var()} | not_found().
-read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
+-spec read_var(id(), value(), store(), pid(), function(), function()) ->
+    {ok, var()} | not_found() | block.
+read_var(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
     Mutator = fun(#dv{type=Type, value=Value, metadata=Metadata, lazy_threads=LT}=Object) ->
             %% When no threshold is specified, use the bottom value for the
             %% given lattice.
@@ -493,56 +570,35 @@ read(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
 %% @doc Perform a read (or monotonic read) for a series of particular
 %%      identifiers.
 %%
+%%
 -spec read_any([{id(), value()}], pid(), store()) ->
     {ok, var()} | {ok, not_available_yet}.
 read_any(Reads, Self, Store) ->
-    Found = lists:foldl(
-            fun({Id, Threshold0}, AlreadyFound) ->
-                    case AlreadyFound of
-                        false ->
-                            Mutator = fun(#dv{type=Type, value=Value, metadata=Metadata, lazy_threads=LT}=Object) ->
-                                    %% When no threshold is specified, use the bottom
-                                    %% value for the given lattice.
-                                    %%
-                                    Threshold = case Threshold0 of
-                                        undefined ->
-                                            lasp_type:new(Type);
-                                        {strict, undefined} ->
-                                            {strict, lasp_type:new(Type)};
-                                        Threshold0 ->
-                                            Threshold0
-                                    end,
+    Found = lists:foldl(fun({Id, Threshold}, AlreadyFound) ->
+        case AlreadyFound of
+            false ->
+                ReplyFun = fun
+                    ({error, _}) ->
+                        false;
+                    ({_Id, _Type, _Metadata, _Value}=FoundValue) ->
+                        {ok, FoundValue}
+                end,
+                case read(Id, Threshold, Store, Self, ReplyFun, fun() -> false end) of
+                    {ok, {_Id, _Type, _Metadata, _Value}=Value} ->
+                        {ok, Value};
+                    _ -> false
+                end;
+            Result ->
+                Result
+        end
+    end, false, Reads),
 
-                                    %% Notify all lazy processes of this read.
-                                    {ok, SL} = reply_to_all(LT, {ok, Threshold}),
-
-                                    %% Satisfy read if threshold is met.
-                                    case lasp_type:threshold_met(Type, Value, Threshold) of
-                                        true ->
-                                            {Object, {ok, {Id, Type, Metadata, Value}}};
-                                        false ->
-                                            WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
-                                            {Object#dv{waiting_threads=WT, lazy_threads=SL}, error}
-                                    end
-                            end,
-
-                            case do(update, [Store, Id, Mutator]) of
-                                {ok, {Id, Type, Metadata, Value}} ->
-                                    {ok, {Id, Type, Metadata, Value}};
-                                error ->
-                                    false
-                            end;
-                        Result ->
-                            Result
-                        end
-                    end, false, Reads),
-
-                    case Found of
-                        false ->
-                            {ok, not_available_yet};
-                        Value ->
-                            Value
-                    end.
+    case Found of
+        false ->
+            {ok, not_available_yet};
+        Value ->
+            Value
+    end.
 
 %% @doc Define a dataflow variable to be bound to another dataflow
 %%      variable.
@@ -753,12 +809,16 @@ stream(Id, Function, Store) ->
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.
 %%
+%%      @todo track in dag
+%%      The output vertex should be a process identifier,
+%%      but since it can be the same as the one used in bind,
+%%      it could create a loop in the dag.
+%%
 stream(Id, Function, _Store, ReadFun) ->
-    TransFun = fun({_, T, _, V}) ->
+    Fun = fun({_, T, _, V}) ->
         Function(lasp_type:query(T, V))
     end,
-    WriteFun = fun(_, X) -> X end,
-    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {stream, WriteFun}]).
+    lasp_process:start_link([[{Id, ReadFun}], Fun]).
 
 %% @doc Callback wait_needed function for lasp_vnode, where we
 %%      change the reply and blocking replies.

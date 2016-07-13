@@ -13,4 +13,4 @@ RUN cd /tmp && \
 CMD cd /opt && \
     git clone https://github.com/lasp-lang/lasp.git -b unstable && \
     cd lasp && \
-    make ads
+    make evaluate-local

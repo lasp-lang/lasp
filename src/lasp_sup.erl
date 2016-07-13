@@ -253,6 +253,12 @@ music_festival_child_specs() ->
                                     permanent, 5000, worker,
                                     [lasp_music_festival_client]},
 
+            %% Configure proper partisan tag.
+            partisan_config:set(tag, client),
+
+            %% Configure reserved slots.
+            partisan_config:set(reservations, [server]),
+
             [MusicFestivalClient];
         false ->
             []
@@ -272,6 +278,10 @@ music_festival_child_specs() ->
                                    {lasp_music_festival_server, start_link, []},
                                     permanent, 5000, worker,
                                     [lasp_music_festival_server]},
+
+            %% Configure proper partisan tag.
+            partisan_config:set(tag, server),
+
             [MusicFestivalServer];
         false ->
             []
@@ -297,6 +307,11 @@ advertisement_counter_child_specs() ->
                                 permanent, 5000, worker,
                                 [lasp_advertisement_counter_client]},
 
+            %% Configure proper partisan tag.
+            partisan_config:set(tag, client),
+
+            %% Configure reserved slots.
+            partisan_config:set(reservations, [server]),
 
             [AdCounterClient];
         false ->
@@ -317,6 +332,10 @@ advertisement_counter_child_specs() ->
                                {lasp_advertisement_counter_server, start_link, []},
                                 permanent, 5000, worker,
                                 [lasp_advertisement_counter_server]},
+
+            %% Configure proper partisan tag.
+            partisan_config:set(tag, server),
+
             [AdCounterServer];
         false ->
             []

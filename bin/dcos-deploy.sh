@@ -5,6 +5,16 @@ if [ -z "$DCOS" ]; then
   exit 1
 fi
 
+if [ -z "$MODE" ]; then
+  echo ">>> MODE is not configured; please export MODE."
+  exit 1
+fi
+
+if [ -z "$BROADCAST" ]; then
+  echo ">>> BROADCAST is not configured; please export BROADCAST."
+  exit 1
+fi
+
 if [ -z "$TOKEN" ]; then
   echo ">>> TOKEN is not configured; please export TOKEN."
   exit 1
@@ -51,7 +61,8 @@ cat <<EOF > lasp-server.json
   "env": {
     "AD_COUNTER_SIM_SERVER": "true",
     "AD_COUNTER_SIM_CLIENT": "true",
-    "MODE": "delta_based",
+    "MODE": "$MODE",
+    "BROADCAST": "$BROADCAST",
     "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"
@@ -108,7 +119,8 @@ cat <<EOF > lasp-client.json
   "ports": [0, 0],
   "env": {
     "AD_COUNTER_SIM_CLIENT": "true",
-    "MODE": "delta_based",
+    "MODE": "$MODE",
+    "BROADCAST": "$BROADCAST",
     "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"

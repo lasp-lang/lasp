@@ -78,23 +78,23 @@ default_test(_Config) ->
     ok.
 
 state_based_with_aae_test(Config) ->
-    lasp_simulation_support:run(ad_counter_state_based_with_aae_test,
+    lasp_simulation_support:run(state_based_with_aae_test,
         Config,
         [{mode, state_based},
          {set, orset},
          {broadcast, false},
-         {evaluation_identifier, ad_counter_state_based_with_aae}]),
+         {evaluation_identifier, state_based_with_aae}]),
     ok.
 
 state_based_with_aae_and_tree_test(Config) ->
     case os:getenv("OMIT_HIGH_ULIMIT", "false") of
         "false" ->
-            lasp_simulation_support:run(ad_counter_state_based_with_aae_and_tree_test,
+            lasp_simulation_support:run(state_based_with_aae_and_tree_test,
                 Config,
                 [{mode, state_based},
                  {set, orset},
                  {broadcast, true},
-                 {evaluation_identifier, ad_counter_state_based_with_aae_and_tree}]),
+                 {evaluation_identifier, state_based_with_aae_and_tree}]),
             ok;
         _ ->
             %% Omit.
@@ -102,32 +102,32 @@ state_based_with_aae_and_tree_test(Config) ->
     end.
 
 delta_based_with_aae_test(Config) ->
-    lasp_simulation_support:run(ad_counter_delta_based_with_aae_test,
+    lasp_simulation_support:run(delta_based_with_aae_test,
         Config,
         [{mode, delta_based},
          {set, orset},
          {broadcast, false},
-         {evaluation_identifier, ad_counter_delta_based_with_aae}]),
+         {evaluation_identifier, delta_based_with_aae}]),
     ok.
 
 state_based_ps_with_aae_test(Config) ->
-    lasp_simulation_support:run(ad_counter_state_based_ps_with_aae_test,
+    lasp_simulation_support:run(state_based_ps_with_aae_test,
         Config,
         [{mode, state_based},
          {set, awset_ps},
          {broadcast, false},
-         {evaluation_identifier, ad_counter_state_based_ps_with_aae}]),
+         {evaluation_identifier, state_based_ps_with_aae}]),
     ok.
 
 state_based_ps_with_aae_and_tree_test(Config) ->
     case os:getenv("OMIT_HIGH_ULIMIT", "false") of
         "false" ->
-            lasp_simulation_support:run(ad_counter_state_based_ps_with_aae_and_tree_test,
+            lasp_simulation_support:run(state_based_ps_with_aae_and_tree_test,
                 Config,
                 [{mode, state_based},
                  {set, awset_ps},
                  {broadcast, true},
-                 {evaluation_identifier, ad_counter_state_based_ps_with_aae_and_tree}]),
+                 {evaluation_identifier, state_based_ps_with_aae_and_tree}]),
             ok;
         _ ->
             %% Omit.
@@ -135,14 +135,15 @@ state_based_ps_with_aae_and_tree_test(Config) ->
     end.
 
 delta_based_ps_with_aae_test(Config) ->
-    lasp_simulation_support:run(ad_counter_delta_based_ps_with_aae_test,
+    lasp_simulation_support:run(delta_based_ps_with_aae_test,
         Config,
         [{mode, delta_based},
          {set, awset_ps},
          {broadcast, false},
-         {evaluation_identifier, ad_counter_delta_based_ps_with_aae}]),
+         {evaluation_identifier, delta_based_ps_with_aae}]),
     ok.
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+

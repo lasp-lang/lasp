@@ -94,6 +94,7 @@ plots:
 		rm -rf priv/lager/ priv/evaluation; \
 		(cd priv/ && git clone https://github.com/lasp-lang/evaluation); \
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE; \
+		./rebar3 ct --readable=false --suite=test/lasp_musical_festival_SUITE; \
 		cd priv/evaluation && make plots
 
 evaluate-local: SHELL:=/bin/bash

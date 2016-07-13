@@ -137,7 +137,8 @@ start(_Case, _Config, Options) ->
 
                         %% Configure who should be the server and who's
                         %% the client.
-                        Simulation = proplists:get_value(simulation, ad_counter),
+                        Simulation = proplists:get_value(simulation, Options),
+
                         case Simulation of
                             ad_counter ->
                                 case Node of

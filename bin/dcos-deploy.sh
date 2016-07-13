@@ -15,6 +15,11 @@ if [ -z "$ELB_HOST" ]; then
   exit 1
 fi
 
+if [ -z "$EVALUATION_PASSPHRASE" ]; then
+  echo ">>> EVALUATION_PASSPHRASE is not configured; please export EVALUATION_PASSPHRASE."
+  exit 1
+fi
+
 echo ">>> Beginning deployment!"
 
 echo ">>> Configuring Lasp"
@@ -47,6 +52,7 @@ cat <<EOF > lasp-orchestrator.json
     "AD_COUNTER_SIM_SERVER": "true",
     "AD_COUNTER_SIM_CLIENT": "true",
     "MODE": "delta_based",
+    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"
   },
@@ -103,6 +109,7 @@ cat <<EOF > lasp.json
   "env": {
     "AD_COUNTER_SIM_CLIENT": "true",
     "MODE": "delta_based",
+    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"
   },

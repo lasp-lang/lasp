@@ -101,14 +101,14 @@ handle_cast(Msg, State) ->
 handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
     timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE),
 
-    %% Randomly get information from the orchestrator nodes and the
+    %% Randomly get information from the server nodes and the
     %% regular nodes.
     %%
     Task = case rand_compat:uniform(10) rem 2 == 0 of
         true ->
-            "lasp-orchestrator";
+            "lasp-server";
         false ->
-            "lasp"
+            "lasp-client"
     end,
 
     Nodes = case request(Task) of

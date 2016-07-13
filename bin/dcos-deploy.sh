@@ -25,12 +25,12 @@ echo ">>> Beginning deployment!"
 echo ">>> Configuring Lasp"
 cd /tmp
 
-cat <<EOF > lasp-orchestrator.json
+cat <<EOF > lasp-server.json
 {
   "acceptedResourceRoles": [
     "slave_public"
   ],
-  "id": "lasp-orchestrator",
+  "id": "lasp-server",
   "dependencies": [],
   "constraints": [["hostname", "UNIQUE", ""]],
   "cpus": 1.0,
@@ -75,21 +75,21 @@ cat <<EOF > lasp-orchestrator.json
 }
 EOF
 
-echo ">>> Removing orchestrator from Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-orchestrator
+echo ">>> Removing lasp-server from Marathon"
+curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-server
 sleep 2
 
-echo ">>> Adding orchestrator to Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-orchestrator.json $DCOS/service/marathon/v2/apps
+echo ">>> Adding lasp-server to Marathon"
+curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-server.json $DCOS/service/marathon/v2/apps
 echo
 sleep 10
 
-cat <<EOF > lasp.json
+cat <<EOF > lasp-client.json
 {
   "acceptedResourceRoles": [
     "slave_public"
   ],
-  "id": "lasp",
+  "id": "lasp-client",
   "dependencies": [],
   "cpus": 1.0,
   "mem": 2048.0,
@@ -128,11 +128,11 @@ cat <<EOF > lasp.json
 }
 EOF
 
-echo ">>> Removing lasp from Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp
+echo ">>> Removing lasp-client from Marathon"
+curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client
 sleep 2
 
-echo ">>> Adding lasp to Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp.json $DCOS/service/marathon/v2/apps
+echo ">>> Adding lasp-client to Marathon"
+curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-client.json $DCOS/service/marathon/v2/apps
 echo
 sleep 10

@@ -240,9 +240,9 @@ music_festival_child_specs() ->
     %% Figure out who is acting as the client.
     MusicClientDefault = list_to_atom(os:getenv("MUSIC_FESTIVAL_SIM_CLIENT", "false")),
     MusicClientEnabled = application:get_env(?APP,
-                                             music_festival_client,
+                                             music_festival_simulation_client,
                                              MusicClientDefault),
-    lasp_config:set(music_festival_client, MusicClientEnabled),
+    lasp_config:set(music_festival_simulation_client, MusicClientEnabled),
     lager:info("MusicClientEnabled: ~p", [MusicClientEnabled]),
 
     ClientSpecs = case MusicClientEnabled of
@@ -267,9 +267,9 @@ music_festival_child_specs() ->
     %% Figure out who is acting as the server.
     MusicServerDefault = list_to_atom(os:getenv("MUSIC_FESTIVAL_SIM_SERVER", "false")),
     MusicServerEnabled = application:get_env(?APP,
-                                             music_festival_server,
+                                             music_festival_simulation_server,
                                              MusicServerDefault),
-    lasp_config:set(music_festival_server, MusicServerEnabled),
+    lasp_config:set(music_festival_simulation_server, MusicServerEnabled),
     lager:info("MusicServerEnabled: ~p", [MusicServerEnabled]),
 
     ServerSpecs = case MusicServerEnabled of

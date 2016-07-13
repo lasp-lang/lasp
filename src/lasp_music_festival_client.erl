@@ -121,6 +121,9 @@ handle_info(vote, #state{actor=Actor, votes=Votes0, identifiers=Identifiers0}=St
             %% Remove identifier.
             Identifiers = Identifiers0 -- [Identifier],
 
+            %% Update CT instance
+            {ok, _} = lasp:update(?CONVERGENCE_ID, {fst, increment}, Actor),
+
             %% Bump votes.
             Votes = Votes0 + 1,
 
@@ -138,7 +141,7 @@ handle_info(vote, #state{actor=Actor, votes=Votes0, identifiers=Identifiers0}=St
 handle_info(check_convergence, #state{actor=Actor}=State) ->
     MaxEvents = max_votes() * client_number(),
     {ok, {TotalEvents, _}} = lasp:query(?CONVERGENCE_ID),
-    %lager:info("Total number of events observed so far ~p of ~p", [TotalEvents, MaxEvents]),
+    % lager:info("Total number of events observed so far ~p of ~p", [TotalEvents, MaxEvents]),
 
     case TotalEvents == MaxEvents of
         true ->

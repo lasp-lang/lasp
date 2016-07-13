@@ -84,8 +84,7 @@
                     type :: type(),
                     clock :: lasp_vclock:vclock(),
                     metadata :: metadata(),
-                    value :: value(),
-                    convergence :: var()}).
+                    value :: value()}).
 
 -define(MEMORY_INTERVAL, 10000).
 -define(DELTA_INTERVAL, 10000).
@@ -164,7 +163,7 @@ start_link(Opts) ->
 -type broadcast_message() :: #broadcast{}.
 -type broadcast_id() :: id().
 -type broadcast_clock() :: clock().
--type broadcast_payload() :: {id(), type(), metadata(), value(), var()}.
+-type broadcast_payload() :: {id(), type(), metadata(), value()}.
 
 %% @doc Returns from the broadcast message the identifier and the payload.
 -spec broadcast_data(broadcast_message()) ->
@@ -173,27 +172,25 @@ broadcast_data(#broadcast{id=Id,
                           type=Type,
                           clock=Clock,
                           metadata=Metadata,
-                          value=Value,
-                          convergence=Convergence}) ->
-    {{Id, Clock}, {Id, Type, Metadata, Value, Convergence}}.
+                          value=Value}) ->
+    {{Id, Clock}, {Id, Type, Metadata, Value}}.
 
 %% @doc Perform a merge of an incoming object with an object in the
 %%      local datastore, as long as we haven't seen a more recent clock
 %%      for the same object.
 -spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) ->
     boolean().
-merge({Id, Clock}, {Id, Type, Metadata, Value, Convergence}) ->
+merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
     case is_stale({Id, Clock}) of
         true ->
             false;
         false ->
             %% Bind information.
             {ok, _} = ?MODULE:local_bind(Id, Type, Metadata, Value),
-            bind_convergence(Convergence),
             true
     end;
-merge({_Id, _Clock}, Payload) ->
-    lager:error("Incoming merge didn't match payload: ~p", [Payload]),
+merge(BroadcastId, Payload) ->
+    lager:error("Incoming merge didn't match; broadcast_id: ~p payload: ~p", [BroadcastId, Payload]),
     false.
 
 %% @doc Use the clock on the object to determine if this message is
@@ -945,8 +942,7 @@ broadcast({Id, Type, Metadata, Value}=Payload) ->
                                    clock=Clock,
                                    type=Type,
                                    metadata=Metadata,
-                                   value=Value,
-                                   convergence=convergence()},
+                                   value=Value},
             plumtree_broadcast:broadcast(Broadcast, ?MODULE);
         false ->
             ok
@@ -1143,14 +1139,3 @@ init_delta_sync(Peer) ->
 %% @private
 membership() ->
     lasp_peer_service:members().
-
-%% @private
-convergence() ->
-    {ok, Convergence} = lasp:read(?CONVERGENCE_ID, undefined),
-    lager:info("*** read: ~p", [Convergence]),
-    Convergence.
-
-%% @private
-bind_convergence({Id, Type, Metadata, Value}) ->
-    {ok, Result} = ?MODULE:local_bind(Id, Type, Metadata, Value),
-    {ok, Result}.

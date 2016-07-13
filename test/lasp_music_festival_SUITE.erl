@@ -84,7 +84,7 @@ state_based_with_aae_test(Config) ->
          {simulation, music_festival},
          {set, orset},
          {broadcast, false},
-         {evaluation_identifier, music_festival_state_based_with_aae}]),
+         {evaluation_identifier, state_based_with_aae}]),
     ok.
 
 state_based_with_aae_and_tree_test(Config) ->
@@ -96,7 +96,7 @@ state_based_with_aae_and_tree_test(Config) ->
                  {simulation, music_festival},
                  {set, orset},
                  {broadcast, true},
-                 {evaluation_identifier, music_festival_state_based_with_aae_and_tree}]),
+                 {evaluation_identifier, state_based_with_aae_and_tree}]),
             ok;
         _ ->
             %% Omit.
@@ -110,7 +110,7 @@ delta_based_with_aae_test(Config) ->
          {simulation, music_festival},
          {set, orset},
          {broadcast, false},
-         {evaluation_identifier, music_festival_delta_based_with_aae}]),
+         {evaluation_identifier, delta_based_with_aae}]),
     ok.
 
 state_based_ps_with_aae_test(Config) ->
@@ -120,7 +120,7 @@ state_based_ps_with_aae_test(Config) ->
          {simulation, music_festival},
          {set, awset_ps},
          {broadcast, false},
-         {evaluation_identifier, music_festival_state_based_ps_with_aae}]),
+         {evaluation_identifier, state_based_ps_with_aae}]),
     ok.
 
 state_based_ps_with_aae_and_tree_test(Config) ->
@@ -132,7 +132,7 @@ state_based_ps_with_aae_and_tree_test(Config) ->
                  {simulation, music_festival},
                  {set, awset_ps},
                  {broadcast, true},
-                 {evaluation_identifier, music_festival_state_based_ps_with_aae_and_tree}]),
+                 {evaluation_identifier, state_based_ps_with_aae_and_tree}]),
             ok;
         _ ->
             %% Omit.
@@ -146,7 +146,7 @@ delta_based_ps_with_aae_test(Config) ->
          {simulation, music_festival},
          {set, awset_ps},
          {broadcast, false},
-         {evaluation_identifier, music_festival_delta_based_ps_with_aae}]),
+         {evaluation_identifier, delta_based_ps_with_aae}]),
     ok.
 
 %% ===================================================================

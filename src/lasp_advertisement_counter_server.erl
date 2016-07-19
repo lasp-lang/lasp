@@ -111,13 +111,13 @@ handle_info(log, #state{ads=Ads}=State) ->
     {noreply, State};
 
 handle_info(check_convergence, #state{}=State) ->
-    {ok, {_, Convergence}} = lasp:query(?CONVERGENCE_ID),
+    {ok, {_, ConvergenceAndLogs}} = lasp:query(?CONVERGENCE_ID),
 
     NodesWithAllEvents = lists:filter(
-        fun({_Node, AllEvents}) ->
+        fun({_Node, {AllEvents, _LogsPushed}}) ->
             AllEvents
         end,
-        Convergence
+        ConvergenceAndLogs
     ),
 
     case length(NodesWithAllEvents) == client_number() of

@@ -147,7 +147,7 @@ handle_info(check_convergence, #state{actor=Actor}=State) ->
         true ->
             lager:info("Convergence reached on node ~p", [node()]),
             %% Update CT instance
-            lasp:update(?CONVERGENCE_ID, {snd, {Actor, true}}, Actor),
+            lasp:update(?CONVERGENCE_ID, {snd, {Actor, {fst, true}}}, Actor),
             lasp_transmission_instrumentation:convergence();
         false ->
             schedule_check_convergence()

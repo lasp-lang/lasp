@@ -485,7 +485,10 @@ maybe_unnecessary(G, V) ->
 %%%===================================================================
 
 to_dot(Graph) ->
-    case digraph_utils:topsort(Graph) of
+    Vertices = lists:filter(fun(V) ->
+        not (digraph:in_degree(Graph, V) =:= 0 andalso digraph:out_degree(Graph, V) =:= 0)
+    end, digraph_utils:topsort(Graph)),
+    case Vertices of
         [] -> {error, no_data};
         VertexList ->
             Start = ["digraph dag {\n"],

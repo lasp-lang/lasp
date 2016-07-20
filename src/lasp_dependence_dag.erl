@@ -95,12 +95,12 @@ add_edges(Src, Dst, Pid, ReadFuns, TransFun, WriteFun) ->
 %% @doc Return the dot representation as a string.
 -spec to_dot() -> {ok, string()} | {error, no_data}.
 to_dot() ->
-  gen_server:call(?MODULE, to_dot, infinity).
+    gen_server:call(?MODULE, to_dot, infinity).
 
 %% @doc Write the dot representation of the dag to the given file path.
 -spec export_dot(string()) -> ok | {error, no_data}.
 export_dot(Path) ->
-  gen_server:call(?MODULE, {export_dot, Path}, infinity).
+    gen_server:call(?MODULE, {export_dot, Path}, infinity).
 
 n_vertices() ->
     gen_server:call(?MODULE, n_vertices, infinity).

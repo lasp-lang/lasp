@@ -68,7 +68,7 @@ start_link() ->
 
 -spec add_vertex(id()) -> ok.
 add_vertex(V) ->
-    gen_server:call(?MODULE, {add_vertex, V}, infinity).
+    add_vertices([V]).
 
 -spec add_vertices(list(id())) -> ok.
 add_vertices([]) ->
@@ -154,10 +154,6 @@ handle_call({out_edges, V}, _From, #state{dag=Dag}=State) ->
 handle_call({in_edges, V}, _From, #state{dag=Dag}=State) ->
     Edges = [digraph:edge(Dag, E) || E <- digraph:in_edges(Dag, V)],
     {reply, {ok, Edges}, State};
-
-handle_call({add_vertex, V}, _From, #state{dag=Dag}=State) ->
-    digraph:add_vertex(Dag, V),
-    {reply, ok, State};
 
 handle_call({add_vertices, Vs}, _From, #state{dag=Dag}=State) ->
     [digraph:add_vertex(Dag, V) || V <- Vs],

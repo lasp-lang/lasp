@@ -32,6 +32,9 @@
          terminate/2,
          code_change/3]).
 
+%% @todo Remove. Debug only
+-export([contract/0]).
+
 %% Defines how often an optimization pass happens.
 %% A value of 0 means the optimization happens every time.
 -define(CONTRACTION_INTERVAL, 0).
@@ -138,6 +141,9 @@ in_edges(V) ->
 process_map() ->
     gen_server:call(?MODULE, get_process_map, infinity).
 
+contract() ->
+    gen_server:call(?MODULE, contract, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -187,6 +193,12 @@ handle_call({export_dot, Path}, _From, #state{dag=Dag}=State) ->
 
 handle_call(get_process_map, _From, #state{process_map=PM}=State) ->
     {reply, {ok, dict:to_list(PM)}, State};
+
+handle_call(contract, _From, #state{dag=Dag}=State) ->
+    lists:foreach(fun(P) ->
+        contract(Dag, P)
+    end, contraction_paths(Dag)),
+    {reply, ok, State};
 
 %% @doc Check if linking the given vertices will introduce a cycle in the graph.
 %%
@@ -479,6 +491,161 @@ maybe_unnecessary(_G, V) when is_pid(V) ->
 
 maybe_unnecessary(G, V) ->
     digraph:in_degree(G, V) =:= 1.
+
+%% @doc Perform path contraction in the given sequence of vertices.
+%%
+%%      The resulting edge represents a lasp process with the read
+%%      function of the first vertex, the write function of the last
+%%      and the composition of all inner transform functions.
+%%
+%%      Given two consecutive edges, (v1, v2) = f and (v2, v3) = g, with
+%%      metadata:
+%%
+%%      f = <r_f, t_f, w_f>
+%%
+%%      g = <r_g, t_g, w_g>
+%%
+%%      where `r`, `t` and `w` represent the read, transform and write
+%%      functions, we define the composition of `f` and `g` as
+%%
+%%      g . f = <r_f, (t_g . t_f), w_g >
+%%
+%%      where ( . ) is defined as the usual composition operator.
+%%      The result of this operation is a new edge h = (v1, v3).
+%%
+contract(G, VSeq) ->
+    [First, Second | _] = VSeq,
+    Last = lists:last(VSeq),
+    SndLast = lists:nth(length(VSeq) - 1, VSeq),
+
+    %% Read function from the first vertex.
+    ReadFun = lists:nth(1, get_read_functions(G, First, Second)),
+    Read = {First, ReadFun},
+
+    %% List of all transforming functions.
+    TransFuns = collect_trans_funs(G, VSeq),
+
+    %% Write function from the last vertex.
+    WriteFun = lists:nth(1, get_write_functions(G, SndLast, Last)),
+    Write = {Last, WriteFun},
+
+    %% Since all transforming functions (with arity one) are
+    %% of type (CRDT -> value), we need an intermediate
+    %% function (value -> CRDT) to be able to compose them.
+    %%
+    %% The last function gets back the result from the last output.
+    %%
+    %% We define path contraction on those containing unnecessary
+    %% vertices only, so we don't care for multi-arity functions.
+    TransFun = fun({Id, T, Metadata, _OldValue}=X) ->
+        apply_sequentially(X, TransFuns, fun(NewValue) ->
+            {Id, T, Metadata, NewValue}
+        end, fun({_, _, _, V}) ->  V  end)
+    end,
+
+    %% @todo Prototype
+    OldPids = collect_pids(G, VSeq),
+    kill_then_start(OldPids, [[Read], TransFun, Write]).
+
+%% @todo Not secure until we implement cleaving
+kill_then_start(Pids, Args) ->
+    spawn(fun() ->
+        lists:foreach(fun(P) ->
+            lasp_process_sup:terminate_child(lasp_process_sup, P)
+        end, Pids),
+        lasp_process:start_dag_link(Args)
+    end).
+
+%% @doc Get the list of pids from the edges between V1 and V2
+-spec get_connecting_pids(digraph:graph(),
+                          lasp_vertex(),
+                          lasp_vertex()) -> list(pid()).
+
+get_connecting_pids(G, V1, V2) ->
+    get_edge_properties(fun({_, _, _, E}) ->
+        E#edge_label.pid
+    end, G, V1, V2).
+
+%% @doc Recursively get all pids from the given path.
+-spec collect_pids(digraph:graph(), contract_path()) -> list(pid()).
+collect_pids(G, [_ | T]=Seq) ->
+    lists:flatten(zipwith(fun(Src, Dst) ->
+        get_connecting_pids(G, Src, Dst)
+    end, Seq, T)).
+
+%% @doc Get the list of read functions from the edges between V1 and V2
+-spec get_read_functions(digraph:graph(),
+                         lasp_vertex(),
+                         lasp_vertex()) -> list(function()).
+
+get_read_functions(G, V1, V2) ->
+    get_edge_properties(fun({_, _, _, E}) ->
+        E#edge_label.read
+    end, G, V1, V2).
+
+%% @doc Get the list of transform functions from the edges between V1 and V2
+-spec get_transform_functions(digraph:graph(),
+                              lasp_vertex(),
+                              lasp_vertex()) -> list(function()).
+
+get_transform_functions(G, V1, V2) ->
+    get_edge_properties(fun({_, _, _, E}) ->
+        E#edge_label.transform
+    end, G, V1, V2).
+
+%% @doc Recursively get all transform functions from the given path.
+-spec collect_trans_funs(digraph:graph(), contract_path()) -> list(function()).
+collect_trans_funs(G, [_ | T]=Seq) ->
+    lists:flatten(zipwith(fun(Src, Dst) ->
+        get_transform_functions(G, Src, Dst)
+    end, Seq, T)).
+
+%% @doc Get the list of write functions from the edges between V1 and V2
+-spec get_write_functions(digraph:graph(),
+                          lasp_vertex(),
+                          lasp_vertex()) -> list(function()).
+
+get_write_functions(G, V1, V2) ->
+    get_edge_properties(fun({_, _, _, E}) ->
+        E#edge_label.write
+    end, G, V1, V2).
+
+-spec get_edge_properties(function(),
+                          digraph:graph(),
+                          lasp_vertex(),
+                          lasp_vertex()) -> list(pid() | function()).
+
+get_edge_properties(Fn, G, V1, V2) ->
+    lists:map(Fn, get_direct_edges(G, V1, V2)).
+
+%% @doc Zipwith that works with lists of different lengths.
+%%
+%%      Stops as soon as one of the lists is empty.
+%%
+%%      zipwith(fun(X, Y) -> {X, Y} end, [1,2,3], [1,2]).
+%%      => [{1,1}, {2,2}]
+%%
+-spec zipwith(function(), list(any()), list(any())) -> list(any()).
+zipwith(Fn, [X | Xs], [Y | Ys]) ->
+    [Fn(X, Y) | zipwith(Fn, Xs, Ys)];
+
+zipwith(Fn, _, _) when is_function(Fn, 2) -> [].
+
+%% @doc Thread a value through a list of functions.
+%%
+%%      Takes an initial value, a list of functions, and two transforming
+%%      functions. The first one transforms the output of a function into
+%%      the input of the next one in the list. The second transforms the
+%%      output of the final function in the list.
+%%
+%%      When Int and Final are the identity function, apply_sequentially
+%%      is equivalent to applying X to the composition of all functions
+%%      in the list.
+%%
+-spec apply_sequentially(any(), list(function()), function(), function()) -> any().
+apply_sequentially(X, [], _, Final) -> Final(X);
+apply_sequentially(X, [H | T], Int, Final) ->
+    apply_sequentially(Int(H(X)), T, Int, Final).
 
 %%%===================================================================
 %%% .DOT export functions

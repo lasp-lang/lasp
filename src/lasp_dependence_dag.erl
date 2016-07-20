@@ -32,6 +32,10 @@
          terminate/2,
          code_change/3]).
 
+%% Defines how often an optimization pass happens.
+%% A value of 0 means the optimization happens every time.
+-define(CONTRACTION_INTERVAL, 0).
+
 %%%===================================================================
 %%% Type definitions
 %%%===================================================================
@@ -45,7 +49,8 @@
 -type process_map() :: dict:dict(pid(), {id(), id()}).
 
 -record(state, {dag :: digraph:graph(),
-                process_map :: process_map()}).
+                process_map :: process_map(),
+                contraction_step :: non_neg_integer()}).
 
 %% We store the function metadata as the edge label.
 -record(edge_label, {pid :: pid(),
@@ -60,6 +65,8 @@
                       digraph:vertex(),
                       digraph:vertex(),
                       #edge_label{}}.
+
+-type contract_path() :: list(lasp_vertex()).
 
 %%%===================================================================
 %%% API
@@ -138,7 +145,8 @@ process_map() ->
 %% @doc Initialize state.
 init([]) ->
     {ok, #state{dag=digraph:new([acyclic]),
-                process_map=dict:new()}}.
+                process_map=dict:new(),
+                contraction_step=0}}.
 
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
@@ -195,6 +203,15 @@ handle_call(get_process_map, _From, #state{process_map=PM}=State) ->
 %%      an infinite loop can be created if the vertices form a loop.
 %%
 handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag}=State) ->
+
+    %% @todo A cleaving in the graph should never introduce loops
+    %%       should check optimized nodes so that we don't accidentally
+    %%       introduce loops while a node is not connected.
+    %%
+    %%       For example, A -> B -> C, B -> A is a loop, but if (A, B) is
+    %%       optimized, we could make that edge. If we cleave after that,
+    %%       trying to make (A, B) will fail.
+
     Response = case lists:member(To, From) of
         true -> true;
         false ->
@@ -216,7 +233,13 @@ handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag}=State) ->
 %%      We monitor all edge Pids to know when they die or get restarted.
 %%
 handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
-            _From, #state{dag=Dag, process_map=Pm}=State) ->
+            _From, #state{dag=Dag, process_map=Pm, contraction_step=CtStep}=State) ->
+
+    %% @todo Should perform contractions at CONTRACTION_INTERVAL
+    %%       and check for cleaving every time an edge is added.
+    %%
+    %%       First, check if this edge involves a contracted vertex
+    %%       if it does, perform a cleaving step on it.
 
     %% Add vertices only if they are either sources or sinks. (See add_if)
     %% All user-defined variables are tracked through the `declare` function.
@@ -232,7 +255,7 @@ handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
                                                   transform=TransFun,
                                                   write=WriteFun})
     end, Src),
-    {R, St} = case lists:any(fun is_graph_error/1, Status) of
+    {R, St0} = case lists:any(fun is_graph_error/1, Status) of
         true -> {error, State};
         false ->
             erlang:monitor(process, Pid),
@@ -244,6 +267,18 @@ handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
             end, Pm, Src),
 
             {ok, State#state{process_map=ProcessMap}}
+    end,
+
+    St = case CtStep of
+        ?CONTRACTION_INTERVAL ->
+            %% @todo Contraction step
+            lists:foreach(fun(Path) ->
+                io:format("Suitable contraction path:~n"),
+                lists:foreach(fun(El) -> io:format("  ~s~n", [v_str(El)]) end, Path)
+            end, contraction_paths(Dag)),
+            St0#state{contraction_step=0};
+        _ ->
+            St0#state{contraction_step = CtStep + 1}
     end,
     {reply, R, St}.
 
@@ -341,6 +376,113 @@ add_if_pid(Dag, Pid) when is_pid(Pid) ->
 
 add_if_pid(_, _) ->
     ok.
+
+%%%===================================================================
+%%% Contraction / Cleaving Functions
+%%%===================================================================
+
+%% @doc Return a list of contraction candidate paths in the graph.
+%%
+%%      A contraction path is formed by two necessary endpoints, and
+%%      a list of unnecessary vertices connecting them.
+%%
+%%      If no paths are found, the empty list is returned.
+%%
+-spec contraction_paths(digraph:graph()) -> list(contract_path()).
+contraction_paths(G) ->
+    Result = contraction_paths(G, digraph_utils:topsort(G), sets:new(), [[]]),
+    lists:filter(fun(L) -> length(L) > 0 end, Result).
+
+-spec contraction_paths(digraph:graph(),
+                        list(lasp_vertex()),
+                        sets:set(lasp_vertex()),
+                        list(digraph:vertex())) -> list(contract_path()).
+
+contraction_paths(G, [V | Vs], Visited, Acc) ->
+    case sets:is_element(V, Visited) of
+        true -> contraction_paths(G, Vs, Visited, Acc);
+        _ -> case is_unnecessary(G, V) of
+            true ->
+                Path = get_children_while(fun(El) ->
+                    is_unnecessary(G, El)
+                end, G, V),
+
+                AllVisited = lists:foldl(fun sets:add_element/2, Visited, Path),
+
+                %% We already know it only has one parent.
+                [Parent | _] = digraph:in_neighbours(G, V),
+
+                contraction_paths(G, Vs, AllVisited, [[Parent | Path] | Acc]);
+            false ->
+                contraction_paths(G, Vs, sets:add_element(V, Visited), Acc)
+        end
+    end;
+
+contraction_paths(_, [], _, Acc) -> Acc.
+
+%% @doc Recursively get all the children of a given vertex that satisfy
+%%      the given predicate.
+%%
+%%      Returns a list of the children, in depth-first order, with the
+%%      first element that doesn't satisfy the predicate in the last
+%%      position of the list.
+%%
+%%      If the given vertex has no children, or if it doesn't satisfy
+%%      the predicate, a list with it as the only element is returned.
+%%
+-spec get_children_while(fun((lasp_vertex()) -> boolean()),
+                         digraph:graph(),
+                         lasp_vertex()) -> list(lasp_vertex()).
+
+get_children_while(Pred, G, V) ->
+    lists:reverse(get_children_while(Pred, G, V, [])).
+
+-spec get_children_while(fun((lasp_vertex()) -> boolean()),
+                         digraph:graph(),
+                         lasp_vertex(),
+                         list(lasp_vertex())) -> list(lasp_vertex()).
+
+get_children_while(Pred, G, V, Acc) ->
+    case Pred(V) of
+        true ->
+            Res = lists:flatmap(fun(Child) ->
+                get_children_while(Pred, G, Child, Acc)
+            end, digraph:out_neighbours(G, V)),
+            Res ++ Acc ++ [V];
+        false -> [V | Acc]
+    end.
+
+%% @doc Unnecessary vertex.
+%%
+%%      An unnecessary vertex iff its out degree = in degree = 1, where
+%%      the parent and the child are regular vertices (not pids) and the
+%%      child only has one parent.
+%%
+%%      Unnecessary vertices can be contracted in the graph.
+%%
+-spec is_unnecessary(digraph:graph(), lasp_vertex()) -> boolean().
+is_unnecessary(G, V) ->
+    case digraph:in_degree(G, V) =:= 1 andalso digraph:out_degree(G, V) =:= 1 of
+        false -> false;
+        true ->
+            %% We already know it only has one parent and one child.
+            [Parent | _] = digraph:in_neighbours(G, V),
+            [Child  | _] = digraph:out_neighbours(G, V),
+            %% Parent isn't a pid, Child isn't a pid _and_ only has a parent.
+            not is_pid(Parent) andalso maybe_unnecessary(G, Child)
+    end.
+
+%% @doc Unnecessary vertex candidate.
+-spec maybe_unnecessary(digraph:graph(), lasp_vertex()) -> boolean().
+maybe_unnecessary(_G, V) when is_pid(V) ->
+    false;
+
+maybe_unnecessary(G, V) ->
+    digraph:in_degree(G, V) =:= 1.
+
+%%%===================================================================
+%%% .DOT export functions
+%%%===================================================================
 
 to_dot(Graph) ->
     case digraph_utils:topsort(Graph) of

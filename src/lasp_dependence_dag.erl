@@ -53,11 +53,13 @@
                     transform :: function(),
                     write :: function()}).
 
+-type lasp_vertex() :: id() | pid().
+
 %% Return type of digraph:edge/2
--type edge() :: {digraph:edge(),
-                 digraph:vertex(),
-                 digraph:vertex(),
-                 #edge_label{}}.
+-type lasp_edge() :: {digraph:edge(),
+                      digraph:vertex(),
+                      digraph:vertex(),
+                      #edge_label{}}.
 
 %%%===================================================================
 %%% API
@@ -66,11 +68,11 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec add_vertex(id()) -> ok.
+-spec add_vertex(lasp_vertex()) -> ok.
 add_vertex(V) ->
     add_vertices([V]).
 
--spec add_vertices(list(id())) -> ok.
+-spec add_vertices(list(lasp_vertex())) -> ok.
 add_vertices([]) ->
     ok;
 
@@ -78,7 +80,7 @@ add_vertices(Vs) ->
     gen_server:call(?MODULE, {add_vertices, Vs}, infinity).
 
 %% @doc Check if linking the given vertices will form a loop.
--spec will_form_cycle(list(id()), id()) -> boolean().
+-spec will_form_cycle(list(lasp_vertex()), lasp_vertex()) -> boolean().
 will_form_cycle(Src, Dst) ->
     gen_server:call(?MODULE, {will_form_cycle, Src, Dst}, infinity).
 
@@ -88,7 +90,13 @@ will_form_cycle(Src, Dst) ->
 %%      either because it formed a loop, or because some of the
 %%      vertices weren't in the graph.
 %%
--spec add_edges(list(id()), id(), pid(), list({id(), function()}), function(), {id(), function()}) -> ok | error.
+-spec add_edges(list(lasp_vertex()),
+                lasp_vertex(),
+                pid(),
+                list({lasp_vertex(), function()}),
+                     function(),
+                     {lasp_vertex(), function()}) -> ok | error.
+
 add_edges(Src, Dst, Pid, ReadFuns, TransFun, WriteFun) ->
     gen_server:call(?MODULE, {add_edges, Src, Dst, Pid, ReadFuns, TransFun, WriteFun}, infinity).
 
@@ -291,7 +299,7 @@ is_edge_error(_) ->
     false.
 
 %% @doc Delete all edges between Src and Dst with the given pid..
--spec delete_with_pid(digraph:graph(), id(), id(), term()) -> digraph:graph().
+-spec delete_with_pid(digraph:graph(), lasp_vertex(), lasp_vertex(), term()) -> digraph:graph().
 delete_with_pid(Graph, Src, Dst, Pid) ->
     lists:foreach(fun
         ({E, _, _, #edge_label{pid=TargetPid}}) when TargetPid =:= Pid ->
@@ -308,7 +316,7 @@ delete_with_pid(Graph, Src, Dst, Pid) ->
 %%      only the ones linking to V2.
 %%
 -spec get_direct_edges(digraph:graph(),
-                       digraph:vertex(), digraph:vertex()) -> list(edge()).
+                       lasp_vertex(), lasp_vertex()) -> list(lasp_edge()).
 
 get_direct_edges(G, V1, V2) ->
     lists:flatmap(fun(Ed) ->
@@ -324,7 +332,7 @@ get_direct_edges(G, V1, V2) ->
 %%      as adding the same vertex multiple times removes any
 %%      metadata (labels).
 %%
--spec add_if_pid(digraph:graph(), pid()) -> ok.
+-spec add_if_pid(digraph:graph(), lasp_vertex()) -> ok.
 add_if_pid(Dag, Pid) when is_pid(Pid) ->
    case digraph:vertex(Dag, Pid) of
       false -> digraph:add_vertex(Dag, Pid);

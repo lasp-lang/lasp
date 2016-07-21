@@ -607,7 +607,8 @@ remove_edges(Dag, VSeq, Pid, OptMap) ->
     end, dict:new(), get_metadata(Dag, VSeq)),
 
     %% Tag all unnecessary vertices in the path with the new process Pid
-    tag_unnecessary(Dag, VSeq, Pid),
+    UnnecesaryVertices = lists:sublist(VSeq, 2, length(VSeq) - 2),
+    tag_unnecessary(Dag, UnnecesaryVertices, Pid),
 
     %% Delete the intermediate edges and kill the associated processes.
     OldPids = collect_pids(Dag, VSeq),
@@ -649,10 +650,9 @@ get_metadata(G, V1, V2) ->
 %% @doc Tag the unnecessary vertices in the given path with a pid.
 -spec tag_unnecessary(digraph:graph(), contract_path(), pid()) -> ok.
 tag_unnecessary(Dag, VSeq, Pid) ->
-    Intermediate = lists:sublist(VSeq, 2, length(VSeq) - 2),
     lists:foreach(fun(V) ->
         digraph:add_vertex(Dag, V, #vertex_label{pointer_pid=Pid})
-    end, Intermediate).
+    end, VSeq).
 
 %% @doc Get the list of pids from the edges between V1 and V2
 -spec get_connecting_pids(digraph:graph(),

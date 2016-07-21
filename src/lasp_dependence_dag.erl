@@ -24,6 +24,11 @@
          out_edges/1,
          in_edges/1]).
 
+%% @todo Only export on test. Optimization Debug
+-export([contract/0,
+         cleave/1,
+         cleave_all/0]).
+
 %% gen_server callbacks
 -export([init/1,
          handle_call/3,
@@ -31,9 +36,6 @@
          handle_info/2,
          terminate/2,
          code_change/3]).
-
-%% @todo Remove. Debug only
--export([contract/0]).
 
 %% Defines how often an optimization pass happens.
 %% A value of 0 means the optimization happens every time.
@@ -63,9 +65,11 @@
 %% as part of a path contraction.
 %%
 %% Used during the cleaving step.
+%% @todo Optimize
 -type optimized_map() :: dict:dict(pid(),
-                                   dict:dict(lasp_vertex(),
-                                             {lasp_vertex(), #process_metadata{}})).
+                                   {contract_path(),
+                                    dict:dict(lasp_vertex(),
+                                              {lasp_vertex(), #process_metadata{}})}).
 
 -record(state, {dag :: digraph:graph(),
                 process_map :: process_map(),
@@ -77,6 +81,10 @@
                     read :: function(),
                     transform :: function(),
                     write :: function()}).
+
+%% @todo Move somewhere else
+%% A tuple of the arguments of a lasp process.
+-type process_args() :: {[{lasp_vertex(), function()}], function(), {lasp_vertex(), function()}}.
 
 %% @todo For now, maybe changed for another data structure
 -record(vertex_label, {pointer_pid :: pid()}).
@@ -164,6 +172,12 @@ process_map() ->
 contract() ->
     gen_server:call(?MODULE, contract, infinity).
 
+cleave(Vertex) ->
+    gen_server:call(?MODULE, {cleave, Vertex}, infinity).
+
+cleave_all() ->
+    gen_server:call(?MODULE, cleave_all, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -221,6 +235,18 @@ handle_call(contract, _From, #state{dag=Dag}=State) ->
     end, contraction_paths(Dag)),
     {reply, ok, State};
 
+handle_call({cleave, Vertex}, _From, #state{dag=Dag}=State) ->
+    cleave_if_contracted(Dag, Vertex),
+    {reply, ok, State};
+
+handle_call(cleave_all, _From, #state{optimized_map=OptMap}=State) ->
+    lists:foreach(fun(Pid) ->
+        spawn_link(fun() ->
+            lasp_process_sup:terminate_child(lasp_process_sup, Pid)
+        end)
+    end, dict:fetch_keys(OptMap)),
+    {reply, ok, State};
+
 %% @doc Check if linking the given vertices will introduce a cycle in the graph.
 %%
 %%      Naive approach first: check if To is a member of From
@@ -268,20 +294,22 @@ handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag}=State) ->
 handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
             _From, #state{dag=Dag, process_map=Pm, contraction_step=CtStep}=State) ->
 
-    %% @todo Should perform contractions at CONTRACTION_INTERVAL
-    %%       and check for cleaving every time an edge is added.
-    %%
-    %%       First, check if this edge involves a contracted vertex
-    %%       if it does, perform a cleaving step on it.
-
-    %% @todo Cleaving step
-    %%       Check if any of the given vertices has been optimized in
-    %%       in the past.
-
     %% Add vertices only if they are either sources or sinks. (See add_if)
     %% All user-defined variables are tracked through the `declare` function.
     lists:foreach(fun(V) -> add_if_pid(Dag, V) end, Src),
     add_if_pid(Dag, Dst),
+
+    %% @todo This should happen before creating the process
+    %%
+    %%       Otherwise the process acts on old data. This is only a problem
+    %%       with queries and reads, since they return the value of the vertex.
+    %%       Binds and updates are ok, since values will eventually propagate
+    %%       through the graph.
+    %%
+    %% Undo any optimizations involving these vertices.
+    lists:foreach(fun(V) ->
+        cleave_if_contracted(Dag, V)
+    end, [Dst | Src]),
 
     %% For all V in Src, make edge (V, Dst) with label {Pid, Read, Trans, Write}
     %% (where {Id, Read} = ReadFuns s.t. Id = V)
@@ -309,10 +337,21 @@ handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
     St = case CtStep of
         ?CONTRACTION_INTERVAL ->
             %% @todo Contraction step
-            lists:foreach(fun(Path) ->
-                io:format("Suitable contraction path:~n"),
-                lists:foreach(fun(El) -> io:format("  ~s~n", [v_str(El)]) end, Path)
-            end, contraction_paths(Dag)),
+            %%
+            %%       How do we prevent a contraction from happening
+            %%       as part of the edges created from another contraction?
+            %%
+            %%       If the dag starts a new contraction step as part of
+            %%       another contraction, multiple path contractions may
+            %%       happen, leading to multiple edges between vertices.
+            %%
+            %%       Either make contractions manual, or measure the
+            %%       probability of a vertex to be updated if it has been
+            %%       changed recently. Paths that contain "active" vertices
+            %%       won't be contracted, as they are determined to be changed
+            %%       often. Only contract paths that are relatively stable
+            %%       (haven't changed in X ticks).
+            %%
             St0#state{contraction_step=0};
         _ ->
             St0#state{contraction_step = CtStep + 1}
@@ -333,15 +372,31 @@ handle_cast(_Request, State) ->
 %%      we have to know when it happens so we can delete the appropiate
 %%      edges in the graph.
 %%
-handle_info({'DOWN', _, process, Pid, _Reason}, #state{dag=Dag,
-                                                       process_map=PM,
-                                                       optimized_map=OptMap}=State) ->
+handle_info({'DOWN', _, process, Pid, Reason}, #state{dag=Dag,
+                                                      process_map=PM,
+                                                      optimized_map=OptMap}=State) ->
     {ok, Edges} = dict:find(Pid, PM),
     NewDag = lists:foldl(fun({F, T}, G) ->
         delete_with_pid(G, F, T, Pid)
     end, Dag, Edges),
 
-    %% @todo Update the tags in the unnecessary vertices.
+    %% If terminated by supervisor, cleave any associated paths.
+    case Reason of
+        shutdown -> cleave_associated_path(Dag, Pid, OptMap);
+        _ -> ok
+    end,
+
+    %% @todo Update the tags in the unnecessary vertices when killed.
+    %%
+    %%       Optimized vertices hold a pointer to the optimized process,
+    %%       so this tag should be updated every time the process changes
+    %%       its pid.
+    %%
+    %%       Not quite as simple, since lasp processes have no
+    %%       identity (all metadata can change from time to time,
+    %%       even if all details stay the same), we have no way
+    %%       of correctly identifying what vertices to tag.
+    %%
     {noreply, State#state{dag=NewDag,
                           process_map=dict:erase(Pid, PM),
                           optimized_map=dict:erase(Pid, OptMap)}};
@@ -585,6 +640,9 @@ contract(G, VSeq) ->
         end, fun({_, _, _, V}) ->  V  end)
     end,
 
+    %% Since creating a new process involves calling ourselves,
+    %% we must start it in another process and handle the result
+    %% asynchronously.
     Self = self(),
     spawn_link(fun() ->
         {ok, Pid} = lasp_process:start_dag_link([[Read], TransFun, Write]),
@@ -608,7 +666,7 @@ remove_edges(Dag, VSeq, Pid, OptMap) ->
 
     %% Tag all unnecessary vertices in the path with the new process Pid
     UnnecesaryVertices = lists:sublist(VSeq, 2, length(VSeq) - 2),
-    tag_unnecessary(Dag, UnnecesaryVertices, Pid),
+    tag_vertices(Dag, UnnecesaryVertices, #vertex_label{pointer_pid=Pid}),
 
     %% Delete the intermediate edges and kill the associated processes.
     OldPids = collect_pids(Dag, VSeq),
@@ -618,7 +676,62 @@ remove_edges(Dag, VSeq, Pid, OptMap) ->
         end, OldPids)
     end),
 
-    dict:store(Pid, UnnecessaryDict, OptMap).
+    dict:store(Pid, {UnnecesaryVertices, UnnecessaryDict}, OptMap).
+
+%% @doc If the given vertex was part of a contracted path, cleave it
+%%
+%%      Contracted vertices contain a pointer to the Pid of the process
+%%      that forms the contraction of the path.
+%%
+-spec cleave_if_contracted(digraph:graph(), lasp_vertex()) -> ok.
+cleave_if_contracted(G, Vertex) ->
+    case digraph:vertex(G, Vertex) of
+        {_, #vertex_label{pointer_pid = Pid}} ->
+            spawn_link(fun() ->
+                lasp_process_sup:terminate_child(lasp_process_sup, Pid)
+            end),
+            ok;
+        _ -> ok
+    end.
+
+%% @doc Cleave the path represented by the given process Pid.
+%%
+%%      If the Pid represents a process that contracted a path,
+%%      start all the intermediate processes of the path,
+%%      and then kill the given Pid.
+%%
+cleave_associated_path(G, Pid, OptMap) ->
+    case dict:find(Pid, OptMap) of
+        error -> ok;
+        {ok, {VSeq, InnerDict}} ->
+            ProcessArgs = unpack_opt_inner_dict(InnerDict),
+            tag_vertices(G, VSeq, []),
+            spawn_link(fun() ->
+                lists:foreach(fun({_Reads, _TransForms, _Write}=Args) ->
+                    lasp_process:start_dag_link(tuple_to_list(Args))
+                end, ProcessArgs)
+            end)
+    end.
+
+%% @doc Get the process arguments of the given optimized map inner dict.
+%%
+
+-spec unpack_opt_inner_dict(dict:dict(lasp_vertex(),
+                                      {lasp_vertex(),
+                                       #process_metadata{}})) -> list(process_args()).
+unpack_opt_inner_dict(OptInnerMap) ->
+    dict:fold(fun(Parent, {Child, Metadata}, Acc) ->
+        ReadFun = Metadata#process_metadata.read,
+        Read = {Parent, ReadFun},
+
+        Transform = Metadata#process_metadata.transform,
+
+        WriteFun = Metadata#process_metadata.write,
+        Write = {Child, WriteFun},
+
+        ProcessArgs = {[Read], Transform, Write},
+        [ProcessArgs | Acc]
+    end, [], OptInnerMap).
 
 %% @doc Given a path contraction candidate in the graph, return the process
 %%      metadata from all intermediate edges.
@@ -648,10 +761,10 @@ get_metadata(G, V1, V2) ->
     end, Edges).
 
 %% @doc Tag the unnecessary vertices in the given path with a pid.
--spec tag_unnecessary(digraph:graph(), contract_path(), pid()) -> ok.
-tag_unnecessary(Dag, VSeq, Pid) ->
+-spec tag_vertices(digraph:graph(), contract_path(), #vertex_label{} | []) -> ok.
+tag_vertices(Dag, VSeq, Label) ->
     lists:foreach(fun(V) ->
-        digraph:add_vertex(Dag, V, #vertex_label{pointer_pid=Pid})
+        digraph:add_vertex(Dag, V, Label)
     end, VSeq).
 
 %% @doc Get the list of pids from the edges between V1 and V2

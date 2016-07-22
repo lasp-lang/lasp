@@ -60,16 +60,13 @@
                            transform :: function(),
                            write :: function()}).
 
-%% We store a mapping Pid -> (Parent -> [{Child, Process Metadata}])
-%% to identify the list of vertices and relationships that get removed
-%% as part of a path contraction.
+%% We store a mapping Pid -> {Path, MetadataList} to identify the list of
+%% vertices and relationships that get removed as part of a path contraction.
 %%
 %% Used during the cleaving step.
-%% @todo Optimize
 -type optimized_map() :: dict:dict(pid(),
                                    {contract_path(),
-                                    dict:dict(lasp_vertex(),
-                                              {lasp_vertex(), #process_metadata{}})}).
+                                    list(#process_metadata{})}).
 
 -record(state, {dag :: digraph:graph(),
                 process_map :: process_map(),
@@ -660,9 +657,7 @@ contract(G, VSeq) ->
 remove_edges(Dag, VSeq, Pid, OptMap) ->
 
     %% Store process metadata in the optimized map
-    UnnecessaryDict = lists:foldl(fun({Src, {Dst, Metadata}}, Acc) ->
-        dict:store(Src, {Dst, Metadata}, Acc)
-    end, dict:new(), get_metadata(Dag, VSeq)),
+    Metadata = get_metadata(Dag, VSeq),
 
     %% Tag all unnecessary vertices in the path with the new process Pid
     UnnecesaryVertices = lists:sublist(VSeq, 2, length(VSeq) - 2),
@@ -676,7 +671,7 @@ remove_edges(Dag, VSeq, Pid, OptMap) ->
         end, OldPids)
     end),
 
-    dict:store(Pid, {UnnecesaryVertices, UnnecessaryDict}, OptMap).
+    dict:store(Pid, {VSeq, Metadata}, OptMap).
 
 %% @doc If the given vertex was part of a contracted path, cleave it
 %%
@@ -703,9 +698,10 @@ cleave_if_contracted(G, Vertex) ->
 cleave_associated_path(G, Pid, OptMap) ->
     case dict:find(Pid, OptMap) of
         error -> ok;
-        {ok, {VSeq, InnerDict}} ->
-            ProcessArgs = unpack_opt_inner_dict(InnerDict),
-            tag_vertices(G, VSeq, []),
+        {ok, {VSeq, MetadataList}} ->
+            ProcessArgs = unpack_optimized_map(VSeq, MetadataList),
+            UnnecesaryVertices = lists:sublist(VSeq, 2, length(VSeq) - 2),
+            tag_vertices(G, UnnecesaryVertices, []),
             spawn_link(fun() ->
                 lists:foreach(fun({_Reads, _TransForms, _Write}=Args) ->
                     lasp_process:start_dag_link(tuple_to_list(Args))
@@ -716,35 +712,31 @@ cleave_associated_path(G, Pid, OptMap) ->
 %% @doc Get the process arguments of the given optimized map inner dict.
 %%
 
--spec unpack_opt_inner_dict(dict:dict(lasp_vertex(),
-                                      {lasp_vertex(),
-                                       #process_metadata{}})) -> list(process_args()).
-unpack_opt_inner_dict(OptInnerMap) ->
-    dict:fold(fun(Parent, {Child, Metadata}, Acc) ->
-        ReadFun = Metadata#process_metadata.read,
-        Read = {Parent, ReadFun},
+-spec unpack_optimized_map(contract_path(), list(#process_metadata{})) -> list(process_args()).
+unpack_optimized_map(VSeq, MetadataList) ->
+    mapi(fun(Pos, El) ->
+        ReadFun = El#process_metadata.read,
+        Read = {lists:nth(Pos, VSeq), ReadFun},
 
-        Transform = Metadata#process_metadata.transform,
+        Transform = El#process_metadata.transform,
 
-        WriteFun = Metadata#process_metadata.write,
-        Write = {Child, WriteFun},
+        WriteFun = El#process_metadata.write,
+        Write = {lists:nth(Pos + 1, VSeq), WriteFun},
 
-        ProcessArgs = {[Read], Transform, Write},
-        [ProcessArgs | Acc]
-    end, [], OptInnerMap).
+        {[Read], Transform, Write}
+    end, MetadataList).
+
 
 %% @doc Given a path contraction candidate in the graph, return the process
 %%      metadata from all intermediate edges.
 %%
 %%      Used to build the optimized map.
 %%
--spec get_metadata(digraph:graph(),
-                   contract_path()) -> list({lasp_vertex(),
-                                             {lasp_vertex(), #process_metadata{}}}).
+-spec get_metadata(digraph:graph(), contract_path()) -> list(#process_metadata{}).
 
 get_metadata(G, [_ | Tail]=VSeq) ->
     zipwith(fun(Src, Dst) ->
-        {Src, {Dst, lists:nth(1, get_metadata(G, Src, Dst))}}
+        lists:nth(1, get_metadata(G, Src, Dst))
     end, VSeq, Tail).
 
 %% @doc Get the process metadata for all edges between the given vertices.
@@ -841,6 +833,18 @@ zipwith(Fn, [X | Xs], [Y | Ys]) ->
     [Fn(X, Y) | zipwith(Fn, Xs, Ys)];
 
 zipwith(Fn, _, _) when is_function(Fn, 2) -> [].
+
+%% @doc Same as lists:map, but the function is applied to the index of
+%%      the element as first argument (counting from 1), and the element
+%%      itself as second argument.
+%%
+mapi(F, List) ->
+    mapi(F, List, 1).
+
+mapi(F, [H | T], Current) ->
+    [F(Current, H) | mapi(F, T, Current + 1)];
+
+mapi(F, [], _Current) when is_function(F, 2) -> [].
 
 %% @doc Thread a value through a list of functions.
 %%

@@ -258,17 +258,9 @@ handle_call(cleave_all, _From, #state{optimized_map=OptMap}=State) ->
 %%      We want to check this before spawning a lasp process, otherwise
 %%      an infinite loop can be created if the vertices form a loop.
 %%
-handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag}=State) ->
+handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag, optimized_map=OptMap}=State) ->
 
-    %% @todo A cleaving in the graph should never introduce loops
-    %%       should check optimized nodes so that we don't accidentally
-    %%       introduce loops while a node is not connected.
-    %%
-    %%       For example, A -> B -> C, B -> A is a loop, but if (A, B) is
-    %%       optimized, we could make that edge. If we cleave after that,
-    %%       trying to make (A, B) will fail.
-
-    Response = case lists:member(To, From) of
+    Response = case lists:member(To, From) orelse optimized_cycle(Dag, From, To, OptMap) of
         true -> true;
         false ->
             Status = [digraph:add_edge(Dag, F, To) || F <- From],
@@ -483,7 +475,7 @@ add_if_pid(_, _) ->
     ok.
 
 %%%===================================================================
-%%% Contraction / Cleaving Functions
+%%% Contraction Functions
 %%%===================================================================
 
 %% @doc Return a list of contraction candidate paths in the graph.
@@ -673,6 +665,80 @@ remove_edges(Dag, VSeq, Pid, OptMap) ->
 
     dict:store(Pid, {VSeq, Metadata}, OptMap).
 
+%% @doc Check if a list of future edges involving contracted vertices introduce a loop.
+%%
+%%      Checks optimized nodes so that we don't accidentally introduce
+%%      loops while a vertex is not connected.
+%%
+%%      For example, A -> B -> C, B -> A is a loop, but if (A, B) is
+%%      optimized, we could make that edge. If we cleave after that,
+%%      trying to make (A, B) will fail.
+%%
+-spec optimized_cycle(digraph:graph(), list(lasp_vertex()), lasp_vertex(), optimized_map()) -> boolean().
+optimized_cycle(G, From, To, OptMap) ->
+    OptimizedTails = lists:filter(fun(F) ->
+        not (contracted(G, F) =:= false)
+    end, From),
+    case {OptimizedTails, contracted(G, To)} of
+
+        %% Contracted -> Contracted forms a loop if the tails of both are
+        %% the same, or if it exists a path from the tail of the child
+        %% to the tail of the parent.
+        {[_|_]=ContractedVertices, {true, ChildPid}} ->
+
+            ParentTails = lists:map(fun(V) ->
+                {_, #vertex_label{pointer_pid = PPid}} = digraph:vertex(G, V),
+                get_process_tail(PPid, OptMap)
+            end, ContractedVertices),
+
+            ChildTail = get_process_tail(ChildPid, OptMap),
+
+            lists:any(fun(PTail) ->
+                not (digraph:get_path(G, ChildTail, PTail) =:= false)
+                orelse (ChildTail =:= PTail)
+            end, ParentTails);
+
+        %% Contracted -> Uncontracted forms a loop if there exists a path
+        %% from the child to the tail of the parent, or if the child is the
+        %% source.
+        {[_|_]=ContractedVertices, false} ->
+
+            Tails = lists:map(fun(V) ->
+                {_, #vertex_label{pointer_pid = Pid}} = digraph:vertex(G, V),
+                get_process_tail(Pid, OptMap)
+            end, ContractedVertices),
+
+            lists:any(fun(Tail) ->
+                not (digraph:get_path(G, To, Tail) =:= false)
+                orelse (Tail =:= To)
+            end, Tails);
+
+        %% Uncontracted -> Contracted forms a loop if there exists a path
+        %% from the source of the child to the parent, or the source is
+        %% the parent.
+        {[], {true, Pid}} ->
+
+            Tail = get_process_tail(Pid, OptMap),
+
+            lists:any(fun(V) ->
+                not (digraph:get_path(G, Tail, V) =:= false)
+                orelse Tail =:= V
+            end, From);
+
+        %% Both are uncontracted, we can let callee deal with this.
+        {[], false} -> false
+    end.
+
+%% @doc Get the tail of the process that contracted a path.
+-spec get_process_tail(pid(), optimized_map()) -> lasp_vertex().
+get_process_tail(Pid, OptMap) ->
+    {[Tail | _], _} = dict:fetch(Pid, OptMap),
+    Tail.
+
+%%%===================================================================
+%%% Cleave Functions
+%%%===================================================================
+
 %% @doc If the given vertex was part of a contracted path, cleave it
 %%
 %%      Contracted vertices contain a pointer to the Pid of the process
@@ -680,13 +746,13 @@ remove_edges(Dag, VSeq, Pid, OptMap) ->
 %%
 -spec cleave_if_contracted(digraph:graph(), lasp_vertex()) -> ok.
 cleave_if_contracted(G, Vertex) ->
-    case digraph:vertex(G, Vertex) of
-        {_, #vertex_label{pointer_pid = Pid}} ->
+    case contracted(G, Vertex) of
+        {true, Pid} ->
             spawn_link(fun() ->
                 lasp_process_sup:terminate_child(lasp_process_sup, Pid)
             end),
             ok;
-        _ -> ok
+        false -> ok
     end.
 
 %% @doc Cleave the path represented by the given process Pid.
@@ -710,7 +776,6 @@ cleave_associated_path(G, Pid, OptMap) ->
     end.
 
 %% @doc Get the process arguments of the given optimized map inner dict.
-%%
 
 -spec unpack_optimized_map(contract_path(), list(#process_metadata{})) -> list(process_args()).
 unpack_optimized_map(VSeq, MetadataList) ->
@@ -726,6 +791,17 @@ unpack_optimized_map(VSeq, MetadataList) ->
         {[Read], Transform, Write}
     end, MetadataList).
 
+%% @doc Check if a vertex was optimized in the past.
+%%
+%%      If it was optimized, return also the pointer to the Pid
+%%      of the process that contracted the path.
+%%
+-spec contracted(digraph:graph(), lasp_vertex()) -> {true, pid()} | false.
+contracted(G, V) ->
+    case digraph:vertex(G, V) of
+        {_, #vertex_label{pointer_pid = Pid}} -> {true, Pid};
+        _ -> false
+    end.
 
 %% @doc Given a path contraction candidate in the graph, return the process
 %%      metadata from all intermediate edges.
@@ -758,6 +834,10 @@ tag_vertices(Dag, VSeq, Label) ->
     lists:foreach(fun(V) ->
         digraph:add_vertex(Dag, V, Label)
     end, VSeq).
+
+%%%===================================================================
+%%% Utility Functions
+%%%===================================================================
 
 %% @doc Get the list of pids from the edges between V1 and V2
 -spec get_connecting_pids(digraph:graph(),

@@ -81,9 +81,10 @@
 
 %% @todo Move somewhere else
 %% A tuple of the arguments of a lasp process.
--type process_args() :: {[{lasp_vertex(), function()}], function(), {lasp_vertex(), function()}}.
+-type process_args() :: {[{lasp_vertex(), function()}],
+                         function(),
+                         {lasp_vertex(), function()}}.
 
-%% @todo For now, maybe changed for another data structure
 -record(vertex_label, {pointer_pid :: pid()}).
 
 -type lasp_vertex() :: id() | pid().
@@ -340,6 +341,10 @@ handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
             %%       won't be contracted, as they are determined to be changed
             %%       often. Only contract paths that are relatively stable
             %%       (haven't changed in X ticks).
+            %%
+            %%       Another option is to implement a special function to
+            %%       create edges in the graph that don't count towards
+            %%       the contraction step count.
             %%
             St0#state{contraction_step=0};
         _ ->

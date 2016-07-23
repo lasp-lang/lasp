@@ -1104,8 +1104,8 @@ send(Msg, Peer) ->
     case PeerServiceManager:forward_message(Peer, ?MODULE, Msg) of
         ok ->
             ok;
-        Error ->
-            lager:error("Failed send to ~p for reason ~p", [Peer, Error]),
+        _Error ->
+            % lager:error("Failed send to ~p for reason ~p", [Peer, Error]),
             ok
     end.
 

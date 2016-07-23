@@ -55,7 +55,7 @@ process_post(ReqData, Ctx) ->
         {_, undefined} ->
             {false, ReqData, Ctx#ctx{id=Id, type=Type}};
         {_, _} ->
-            Decoded = Type:decode(msgpack:unpack(Body)),
+            Decoded = Type:decode(msgpack, Body),
 
             case lasp:bind({binary(Id), atomize(Type)}, Decoded) of
                 {ok, Object} ->
@@ -86,7 +86,7 @@ resource_exists(ReqData, Ctx) ->
    end.
 
 to_msgpack(ReqData, #ctx{type=Type, object=Object}=Ctx) ->
-    Encoded = msgpack:pack(Type:encode(Object)),
+    Encoded = Type:encode(msgpack, Object),
     {Encoded, ReqData, Ctx}.
 
 %%%===================================================================

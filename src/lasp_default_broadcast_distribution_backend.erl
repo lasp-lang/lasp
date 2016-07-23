@@ -792,7 +792,7 @@ handle_info(memory_report, State) ->
     {noreply, State};
 
 handle_info(aae_sync, #state{store=Store} = State) ->
-    lager:info("Beginning AAE synchronization."),
+    % lager:info("Beginning AAE synchronization."),
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
@@ -800,7 +800,7 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     %% Remove ourself.
     Peers = Members -- [node()],
 
-    lager:info("Beginning sync for peers: ~p", [Peers]),
+    % lager:info("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
     lists:foreach(fun(Peer) -> init_aae_sync(Peer, Store) end, Peers),
@@ -810,7 +810,7 @@ handle_info(aae_sync, #state{store=Store} = State) ->
 
     {noreply, State};
 handle_info(delta_sync, State) ->
-    lager:info("Beginning delta synchronization."),
+    % lager:info("Beginning delta synchronization."),
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
@@ -818,12 +818,10 @@ handle_info(delta_sync, State) ->
     %% Remove ourself.
     Peers = Members -- [node()],
 
-    lager:info("Beginning sync for peers: ~p", [Peers]),
+    % lager:info("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
-    lists:foreach(fun(Peer) ->
-                          init_delta_sync(Peer)
-                  end, Peers),
+    lists:foreach(fun(Peer) -> init_delta_sync(Peer) end, Peers),
 
     %% Schedule next synchronization.
     schedule_delta_synchronization(),
@@ -1020,7 +1018,7 @@ schedule_memory_report() ->
 
 %% @private
 memory_report() ->
-    case lasp_config:get(memory_report, true) of
+    case lasp_config:get(memory_report, false) of
         true ->
             PlumtreeBroadcast = erlang:whereis(plumtree_broadcast),
             lager:info("Plumtree message queue: ~p",

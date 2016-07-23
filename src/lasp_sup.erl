@@ -69,6 +69,10 @@ init(_Args) ->
             ok
     end,
 
+    %% Configure the peer service.
+    partisan_config:set(partisan_peer_service_manager,
+                        partisan_default_peer_service_manager),
+
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},
                  permanent, infinity, supervisor, [partisan_sup]},

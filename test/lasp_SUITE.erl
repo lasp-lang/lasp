@@ -508,8 +508,11 @@ membership_test(Config) ->
                                                 [WrongPassive])
                                 end
                           end, Nodes);
-        _ ->
-            ok
+        partisan_default_peer_service_manager ->
+            lists:foreach(fun(Node) ->
+                                {ok, Members} = rpc:call(Node, Manager, members, []),
+                                lists:usort(Members) =:= lists:usort(Nodes)
+                          end, Nodes)
     end,
 
     ok.

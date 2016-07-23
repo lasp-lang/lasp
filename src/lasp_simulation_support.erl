@@ -114,7 +114,7 @@ start(_Case, _Config, Options) ->
                                                                        partisan_peer_service]),
                             ok = rpc:call(Node, application, set_env, [plumtree,
                                                                        broadcast_mods,
-                                                                       [lasp_plumtree_broadcast_distribution_backend]]),
+                                                                       [lasp_default_broadcast_distribution_backend]]),
                             ok = rpc:call(Node, application, set_env, [lasp,
                                                                        data_root,
                                                                        NodeDir])

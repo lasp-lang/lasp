@@ -22,6 +22,8 @@
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -export([init/1,
+         allowed_methods/2,
+         process_post/2,
          content_types_provided/2,
          resource_exists/2,
          to_msgpack/2]).
@@ -35,8 +37,34 @@
 init(_) ->
     {ok, #ctx{}}.
 
-content_types_provided(Req, Ctx) ->
-    {[{"application/msgpack", to_msgpack}], Req, Ctx}.
+allowed_methods(ReqData, Ctx) ->
+    {['GET', 'POST', 'HEAD'], ReqData, Ctx}.
+
+content_types_provided(ReqData, Ctx) ->
+    {[{"application/msgpack", to_msgpack}], ReqData, Ctx}.
+
+process_post(ReqData, Ctx) ->
+    Body = wrq:req_body(ReqData),
+
+    Id = wrq:path_info(id, ReqData),
+    Type = wrq:path_info(type, ReqData),
+
+    case {Id, Type} of
+        {undefined, _} ->
+            {false, ReqData, Ctx#ctx{id=Id, type=Type}};
+        {_, undefined} ->
+            {false, ReqData, Ctx#ctx{id=Id, type=Type}};
+        {_, _} ->
+            Decoded = Type:decode(msgpack:unpack(Body)),
+
+            case lasp:bind({binary(Id), atomize(Type)}, Decoded) of
+                {ok, Object} ->
+                    {true, ReqData, Ctx#ctx{id=Id, type=Type, object=Object}};
+                Error ->
+                    lager:info("Received error response: ~p", [Error]),
+                    {false, ReqData, Ctx#ctx{id=Id, type=Type}}
+            end
+    end.
 
 resource_exists(ReqData, Ctx) ->
     Id = wrq:path_info(id, ReqData),

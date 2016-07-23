@@ -30,6 +30,8 @@
          is_inflation/3,
          is_bottom/2,
          is_strict_inflation/3,
+         encode/3,
+         decode/3,
          query/2,
          get_type/1]).
 
@@ -74,6 +76,14 @@ remove_args({T, _Args}) ->
     T;
 remove_args(T) ->
     T.
+
+encode(Type, Encoding, Value) ->
+    T = get_type(remove_args(Type)),
+    T:encode(Encoding, Value).
+
+decode(Type, Encoding, Value) ->
+    T = get_type(remove_args(Type)),
+    T:decode(Encoding, Value).
 
 %% @doc Is bottom?
 is_bottom(Type, Value) ->

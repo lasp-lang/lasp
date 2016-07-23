@@ -51,18 +51,20 @@ process_post(ReqData, Ctx) ->
 
     case {Id, Type} of
         {undefined, _} ->
-            {false, ReqData, Ctx#ctx{id=Id, type=Type}};
+            {false, ReqData, Ctx};
         {_, undefined} ->
-            {false, ReqData, Ctx#ctx{id=Id, type=Type}};
+            {false, ReqData, Ctx};
         {_, _} ->
-            Decoded = Type:decode(erlang, Body),
+            AtomType = atomize(Type),
+            BinaryId = binary(Id),
+            Decoded = lasp_type:decode(AtomType, erlang, Body),
 
-            case lasp:bind({binary(Id), atomize(Type)}, Decoded) of
+            case lasp:bind({BinaryId, AtomType}, Decoded) of
                 {ok, Object} ->
-                    {true, ReqData, Ctx#ctx{id=Id, type=Type, object=Object}};
+                    {true, ReqData, Ctx#ctx{id=BinaryId, type=AtomType, object=Object}};
                 Error ->
                     lager:info("Received error response: ~p", [Error]),
-                    {false, ReqData, Ctx#ctx{id=Id, type=Type}}
+                    {false, ReqData, Ctx}
             end
     end.
 
@@ -72,21 +74,24 @@ resource_exists(ReqData, Ctx) ->
 
     case {Id, Type} of
         {undefined, _} ->
-            {false, ReqData, Ctx#ctx{id=Id, type=Type}};
+            {false, ReqData, Ctx};
         {_, undefined} ->
-            {false, ReqData, Ctx#ctx{id=Id, type=Type}};
+            {false, ReqData, Ctx};
         {_, _} ->
-            case lasp:read({binary(Id), atomize(Type)}, undefined) of
+            AtomType = atomize(Type),
+            BinaryId = binary(Id),
+
+            case lasp:read({BinaryId, AtomType}, undefined) of
                 {ok, Object} ->
-                    {true, ReqData, Ctx#ctx{id=Id, type=Type, object=Object}};
+                    {true, ReqData, Ctx#ctx{id=BinaryId, type=AtomType, object=Object}};
                 Error ->
                     lager:info("Received error response: ~p", [Error]),
-                    {false, ReqData, Ctx#ctx{id=Id, type=Type}}
+                    {false, ReqData, Ctx}
             end
    end.
 
-to_erlang(ReqData, #ctx{type=Type, object=Object}=Ctx) ->
-    Encoded = Type:encode(erlang, Object),
+to_erlang(ReqData, #ctx{type=Type, object={_Id, _Type, _Metadata, Value}}=Ctx) ->
+    Encoded = lasp_type:encode(Type, erlang, Value),
     {Encoded, ReqData, Ctx}.
 
 %%%===================================================================

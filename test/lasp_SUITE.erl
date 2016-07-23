@@ -37,8 +37,6 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/inet.hrl").
 
--define(PEER_SERVICE, partisan_hyparview_peer_service_manager).
-
 %% ===================================================================
 %% common_test callbacks
 %% ===================================================================
@@ -478,6 +476,9 @@ orset_test(_Config) ->
 
 %% @doc Membership test.
 membership_test(Config) ->
+    Manager = lasp_peer_service:manager(),
+    ct:pal("Manager: ~p", [Manager]),
+
     Nodes = proplists:get_value(nodes, Config),
     lager:info("Nodes: ~p", [Nodes]),
     Sorted = lists:usort(Nodes),
@@ -485,24 +486,31 @@ membership_test(Config) ->
     lager:info("Waiting for cluster to stabilize."),
     timer:sleep(10000),
 
-    lists:foreach(fun(Node) ->
-                        {ok, Active} = rpc:call(Node, ?PEER_SERVICE, active, []),
-                        {ok, Passive} = rpc:call(Node, ?PEER_SERVICE, passive, []),
+    case Manager of
+        partisan_hyparview_peer_service_manager ->
+            lists:foreach(fun(Node) ->
+                                {ok, Active} = rpc:call(Node, Manager, active, []),
+                                {ok, Passive} = rpc:call(Node, Manager, passive, []),
 
-                        case lists:usort([Name || {Name, _, _} <- sets:to_list(Active)]) of
-                            Sorted ->
-                                ok;
-                            WrongActive ->
-                                ct:fail("Incorrect nodes in active view on node ~p: ~p should be ~p!", [Node, WrongActive, Sorted])
-                        end,
+                                case lists:usort([Name || {Name, _, _} <- sets:to_list(Active)]) of
+                                    Sorted ->
+                                        ok;
+                                    WrongActive ->
+                                        ct:fail("Incorrect nodes in active view on node ~p: ~p should be ~p!",
+                                                [Node, WrongActive, Sorted])
+                                end,
 
-                        case sets:to_list(Passive) of
-                            [] ->
-                                ok;
-                            WrongPassive ->
-                                ct:fail("Incorrect nodes in passive view: ~p!", [WrongPassive])
-                        end
-                  end, Nodes),
+                                case sets:to_list(Passive) of
+                                    [] ->
+                                        ok;
+                                    WrongPassive ->
+                                        ct:fail("Incorrect nodes in passive view: ~p!",
+                                                [WrongPassive])
+                                end
+                          end, Nodes);
+        _ ->
+            ok
+    end,
 
     ok.
 

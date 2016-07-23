@@ -509,7 +509,6 @@ read(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                                                        ReplyFun,
                                                        BlockingFun]).
 
-
 %% @doc Perform a read (or monotonic read) for a particular identifier.
 %%
 %%      Given an `Id', perform a blocking read until the variable is

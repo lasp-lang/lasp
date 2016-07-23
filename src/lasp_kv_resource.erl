@@ -26,7 +26,7 @@
          process_post/2,
          content_types_provided/2,
          resource_exists/2,
-         to_msgpack/2]).
+         to_erlang/2]).
 
 -include("lasp.hrl").
 -include_lib("webmachine/include/webmachine.hrl").
@@ -41,7 +41,7 @@ allowed_methods(ReqData, Ctx) ->
     {['GET', 'POST', 'HEAD'], ReqData, Ctx}.
 
 content_types_provided(ReqData, Ctx) ->
-    {[{"application/msgpack", to_msgpack}], ReqData, Ctx}.
+    {[{"application/erlang", to_erlang}], ReqData, Ctx}.
 
 process_post(ReqData, Ctx) ->
     Body = wrq:req_body(ReqData),
@@ -55,7 +55,7 @@ process_post(ReqData, Ctx) ->
         {_, undefined} ->
             {false, ReqData, Ctx#ctx{id=Id, type=Type}};
         {_, _} ->
-            Decoded = Type:decode(msgpack, Body),
+            Decoded = Type:decode(erlang, Body),
 
             case lasp:bind({binary(Id), atomize(Type)}, Decoded) of
                 {ok, Object} ->
@@ -85,8 +85,8 @@ resource_exists(ReqData, Ctx) ->
             end
    end.
 
-to_msgpack(ReqData, #ctx{type=Type, object=Object}=Ctx) ->
-    Encoded = Type:encode(msgpack, Object),
+to_erlang(ReqData, #ctx{type=Type, object=Object}=Ctx) ->
+    Encoded = Type:encode(erlang, Object),
     {Encoded, ReqData, Ctx}.
 
 %%%===================================================================

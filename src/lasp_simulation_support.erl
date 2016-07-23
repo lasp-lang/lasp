@@ -198,23 +198,31 @@ start(_Case, _Config, Options) ->
     lists:map(StartFun, Nodes),
 
     ct:pal("Custering nodes..."),
-    ClusterFun = fun(Node) ->
-                        PeerPort = rpc:call(Node,
-                                            partisan_config,
-                                            get,
-                                            [peer_port, ?PEER_PORT]),
-                        ct:pal("Joining node: ~p to ~p at port ~p",
-                               [Node, First, PeerPort]),
-                        ok = rpc:call(First,
-                                      lasp_peer_service,
-                                      join,
-                                      [{Node, {127, 0, 0, 1}, PeerPort}])
-                   end,
-    lists:map(ClusterFun, Nodes),
+    lists:map(fun(Node) -> cluster(Node, Nodes) end, Nodes),
 
     ct:pal("Lasp fully initialized."),
 
     Nodes.
+
+%% @private
+%%
+%% We have to cluster each node with all other nodes to compute the
+%% correct overlay: for instance, sometimes you'll want to establish a
+%% client/server topology, which requires all nodes talk to every other 
+%% node to correctly compute the overlay.
+%%
+cluster(Node, Nodes) when is_list(Nodes) ->
+    lists:map(fun(OtherNode) -> cluster(Node, OtherNode) end, Nodes -- [Node]);
+cluster(Node, OtherNode) ->
+    PeerPort = rpc:call(OtherNode,
+                        partisan_config,
+                        get,
+                        [peer_port, ?PEER_PORT]),
+    ct:pal("Joining node: ~p to ~p at port ~p", [Node, OtherNode, PeerPort]),
+    ok = rpc:call(Node,
+                  lasp_peer_service,
+                  join,
+                  [{OtherNode, {127, 0, 0, 1}, PeerPort}]).
 
 %% @private
 stop(_Nodes) ->

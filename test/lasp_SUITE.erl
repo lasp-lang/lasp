@@ -512,6 +512,11 @@ membership_test(Config) ->
             lists:foreach(fun(Node) ->
                                 {ok, Members} = rpc:call(Node, Manager, members, []),
                                 lists:usort(Members) =:= lists:usort(Nodes)
+                          end, Nodes);
+        partisan_client_server_peer_service_manager ->
+            lists:foreach(fun(Node) ->
+                                {ok, Members} = rpc:call(Node, Manager, members, []),
+                                lists:usort(Members) =:= lists:usort(Nodes)
                           end, Nodes)
     end,
 

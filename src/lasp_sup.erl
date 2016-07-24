@@ -1,4 +1,3 @@
-%% 
 %%
 %% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
 %% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
@@ -71,7 +70,7 @@ init(_Args) ->
 
     %% Configure the peer service.
     partisan_config:set(partisan_peer_service_manager,
-                        partisan_default_peer_service_manager),
+                        partisan_client_server_peer_service_manager),
 
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},

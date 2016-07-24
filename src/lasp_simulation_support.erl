@@ -160,6 +160,11 @@ start(_Case, _Config, Options) ->
                                 end
                         end,
 
+                        %% Configure the peer service.
+                        PeerService = proplists:get_value(partisan_peer_service_manager, Options),
+                        ok = rpc:call(Node, partisan_config, set,
+                                      [partisan_peer_service_manager, PeerService]),
+
                         %% Configure the operational mode.
                         Mode = proplists:get_value(mode, Options),
                         ok = rpc:call(Node, lasp_config, set, [mode, Mode]),

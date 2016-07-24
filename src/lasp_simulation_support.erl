@@ -213,7 +213,7 @@ start(_Case, _Config, Options) ->
 %%
 %% We have to cluster each node with all other nodes to compute the
 %% correct overlay: for instance, sometimes you'll want to establish a
-%% client/server topology, which requires all nodes talk to every other 
+%% client/server topology, which requires all nodes talk to every other
 %% node to correctly compute the overlay.
 %%
 cluster(Node, Nodes) when is_list(Nodes) ->

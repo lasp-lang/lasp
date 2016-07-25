@@ -281,8 +281,8 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
             end,
             Value = lasp_type:new(Type),
             Metadata = MetadataFun(MetadataNew),
-            Counter0 = 0,
-            DeltaMap0 = orddict:new(),
+            Counter = 0,
+            DeltaMap = orddict:new(),
             AckMap = orddict:new(),
             NewId = case Id of
                         {_, Type} ->
@@ -290,11 +290,10 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
                         _ ->
                             {Id, Type}
                     end,
-            DeltaMap = orddict:store(Counter0, {node(), Value}, DeltaMap0),
             ok = do(put, [Store, NewId, #dv{value=Value,
                                             type=Type,
                                             metadata=Metadata,
-                                            delta_counter=increment_counter(Counter0),
+                                            delta_counter=Counter,
                                             delta_map=DeltaMap,
                                             delta_ack_map=AckMap}]),
             {ok, {NewId, Type, Metadata, Value}}

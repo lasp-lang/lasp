@@ -24,6 +24,8 @@
 -include("lasp.hrl").
 
 -export([new/1,
+         new_delta/1,
+         is_delta/1,
          update/4,
          merge/3,
          threshold_met/3,
@@ -117,6 +119,21 @@ new(Type) ->
         _T0 ->
             T:new()
     end.
+
+%% @doc Initialize a new delta for a given type.
+new_delta(Type) ->
+    T = get_type(remove_args(Type)),
+    case Type of
+        {_T0, Args} ->
+            T:new_delta(get_type(Args));
+        _T0 ->
+            T:new_delta()
+    end.
+
+%% @doc Check if some value is a delta
+is_delta({Type, _}=Value) ->
+    T = get_type(Type),
+    T:is_delta(CRDT).
 
 %% @doc Use the proper type for performing an update.
 update(Type, Operation, Actor, Value) ->

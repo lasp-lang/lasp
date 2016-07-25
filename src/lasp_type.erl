@@ -133,7 +133,7 @@ new_delta(Type) ->
 %% @doc Check if some value is a delta
 is_delta({Type, _}=Value) ->
     T = get_type(Type),
-    T:is_delta(CRDT).
+    T:is_delta(Value).
 
 %% @doc Use the proper type for performing an update.
 update(Type, Operation, Actor, Value) ->

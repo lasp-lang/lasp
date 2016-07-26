@@ -40,10 +40,13 @@ eunit:
 ct:
 	${REBAR} as test ct --suite=lasp_SUITE
 
-simulations: ad-counter-simulation music-festival-simulation
+simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation music-festival-simulation
 
-ad-counter-simulation:
-	${REBAR} as test ct --suite=lasp_advertisement_counter_SUITE
+peer-to-peer-ad-counter-simulation:
+	${REBAR} as test ct --suite=lasp_peer_to_peer_advertisement_counter_SUITE
+
+client-server-ad-counter-simulation:
+	${REBAR} as test ct --suite=lasp_client_server_advertisement_counter_SUITE
 
 music-festival-simulation:
 	${REBAR} as test ct --suite=lasp_music_festival_SUITE
@@ -98,8 +101,8 @@ plots:
 	  clear; \
 		rm -rf priv/lager/ priv/evaluation; \
 		(cd priv/ && git clone https://github.com/lasp-lang/evaluation); \
-		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE; \
-		./rebar3 ct --readable=false --suite=test/lasp_musical_festival_SUITE; \
+		./rebar3 ct --readable=false --suite=test/lasp_peer_to_peer_advertisement_counter_SUITE; \
+		./rebar3 ct --readable=false --suite=test/lasp_client_server_advertisement_counter_SUITE; \
 		cd priv/evaluation && make plots
 
 evaluate-local: SHELL:=/bin/bash

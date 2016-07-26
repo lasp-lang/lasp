@@ -1000,7 +1000,15 @@ collect_deltas(Destination, Type, DeltaMap, Min0, Max) ->
                                       _ ->
                                         lasp_type:merge(Type, Deltas0, Delta)
                                   end
-                          end, lasp_type:new(Type), SmallDeltaMap),
+                          end, lasp_type:new_delta(Type), SmallDeltaMap),
+
+    %% @todo should we remove this once we know everything is working fine?
+    case lasp_type:is_delta(Type, Deltas) of
+        false ->
+            lager:info("Folded delta group is not a delta ~p", [Deltas]);
+        true ->
+            ok
+    end,
     Deltas.
 
 %% @private

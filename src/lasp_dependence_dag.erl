@@ -24,10 +24,11 @@
          out_edges/1,
          in_edges/1]).
 
-%% @todo Only export on test. Optimization Debug
+-ifdef(TEST).
 -export([contract/0,
          cleave/1,
          cleave_all/0]).
+-endif.
 
 %% gen_server callbacks
 -export([init/1,
@@ -171,14 +172,37 @@ in_edges(V) ->
 process_map() ->
     gen_server:call(?MODULE, get_process_map, infinity).
 
+-ifdef(TEST).
+
+%% @doc Contract all suitable paths in the graph.
+%%
+%%      A path can be contracted if it contains one or more
+%%      unnecessary vertices. An unnecessary vertex is one
+%%      that only has one child and one parent.
+%%
+%%      This removes intermediate vertices from the graph.
+%%
 contract() ->
     gen_server:call(?MODULE, contract, infinity).
 
+%% @doc Perform vertex cleaving on the given vertex.
+%%
+%%      Given a vertex that was removed as part of a path contraction,
+%%      undo the contraction on all vertices of the path.
+%%
+%%      Does nothing if the vertex was not removed.
+%%
 cleave(Vertex) ->
     gen_server:call(?MODULE, {cleave, Vertex}, infinity).
 
+%% @doc Perform vertex cleaving on all removed vertices.
+%%
+%%      Same as cleave/1, but on all removed vertices of the graph.
+%%
 cleave_all() ->
     gen_server:call(?MODULE, cleave_all, infinity).
+
+-endif.
 
 %%%===================================================================
 %%% gen_server callbacks

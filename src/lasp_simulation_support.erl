@@ -248,7 +248,7 @@ wait_for_completion([Server | _] = _Nodes) ->
                 Convergence = rpc:call(Server, lasp_config, get, [convergence, false]),
                 ct:pal("Waiting for convergence: ~p", [Convergence]),
                 Convergence == true
-        end, 60*2, ?CONVERGENCE_INTERVAL) of
+        end, 60*4, ?CONVERGENCE_INTERVAL) of
         ok ->
             ct:pal("Convergence reached!");
         Error ->

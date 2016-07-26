@@ -25,7 +25,7 @@
 
 -export([new/1,
          new_delta/1,
-         is_delta/1,
+         is_delta/2,
          update/4,
          merge/3,
          threshold_met/3,
@@ -131,8 +131,8 @@ new_delta(Type) ->
     end.
 
 %% @doc Check if some value is a delta
-is_delta({Type, _}=Value) ->
-    T = get_type(Type),
+is_delta(Type, Value) ->
+    T = get_type(remove_args(Type)),
     T:is_delta(Value).
 
 %% @doc Use the proper type for performing an update.

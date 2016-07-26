@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 %%
 
--module(lasp_advertisement_counter_SUITE).
+-module(lasp_peer_to_peer_advertisement_counter_SUITE).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 %% common_test callbacks
@@ -61,21 +61,12 @@ end_per_testcase(Case, _Config) ->
 
 all() ->
     [
-     default_test,
-
      peer_to_peer_state_based_with_aae_test,
      peer_to_peer_state_based_with_aae_and_tree_test,
      peer_to_peer_delta_based_with_aae_test,
      peer_to_peer_state_based_ps_with_aae_test,
      peer_to_peer_state_based_ps_with_aae_and_tree_test,
-     peer_to_peer_delta_based_ps_with_aae_test,
-
-     client_server_state_based_with_aae_test,
-     client_server_state_based_with_aae_and_tree_test,
-     client_server_delta_based_with_aae_test,
-     client_server_state_based_ps_with_aae_test,
-     client_server_state_based_ps_with_aae_and_tree_test,
-     client_server_delta_based_ps_with_aae_test
+     peer_to_peer_delta_based_ps_with_aae_test
     ].
 
 %% ===================================================================
@@ -166,89 +157,3 @@ peer_to_peer_delta_based_ps_with_aae_test(Config) ->
          {broadcast, false},
          {evaluation_identifier, peer_to_peer_delta_based_ps_with_aae}]),
     ok.
-
-%% ===================================================================
-%% client/server with local replica
-%% ===================================================================
-
-client_server_state_based_with_aae_test(Config) ->
-    lasp_simulation_support:run(client_server_ad_counter_state_based_with_aae_test,
-        Config,
-        [{mode, state_based},
-         {simulation, ad_counter},
-         {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
-         {set, orset},
-         {broadcast, false},
-         {evaluation_identifier, client_server_state_based_with_aae}]),
-    ok.
-
-client_server_state_based_with_aae_and_tree_test(Config) ->
-    case os:getenv("OMIT_HIGH_ULIMIT", "false") of
-        "false" ->
-            lasp_simulation_support:run(client_server_ad_counter_state_based_with_aae_and_tree_test,
-                Config,
-                [{mode, state_based},
-                 {simulation, ad_counter},
-                 {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
-                 {set, orset},
-                 {broadcast, true},
-                 {evaluation_identifier, client_server_state_based_with_aae_and_tree}]),
-            ok;
-        _ ->
-            %% Omit.
-            ok
-    end.
-
-client_server_delta_based_with_aae_test(Config) ->
-    lasp_simulation_support:run(client_server_ad_counter_delta_based_with_aae_test,
-        Config,
-        [{mode, delta_based},
-         {simulation, ad_counter},
-         {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
-         {set, orset},
-         {broadcast, false},
-         {evaluation_identifier, client_server_delta_based_with_aae}]),
-    ok.
-
-client_server_state_based_ps_with_aae_test(Config) ->
-    lasp_simulation_support:run(client_server_ad_counter_state_based_ps_with_aae_test,
-        Config,
-        [{mode, state_based},
-         {simulation, ad_counter},
-         {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
-         {set, awset_ps},
-         {broadcast, false},
-         {evaluation_identifier, client_server_state_based_ps_with_aae}]),
-    ok.
-
-client_server_state_based_ps_with_aae_and_tree_test(Config) ->
-    case os:getenv("OMIT_HIGH_ULIMIT", "false") of
-        "false" ->
-            lasp_simulation_support:run(client_server_ad_counter_state_based_ps_with_aae_and_tree_test,
-                Config,
-                [{mode, state_based},
-                 {simulation, ad_counter},
-                 {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
-                 {set, awset_ps},
-                 {broadcast, true},
-                 {evaluation_identifier, client_server_state_based_ps_with_aae_and_tree}]),
-            ok;
-        _ ->
-            %% Omit.
-            ok
-    end.
-
-client_server_delta_based_ps_with_aae_test(Config) ->
-    lasp_simulation_support:run(client_server_ad_counter_delta_based_ps_with_aae_test,
-        Config,
-        [{mode, delta_based},
-         {simulation, ad_counter},
-         {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
-         {set, awset_ps},
-         {broadcast, false},
-         {evaluation_identifier, client_server_delta_based_ps_with_aae}]),
-    ok.
-
-%% ===================================================================
-%% Internal functions
-%% ===================================================================

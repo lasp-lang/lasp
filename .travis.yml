@@ -10,7 +10,8 @@ script:
   - make dialyzer
   - make lint
   - make ct
-  - make ad-counter-simulation
+  - make peer-to-peer-ad-counter-simulation
+  - make client-server-ad-counter-simulation
   - make music-festival-simulation
 notifications:
   email: christopher.meiklejohn@gmail.com

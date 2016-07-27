@@ -96,7 +96,7 @@ init(_Args) ->
                   MarathonPeerRefresh,
                   Process] ++ WebSpecs,
 
-    DagEnabled = application:get_env(?APP, dag_enabled, false),
+    DagEnabled = application:get_env(?APP, dag_enabled, true),
     lasp_config:set(dag_enabled, DagEnabled),
     BaseSpecs = case DagEnabled of
         true -> [DepDag | BaseSpecs0];

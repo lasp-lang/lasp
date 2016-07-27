@@ -24,12 +24,16 @@
 -include("lasp.hrl").
 
 -export([new/1,
+         new_delta/1,
+         is_delta/2,
          update/4,
          merge/3,
          threshold_met/3,
          is_inflation/3,
          is_bottom/2,
          is_strict_inflation/3,
+         encode/3,
+         decode/3,
          query/2,
          get_type/1]).
 
@@ -75,6 +79,14 @@ remove_args({T, _Args}) ->
 remove_args(T) ->
     T.
 
+encode(Type, Encoding, Value) ->
+    T = get_type(remove_args(Type)),
+    T:encode(Encoding, Value).
+
+decode(Type, Encoding, Value) ->
+    T = get_type(remove_args(Type)),
+    T:decode(Encoding, Value).
+
 %% @doc Is bottom?
 is_bottom(Type, Value) ->
     T = get_type(remove_args(Type)),
@@ -107,6 +119,21 @@ new(Type) ->
         _T0 ->
             T:new()
     end.
+
+%% @doc Initialize a new delta for a given type.
+new_delta(Type) ->
+    T = get_type(remove_args(Type)),
+    case Type of
+        {_T0, Args} ->
+            T:new_delta(get_type(Args));
+        _T0 ->
+            T:new_delta()
+    end.
+
+%% @doc Check if some value is a delta
+is_delta(Type, Value) ->
+    T = get_type(remove_args(Type)),
+    T:is_delta(Value).
 
 %% @doc Use the proper type for performing an update.
 update(Type, Operation, Actor, Value) ->

@@ -126,8 +126,10 @@
 -define(IMPRESSION_NUMBER, 10).
 -define(IMPRESSION_INTERVAL, 1000).
 -define(CONVERGENCE_INTERVAL, 1000).
--define(EVAL_NUMBER, 2).
+-define(EVAL_NUMBER, 1).
 -define(MAX_IMPRESSIONS, 100).
 -define(LOG_INTERVAL, 10000).
 -define(VOTING_INTERVAL, 1000).
 -define(ADS, 10).
+
+-define(DEFAULT_DISTRIBUTION_BACKEND, lasp_default_broadcast_distribution_backend).

@@ -258,7 +258,7 @@ start_runner() ->
                              ?EXCHANGE_TIMER),
     ok = application:set_env(plumtree,
                              broadcast_mods,
-                             [lasp_plumtree_broadcast_distribution_backend]),
+                             [lasp_default_broadcast_distribution_backend]),
 
     {ok, _} = application:ensure_all_started(lasp),
 
@@ -313,7 +313,7 @@ load_lasp(Node, Config, Case) ->
                                                ?EXCHANGE_TIMER]),
     ok = rpc:call(Node, application, set_env, [plumtree,
                                                broadcast_mods,
-                                               [lasp_plumtree_broadcast_distribution_backend]]),
+                                               [lasp_default_broadcast_distribution_backend]]),
     ok = rpc:call(Node, application, set_env, [lasp,
                                                data_root,
                                                NodeDir]).

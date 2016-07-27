@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_plumtree_broadcast_distribution_backend).
+-module(lasp_default_broadcast_distribution_backend).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).
@@ -792,7 +792,7 @@ handle_info(memory_report, State) ->
     {noreply, State};
 
 handle_info(aae_sync, #state{store=Store} = State) ->
-    lager:info("Beginning AAE synchronization."),
+    % lager:info("Beginning AAE synchronization."),
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
@@ -800,7 +800,7 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     %% Remove ourself.
     Peers = Members -- [node()],
 
-    lager:info("Beginning sync for peers: ~p", [Peers]),
+    % lager:info("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
     lists:foreach(fun(Peer) -> init_aae_sync(Peer, Store) end, Peers),
@@ -810,7 +810,7 @@ handle_info(aae_sync, #state{store=Store} = State) ->
 
     {noreply, State};
 handle_info(delta_sync, State) ->
-    lager:info("Beginning delta synchronization."),
+    % lager:info("Beginning delta synchronization."),
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
@@ -818,12 +818,10 @@ handle_info(delta_sync, State) ->
     %% Remove ourself.
     Peers = Members -- [node()],
 
-    lager:info("Beginning sync for peers: ~p", [Peers]),
+    % lager:info("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
-    lists:foreach(fun(Peer) ->
-                          init_delta_sync(Peer)
-                  end, Peers),
+    lists:foreach(fun(Peer) -> init_delta_sync(Peer) end, Peers),
 
     %% Schedule next synchronization.
     schedule_delta_synchronization(),
@@ -1002,7 +1000,15 @@ collect_deltas(Destination, Type, DeltaMap, Min0, Max) ->
                                       _ ->
                                         lasp_type:merge(Type, Deltas0, Delta)
                                   end
-                          end, lasp_type:new(Type), SmallDeltaMap),
+                          end, lasp_type:new_delta(Type), SmallDeltaMap),
+
+    %% @todo should we remove this once we know everything is working fine?
+    case lasp_type:is_delta(Type, Deltas) of
+        false ->
+            lager:info("Folded delta group is not a delta ~p", [Deltas]);
+        true ->
+            ok
+    end,
     Deltas.
 
 %% @private
@@ -1020,7 +1026,7 @@ schedule_memory_report() ->
 
 %% @private
 memory_report() ->
-    case lasp_config:get(memory_report, true) of
+    case lasp_config:get(memory_report, false) of
         true ->
             PlumtreeBroadcast = erlang:whereis(plumtree_broadcast),
             lager:info("Plumtree message queue: ~p",
@@ -1104,8 +1110,8 @@ send(Msg, Peer) ->
     case PeerServiceManager:forward_message(Peer, ?MODULE, Msg) of
         ok ->
             ok;
-        Error ->
-            lager:error("Failed send to ~p for reason ~p", [Peer, Error]),
+        _Error ->
+            % lager:error("Failed send to ~p for reason ~p", [Peer, Error]),
             ok
     end.
 
@@ -1117,7 +1123,7 @@ extract_type_and_payload({Type, _From, Payload, _Count}) ->
 
 %% @private
 init_aae_sync(Peer, Store) ->
-    lager:info("Initializing AAE synchronization with peer: ~p", [Peer]),
+    % lager:info("Initializing AAE synchronization with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
@@ -1128,8 +1134,9 @@ init_aae_sync(Peer, Store) ->
                             [{ok, {Id, Type, Metadata, Value}}|Acc0]
                     end
                end,
-    {ok, Result} = do(fold, [Store, Function, []]),
-    lager:info("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]).
+    {ok, _Result} = do(fold, [Store, Function, []]),
+    % lager:info("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]).
+    ok.
 
 %% @private
 init_delta_sync(Peer) ->

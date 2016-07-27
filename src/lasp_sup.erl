@@ -1,4 +1,3 @@
-%% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
 %% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
@@ -69,14 +68,18 @@ init(_Args) ->
             ok
     end,
 
+    %% Configure the peer service.
+    partisan_config:set(partisan_peer_service_manager,
+                        partisan_client_server_peer_service_manager),
+
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},
                  permanent, infinity, supervisor, [partisan_sup]},
 
-    PlumtreeBackend = {lasp_plumtree_broadcast_distribution_backend,
-                       {lasp_plumtree_broadcast_distribution_backend, start_link, []},
-                        permanent, 5000, worker,
-                        [lasp_plumtree_broadcast_distribution_backend]},
+    DistributionBackend = {lasp_default_broadcast_distribution_backend,
+                           {lasp_default_broadcast_distribution_backend, start_link, []},
+                            permanent, 5000, worker,
+                            [lasp_default_broadcast_distribution_backend]},
 
     Plumtree = {plumtree_sup,
                 {plumtree_sup, start_link, []},
@@ -91,7 +94,7 @@ init(_Args) ->
 
     BaseSpecs0 = [Unique,
                   Partisan,
-                  PlumtreeBackend,
+                  DistributionBackend,
                   Plumtree,
                   MarathonPeerRefresh,
                   Process] ++ WebSpecs,
@@ -221,7 +224,7 @@ configure_defaults() ->
     DistributionBackend = application:get_env(
                             ?APP,
                             distribution_backend,
-                            lasp_plumtree_broadcast_distribution_backend),
+                            lasp_default_broadcast_distribution_backend),
     lasp_config:set(distribution_backend, DistributionBackend),
 
     %% Delta specific configuration values.

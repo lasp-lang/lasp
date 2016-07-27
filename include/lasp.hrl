@@ -131,6 +131,5 @@
 -define(LOG_INTERVAL, 10000).
 -define(VOTING_INTERVAL, 1000).
 -define(ADS, 10).
--define(PUSH_LOGS, true).
 
 -define(DEFAULT_DISTRIBUTION_BACKEND, lasp_default_broadcast_distribution_backend).

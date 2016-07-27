@@ -82,10 +82,10 @@ init([]) ->
     {ok, _} = lasp:declare(Id, Type),
 
     %% schedule check convergence or check push logs
-    case ?PUSH_LOGS of
+    case lasp_simulation_support:should_push_logs() of
         true ->
             schedule_check_push_logs();
-        false ->
+        _ ->
             schedule_check_convergence()
     end,
 

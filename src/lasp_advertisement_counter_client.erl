@@ -149,10 +149,10 @@ handle_info(check_convergence, #state{actor=Actor}=State) ->
             lasp:update(?CONVERGENCE_ID, {snd, {Actor, {fst, true}}}, Actor),
             lasp_transmission_instrumentation:convergence(),
 
-            case ?PUSH_LOGS of
+            case lasp_simulation_support:should_push_logs() of
                 true ->
                     schedule_check_push_logs();
-                false ->
+                _ ->
                     ok
             end;
         false ->

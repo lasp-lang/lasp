@@ -183,7 +183,7 @@ latency_test(_Config) ->
     RunCase = fun
         RC(0, Acc, _, _, _, _) ->
             lists:reverse(Acc);
-        RC(Iterations, Acc, From, To, {add, N}=Mutator, Threshold0) ->
+        RC(Iterations, Acc, From, To, Mutator, Threshold0) ->
             Threshold = case Threshold0 of
                 undefined ->
                     {strict, undefined};
@@ -195,24 +195,24 @@ latency_test(_Config) ->
                 lasp:read(T, Th)
             end,
             {Time, {ok, {_, _, _, NewThreshold}}} = timer:tc(MutateAndRead, [From, To, Mutator, Threshold]),
-            RC(Iterations - 1, [Time | Acc], From, To, {add, N+1}, NewThreshold)
+            RC(Iterations - 1, [Time | Acc], From, To, Mutator, NewThreshold)
     end,
     TestCase = fun(Optimization, Iterations) ->
-        {ok, {S1, _, _, _ }} = lasp:declare(?SET),
-        {ok, {S2, _, _, _ }} = lasp:declare(?SET),
-        {ok, {S3, _, _, _ }} = lasp:declare(?SET),
-        {ok, {S4, _, _, _ }} = lasp:declare(?SET),
-        {ok, {S5, _, _, _ }} = lasp:declare(?SET),
+        {ok, {S1, _, _, _ }} = lasp:declare(?COUNTER),
+        {ok, {S2, _, _, _ }} = lasp:declare(?COUNTER),
+        {ok, {S3, _, _, _ }} = lasp:declare(?COUNTER),
+        {ok, {S4, _, _, _ }} = lasp:declare(?COUNTER),
+        {ok, {S5, _, _, _ }} = lasp:declare(?COUNTER),
 
-        lasp:map(S1, fun(X) -> X end, S2),
-        lasp:map(S2, fun(X) -> X end, S3),
-        lasp:map(S3, fun(X) -> X end, S4),
-        lasp:filter(S4, fun(_X) -> true end, S5),
+        lasp:bind_to(S2, S1),
+        lasp:bind_to(S3, S2),
+        lasp:bind_to(S4, S3),
+        lasp:bind_to(S5, S4),
         case Optimization of
             contraction -> lasp_dependence_dag:contract();
             _ -> ok
         end,
-        RunCase(Iterations, [], S1, S5, {add, 1}, undefined)
+        RunCase(Iterations, [], S1, S5, increment, undefined)
     end,
     write_csv(contraction, TestCase(contraction, 1000)),
     write_csv(no_contraction, TestCase(no_contraction, 1000)).

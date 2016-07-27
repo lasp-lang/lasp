@@ -112,25 +112,32 @@ latency_test(_Config) ->
                 undefined -> {strict, undefined};
                 _ -> Threshold0
             end,
-            lasp:update(From, Mutator, a),
-            {Time, {ok, {_, _, _, NewThreshold}}} = timer:tc(lasp, read, [To, Threshold]),
+            MutateAndRead = fun(F, T, M, Th) ->
+                lasp:update(F, M, a),
+                lasp:read(T, Th)
+            end,
+            {Time, {ok, {_, _, _, NewThreshold}}} = timer:tc(MutateAndRead, [From, To, Mutator, Threshold]),
             RC(Iterations - 1, [Time | Acc], From, To, {add, N+1}, NewThreshold)
     end,
     TestCase = fun(Optimization, Iterations) ->
         {ok, {S1, _, _, _ }} = lasp:declare(?SET),
         {ok, {S2, _, _, _ }} = lasp:declare(?SET),
         {ok, {S3, _, _, _ }} = lasp:declare(?SET),
+        {ok, {S4, _, _, _ }} = lasp:declare(?SET),
+        {ok, {S5, _, _, _ }} = lasp:declare(?SET),
 
         lasp:map(S1, fun(X) -> X + 1 end, S2),
-        lasp:filter(S2, fun(X) -> (X rem 2) =:= 0 end, S3),
+        lasp:map(S2, fun(X) -> X + 1 end, S3),
+        lasp:map(S3, fun(X) -> X + 1 end, S4),
+        lasp:filter(S4, fun(X) -> (X rem 2) =:= 0 end, S5),
         case Optimization of
             contraction -> lasp_dependence_dag:contract();
             _ -> ok
         end,
-        RunCase(Iterations, [], S1, S3, {add, 1}, undefined)
+        RunCase(Iterations, [], S1, S5, {add, 1}, undefined)
     end,
-    write_csv(contraction, TestCase(contraction, 100)),
-    write_csv(no_contraction, TestCase(no_contraction, 100)).
+    write_csv(contraction, TestCase(contraction, 1000)),
+    write_csv(no_contraction, TestCase(no_contraction, 1000)).
 
 write_csv(Option, Cases) ->
     Path = code:priv_dir(lasp)

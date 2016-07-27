@@ -203,10 +203,10 @@ latency_test(_Config) ->
         {ok, {S4, _, _, _ }} = lasp:declare(?SET),
         {ok, {S5, _, _, _ }} = lasp:declare(?SET),
 
-        lasp:map(S1, fun(X) -> X + 1 end, S2),
-        lasp:map(S2, fun(X) -> X + 1 end, S3),
-        lasp:map(S3, fun(X) -> X + 1 end, S4),
-        lasp:filter(S4, fun(X) -> (X rem 2) =:= 0 end, S5),
+        lasp:map(S1, fun(X) -> X end, S2),
+        lasp:map(S2, fun(X) -> X end, S3),
+        lasp:map(S3, fun(X) -> X end, S4),
+        lasp:filter(S4, fun(_X) -> true end, S5),
         case Optimization of
             contraction -> lasp_dependence_dag:contract();
             _ -> ok

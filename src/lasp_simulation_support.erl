@@ -25,6 +25,7 @@
 -include("lasp.hrl").
 
 -export([run/3]).
+-export([should_push_logs/0, push_logs/0]).
 
 run(Case, Config, Options) ->
     lists:foreach(
@@ -39,6 +40,14 @@ run(Case, Config, Options) ->
         end,
         lists:seq(1, ?EVAL_NUMBER)
     ).
+
+should_push_logs() ->
+    DCOS = os:getenv("DCOS", "false"),
+    list_to_atom(DCOS).
+
+push_logs() ->
+    Result = os:cmd("cd " ++ code:priv_dir(?APP) ++ " ; ./push_logs.sh"),
+    ct:pal("Logs pushed. Output: ~p", [Result]).
 
 %% @private
 start(_Case, _Config, Options) ->
@@ -244,10 +253,11 @@ stop(_Nodes) ->
 
 %% @private
 wait_for_completion([Server | _] = _Nodes) ->
-    case lasp_support:wait_until(fun() ->
-                Convergence = rpc:call(Server, lasp_config, get, [convergence, false]),
-                ct:pal("Waiting for convergence: ~p", [Convergence]),
-                Convergence == true
+    ct:pal("Waiting for convergence"),
+    case lasp_support:wait_until(
+        fun() ->
+            Convergence = rpc:call(Server, lasp_config, get, [convergence, false]),
+            Convergence == true
         end, 60*4, ?CONVERGENCE_INTERVAL) of
         ok ->
             ct:pal("Convergence reached!");

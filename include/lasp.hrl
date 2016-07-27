@@ -107,12 +107,15 @@
 -define(CONVERGENCE_TRACKING, <<"convergence_tracking">>).
 
 -define(CONVERGENCE_PAIR,
-        {?PAIR_TYPE,
-        [
+        {?PAIR_TYPE, [
             ?COUNTER_TYPE,
-            {?GMAP_TYPE, [?BOOLEAN_TYPE]}
-        ]
-    }).
+            {?GMAP_TYPE, [
+                {?PAIR_TYPE, [
+                    ?BOOLEAN_TYPE, %% convergence observed
+                    ?BOOLEAN_TYPE  %% logs pushed
+                ]}
+            ]}
+        ]}).
 
 -define(CONVERGENCE_ID,
         {?CONVERGENCE_TRACKING, ?CONVERGENCE_PAIR}).

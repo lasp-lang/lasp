@@ -42,7 +42,8 @@ run(Case, Config, Options) ->
     ).
 
 push_logs() ->
-    ok.
+    Result = os:cmd("cd " ++ code:priv_dir(?APP) ++ " ; ./push_logs.sh"),
+    ct:pal("Logs pushed. Output: ~p", [Result]).
 
 %% @private
 start(_Case, _Config, Options) ->

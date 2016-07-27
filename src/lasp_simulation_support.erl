@@ -253,10 +253,11 @@ stop(_Nodes) ->
 
 %% @private
 wait_for_completion([Server | _] = _Nodes) ->
-    case lasp_support:wait_until(fun() ->
-                Convergence = rpc:call(Server, lasp_config, get, [convergence, false]),
-                ct:pal("Waiting for convergence: ~p", [Convergence]),
-                Convergence == true
+    ct:pal("Waiting for convergence"),
+    case lasp_support:wait_until(
+        fun() ->
+            Convergence = rpc:call(Server, lasp_config, get, [convergence, false]),
+            Convergence == true
         end, 60*4, ?CONVERGENCE_INTERVAL) of
         ok ->
             ct:pal("Convergence reached!");

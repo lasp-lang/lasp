@@ -106,7 +106,8 @@ all() ->
 
 latency_test(_Config) ->
     RunCase = fun
-        RC(0, Acc, _, _, _, _) -> Acc;
+        RC(0, Acc, _, _, _, _) ->
+            lists:reverse(Acc);
         RC(Iterations, Acc, From, To, {add, N}=Mutator, Threshold0) ->
             Threshold = case Threshold0 of
                 undefined ->

@@ -109,8 +109,10 @@ latency_test(_Config) ->
         RC(0, Acc, _, _, _, _) -> Acc;
         RC(Iterations, Acc, From, To, {add, N}=Mutator, Threshold0) ->
             Threshold = case Threshold0 of
-                undefined -> {strict, undefined};
-                _ -> Threshold0
+                undefined ->
+                    {strict, undefined};
+                _ ->
+                    {strict, Threshold0}
             end,
             MutateAndRead = fun(F, T, M, Th) ->
                 lasp:update(F, M, a),

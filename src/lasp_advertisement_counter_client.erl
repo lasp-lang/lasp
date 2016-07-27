@@ -147,9 +147,36 @@ handle_info(check_convergence, #state{actor=Actor}=State) ->
             lager:info("Convergence reached on node ~p", [node()]),
             %% Update CT instance
             lasp:update(?CONVERGENCE_ID, {snd, {Actor, {fst, true}}}, Actor),
-            lasp_transmission_instrumentation:convergence();
+            lasp_transmission_instrumentation:convergence(),
+
+            case ?PUSH_LOGS of
+                true ->
+                    schedule_check_push_logs();
+                false ->
+                    ok
+            end;
         false ->
             schedule_check_convergence()
+    end,
+
+    {noreply, State};
+
+handle_info(check_push_logs, #state{actor=Actor}=State) ->
+    {ok, {_, ConvergenceAndLogs}} = lasp:query(?CONVERGENCE_ID),
+
+    NodesWithAllEvents = lists:filter(
+        fun({_Node, {AllEvents, _LogsPushed}}) ->
+            AllEvents
+        end,
+        ConvergenceAndLogs
+    ),
+
+    case length(NodesWithAllEvents) == client_number() of
+        true ->
+            lasp_simulation_support:push_logs(),
+            lasp:update(?CONVERGENCE_ID, {snd, {Actor, {snd, true}}}, Actor);
+        false ->
+            schedule_check_push_logs()
     end,
 
     {noreply, State};
@@ -185,6 +212,10 @@ schedule_logging() ->
 %% @private
 schedule_check_convergence() ->
     erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_convergence).
+
+%% @private
+schedule_check_push_logs() ->
+    erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_push_logs).
 
 %% @private
 max_impressions() ->

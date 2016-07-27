@@ -25,6 +25,7 @@
 -include("lasp.hrl").
 
 -export([run/3]).
+-export([push_logs/0]).
 
 run(Case, Config, Options) ->
     lists:foreach(
@@ -39,6 +40,9 @@ run(Case, Config, Options) ->
         end,
         lists:seq(1, ?EVAL_NUMBER)
     ).
+
+push_logs() ->
+    ok.
 
 %% @private
 start(_Case, _Config, Options) ->

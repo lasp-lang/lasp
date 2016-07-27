@@ -78,6 +78,7 @@ all() ->
     [
      parser_test,
      combined_view_test,
+     latency_test,
      stream_test,
      query_test,
      ivar_test,
@@ -177,6 +178,48 @@ combined_view_test(_Config) ->
     ?assertMatch([["Breathless"]], lasp_sql_materialized_view:get_value(Id2, [title])),
 
     ok.
+
+latency_test(_Config) ->
+    RunCase = fun
+        RC(0, Acc, _, _, _, _) -> Acc;
+        RC(Iterations, Acc, From, To, {add, N}=Mutator, Threshold0) ->
+            Threshold = case Threshold0 of
+                undefined -> {strict, undefined};
+                _ -> Threshold0
+            end,
+            lasp:update(From, Mutator, a),
+            {Time, {ok, {_, _, _, NewThreshold}}} = timer:tc(lasp, read, [To, Threshold]),
+            RC(Iterations - 1, [Time | Acc], From, To, {add, N+1}, NewThreshold)
+    end,
+    TestCase = fun(Optimization, Iterations) ->
+        {ok, {S1, _, _, _ }} = lasp:declare(?SET),
+        {ok, {S2, _, _, _ }} = lasp:declare(?SET),
+        {ok, {S3, _, _, _ }} = lasp:declare(?SET),
+
+        lasp:map(S1, fun(X) -> X + 1 end, S2),
+        lasp:filter(S2, fun(X) -> (X rem 2) =:= 0 end, S3),
+        case Optimization of
+            contraction -> lasp_dependence_dag:contract();
+            _ -> ok
+        end,
+        RunCase(Iterations, [], S1, S3, {add, 1}, undefined)
+    end,
+    write_csv(contraction, TestCase(contraction, 100)),
+    write_csv(no_contraction, TestCase(no_contraction, 100)).
+
+write_csv(Option, Cases) ->
+    Path = code:priv_dir(lasp)
+           ++ "/evaluation/logs/path_contraction/"
+           ++ atom_to_list(Option) ++ "/"
+           ++ integer_to_list(timestamp()) ++ "/",
+    ok = filelib:ensure_dir(Path),
+    lists:foreach(fun(Case) ->
+        file:write_file(Path ++ "runner.csv", io_lib:fwrite("~p\n", [Case]), [append])
+    end, Cases).
+
+timestamp() ->
+    {Mega, Sec, _Micro} = erlang:timestamp(),
+    Mega * 1000000 + Sec.
 
 %% @doc Increment counter and test stream behaviour.
 stream_test(_Config) ->

@@ -123,6 +123,10 @@ init(_Args) ->
             BaseSpecs
     end,
 
+    ClientNumberDefault = list_to_atom(os:getenv("CLIENT_NUMBER", "3")),
+    ClientNumber = application:get_env(?APP, client_number, ClientNumberDefault),
+    lasp_config:set(client_number, ClientNumber),
+
     %% Setup the advertisement counter example, if necessary.
     AdSpecs = advertisement_counter_child_specs(),
 

@@ -194,7 +194,7 @@ max_votes() ->
 
 %% @private
 client_number() ->
-    ?NUM_NODES.
+    lasp_config:get(client_number, 3).
 
 %% @private
 identifiers() ->

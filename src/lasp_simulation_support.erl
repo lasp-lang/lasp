@@ -199,7 +199,11 @@ start(_Case, _Config, Options) ->
 
                         %% Configure instrumentation.
                         ok = rpc:call(Node, lasp_config, set,
-                                      [instrumentation, true])
+                                      [instrumentation, true]),
+
+                        %% Configure client number
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [client_number, length(?CT_SLAVES) - 1])
                    end,
     lists:map(ConfigureFun, Nodes),
 

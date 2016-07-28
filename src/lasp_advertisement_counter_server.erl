@@ -132,7 +132,8 @@ handle_info(check_convergence, #state{}=State) ->
         true ->
             lager:info("Convergence reached on all clients"),
             lasp_config:set(convergence, true),
-            lasp_transmission_instrumentation:convergence();
+            lasp_transmission_instrumentation:convergence(),
+            init:stop();
         false ->
             schedule_check_convergence()
     end,
@@ -153,7 +154,8 @@ handle_info(check_push_logs, #state{}=State) ->
         true ->
             lager:info("Logs pushed on all clients"),
             lasp_simulation_support:push_logs(),
-            lasp_config:set(convergence, true);
+            lasp_config:set(convergence, true),
+            init:stop();
         false ->
             schedule_check_push_logs()
     end,
@@ -258,7 +260,7 @@ trigger(#ad{counter=CounterId} = Ad, Ads, Actor) ->
 
 %% @private
 client_number() ->
-    ?NUM_NODES.
+    lasp_config:get(client_number, 3).
 
 %% @private
 schedule_check_convergence() ->

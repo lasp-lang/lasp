@@ -1005,7 +1005,7 @@ collect_deltas(Destination, Type, DeltaMap, Min0, Max) ->
     %% @todo should we remove this once we know everything is working fine?
     case lasp_type:is_delta(Type, Deltas) of
         false ->
-            lager:info("Folded delta group is not a delta ~p", [Deltas]);
+            lager:info("Folded delta group is not a delta");
         true ->
             ok
     end,

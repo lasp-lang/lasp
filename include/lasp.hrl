@@ -7,9 +7,6 @@
 %% Peer service port.
 -define(PEER_PORT, 9000).
 
-%% Number of additional nodes to run for the test suite.
--define(NUM_NODES, 3).
-
 %% Code which connects the storage backends to the implementation.
 -define(CORE, lasp_core).
 
@@ -118,7 +115,6 @@
         {?CONVERGENCE_TRACKING, ?CONVERGENCE_PAIR}).
 
 %% Simulation helpers.
--define(CT_SLAVES, [rita, sue, bob, jerome]).
 -define(AAE_INTERVAL, 10000).
 -define(IMPRESSION_NUMBER, 10).
 -define(IMPRESSION_INTERVAL, 1000).

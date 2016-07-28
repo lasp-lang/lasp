@@ -229,7 +229,7 @@ trigger(#ad{counter=CounterId} = Ad, Ads, Actor) ->
 
 %% @private
 client_number() ->
-    ?NUM_NODES.
+    lasp_config:get(client_number, 3).
 
 %% @private
 track_convergence() ->

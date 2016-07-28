@@ -197,6 +197,12 @@ configure_defaults() ->
                                                   EvaluationTimestampDefault),
     lasp_config:set(evaluation_timstamp, EvaluationTimestampEnabled),
 
+    ClientNumberDefault = list_to_integer(os:getenv("CLIENT_NUMBER", "3")),
+    ClientNumber = application:get_env(?APP,
+                                       client_number,
+                                       ClientNumberDefault),
+    lasp_config:set(client_number, ClientNumber),
+
     %% Peer service.
     PeerService = application:get_env(plumtree,
                                       peer_service,

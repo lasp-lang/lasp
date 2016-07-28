@@ -1,4 +1,4 @@
-%% -------------------------------------------------------------------
+%% ------------------------------------------------------------------
 %%
 %% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
 %%
@@ -27,21 +27,25 @@
 -export([run/3]).
 
 run(Case, Config, Options) ->
+    ClientNumber = lasp_config:get(client_number, 3),
+    NodeNames = node_list(ClientNumber),
+
     lists:foreach(
         fun(_EvalNumber) ->
-            Nodes = start(
+            Server = start(
+              NodeNames,
               Case,
               Config,
               [{evaluation_timestamp, timestamp()} | Options]
             ),
-            wait_for_completion(Nodes),
-            stop(Nodes)
+            wait_for_completion(Server),
+            stop(NodeNames)
         end,
         lists:seq(1, ?EVAL_NUMBER)
     ).
 
 %% @private
-start(_Case, _Config, Options) ->
+start(NodeNames, _Case, _Config, Options) ->
     %% Launch distribution for the test runner.
     ct:pal("Launching Erlang distribution..."),
 
@@ -78,7 +82,8 @@ start(_Case, _Config, Options) ->
                                     ct:fail(Error)
                             end
                      end,
-    [First|_] = Nodes = lists:map(InitializerFun, ?CT_SLAVES),
+
+    [Server | _] = Nodes = lists:map(InitializerFun, NodeNames),
 
     %% Load Lasp on all of the nodes.
     LoaderFun = fun(Node) ->
@@ -142,7 +147,7 @@ start(_Case, _Config, Options) ->
                         case Simulation of
                             ad_counter ->
                                 case Node of
-                                    First ->
+                                    Server ->
                                         ok = rpc:call(Node, lasp_config, set,
                                                       [ad_counter_simulation_server, true]);
                                     _ ->
@@ -151,7 +156,7 @@ start(_Case, _Config, Options) ->
                                 end;
                             music_festival ->
                                 case Node of
-                                    First ->
+                                    Server ->
                                         ok = rpc:call(Node, lasp_config, set,
                                                       [music_festival_simulation_server, true]);
                                     _ ->
@@ -207,7 +212,7 @@ start(_Case, _Config, Options) ->
 
     ct:pal("Lasp fully initialized."),
 
-    Nodes.
+    Server.
 
 %% @private
 %%
@@ -230,7 +235,7 @@ cluster(Node, OtherNode) ->
                   [{OtherNode, {127, 0, 0, 1}, PeerPort}]).
 
 %% @private
-stop(_Nodes) ->
+stop(Nodes) ->
     StopFun = fun(Node) ->
         case ct_slave:stop(Node) of
             {ok, _} ->
@@ -239,11 +244,12 @@ stop(_Nodes) ->
                 ct:fail(Error)
         end
     end,
-    lists:map(StopFun, ?CT_SLAVES),
+    lists:map(StopFun, Nodes),
     ok.
 
 %% @private
-wait_for_completion([Server | _] = _Nodes) ->
+wait_for_completion(Server) ->
+    ct:pal("wait for com ~p~n", [Server]),
     case lasp_support:wait_until(fun() ->
                 Convergence = rpc:call(Server, lasp_config, get, [convergence, false]),
                 ct:pal("Waiting for convergence: ~p", [Convergence]),
@@ -263,3 +269,13 @@ codepath() ->
 timestamp() ->
     {Mega, Sec, _Micro} = erlang:timestamp(),
     Mega * 1000000 + Sec.
+
+%% @private
+node_list(ClientNumber) ->
+    Clients = client_list(ClientNumber),
+    [server | Clients].
+
+%% @private
+client_list(0) -> [];
+client_list(N) -> lists:append(client_list(N - 1), [list_to_atom("client_" ++ integer_to_list(N))]).
+

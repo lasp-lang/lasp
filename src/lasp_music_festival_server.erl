@@ -134,7 +134,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 client_number() ->
-    ?NUM_NODES.
+    lasp_config:get(client_number, 3).
 
 %% @private
 track_convergence() ->

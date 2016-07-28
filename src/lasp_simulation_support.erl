@@ -31,6 +31,8 @@ run(Case, Config, Options) ->
     ClientNumber = lasp_config:get(client_number, 3),
     NodeNames = node_list(ClientNumber),
 
+    ct:pal("Running ~p with nodes ~p", [Case, NodeNames]),
+
     lists:foreach(
         fun(_EvalNumber) ->
             Server = start(
@@ -151,18 +153,13 @@ start(NodeNames, _Case, _Config, Options) ->
 
                         %% Configure who should be the server and who's
                         %% the client.
-                        Simulation = proplists:get_value(simulation, Options),
-
-                        case Simulation of
-                            ad_counter ->
-                                case Node of
-                                    Server ->
-                                        ok = rpc:call(Node, lasp_config, set,
-                                                      [ad_counter_simulation_server, true]);
-                                    _ ->
-                                        ok = rpc:call(Node, lasp_config, set,
-                                                      [ad_counter_simulation_client, true])
-                                end
+                        case Node of
+                            Server ->
+                                ok = rpc:call(Node, lasp_config, set,
+                                              [ad_counter_simulation_server, true]);
+                            _ ->
+                                ok = rpc:call(Node, lasp_config, set,
+                                              [ad_counter_simulation_client, true])
                         end,
 
                         %% Configure the peer service.
@@ -184,6 +181,7 @@ start(NodeNames, _Case, _Config, Options) ->
                         ok = rpc:call(Node, lasp_config, set, [set, Set]),
 
                         %% Configure evaluation identifier.
+                        Simulation = proplists:get_value(simulation, Options),
                         EvalIdentifier = proplists:get_value(evaluation_identifier, Options),
                         ok = rpc:call(Node, lasp_config, set,
                                       [evaluation_identifier, {Simulation, EvalIdentifier}]),

@@ -81,7 +81,7 @@ client_server_delta_based_divergence_test(Config) ->
             lasp_config:set(client_number, ClientNumber),
             EvaluationIdentifier = list_to_atom("client_server_delta_based_divergence" ++ integer_to_list(ClientNumber)),
 
-    			  lasp_simulation_support:run(client_server_delta_based_divergence_test,
+            lasp_simulation_support:run(client_server_delta_based_divergence_test,
                 Config,
                 [{mode, delta_based},
                  {simulation, ad_counter_divergence},
@@ -91,9 +91,9 @@ client_server_delta_based_divergence_test(Config) ->
                  {instrumentation, false},
                  {evaluation_identifier, EvaluationIdentifier}]
             )
-				end,
-				lists:seq(?MIN_CLIENTS, ?MAX_CLIENTS)
-		),
+        end,
+        lists:seq(?MIN_CLIENTS, ?MAX_CLIENTS)
+    ),
     ok.
 
 peer_to_peer_delta_based_divergence_test(Config) ->

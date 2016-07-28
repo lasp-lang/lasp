@@ -162,15 +162,6 @@ start(NodeNames, _Case, _Config, Options) ->
                                     _ ->
                                         ok = rpc:call(Node, lasp_config, set,
                                                       [ad_counter_simulation_client, true])
-                                end;
-                            music_festival ->
-                                case Node of
-                                    Server ->
-                                        ok = rpc:call(Node, lasp_config, set,
-                                                      [music_festival_simulation_server, true]);
-                                    _ ->
-                                        ok = rpc:call(Node, lasp_config, set,
-                                                      [music_festival_simulation_client, true])
                                 end
                         end,
 

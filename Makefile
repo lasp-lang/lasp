@@ -40,16 +40,13 @@ eunit:
 ct:
 	${REBAR} as test ct --suite=lasp_SUITE
 
-simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation music-festival-simulation
+simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation
 
 peer-to-peer-ad-counter-simulation:
 	${REBAR} as test ct --suite=lasp_peer_to_peer_advertisement_counter_SUITE
 
 client-server-ad-counter-simulation:
 	${REBAR} as test ct --suite=lasp_client_server_advertisement_counter_SUITE
-
-music-festival-simulation:
-	${REBAR} as test ct --suite=lasp_music_festival_SUITE
 
 ##
 ## Release targets

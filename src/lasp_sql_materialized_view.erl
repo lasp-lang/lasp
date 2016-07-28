@@ -34,6 +34,8 @@ create(Specification) when is_list(Specification) ->
     %% Tokenize the string.
     {ok, Tokens, _EndLine} = ?SQL_LEXER:string(Specification),
 
+    ct:pal("Tokens: ~p", [Tokens]),
+
     %% Parse the tokens.
     {ok, ParseTree} = ?SQL_PARSER:parse(Tokens),
 
@@ -45,6 +47,9 @@ create(Specification) when is_list(Specification) ->
     ct:pal("Result: ~p", [Result]),
 
     ok.
+
+materialize({where, Predicates}, State) ->
+    materialize(Predicates, State);
 
 materialize({intersection, Left, Right}, State0) ->
     %% Build predicates on the left.

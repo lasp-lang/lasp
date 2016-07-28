@@ -1,11 +1,13 @@
 Nonterminals
-predicates predicate element.
+statement predicates predicate element.
 
-Terminals atom var integer string union intersection comparator.
+Terminals atom var integer string where union intersection comparator.
 
 Expect 1.
 
-Rootsymbol predicates.
+Rootsymbol statement.
+
+statement -> where predicates : {where, '$2'}.
 
 predicates -> predicate : '$1'.
 predicates -> predicate union predicate : {union, '$1', '$3'}.

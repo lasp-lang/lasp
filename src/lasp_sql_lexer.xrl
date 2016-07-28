@@ -7,6 +7,7 @@ C   = (<|<=|=|=>|>)
 
 Rules.
 
+where  : {token,{where,TokenLine,list_to_atom(TokenChars)}}.
 or     : {token,{union,TokenLine,list_to_atom(TokenChars)}}.
 and    : {token,{intersection,TokenLine,list_to_atom(TokenChars)}}.
 {C}    : {token,{comparator,TokenLine,list_to_atom(TokenChars)}}.

@@ -104,8 +104,8 @@ plots:
 
 div:
 	pkill -9 beam.smp; \
-    clear; \
-    ./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_divergence_SUITE
+		clear; \
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_divergence_SUITE
 
 evaluate-local: SHELL:=/bin/bash
 evaluate-local:

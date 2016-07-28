@@ -6,4 +6,4 @@ if [ ! -z "$BUILD" ]; then
 fi
 
 echo "Launching docker instance."
-docker run --dns=4.2.2.1 -e "EVALUATION_PASSPHRASE=$EVALUATION_PASSPHRASE" -t -i cmeiklejohn/lasp-evaluation
+docker run --dns=4.2.2.1 -e "DCOS=true" -e "EVALUATION_PASSPHRASE=$EVALUATION_PASSPHRASE" -t -i cmeiklejohn/lasp-evaluation

@@ -78,8 +78,16 @@ init([]) ->
     launch_triggers(AdList, Ads, Actor),
 
     %% Create instance for convergence tracking
-    %% Also schedule check convergence
-    track_convergence(),
+    {Id, Type} = ?CONVERGENCE_ID,
+    {ok, _} = lasp:declare(Id, Type),
+
+    %% schedule check convergence or check push logs
+    case lasp_simulation_support:should_push_logs() of
+        true ->
+            schedule_check_push_logs();
+        _ ->
+            schedule_check_convergence()
+    end,
 
     {ok, #state{actor=Actor, ads=Ads}}.
 
@@ -111,13 +119,13 @@ handle_info(log, #state{ads=Ads}=State) ->
     {noreply, State};
 
 handle_info(check_convergence, #state{}=State) ->
-    {ok, {_, Convergence}} = lasp:query(?CONVERGENCE_ID),
+    {ok, {_, ConvergenceAndLogs}} = lasp:query(?CONVERGENCE_ID),
 
     NodesWithAllEvents = lists:filter(
-        fun({_Node, AllEvents}) ->
+        fun({_Node, {AllEvents, _LogsPushed}}) ->
             AllEvents
         end,
-        Convergence
+        ConvergenceAndLogs
     ),
 
     case length(NodesWithAllEvents) == client_number() of
@@ -127,6 +135,27 @@ handle_info(check_convergence, #state{}=State) ->
             lasp_transmission_instrumentation:convergence();
         false ->
             schedule_check_convergence()
+    end,
+
+    {noreply, State};
+
+handle_info(check_push_logs, #state{}=State) ->
+    {ok, {_, ConvergenceAndLogs}} = lasp:query(?CONVERGENCE_ID),
+
+    NodesWithLogsPushed = lists:filter(
+        fun({_Node, {_AllEvents, LogsPushed}}) ->
+            LogsPushed
+        end,
+        ConvergenceAndLogs
+    ),
+
+    case length(NodesWithLogsPushed) == client_number() of
+        true ->
+            lager:info("Logs pushed on all clients"),
+            lasp_simulation_support:push_logs(),
+            lasp_config:set(convergence, true);
+        false ->
+            schedule_check_push_logs()
     end,
 
     {noreply, State};
@@ -232,14 +261,12 @@ client_number() ->
     lasp_config:get(client_number, 3).
 
 %% @private
-track_convergence() ->
-    {Id, Type} = ?CONVERGENCE_ID,
-    {ok, _} = lasp:declare(Id, Type),
-    schedule_check_convergence().
-
-%% @private
 schedule_check_convergence() ->
     erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_convergence).
+
+%% @private
+schedule_check_push_logs() ->
+    erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_push_logs).
 
 %% @private
 schedule_logging() ->

@@ -28,12 +28,6 @@ fprof.trace
 .rebar3/
 .eqc/
 dcos/
-priv/evaluation/logs
-priv/evaluation/plots/*.csv
-priv/evaluation/plots/*.pdf
-priv/evaluation/plots/*_with_aae*
 priv/ssh/*id_rsa*
 priv/evaluation
-priv/plots
-priv/logs
 priv/lager

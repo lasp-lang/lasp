@@ -7,6 +7,8 @@ C   = (<|<=|=|=>|>)
 
 Rules.
 
+select : {token,{select,TokenLine,list_to_atom(TokenChars)}}.
+from   : {token,{from,TokenLine,list_to_atom(TokenChars)}}.
 where  : {token,{where,TokenLine,list_to_atom(TokenChars)}}.
 or     : {token,{union,TokenLine,list_to_atom(TokenChars)}}.
 and    : {token,{intersection,TokenLine,list_to_atom(TokenChars)}}.

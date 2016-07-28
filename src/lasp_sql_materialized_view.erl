@@ -25,7 +25,7 @@
 
 -export([create/1]).
 
--record(state, {set_id}).
+-record(state, {set_id, projection_output_id, predicate_output_id}).
 
 -define(DEFAULT, <<"hi">>).
 
@@ -42,11 +42,38 @@ create(Specification) when is_list(Specification) ->
     ct:pal("Parse Tree: ~p", [ParseTree]),
 
     %% Create.
-    {Result, _State} = materialize(ParseTree, #state{set_id=?DEFAULT}),
-
-    ct:pal("Result: ~p", [Result]),
+    _OutputId = materialize(ParseTree, #state{set_id=?DEFAULT}),
 
     ok.
+
+%% Entry point to evaluation of the parse tree.
+materialize({query, Projections, {from, Collection}, Predicates}, State0) ->
+    %% Convert collection identifier to binary.
+    CollectionId = list_to_binary(atom_to_list(Collection)),
+
+    %% Materialize a dataflow graph for the predicate tree.
+    {PredicateOutputId, State1} = materialize(Predicates,
+                                              State0#state{set_id=CollectionId}),
+
+    %% Materialize projections.
+    {ProjectionOutputId, _State} = materialize(Projections,
+                                               State1#state{predicate_output_id=PredicateOutputId}),
+
+    %% Return the top node of the DAG.
+    ProjectionOutputId;
+
+%% TODO: Single projection only!
+materialize({select, Projections},
+            #state{predicate_output_id=PredicateOutputId}=State) ->
+    %% Create a node for the result of the predicate.
+    {ok, {OutputId, _, _, _}} = lasp:declare(?SET),
+
+    %% Apply the projection.
+    lasp:map(PredicateOutputId,
+             fun(Tuple) -> extract(Projections, Tuple) end,
+             OutputId),
+
+    {OutputId, State};
 
 materialize({where, Predicates}, State) ->
     materialize(Predicates, State);
@@ -111,3 +138,6 @@ comparator(Tuple, Variable, Comparator, Element) ->
             %% TODO
             {error, undefined}
     end.
+
+extract(Variable, Tuple) ->
+    maps:get(Variable, Tuple).

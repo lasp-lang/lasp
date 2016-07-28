@@ -104,9 +104,9 @@ all() ->
 -define(ID, <<"myidentifier">>).
 
 parser_test(_Config) ->
-    ok = lasp_sql_materialized_view:create("where A = 22 or B < 10"),
-    ok = lasp_sql_materialized_view:create("where A <= 22 and B => 10"),
-    ok = lasp_sql_materialized_view:create("where A <= 22 and C > 19"),
+    ok = lasp_sql_materialized_view:create("select name from users where age = 22 or age < 10"),
+    ok = lasp_sql_materialized_view:create("select name from users where age <= 22 and age => 10"),
+    ok = lasp_sql_materialized_view:create("select name from users where age < 22 and age > 19"),
     ok.
 
 %% @doc Increment counter and test stream behaviour.

@@ -102,6 +102,11 @@ plots:
 		./rebar3 ct --readable=false --suite=test/lasp_client_server_advertisement_counter_SUITE; \
 		cd priv/evaluation && make plots
 
+div:
+	pkill -9 beam.smp; \
+    clear; \
+    ./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_divergence_SUITE
+
 evaluate-local: SHELL:=/bin/bash
 evaluate-local:
 	priv/evaluate-local.sh

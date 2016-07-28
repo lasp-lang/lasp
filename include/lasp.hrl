@@ -133,3 +133,7 @@
 -define(ADS, 10).
 
 -define(DEFAULT_DISTRIBUTION_BACKEND, lasp_default_broadcast_distribution_backend).
+
+%% Lexer and parser.
+-define(SQL_LEXER, lasp_sql_lexer).
+-define(SQL_PARSER, lasp_sql_parser).

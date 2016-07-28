@@ -76,6 +76,7 @@ end_per_testcase(Case, Config) ->
 
 all() ->
     [
+     parser_test,
      stream_test,
      query_test,
      ivar_test,
@@ -91,15 +92,24 @@ all() ->
      membership_test
     ].
 
+-include("lasp.hrl").
+
 %% ===================================================================
 %% tests
 %% ===================================================================
 
--define(SET, orset).
 -define(AWSET_PS, awset_ps).
 -define(COUNTER, pncounter).
 
 -define(ID, <<"myidentifier">>).
+
+parser_test(_Config) ->
+    ct:pal("Beginning parse_test"),
+    {ok, Tokens, _EndLine} = ?SQL_LEXER:string("A = 22 or B < 10"),
+    ct:pal("Tokens: ~p", [Tokens]),
+    {ok, ParseTree} = ?SQL_PARSER:parse(Tokens),
+    ct:pal("Parse tree: ~p", [ParseTree]),
+    ok.
 
 %% @doc Increment counter and test stream behaviour.
 stream_test(_Config) ->

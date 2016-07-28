@@ -153,7 +153,7 @@ handle_info(check_convergence, #state{actor=Actor}=State) ->
                 true ->
                     schedule_check_push_logs();
                 _ ->
-                    ok
+                    init:stop()
             end;
         false ->
             schedule_check_convergence()
@@ -174,7 +174,8 @@ handle_info(check_push_logs, #state{actor=Actor}=State) ->
     case length(NodesWithAllEvents) == client_number() of
         true ->
             lasp_simulation_support:push_logs(),
-            lasp:update(?CONVERGENCE_ID, {snd, {Actor, {snd, true}}}, Actor);
+            lasp:update(?CONVERGENCE_ID, {snd, {Actor, {snd, true}}}, Actor),
+            init:stop();
         false ->
             schedule_check_push_logs()
     end,
@@ -223,4 +224,4 @@ max_impressions() ->
 
 %% @private
 client_number() ->
-    ?NUM_NODES.
+    lasp_config:get(client_number, 3).

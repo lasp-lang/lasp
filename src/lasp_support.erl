@@ -171,7 +171,7 @@ heal_cluster(ANodes, BNodes) ->
 nodelist() ->
     lists:map(fun(X) ->
                       list_to_atom("node-" ++ integer_to_list(X))
-              end, lists:seq(1, ?NUM_NODES)).
+              end, lists:seq(1, lasp_config:get(client_number, 3))).
 
 start_nodes(Case, Config0) ->
     StartedConfig = lists:foldl(fun(N, Config) ->

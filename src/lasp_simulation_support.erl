@@ -52,9 +52,9 @@ push_logs() ->
     case ShouldPush of
         true ->
             Result = os:cmd("cd " ++ code:priv_dir(?APP) ++ " ; ./push_logs.sh"),
-            ct:pal("Logs pushed. Output: ~p", [Result]);
+            lager:info("Logs pushed. Output: ~p", [Result]);
         false ->
-            ct:pal("Won't push the logs")
+            lager:info("Won't push the logs")
     end.
 
 %% @private

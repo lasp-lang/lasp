@@ -120,10 +120,10 @@ handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
             Impressions0 + 1
     end,
 
-	  %% - If I did nothing (`Impressions0 == Impressions1`), 
+    %% - If I did nothing (`Impressions0 == Impressions1`),
     %% and the `Impressions1 > 0` (meaning I did something before)
     %% then all ads are disabled and simulation has ended
-    %%      (If we don't check for `Impressions1 > 0` it might mean that 
+    %%      (If we don't check for `Impressions1 > 0` it might mean that
     %%      the experiment hasn't started yet)
     %% - Else, keep doing impressions
     case Impressions0 == Impressions1 andalso Impressions1 > 0 of

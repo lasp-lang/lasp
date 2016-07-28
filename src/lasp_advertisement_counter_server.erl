@@ -121,7 +121,7 @@ handle_info(check_simulation_end, #state{}=State) ->
 
     NodesWithLogsPushed = lists:filter(
         fun({_Node, {_AdsDisabled, LogsPushed}}) ->
-						LogsPushed
+            LogsPushed
         end,
         AdsDisabledAndLogs
     ),
@@ -222,7 +222,7 @@ launch_triggers(AdList, Ads, Actor) ->
                     trigger(Ad, Ads, Actor)
                 end
             )
-        end, 
+        end,
         AdList
     ).
 

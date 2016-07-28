@@ -194,8 +194,9 @@ start(NodeNames, _Case, _Config, Options) ->
                                       [evaluation_timestamp, EvalTimestamp]),
 
                         %% Configure instrumentation.
+                        Instrumentation = proplists:get_value(instrumentation, Options, true),
                         ok = rpc:call(Node, lasp_config, set,
-                                      [instrumentation, true])
+                                      [instrumentation, Instrumentation])
                    end,
     lists:map(ConfigureFun, Nodes),
 

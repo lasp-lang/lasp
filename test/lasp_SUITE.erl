@@ -226,7 +226,7 @@ latency_with_reads_test(_Config) ->
             end,
             case (Iterations rem 10) =:= 0 of
                 true ->
-                    RandomChoice = lists:nth(random:uniform(length(Intermediate)), Intermediate),
+                    RandomChoice = lists:nth(lasp_support:puniform(length(Intermediate)), Intermediate),
                     _ = lasp:read(RandomChoice, undefined);
                 _ -> ok
             end,

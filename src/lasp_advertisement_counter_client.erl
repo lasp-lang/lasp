@@ -66,9 +66,6 @@ init([]) ->
     %% Schedule logging.
     schedule_logging(),
 
-    %% Schedule check convergence
-    schedule_check_convergence(),
-
     {ok, #state{actor=Actor, impressions=0}}.
 
 %% @private
@@ -89,11 +86,10 @@ handle_cast(Msg, State) ->
 handle_info(log, #state{impressions=Impressions}=State) ->
     %% Get current value of the list of advertisements.
     {ok, Ads} = lasp:query({?ADS_WITH_CONTRACTS, ?SET_TYPE}),
-    AdList = sets:to_list(Ads),
 
     lager:info("Impressions: ~p", [Impressions]),
 
-    lager:info("Current advertisement list size: ~p", [length(AdList)]),
+    lager:info("Current advertisement list size: ~p", [sets:size(Ads)]),
 
     %% Schedule advertisement counter impression.
     schedule_logging(),
@@ -120,63 +116,50 @@ handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
             %% Increment counter.
             {ok, _} = lasp:update(Counter, increment, Actor),
 
-            %% Update CT instance
-            {ok, _} = lasp:update(?CONVERGENCE_ID, {fst, increment}, Actor),
-
             %% Increment impressions.
             Impressions0 + 1
     end,
 
-    %% Schedule advertisement counter impression.
-    case Impressions1 < max_impressions() of
+	  %% - If I did nothing (`Impressions0 == Impressions1`), 
+    %% and the `Impressions1 > 0` (meaning I did something before)
+    %% then all ads are disabled and simulation has ended
+    %%      (If we don't check for `Impressions1 > 0` it might mean that 
+    %%      the experiment hasn't started yet)
+    %% - Else, keep doing impressions
+    case Impressions0 == Impressions1 andalso Impressions1 > 0 of
         true ->
-            schedule_impression();
+            lager:info("All ads are disabled. Node: ~p", [node()]),
+
+            %% Update Simulation Status Instance
+            lasp:update(?SIM_STATUS_ID, {Actor, {fst, true}}, Actor),
+            lasp_transmission_instrumentation:convergence(),
+            schedule_check_simulation_end();
         false ->
-            lager:info("Max number of impressions reached. Node: ~p", [node()])
+            schedule_impression()
     end,
 
     {noreply, State#state{impressions=Impressions1}};
 
-handle_info(check_convergence, #state{actor=Actor}=State) ->
-    MaxEvents = max_impressions() * client_number(),
-    {ok, {TotalEvents, _}} = lasp:query(?CONVERGENCE_ID),
-    %lager:info("Total number of events observed so far ~p of ~p", [TotalEvents, MaxEvents]),
+handle_info(check_simulation_end, #state{actor=Actor}=State) ->
+    %% A simulation ends for clients when all clients have
+    %% observed all ads disabled (first component of the map in
+    %% the simulation status instance is true for all clients)
+    {ok, AdsDisabledAndLogs} = lasp:query(?SIM_STATUS_ID),
 
-    case TotalEvents == MaxEvents of
-        true ->
-            lager:info("Convergence reached on node ~p", [node()]),
-            %% Update CT instance
-            lasp:update(?CONVERGENCE_ID, {snd, {Actor, {fst, true}}}, Actor),
-            lasp_transmission_instrumentation:convergence(),
-
-            case lasp_simulation_support:should_push_logs() of
-                true ->
-                    schedule_check_push_logs();
-                _ ->
-                    ok
-            end;
-        false ->
-            schedule_check_convergence()
-    end,
-
-    {noreply, State};
-
-handle_info(check_push_logs, #state{actor=Actor}=State) ->
-    {ok, {_, ConvergenceAndLogs}} = lasp:query(?CONVERGENCE_ID),
-
-    NodesWithAllEvents = lists:filter(
-        fun({_Node, {AllEvents, _LogsPushed}}) ->
-            AllEvents
+    NodesWithAdsDisabled = lists:filter(
+        fun({_Node, {AdsDisabled, _LogsPushed}}) ->
+            AdsDisabled
         end,
-        ConvergenceAndLogs
+        AdsDisabledAndLogs
     ),
 
-    case length(NodesWithAllEvents) == client_number() of
+    case length(NodesWithAdsDisabled) == client_number() of
         true ->
-            lasp_simulation_support:push_logs(),
-            lasp:update(?CONVERGENCE_ID, {snd, {Actor, {snd, true}}}, Actor);
+            lager:info("All nodes observed ads disabled. Node ~p", [node()]),
+            lasp:update(?SIM_STATUS_ID, {Actor, {snd, true}}, Actor),
+            lasp_simulation_support:push_logs();
         false ->
-            schedule_check_push_logs()
+            schedule_check_simulation_end()
     end,
 
     {noreply, State};
@@ -210,16 +193,8 @@ schedule_logging() ->
     erlang:send_after(?LOG_INTERVAL, self(), log).
 
 %% @private
-schedule_check_convergence() ->
-    erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_convergence).
-
-%% @private
-schedule_check_push_logs() ->
-    erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_push_logs).
-
-%% @private
-max_impressions() ->
-    lasp_config:get(simulation_event_number, 10).
+schedule_check_simulation_end() ->
+    erlang:send_after(?STATUS_INTERVAL, self(), check_simulation_end).
 
 %% @private
 client_number() ->

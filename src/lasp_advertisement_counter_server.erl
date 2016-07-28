@@ -62,8 +62,8 @@ start_link() ->
 init([]) ->
     lager:info("Advertisement counter server initialized."),
 
-    %% Track whether convergence is reached or not.
-    lasp_config:set(convergence, false),
+    %% Track whether simulation has ended or not.
+    lasp_config:set(simulation_end, false),
 
     %% Generate actor identifier.
     Actor = self(),
@@ -77,17 +77,12 @@ init([]) ->
     %% Initialize triggers.
     launch_triggers(AdList, Ads, Actor),
 
-    %% Create instance for convergence tracking
-    {Id, Type} = ?CONVERGENCE_ID,
+    %% Create instance for simulation status tracking
+    {Id, Type} = ?SIM_STATUS_ID,
     {ok, _} = lasp:declare(Id, Type),
 
-    %% schedule check convergence or check push logs
-    case lasp_simulation_support:should_push_logs() of
-        true ->
-            schedule_check_push_logs();
-        _ ->
-            schedule_check_convergence()
-    end,
+    %% Schedule check simulation end
+    schedule_check_simulation_end(),
 
     {ok, #state{actor=Actor, ads=Ads}}.
 
@@ -109,53 +104,36 @@ handle_cast(Msg, State) ->
 handle_info(log, #state{ads=Ads}=State) ->
     %% Print number of enabled ads.
     {ok, AdList} = lasp:query(Ads),
-    Size = sets:size(AdList),
 
-    lager:info("Enabled advertisements: ~p", [Size]),
+    lager:info("Enabled advertisements: ~p", [sets:size(AdList)]),
 
     %% Schedule advertisement counter impression.
     schedule_logging(),
 
     {noreply, State};
 
-handle_info(check_convergence, #state{}=State) ->
-    {ok, {_, ConvergenceAndLogs}} = lasp:query(?CONVERGENCE_ID),
-
-    NodesWithAllEvents = lists:filter(
-        fun({_Node, {AllEvents, _LogsPushed}}) ->
-            AllEvents
-        end,
-        ConvergenceAndLogs
-    ),
-
-    case length(NodesWithAllEvents) == client_number() of
-        true ->
-            lager:info("Convergence reached on all clients"),
-            lasp_config:set(convergence, true),
-            lasp_transmission_instrumentation:convergence();
-        false ->
-            schedule_check_convergence()
-    end,
-
-    {noreply, State};
-
-handle_info(check_push_logs, #state{}=State) ->
-    {ok, {_, ConvergenceAndLogs}} = lasp:query(?CONVERGENCE_ID),
+handle_info(check_simulation_end, #state{}=State) ->
+    %% A simulation ends for the server when all clients have
+    %% observed that all clients observed all ads disabled and
+    %% pushed their logs (second component of the map in
+    %% the simulation status instance is true for all clients)
+    {ok, AdsDisabledAndLogs} = lasp:query(?SIM_STATUS_ID),
 
     NodesWithLogsPushed = lists:filter(
-        fun({_Node, {_AllEvents, LogsPushed}}) ->
-            LogsPushed
+        fun({_Node, {_AdsDisabled, LogsPushed}}) ->
+						LogsPushed
         end,
-        ConvergenceAndLogs
+        AdsDisabledAndLogs
     ),
 
     case length(NodesWithLogsPushed) == client_number() of
         true ->
-            lager:info("Logs pushed on all clients"),
+            lager:info("All nodes have pushed their logs"),
+            lasp_transmission_instrumentation:convergence(),
             lasp_simulation_support:push_logs(),
-            lasp_config:set(convergence, true);
+            lasp_config:set(simulation_end, true);
         false ->
-            schedule_check_push_logs()
+            schedule_check_simulation_end()
     end,
 
     {noreply, State};
@@ -237,11 +215,16 @@ build_dag() ->
 
 %% @private
 launch_triggers(AdList, Ads, Actor) ->
-    lists:map(fun(Ad) ->
-                      spawn_link(fun() ->
-                                         trigger(Ad, Ads, Actor)
-                                 end)
-              end, AdList).
+    lists:map(
+        fun(Ad) ->
+            spawn_link(
+                fun() ->
+                    trigger(Ad, Ads, Actor)
+                end
+            )
+        end, 
+        AdList
+    ).
 
 %% @private
 trigger(#ad{counter=CounterId} = Ad, Ads, Actor) ->
@@ -257,17 +240,13 @@ trigger(#ad{counter=CounterId} = Ad, Ads, Actor) ->
     ok.
 
 %% @private
-client_number() ->
-    lasp_config:get(client_number, 3).
-
-%% @private
-schedule_check_convergence() ->
-    erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_convergence).
-
-%% @private
-schedule_check_push_logs() ->
-    erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_push_logs).
-
-%% @private
 schedule_logging() ->
     erlang:send_after(?LOG_INTERVAL, self(), log).
+
+%% @private
+schedule_check_simulation_end() ->
+    erlang:send_after(?STATUS_INTERVAL, self(), check_simulation_end).
+
+%% @private
+client_number() ->
+    lasp_config:get(client_number, 3).

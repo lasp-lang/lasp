@@ -25,7 +25,7 @@
 -include("lasp.hrl").
 
 -export([run/3]).
--export([should_push_logs/0, push_logs/0]).
+-export([push_logs/0]).
 
 run(Case, Config, Options) ->
     ClientNumber = lasp_config:get(client_number, 3),
@@ -45,13 +45,17 @@ run(Case, Config, Options) ->
         lists:seq(1, ?EVAL_NUMBER)
     ).
 
-should_push_logs() ->
-    DCOS = os:getenv("DCOS", "false"),
-    list_to_atom(DCOS).
-
 push_logs() ->
-    Result = os:cmd("cd " ++ code:priv_dir(?APP) ++ " ; ./push_logs.sh"),
-    ct:pal("Logs pushed. Output: ~p", [Result]).
+    DCOS = os:getenv("DCOS", "false"),
+    ShouldPush = list_to_atom(DCOS),
+
+    case ShouldPush of
+        true ->
+            Result = os:cmd("cd " ++ code:priv_dir(?APP) ++ " ; ./push_logs.sh"),
+            ct:pal("Logs pushed. Output: ~p", [Result]);
+        false ->
+            ct:pal("Won't push the logs")
+    end.
 
 %% @private
 start(NodeNames, _Case, _Config, Options) ->
@@ -144,10 +148,6 @@ start(NodeNames, _Case, _Config, Options) ->
                         %% Configure plumtree AAE interval to be the same.
                         ok = rpc:call(Node, application, set_env,
                                       [plumtree, broadcast_exchange_timer, ?AAE_INTERVAL]),
-
-                        %% Configure number of impressions.
-                        ok = rpc:call(Node, lasp_config, set,
-                                      [simulation_event_number, ?IMPRESSION_NUMBER]),
 
                         %% Configure who should be the server and who's
                         %% the client.
@@ -249,15 +249,15 @@ stop(Nodes) ->
 
 %% @private
 wait_for_completion(Server) ->
-    ct:pal("Waiting for convergence"),
+    ct:pal("Waiting for simulation to end"),
     case lasp_support:wait_until(fun() ->
-                Convergence = rpc:call(Server, lasp_config, get, [convergence, false]),
-                Convergence == true
-        end, 60*4, ?CONVERGENCE_INTERVAL) of
+                SimulationEnd = rpc:call(Server, lasp_config, get, [simulation_end, false]),
+                SimulationEnd == true
+        end, 60*4, ?STATUS_INTERVAL) of
         ok ->
-            ct:pal("Convergence reached!");
+            ct:pal("Simulation ended with success");
         Error ->
-            ct:fail("Convergence not reached: ~p", [Error])
+            ct:fail("Simulation failed: ~p", [Error])
     end.
 
 %% @private

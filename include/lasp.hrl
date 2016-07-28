@@ -100,30 +100,26 @@
 -define(SET_TYPE, lasp_config:get(set, orset)).
 -define(PAIR_TYPE, pair).
 
-%% Convergence tracking code.
--define(CONVERGENCE_TRACKING, <<"convergence_tracking">>).
+%% Simulation status tracking code.
+-define(SIM_STATUS_TRACKING, <<"status_tracking">>).
 
--define(CONVERGENCE_PAIR,
-        {?PAIR_TYPE, [
-            ?COUNTER_TYPE,
-            {?GMAP_TYPE, [
-                {?PAIR_TYPE, [
-                    ?BOOLEAN_TYPE, %% convergence observed
-                    ?BOOLEAN_TYPE  %% logs pushed
-                ]}
+-define(SIM_STATUS_STRUCTURE,
+        {?GMAP_TYPE, [
+            {?PAIR_TYPE, [
+                ?BOOLEAN_TYPE, %% observed ads disabled
+                ?BOOLEAN_TYPE  %% logs pushed
             ]}
         ]}).
 
--define(CONVERGENCE_ID,
-        {?CONVERGENCE_TRACKING, ?CONVERGENCE_PAIR}).
+-define(SIM_STATUS_ID,
+        {?SIM_STATUS_TRACKING, ?SIM_STATUS_STRUCTURE}).
 
 %% Simulation helpers.
 -define(AAE_INTERVAL, 10000).
--define(IMPRESSION_NUMBER, 10).
 -define(IMPRESSION_INTERVAL, 1000).
--define(CONVERGENCE_INTERVAL, 1000).
+-define(STATUS_INTERVAL, 1000).
 -define(EVAL_NUMBER, 1).
--define(MAX_IMPRESSIONS, 100).
+-define(MAX_IMPRESSIONS, 1).
 -define(LOG_INTERVAL, 10000).
 -define(VOTING_INTERVAL, 1000).
 -define(ADS, 10).

@@ -25,7 +25,6 @@
 -include("lasp.hrl").
 
 -export([run/3]).
--export([push_logs/0]).
 
 run(Case, Config, Options) ->
     ClientNumber = lasp_config:get(client_number, 3),
@@ -46,18 +45,6 @@ run(Case, Config, Options) ->
         end,
         lists:seq(1, ?EVAL_NUMBER)
     ).
-
-push_logs() ->
-    DCOS = os:getenv("DCOS", "false"),
-    ShouldPush = list_to_atom(DCOS),
-
-    case ShouldPush of
-        true ->
-            Result = os:cmd("cd " ++ code:priv_dir(?APP) ++ " ; ./push_logs.sh"),
-            lager:info("Logs pushed. Output: ~p", [Result]);
-        false ->
-            lager:info("Won't push the logs")
-    end.
 
 %% @private
 start(NodeNames, _Case, _Config, Options) ->
@@ -252,7 +239,7 @@ wait_for_completion(Server) ->
     case lasp_support:wait_until(fun() ->
                 SimulationEnd = rpc:call(Server, lasp_config, get, [simulation_end, false]),
                 SimulationEnd == true
-        end, 60*4, ?STATUS_INTERVAL) of
+        end, 60*10, ?STATUS_INTERVAL) of
         ok ->
             ct:pal("Simulation ended with success");
         Error ->

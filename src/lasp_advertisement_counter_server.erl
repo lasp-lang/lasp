@@ -130,7 +130,7 @@ handle_info(check_simulation_end, #state{}=State) ->
         true ->
             lager:info("All nodes have pushed their logs"),
             lasp_transmission_instrumentation:convergence(),
-            lasp_simulation_support:push_logs(),
+            lasp_support:push_logs(),
             lasp_config:set(simulation_end, true);
         false ->
             schedule_check_simulation_end()

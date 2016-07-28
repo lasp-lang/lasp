@@ -79,6 +79,7 @@ all() ->
      parser_test,
      combined_view_test,
      latency_test,
+     latency_with_reads_test,
      stream_test,
      query_test,
      ivar_test,
@@ -207,6 +208,47 @@ latency_test(_Config) ->
     end,
     write_csv(contraction, TestCase(5, contraction, 1000)),
     write_csv(no_contraction, TestCase(5, no_contraction, 1000)).
+
+latency_with_reads_test(_Config) ->
+    RunCase = fun
+        RC(0, Acc, _, _, _, _, _) ->
+            lists:reverse(Acc);
+        RC(Iterations, Acc, From, To, Intermediate, Mutator, Threshold0) ->
+            Threshold = case Threshold0 of
+                undefined ->
+                    {strict, undefined};
+                _ ->
+                    {strict, Threshold0}
+            end,
+            case ((Iterations + 1) rem 10) =:= 0 of
+                true -> lasp_dependence_dag:contract();
+                _ -> ok
+            end,
+            case (Iterations rem 10) =:= 0 of
+                true ->
+                    RandomChoice = lists:nth(random:uniform(length(Intermediate)), Intermediate),
+                    _ = lasp:read(RandomChoice, undefined);
+                _ -> ok
+            end,
+            MutateAndRead = fun(F, T, M, Th) ->
+                lasp:update(F, M, a),
+                lasp:read(T, Th)
+            end,
+            {Time, {ok, {_, _, _, NewThreshold}}} = timer:tc(MutateAndRead, [From, To, Mutator, Threshold]),
+            RC(Iterations - 1, [Time | Acc], From, To, Intermediate, Mutator, NewThreshold)
+    end,
+    TestCase = fun(Vertices, Optimization, Iterations) ->
+        Ids = generate_path(Vertices, ?COUNTER),
+        case Optimization of
+            contraction -> lasp_dependence_dag:contract();
+            _ -> ok
+        end,
+        First = lists:nth(1, Ids),
+        Last = lists:last(Ids),
+        Intermediate = lists:sublist(Ids, 2, erlang:length(Ids) - 2),
+        RunCase(Iterations, [], First, Last, Intermediate, increment, undefined)
+    end,
+    write_csv(contraction_with_reads, TestCase(5, contraction, 1000)).
 
 generate_path(N, Type) ->
     [_|Tail]=Ids = lists:map(fun(_) ->

@@ -129,14 +129,13 @@ comparator(Tuple, Variable, Comparator, Element) ->
         '>=' ->
              Var >= Element;
         '>' ->
-             Var < Element;
+             Var > Element;
         '<' ->
             Var < Element;
         '=<' ->
              Var =< Element;
         _ ->
-            %% TODO
-            {error, undefined}
+            exit({error, comparator_unsupported})
     end.
 
 extract(Variable, Tuple) ->

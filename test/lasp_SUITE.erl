@@ -104,11 +104,9 @@ all() ->
 -define(ID, <<"myidentifier">>).
 
 parser_test(_Config) ->
-    ct:pal("Beginning parse_test"),
-    {ok, Tokens, _EndLine} = ?SQL_LEXER:string("A = 22 or B < 10"),
-    ct:pal("Tokens: ~p", [Tokens]),
-    {ok, ParseTree} = ?SQL_PARSER:parse(Tokens),
-    ct:pal("Parse tree: ~p", [ParseTree]),
+    ok = lasp_sql_materialized_view:create("A = 22 or B < 10"),
+    ok = lasp_sql_materialized_view:create("A <= 22 and B => 10"),
+    ok = lasp_sql_materialized_view:create("A <= 22 and C > 19"),
     ok.
 
 %% @doc Increment counter and test stream behaviour.

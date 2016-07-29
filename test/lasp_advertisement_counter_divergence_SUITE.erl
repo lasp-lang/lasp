@@ -61,27 +61,27 @@ end_per_testcase(Case, _Config) ->
 
 all() ->
     [
-     client_server_delta_based_divergence_test,
-     peer_to_peer_delta_based_divergence_test
+     client_server_divergence_test,
+     peer_to_peer_divergence_test
     ].
 
 %% ===================================================================
 %% tests
 %% ===================================================================
 
--define(MIN_CLIENTS, 1).
--define(MAX_CLIENTS, 5).
+-define(MIN_POW, 2).
+-define(MAX_POW, 6).
 
 default_test(_Config) ->
     ok.
 
-client_server_delta_based_divergence_test(Config) ->
+client_server_divergence_test(Config) ->
 		lists:foreach(
 				fun(ClientNumber) ->
             lasp_config:set(client_number, ClientNumber),
-            EvaluationIdentifier = list_to_atom("client_server_delta_based_divergence" ++ integer_to_list(ClientNumber)),
+            EvaluationIdentifier = list_to_atom("client_server_divergence_" ++ integer_to_list(ClientNumber)),
 
-            lasp_simulation_support:run(client_server_delta_based_divergence_test,
+            lasp_simulation_support:run(client_server_divergence_test,
                 Config,
                 [{mode, delta_based},
                  {simulation, ad_counter_divergence},
@@ -92,17 +92,17 @@ client_server_delta_based_divergence_test(Config) ->
                  {evaluation_identifier, EvaluationIdentifier}]
             )
         end,
-        lists:seq(?MIN_CLIENTS, ?MAX_CLIENTS)
+        clients()
     ),
     ok.
 
-peer_to_peer_delta_based_divergence_test(Config) ->
+peer_to_peer_divergence_test(Config) ->
     lists:foreach(
         fun(ClientNumber) ->
             lasp_config:set(client_number, ClientNumber),
-            EvaluationIdentifier = list_to_atom("peer_to_peer_delta_based_divergence" ++ integer_to_list(ClientNumber)),
+            EvaluationIdentifier = list_to_atom("peer_to_peer_divergence_" ++ integer_to_list(ClientNumber)),
 
-            lasp_simulation_support:run(peer_to_peer_delta_based_divergence_test,
+            lasp_simulation_support:run(peer_to_peer_divergence_test,
                 Config,
                 [{mode, delta_based},
                  {simulation, ad_counter_divergence},
@@ -113,10 +113,19 @@ peer_to_peer_delta_based_divergence_test(Config) ->
                  {evaluation_identifier, EvaluationIdentifier}]
             )
         end,
-        lists:seq(?MIN_CLIENTS, ?MAX_CLIENTS)
+        clients()
     ),
     ok.
 
 %% ===================================================================
 %% Internal functions
 %% ===================================================================
+
+clients() ->
+    lists:map(
+        fun(Power) ->
+            round(math:pow(2, Power))
+        end,
+        lists:seq(?MIN_POW, ?MAX_POW)
+    ).
+

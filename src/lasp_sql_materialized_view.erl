@@ -41,10 +41,8 @@ create(Specification) when is_list(Specification) ->
 
     ct:pal("Parse Tree: ~p", [ParseTree]),
 
-    %% Create.
-    _OutputId = materialize(ParseTree, #state{set_id=?DEFAULT}),
-
-    ok.
+    %% Create and return identifier.
+    materialize(ParseTree, #state{set_id=?DEFAULT}).
 
 %% Entry point to evaluation of the parse tree.
 materialize({query, Projections, {from, Collection}, Predicates}, State0) ->

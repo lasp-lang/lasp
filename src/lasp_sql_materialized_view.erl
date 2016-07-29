@@ -47,7 +47,7 @@ create(Specification) when is_list(Specification) ->
 %% Entry point to evaluation of the parse tree.
 materialize({query, Projections, {from, Collection}, Predicates}, State0) ->
     %% Convert collection identifier to binary.
-    CollectionId = list_to_binary(atom_to_list(Collection)),
+    CollectionId = {list_to_binary(atom_to_list(Collection)), ?SET},
 
     %% Materialize a dataflow graph for the predicate tree.
     {PredicateOutputId, State1} = materialize(Predicates,

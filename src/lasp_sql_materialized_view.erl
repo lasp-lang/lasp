@@ -34,8 +34,8 @@
 
 %% @doc Insert in a SQL table the given rows.
 create_table_with_values(TableName, Args) when is_atom(TableName) ->
-    Name = list_to_binary(atom_to_list(TableName)),
-    lasp:declare(Name, ?SET),
+    {Name, Type} = generate_identifier(TableName),
+    lasp:declare(Name, Type),
     lists:foreach(fun(Row) ->
         RowMap = maps:from_list(Row),
         lasp:update({Name, ?SET}, {add, RowMap}, a)
@@ -44,7 +44,7 @@ create_table_with_values(TableName, Args) when is_atom(TableName) ->
 %% @doc Given a SQL table and a list of rows, return the values of those rows.
 get_value(TableName, Rows) ->
     Name = case is_atom(TableName) of
-        true -> {list_to_binary(atom_to_list(TableName)), ?SET};
+        true -> generate_identifier(TableName);
         _ -> TableName
     end,
     {ok, Set} = lasp:query(Name),

@@ -25,7 +25,7 @@
 
 %% API
 -export([start_link/0,
-         trigger/3]).
+         trigger/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -38,7 +38,7 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {actor, ads, adlist}).
+-record(state, {actor, adlist}).
 
 -record(ad, {id, image, counter}).
 
@@ -72,10 +72,10 @@ init([]) ->
     schedule_logging(),
 
     %% Build DAG.
-    {ok, Ads, AdList} = build_dag(),
+    {ok, AdList} = build_dag(),
 
     %% Initialize triggers.
-    launch_triggers(AdList, Ads, Actor),
+    launch_triggers(AdList, Actor),
 
     %% Create instance for simulation status tracking
     {Id, Type} = ?SIM_STATUS_ID,
@@ -84,7 +84,7 @@ init([]) ->
     %% Schedule check simulation end
     schedule_check_simulation_end(),
 
-    {ok, #state{actor=Actor, ads=Ads, adlist=AdList}}.
+    {ok, #state{actor=Actor, adlist=AdList}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -101,11 +101,11 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(log, #state{ads=Ads}=State) ->
+handle_info(log, #state{}=State) ->
     %% Print number of enabled ads.
-    {ok, AdList} = lasp:query(Ads),
+    {ok, Ads} = lasp:query({?ADS, ?SET_TYPE}),
 
-    lager:info("Enabled advertisements: ~p", [sets:size(AdList)]),
+    lager:info("Enabled advertisements: ~p", [sets:size(Ads)]),
 
     %% Schedule advertisement counter impression.
     schedule_logging(),
@@ -198,7 +198,7 @@ build_dag() ->
     AdList = RovioAdList ++ RiotAdList,
 
     %% Union ads.
-    {ok, {Ads, _, _, _}} = lasp:declare(?SET_TYPE),
+    {ok, {Ads, _, _, _}} = lasp:declare(?ADS, ?SET_TYPE),
     ok = lasp:union(RovioAds, RiotAds, Ads),
 
     %% Compute the Cartesian product of both ads and contracts.
@@ -212,15 +212,15 @@ build_dag() ->
     end,
     ok = lasp:filter(AdsContracts, FilterFun, AdsWithContracts),
 
-    {ok, Ads, AdList}.
+    {ok, AdList}.
 
 %% @private
-launch_triggers(AdList, Ads, Actor) ->
+launch_triggers(AdList, Actor) ->
     lists:map(
         fun(Ad) ->
             spawn_link(
                 fun() ->
-                    trigger(Ad, Ads, Actor)
+                    trigger(Ad, Actor)
                 end
             )
         end,
@@ -228,7 +228,7 @@ launch_triggers(AdList, Ads, Actor) ->
     ).
 
 %% @private
-trigger(#ad{counter=CounterId} = Ad, Ads, Actor) ->
+trigger(#ad{counter=CounterId} = Ad, Actor) ->
     %% Blocking threshold read for max advertisement impressions.
     {ok, Value} = lasp:read(CounterId, {value, ?MAX_IMPRESSIONS}),
 
@@ -236,7 +236,7 @@ trigger(#ad{counter=CounterId} = Ad, Ads, Actor) ->
     lager:info("Counter: ~p", [Value]),
 
     %% Remove the advertisement.
-    {ok, _} = lasp:update(Ads, {rmv, Ad}, Actor),
+    {ok, _} = lasp:update({?ADS, ?SET_TYPE}, {rmv, Ad}, Actor),
 
     ok.
 

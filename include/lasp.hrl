@@ -93,6 +93,7 @@
 -type object() :: crdt().
 
 %% Test identifiers.
+-define(ADS, <<"ads">>).
 -define(ADS_WITH_CONTRACTS, <<"ads_with_contracts">>).
 -define(BOOLEAN_TYPE, boolean).
 -define(COUNTER_TYPE, gcounter).

@@ -122,6 +122,6 @@
 -define(MAX_IMPRESSIONS, 1).
 -define(LOG_INTERVAL, 10000).
 -define(VOTING_INTERVAL, 1000).
--define(ADS, 5).
+-define(ADS_NUMBER, 5).
 
 -define(DEFAULT_DISTRIBUTION_BACKEND, lasp_default_broadcast_distribution_backend).

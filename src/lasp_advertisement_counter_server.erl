@@ -162,7 +162,7 @@ create_ads_and_contracts(Ads, Contracts) ->
     AdIds = lists:map(fun(_) ->
                               {ok, Unique} = lasp_unique:unique(),
                               Unique
-                      end, lists:seq(1, ?ADS)),
+                      end, lists:seq(1, ?ADS_NUMBER)),
     lists:map(fun(Id) ->
                 {ok, _} = lasp:update(Contracts,
                                       {add, #contract{id=Id}},

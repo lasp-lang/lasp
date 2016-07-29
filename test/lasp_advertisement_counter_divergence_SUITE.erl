@@ -70,7 +70,7 @@ all() ->
 %% ===================================================================
 
 -define(MIN_CLIENTS, 1).
--define(MAX_CLIENTS, 2).
+-define(MAX_CLIENTS, 5).
 
 default_test(_Config) ->
     ok.

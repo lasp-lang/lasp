@@ -74,7 +74,6 @@ materialize({query, Projections, {from, Collection}, Predicates}, State0) ->
     %% Return the top node of the DAG.
     ProjectionOutputId;
 
-%% TODO: Single projection only!
 materialize({select, Projections},
             #state{output_id=OutputId, predicate_output_id=PredicateOutputId}=State) ->
 
@@ -148,8 +147,10 @@ comparator(Tuple, Variable, Comparator, Element) ->
             exit({error, comparator_unsupported})
     end.
 
-extract(Variable, Tuple) ->
-    maps:get(Variable, Tuple).
+extract(Variables, Tuple) ->
+    lists:foldl(fun(Variable, Map) ->
+                        maps:put(Variable, maps:get(Variable, Tuple, undefined), Map)
+                end, maps:new(), Variables).
 
 generate_identifier(Id) when is_atom(Id) ->
     {list_to_binary(atom_to_list(Id)), ?SET}.

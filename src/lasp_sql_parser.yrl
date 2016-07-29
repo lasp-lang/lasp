@@ -1,7 +1,7 @@
 Nonterminals
-statement select_clause from_clause where_clause predicates predicate element.
+statement select_clause from_clause where_clause predicates predicate elements element.
 
-Terminals atom var integer string select from where union intersection comparator.
+Terminals ',' atom var integer string select from where union intersection comparator.
 
 Expect 1.
 
@@ -9,7 +9,7 @@ Rootsymbol statement.
 
 statement -> select_clause from_clause where_clause : {query, '$1', '$2', '$3'}.
 
-select_clause -> select element : {select, '$2'}.
+select_clause -> select elements : {select, '$2'}.
 
 from_clause -> from element : {from, '$2'}.
 
@@ -22,6 +22,9 @@ predicates -> predicates union predicate : {union, '$1', '$3'}.
 predicates -> predicate intersection predicate : {intersection, '$1', '$3'}.
 
 predicate -> var comparator element : {predicate, {var, unwrap('$1')}, unwrap('$2'), '$3'}.
+
+elements -> element : ['$1'].
+elements -> element ',' elements : ['$1'] ++ '$3'.
 
 element -> atom : '$1'.
 element -> var : unwrap('$1').

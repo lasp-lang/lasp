@@ -107,6 +107,7 @@ parser_test(_Config) ->
     {ok, _Identifier1} = lasp_sql_materialized_view:create("select name from users where age = 22 or age < 10"),
     {ok, _Identifier2} = lasp_sql_materialized_view:create("select name from users where age <= 22 and age => 10"),
     {ok, _Identifier3} = lasp_sql_materialized_view:create("select name from users where age < 22 and age > 19"),
+    {ok, _Identifier4} = lasp_sql_materialized_view:create("select name, age from users where age < 22 and age > 19"),
     ok.
 
 %% @doc Increment counter and test stream behaviour.

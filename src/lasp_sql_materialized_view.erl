@@ -23,14 +23,25 @@
 
 -include("lasp.hrl").
 
--export([create/1]).
+-export([create/1,
+         create/2]).
 
--record(state, {set_id, projection_output_id, predicate_output_id}).
+-record(state, {output_id, set_id, projection_output_id, predicate_output_id}).
 
 -define(DEFAULT, <<"hi">>).
 
 %% @doc Create a SQL view from a textual specification.
 create(Specification) when is_list(Specification) ->
+
+    %% Create a node for the result of the predicate.
+    {ok, {OutputId, _, _, _}} = lasp:declare(?SET),
+
+    %% Create using a given output.
+    create(OutputId, Specification).
+
+%% @doc Create a SQL view from a textual specification.
+create(OutputId, Specification) when is_list(Specification) ->
+
     %% Tokenize the string.
     {ok, Tokens, _EndLine} = ?SQL_LEXER:string(Specification),
 
@@ -42,7 +53,7 @@ create(Specification) when is_list(Specification) ->
     ct:pal("Parse Tree: ~p", [ParseTree]),
 
     %% Create and return identifier.
-    OutputId = materialize(ParseTree, #state{set_id=?DEFAULT}),
+    OutputId = materialize(ParseTree, #state{output_id=OutputId}),
 
     %% Return output identifier.
     {ok, OutputId}.
@@ -50,7 +61,7 @@ create(Specification) when is_list(Specification) ->
 %% Entry point to evaluation of the parse tree.
 materialize({query, Projections, {from, Collection}, Predicates}, State0) ->
     %% Convert collection identifier to binary.
-    CollectionId = {list_to_binary(atom_to_list(Collection)), ?SET},
+    CollectionId = generate_identifier(Collection),
 
     %% Materialize a dataflow graph for the predicate tree.
     {PredicateOutputId, State1} = materialize(Predicates,
@@ -65,9 +76,7 @@ materialize({query, Projections, {from, Collection}, Predicates}, State0) ->
 
 %% TODO: Single projection only!
 materialize({select, Projections},
-            #state{predicate_output_id=PredicateOutputId}=State) ->
-    %% Create a node for the result of the predicate.
-    {ok, {OutputId, _, _, _}} = lasp:declare(?SET),
+            #state{output_id=OutputId, predicate_output_id=PredicateOutputId}=State) ->
 
     %% Apply the projection.
     lasp:map(PredicateOutputId,
@@ -141,3 +150,6 @@ comparator(Tuple, Variable, Comparator, Element) ->
 
 extract(Variable, Tuple) ->
     maps:get(Variable, Tuple).
+
+generate_identifier(Id) when is_atom(Id) ->
+    {list_to_binary(atom_to_list(Id)), ?SET}.

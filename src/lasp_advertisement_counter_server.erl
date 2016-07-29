@@ -38,7 +38,7 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {actor, ads}).
+-record(state, {actor, ads, adlist}).
 
 -record(ad, {id, image, counter}).
 
@@ -84,7 +84,7 @@ init([]) ->
     %% Schedule check simulation end
     schedule_check_simulation_end(),
 
-    {ok, #state{actor=Actor, ads=Ads}}.
+    {ok, #state{actor=Actor, ads=Ads, adlist=AdList}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -112,7 +112,7 @@ handle_info(log, #state{ads=Ads}=State) ->
 
     {noreply, State};
 
-handle_info(check_simulation_end, #state{}=State) ->
+handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
     %% A simulation ends for the server when all clients have
     %% observed that all clients observed all ads disabled and
     %% pushed their logs (second component of the map in
@@ -129,8 +129,9 @@ handle_info(check_simulation_end, #state{}=State) ->
     case length(NodesWithLogsPushed) == client_number() of
         true ->
             lager:info("All nodes have pushed their logs"),
-            lasp_transmission_instrumentation:convergence(),
+            log_convergence(),
             lasp_support:push_logs(),
+            log_divergence(AdList),
             lasp_config:set(simulation_end, true);
         false ->
             schedule_check_simulation_end()
@@ -250,3 +251,55 @@ schedule_check_simulation_end() ->
 %% @private
 client_number() ->
     lasp_config:get(client_number, 3).
+
+%% @private
+log_convergence() ->
+    case lasp_config:get(instrumentation, false) of
+        true ->
+            lasp_transmission_instrumentation:convergence();
+        false ->
+            ok
+    end.
+
+%% @private
+log_divergence(AdList) ->
+    Filename = filename(),
+    Divergence = compute_divergence(AdList),
+    lager:info("Divergence ~p", [Divergence]),
+
+    ok = file:write_file(
+        Filename,
+        io_lib:format("~w", [Divergence]),
+        [write]
+    ),
+    ok.
+
+%% @private
+filename() ->
+    EvalIdentifier = case lasp_config:get(evaluation_identifier, undefined) of
+        undefined ->
+            "undefined";
+        {Simulation, Id} ->
+            atom_to_list(Simulation) ++ "/" ++ atom_to_list(Id)
+    end,
+    EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
+    Filename = "divergence",
+    Dir = code:priv_dir(?APP) ++ "/evaluation/logs/"
+        ++ EvalIdentifier ++ "/"
+        ++ integer_to_list(EvalTimestamp) ++ "/",
+    filelib:ensure_dir(Dir),
+    Dir ++ Filename.
+
+%% @private
+compute_divergence(AdList) ->
+    DivergenceSum = lists:foldl(
+        fun(#ad{counter=CounterId} = _Ad, Acc) ->
+            {ok, Value} = lasp:query(CounterId),
+            Divergence = Value - ?MAX_IMPRESSIONS,
+            Acc + Divergence
+        end,
+        0,
+        AdList
+    ),
+
+    DivergenceSum / length(AdList).

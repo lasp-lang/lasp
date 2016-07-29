@@ -35,10 +35,11 @@ run(Case, Config, Options) ->
     lists:foreach(
         fun(_EvalNumber) ->
             Server = start(
-              NodeNames,
               Case,
               Config,
-              [{evaluation_timestamp, timestamp()} | Options]
+              [{client_number, ClientNumber},
+               {nodes, NodeNames},
+               {evaluation_timestamp, timestamp()} | Options]
             ),
             wait_for_completion(Server),
             stop(NodeNames)
@@ -47,7 +48,7 @@ run(Case, Config, Options) ->
     ).
 
 %% @private
-start(NodeNames, _Case, _Config, Options) ->
+start(_Case, _Config, Options) ->
     %% Launch distribution for the test runner.
     ct:pal("Launching Erlang distribution..."),
 
@@ -85,6 +86,7 @@ start(NodeNames, _Case, _Config, Options) ->
                             end
                      end,
 
+    NodeNames = proplists:get_value(nodes, Options),
     [Server | _] = Nodes = lists:map(InitializerFun, NodeNames),
 
     %% Load Lasp on all of the nodes.
@@ -181,7 +183,12 @@ start(NodeNames, _Case, _Config, Options) ->
                         %% Configure instrumentation.
                         Instrumentation = proplists:get_value(instrumentation, Options, true),
                         ok = rpc:call(Node, lasp_config, set,
-                                      [instrumentation, Instrumentation])
+                                      [instrumentation, Instrumentation]),
+
+                        %% Configure client number.
+                        ClientNumber = proplists:get_value(client_number, Options),
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [client_number, ClientNumber])
                    end,
     lists:map(ConfigureFun, Nodes),
 

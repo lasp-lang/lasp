@@ -132,7 +132,7 @@ handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
 
             %% Update Simulation Status Instance
             lasp:update(?SIM_STATUS_ID, {Actor, {fst, true}}, Actor),
-            lasp_transmission_instrumentation:convergence(),
+            log_convergence(),
             schedule_check_simulation_end();
         false ->
             schedule_impression()
@@ -199,3 +199,12 @@ schedule_check_simulation_end() ->
 %% @private
 client_number() ->
     lasp_config:get(client_number, 3).
+
+%% @private
+log_convergence() ->
+    case lasp_config:get(instrumentation, false) of
+        true ->
+            lasp_transmission_instrumentation:convergence();
+        false ->
+            ok
+    end.

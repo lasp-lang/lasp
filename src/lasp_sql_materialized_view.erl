@@ -28,6 +28,12 @@
          get_value/2,
          create_table_with_values/2]).
 
+-ifdef(TEST).
+
+-export([generate_identifier/1]).
+
+-endif.
+
 -record(state, {output_id, set_id, projection_output_id, predicate_output_id}).
 
 -define(DEFAULT, <<"hi">>).

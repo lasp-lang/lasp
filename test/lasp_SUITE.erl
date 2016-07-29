@@ -77,6 +77,7 @@ end_per_testcase(Case, Config) ->
 all() ->
     [
      parser_test,
+     combined_view_test,
      stream_test,
      query_test,
      ivar_test,
@@ -146,6 +147,34 @@ parser_test(_Config) ->
     timer:sleep(100),
 
     ?assertMatch([["Baz", 20], ["Foo", 22]], lasp_sql_materialized_view:get_value(Id5, [name, age])),
+
+    ok.
+
+combined_view_test(_Config) ->
+    ok = lasp_sql_materialized_view:create_table_with_values(classics, [
+        [{title, "Breathless"}, {year, 1960}, {rating, 80}],
+        [{title, "A Woman Is a Woman"}, {year, 1961}, {rating, 76}],
+        [{title, "Masculin Feminin"}, {year, 1966}, {rating, 77}],
+        [{title, "La Chinoise"}, {year, 1967}, {rating, 73}]
+    ]),
+
+    {OutputId, Type}=Output = lasp_sql_materialized_view:generate_identifier(filtered),
+    %% have to declare the value explicitly, otherwise query will fail on write
+    lasp:declare(OutputId, Type),
+    {ok, Id1} = lasp_sql_materialized_view:create(Output,
+                                                  "select title, rating from classics where year => 1960 and year <= 1965"),
+
+    %% Stabilize
+    timer:sleep(100),
+
+    ?assertMatch([["A Woman Is a Woman"], ["Breathless"]], lasp_sql_materialized_view:get_value(Id1, [title])),
+
+    {ok, Id2} = lasp_sql_materialized_view:create("select title from filtered where rating => 80"),
+
+    %% Stabilize
+    timer:sleep(100),
+
+    ?assertMatch([["Breathless"]], lasp_sql_materialized_view:get_value(Id2, [title])),
 
     ok.
 

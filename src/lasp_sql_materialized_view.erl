@@ -135,14 +135,16 @@ comparator(Tuple, Variable, Comparator, Element) ->
     Var = maps:get(Variable, Tuple),
 
     case Comparator of
-        '>=' ->
+        '=>' ->
              Var >= Element;
         '>' ->
              Var > Element;
         '<' ->
             Var < Element;
-        '=<' ->
+        '<=' ->
              Var =< Element;
+        '=' ->
+             Var =:= Element;
         _ ->
             exit({error, comparator_unsupported})
     end.

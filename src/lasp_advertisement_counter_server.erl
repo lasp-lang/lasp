@@ -40,10 +40,6 @@
 %% State record.
 -record(state, {actor, adlist}).
 
--record(ad, {id, image, counter}).
-
--record(contract, {id}).
-
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -172,7 +168,7 @@ create_ads_and_contracts(Ads, Contracts) ->
                 %% Generate a G-Counter.
                 {ok, {CounterId, _, _, _}} = lasp:declare(?COUNTER_TYPE),
 
-                Ad = #ad{id=Id, counter=CounterId},
+                Ad = #ad{id=Id, name=Id, counter=CounterId},
 
                 %% Add it to the advertisement set.
                 {ok, _} = lasp:update(Ads, {add, Ad}, node()),

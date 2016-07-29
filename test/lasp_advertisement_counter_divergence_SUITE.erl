@@ -62,7 +62,8 @@ end_per_testcase(Case, _Config) ->
 all() ->
     [
      client_server_divergence_test,
-     peer_to_peer_divergence_test
+     peer_to_peer_divergence_test,
+     code_peer_to_peer_divergence_test
     ].
 
 %% ===================================================================
@@ -89,6 +90,7 @@ client_server_divergence_test(Config) ->
                  {set, orset},
                  {broadcast, false},
                  {instrumentation, false},
+                 {heavy_client, false},
                  {evaluation_identifier, EvaluationIdentifier}]
             )
         end,
@@ -110,6 +112,29 @@ peer_to_peer_divergence_test(Config) ->
                  {set, orset},
                  {broadcast, false},
                  {instrumentation, false},
+                 {heavy_client, false},
+                 {evaluation_identifier, EvaluationIdentifier}]
+            )
+        end,
+        clients()
+    ),
+    ok.
+
+code_peer_to_peer_divergence_test(Config) ->
+    lists:foreach(
+        fun(ClientNumber) ->
+            lasp_config:set(client_number, ClientNumber),
+            EvaluationIdentifier = list_to_atom("code_peer_to_peer_divergence_" ++ integer_to_list(ClientNumber)),
+
+            lasp_simulation_support:run(code_peer_to_peer_divergence_test,
+                Config,
+                [{mode, delta_based},
+                 {simulation, ad_counter_divergence},
+                 {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
+                 {set, orset},
+                 {broadcast, false},
+                 {instrumentation, false},
+                 {heavy_client, true},
                  {evaluation_identifier, EvaluationIdentifier}]
             )
         end,

@@ -110,8 +110,21 @@ handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
             Random = lasp_support:puniform(Size),
 
             %% @todo Exposes internal details of record.
-            {{ad, _, _, Counter},
-             _Contract} = lists:nth(Random, sets:to_list(Ads)),
+            {{ad, _, _, _, Counter} = Ad, _Contract} =
+                lists:nth(Random, sets:to_list(Ads)),
+
+            %% Spawn a process to disable the advertisement if it goes
+            %% above the maximum number of impressions.
+            %%
+            %% @todo Not optimal at all because it spawns a ton of
+            %% processes, but good enough for now.  Fix me before merge.
+            %%
+            case lasp_config:get(heavy_client, false) of
+                true ->
+                    spawn_link(fun() -> trigger(Ad, Actor) end);
+                false ->
+                    ok
+            end,
 
             %% Increment counter.
             {ok, _} = lasp:update(Counter, increment, Actor),
@@ -208,3 +221,16 @@ log_convergence() ->
         false ->
             ok
     end.
+
+%% @private
+trigger(#ad{counter=CounterId} = Ad, Actor) ->
+    %% Blocking threshold read for max advertisement impressions.
+    {ok, Value} = lasp:read(CounterId, {value, ?MAX_IMPRESSIONS}),
+
+    lager:info("Threshold for ~p reached; disabling!", [Ad]),
+    lager:info("Counter: ~p", [Value]),
+
+    %% Remove the advertisement.
+    {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor),
+
+    ok.

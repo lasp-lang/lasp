@@ -160,6 +160,10 @@ start(_Case, _Config, Options) ->
                         Mode = proplists:get_value(mode, Options),
                         ok = rpc:call(Node, lasp_config, set, [mode, Mode]),
 
+                        %% Configure where code should run.
+                        HeavyClient = proplists:get_value(heavy_client, Options, false),
+                        ok = rpc:call(Node, lasp_config, set, [heavy_client, HeavyClient]),
+
                         %% Configure broadcast settings.
                         Broadcast = proplists:get_value(broadcast, Options),
                         ok = rpc:call(Node, lasp_config, set,

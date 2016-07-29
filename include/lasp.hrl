@@ -126,3 +126,7 @@
 -define(ADS_NUMBER, 5).
 
 -define(DEFAULT_DISTRIBUTION_BACKEND, lasp_default_broadcast_distribution_backend).
+
+%% Ad counter.
+-record(ad, {id, name, image, counter}).
+-record(contract, {id}).

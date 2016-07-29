@@ -104,10 +104,41 @@ all() ->
 -define(ID, <<"myidentifier">>).
 
 parser_test(_Config) ->
-    {ok, _Identifier1} = lasp_sql_materialized_view:create("select name from users where age = 22 or age < 10"),
-    {ok, _Identifier2} = lasp_sql_materialized_view:create("select name from users where age <= 22 and age => 10"),
-    {ok, _Identifier3} = lasp_sql_materialized_view:create("select name from users where age < 22 and age > 19"),
-    {ok, _Identifier4} = lasp_sql_materialized_view:create("select name, age from users where age < 22 and age > 19"),
+    ok = lasp_sql_materialized_view:create_table_with_values(users, [
+        [{name, "Foo"}, {age, 22}],
+        [{name, "Bar"}, {age, 9}],
+        [{name, "Baz"}, {age, 20}]
+    ]),
+
+    ?assertMatch([["Baz", 20], ["Bar", 9], ["Foo", 22]], lasp_sql_materialized_view:get_value(users, [name, age])),
+
+    {ok, Identifier1} = lasp_sql_materialized_view:create("select name from users where age = 22 or age < 10"),
+
+    %% Stabilize
+    timer:sleep(100),
+
+    ?assertMatch([["Bar"], ["Foo"]], lasp_sql_materialized_view:get_value(Identifier1, [name])),
+
+    {ok, Identifier2} = lasp_sql_materialized_view:create("select name from users where age <= 22 and age => 10"),
+
+    %% Stabilize
+    timer:sleep(100),
+
+    ?assertMatch([["Baz"], ["Foo"]], lasp_sql_materialized_view:get_value(Identifier2, [name])),
+
+    {ok, Identifier3} = lasp_sql_materialized_view:create("select name from users where age < 22 and age > 19"),
+
+    %% Stabilize
+    timer:sleep(100),
+
+    ?assertMatch([["Baz"]], lasp_sql_materialized_view:get_value(Identifier3, [name])),
+
+    {ok, Identifier4} = lasp_sql_materialized_view:create("select name, age from users where age < 22 and age > 19"),
+
+    %% Stabilize
+    timer:sleep(100),
+
+    ?assertMatch([["Baz", 20]], lasp_sql_materialized_view:get_value(Identifier4, [name, age])),
     ok.
 
 %% @doc Increment counter and test stream behaviour.

@@ -24,11 +24,35 @@
 -include("lasp.hrl").
 
 -export([create/1,
-         create/2]).
+         create/2,
+         get_value/2,
+         create_table_with_values/2]).
 
 -record(state, {output_id, set_id, projection_output_id, predicate_output_id}).
 
 -define(DEFAULT, <<"hi">>).
+
+%% @doc Insert in a SQL table the given rows.
+create_table_with_values(TableName, Args) when is_atom(TableName) ->
+    Name = list_to_binary(atom_to_list(TableName)),
+    lasp:declare(Name, ?SET),
+    lists:foreach(fun(Row) ->
+        RowMap = maps:from_list(Row),
+        lasp:update({Name, ?SET}, {add, RowMap}, a)
+    end, Args).
+
+%% @doc Given a SQL table and a list of rows, return the values of those rows.
+get_value(TableName, Rows) ->
+    Name = case is_atom(TableName) of
+        true -> {list_to_binary(atom_to_list(TableName)), ?SET};
+        _ -> TableName
+    end,
+    {ok, Set} = lasp:query(Name),
+    lists:map(fun(M) ->
+        lists:foldl(fun(Row, Acc) ->
+            [maps:get(Row, M) | Acc]
+        end, [], lists:reverse(Rows))
+    end, sets:to_list(Set)).
 
 %% @doc Create a SQL view from a textual specification.
 create(Specification) when is_list(Specification) ->

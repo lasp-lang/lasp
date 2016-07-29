@@ -103,7 +103,7 @@ handle_cast(Msg, State) ->
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(log, #state{}=State) ->
     %% Print number of enabled ads.
-    {ok, Ads} = lasp:query({?ADS, ?SET_TYPE}),
+    {ok, Ads} = lasp:query(?ADS),
 
     lager:info("Enabled advertisements: ~p", [sets:size(Ads)]),
 
@@ -198,19 +198,21 @@ build_dag() ->
     AdList = RovioAdList ++ RiotAdList,
 
     %% Union ads.
-    {ok, {Ads, _, _, _}} = lasp:declare(?ADS, ?SET_TYPE),
-    ok = lasp:union(RovioAds, RiotAds, Ads),
+    {AdsId, AdsType} = ?ADS,
+    {ok, _} = lasp:declare(AdsId, AdsType),
+    ok = lasp:union(RovioAds, RiotAds, ?ADS),
 
     %% Compute the Cartesian product of both ads and contracts.
     {ok, {AdsContracts, _, _, _}} = lasp:declare(?SET_TYPE),
-    ok = lasp:product(Ads, Contracts, AdsContracts),
+    ok = lasp:product(?ADS, Contracts, AdsContracts),
 
     %% Filter items by join on item it.
-    {ok, {AdsWithContracts, _, _, _}} = lasp:declare(?ADS_WITH_CONTRACTS, ?SET_TYPE),
+    {AdsContractsId, AdsContractsType} = ?ADS_WITH_CONTRACTS,
+    {ok, _} = lasp:declare(AdsContractsId, AdsContractsType),
     FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
         Id1 =:= Id2
     end,
-    ok = lasp:filter(AdsContracts, FilterFun, AdsWithContracts),
+    ok = lasp:filter(AdsContracts, FilterFun, ?ADS_WITH_CONTRACTS),
 
     {ok, AdList}.
 
@@ -236,7 +238,7 @@ trigger(#ad{counter=CounterId} = Ad, Actor) ->
     lager:info("Counter: ~p", [Value]),
 
     %% Remove the advertisement.
-    {ok, _} = lasp:update({?ADS, ?SET_TYPE}, {rmv, Ad}, Actor),
+    {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor),
 
     ok.
 

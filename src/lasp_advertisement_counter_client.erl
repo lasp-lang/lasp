@@ -85,7 +85,7 @@ handle_cast(Msg, State) ->
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(log, #state{impressions=Impressions}=State) ->
     %% Get current value of the list of advertisements.
-    {ok, Ads} = lasp:query({?ADS_WITH_CONTRACTS, ?SET_TYPE}),
+    {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
 
     lager:info("Impressions: ~p", [Impressions]),
 
@@ -98,7 +98,7 @@ handle_info(log, #state{impressions=Impressions}=State) ->
 
 handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
     %% Get current value of the list of advertisements.
-    {ok, Ads} = lasp:query({?ADS_WITH_CONTRACTS, ?SET_TYPE}),
+    {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
 
     %% Make sure we have ads...
     Impressions1 = case sets:size(Ads) of

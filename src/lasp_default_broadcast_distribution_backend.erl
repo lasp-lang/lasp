@@ -823,8 +823,10 @@ handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
     %% Remove ourself.
     Peers = Members -- [node()],
 
-    %% @todo Change defaults
-    ExchangePeers = case lasp_config:get(random_partition, true) of
+    %% @todo Change defaults.
+    ExchangePeers = case SyncCounter rem 2 == 0 of
+        true ->
+            case lasp_config:get(random_partition, true) of
                 true ->
                     K = lasp_support:puniform(round(length(Peers) / 2)),
                     Random = select_random_sublist(Peers, K),
@@ -832,7 +834,10 @@ handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
                     Peers -- Random;
                 false ->
                     Peers
-            end,
+            end;
+        false ->
+            Peers
+    end,
 
     lager:info("Beginning sync for peers: ~p", [ExchangePeers]),
     case length(ExchangePeers) of

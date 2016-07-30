@@ -820,33 +820,16 @@ handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
 
-    %% Remove ourself.
-    Peers = Members -- [node()],
+    %% Remove ourself and compute exchange peers.
+    Peers = compute_exchange(Members -- [node()]),
 
-    %% @todo Change defaults.
-    ExchangePeers = case SyncCounter rem 2 == 0 of
-        true ->
-            case lasp_config:get(random_partition, true) of
-                true ->
-                    K = lasp_support:puniform(round(length(Peers) / 2)),
-                    Random = select_random_sublist(Peers, K),
-                    lager:info("Partitioning ~p from ~p during sync.", [Random, Peers -- Random]),
-                    Peers -- Random;
-                false ->
-                    Peers
-            end;
-        false ->
-            Peers
-    end,
-
-    lager:info("Beginning sync for peers: ~p", [ExchangePeers]),
-    case length(ExchangePeers) of
+    lager:info("Beginning sync for peers: ~p", [Peers]),
+    case length(Peers) of
         0 ->
             ok;
         _ ->
             %% Ship buffered updates for the fanout value.
-            lists:foreach(fun(Peer) -> init_delta_sync(Peer) end,
-                          ExchangePeers)
+            lists:foreach(fun(Peer) -> init_delta_sync(Peer) end, Peers)
     end,
 
     %% Schedule next synchronization.
@@ -1180,3 +1163,20 @@ select_random_sublist(List, K) ->
 %% @reference http://stackoverflow.com/questions/8817171/shuffling-elements-in-a-list-randomly-re-arrange-list-elements/8820501#8820501
 shuffle(L) ->
     [X || {_, X} <- lists:sort([{lasp_support:puniform(65535), N} || N <- L])].
+
+%% @private
+compute_exchange(Peers) ->
+    Probability = lasp_config:get(partition_probability, 0),
+    lager:info("Probability of partition: ~p", [Probability]),
+    case lasp_support:puniform(100) =< Probability of
+        true ->
+            Percent = lasp_support:puniform(100),
+            lager:info("Partitioning ~p% of the network.", [Percent]),
+            K = round((Percent / 100) * length(Peers)),
+            lager:info("Partitioning ~p percent, or ~p nodes.", [Percent, K]),
+            Random = select_random_sublist(Peers, K),
+            lager:info("Partitioning ~p from ~p during sync.", [Random, Peers -- Random]),
+            Peers -- Random;
+        false ->
+            Peers
+    end.

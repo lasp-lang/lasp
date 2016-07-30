@@ -164,6 +164,10 @@ start(_Case, _Config, Options) ->
                         HeavyClient = proplists:get_value(heavy_client, Options, false),
                         ok = rpc:call(Node, lasp_config, set, [heavy_client, HeavyClient]),
 
+                        %% Configure partitions.
+                        PartitionProbability = proplists:get_value(partition_probability, Options, false),
+                        ok = rpc:call(Node, lasp_config, set, [partition_probability, PartitionProbability]),
+
                         %% Configure broadcast settings.
                         Broadcast = proplists:get_value(broadcast, Options),
                         ok = rpc:call(Node, lasp_config, set,

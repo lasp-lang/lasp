@@ -87,8 +87,8 @@
                     value :: value()}).
 
 -define(MEMORY_INTERVAL, 10000).
--define(DELTA_INTERVAL, 10000).
--define(DELTA_GC_INTERVAL, 30000).
+-define(DELTA_INTERVAL, 30000).
+-define(DELTA_GC_INTERVAL, 60000).
 
 %% Definitions for the bind/read fun abstraction.
 

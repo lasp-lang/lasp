@@ -117,10 +117,10 @@
 
 %% Simulation helpers.
 -define(AAE_INTERVAL, 10000).
--define(IMPRESSION_INTERVAL, 1000).
+-define(IMPRESSION_INTERVAL, 500).
 -define(STATUS_INTERVAL, 1000).
 -define(EVAL_NUMBER, 1).
--define(MAX_IMPRESSIONS, 1).
+-define(MAX_IMPRESSIONS, 100).
 -define(LOG_INTERVAL, 10000).
 -define(VOTING_INTERVAL, 1000).
 -define(ADS_NUMBER, 5).

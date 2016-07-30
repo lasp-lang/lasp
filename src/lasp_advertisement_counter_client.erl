@@ -37,7 +37,7 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {actor, impressions}).
+-record(state, {actor, impressions, triggers}).
 
 %%%===================================================================
 %%% API
@@ -66,7 +66,7 @@ init([]) ->
     %% Schedule logging.
     schedule_logging(),
 
-    {ok, #state{actor=Actor, impressions=0}}.
+    {ok, #state{actor=Actor, impressions=0, triggers=dict:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -94,15 +94,17 @@ handle_info(log, #state{impressions=Impressions}=State) ->
 
     {noreply, State};
 
-handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
+handle_info(view, #state{actor=Actor,
+                         impressions=Impressions0,
+                         triggers=Triggers0}=State) ->
     %% Get current value of the list of advertisements.
     {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
 
     %% Make sure we have ads...
-    Impressions1 = case sets:size(Ads) of
+    {Impressions1, Triggers1} = case sets:size(Ads) of
         0 ->
             %% Do nothing.
-            Impressions0;
+            {Impressions0, Triggers0};
         Size ->
             %% Select random.
             Random = lasp_support:puniform(Size),
@@ -114,21 +116,24 @@ handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
             %% Spawn a process to disable the advertisement if it goes
             %% above the maximum number of impressions.
             %%
-            %% @todo Not optimal at all because it spawns a ton of
-            %% processes, but good enough for now.  Fix me before merge.
-            %%
-            case lasp_config:get(heavy_client, false) of
+            Triggers = case lasp_config:get(heavy_client, false) of
                 true ->
-                    spawn_link(fun() -> trigger(Ad, Actor) end);
+                    case dict:find(Ad, Triggers0) of
+                        {ok, _Pid} ->
+                            Triggers0;
+                        error ->
+                            Pid = spawn_link(fun() -> trigger(Ad, Actor) end),
+                            dict:store(Ad, Pid, Triggers0)
+                    end;
                 false ->
-                    ok
+                    Triggers0
             end,
 
             %% Increment counter.
             {ok, _} = lasp:update(Counter, increment, Actor),
 
             %% Increment impressions.
-            Impressions0 + 1
+            {Impressions0 + 1, Triggers}
     end,
 
     %% - If I did nothing (`Impressions0 == Impressions1`),
@@ -149,7 +154,7 @@ handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
             schedule_impression()
     end,
 
-    {noreply, State#state{impressions=Impressions1}};
+    {noreply, State#state{impressions=Impressions1, triggers=Triggers1}};
 
 handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     %% A simulation ends for clients when all clients have

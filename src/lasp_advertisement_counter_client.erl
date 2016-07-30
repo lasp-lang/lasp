@@ -109,8 +109,7 @@ handle_info(view, #state{actor=Actor,
             %% Select random.
             Random = lasp_support:puniform(Size),
 
-            %% @todo Exposes internal details of record.
-            {{ad, _, _, _, Counter} = Ad, _Contract} =
+            {#ad{counter=Counter} = Ad, _Contract} =
                 lists:nth(Random, sets:to_list(Ads)),
 
             %% Spawn a process to disable the advertisement if it goes

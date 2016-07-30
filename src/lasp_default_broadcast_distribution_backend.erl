@@ -76,6 +76,7 @@
 %% State record.
 -record(state, {store :: store(),
                 actor :: binary(),
+                sync_counter :: non_neg_integer(),
                 counter :: non_neg_integer(),
                 gc_counter :: non_neg_integer()}).
 
@@ -496,7 +497,11 @@ init([]) ->
     %% Schedule report.
     schedule_memory_report(),
 
-    {ok, #state{actor=Actor, counter=Counter, store=Store, gc_counter=GCCounter}}.
+    {ok, #state{actor=Actor,
+                counter=Counter,
+                sync_counter=0,
+                store=Store,
+                gc_counter=GCCounter}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -809,7 +814,7 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     schedule_aae_synchronization(),
 
     {noreply, State};
-handle_info(delta_sync, State) ->
+handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
     % lager:info("Beginning delta synchronization."),
 
     %% Get the active set from the membership protocol.
@@ -818,15 +823,40 @@ handle_info(delta_sync, State) ->
     %% Remove ourself.
     Peers = Members -- [node()],
 
-    % lager:info("Beginning sync for peers: ~p", [Peers]),
+    ExchangePeers = case SyncCounter rem 2 == 0 of
+        true ->
+            %% @todo Change defaults
+            case lasp_config:get(random_partition, true) of
+                true ->
+                    case select_random(Peers, []) of
+                        undefined ->
+                            Peers;
+                        Random ->
+                            lager:info("Partitioning ~p from ~p during sync.",
+                                       [Random, Peers]),
+                            Peers -- [Random]
+                    end;
+                false ->
+                    Peers
+            end;
+        false ->
+            Peers
+    end,
 
-    %% Ship buffered updates for the fanout value.
-    lists:foreach(fun(Peer) -> init_delta_sync(Peer) end, Peers),
+    lager:info("Beginning sync for peers: ~p", [ExchangePeers]),
+    case length(ExchangePeers) of
+        0 ->
+            ok;
+        _ ->
+            %% Ship buffered updates for the fanout value.
+            lists:foreach(fun(Peer) -> init_delta_sync(Peer) end,
+                          ExchangePeers)
+    end,
 
     %% Schedule next synchronization.
     schedule_delta_synchronization(),
 
-    {noreply, State};
+    {noreply, State#state{sync_counter=SyncCounter+1}};
 handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
     MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
     Function =
@@ -1146,3 +1176,16 @@ init_delta_sync(Peer) ->
 %% @private
 membership() ->
     lasp_peer_service:members().
+
+%% @private
+select_random(Members, Omit) ->
+    List = Members -- lists:flatten([Omit]),
+
+    %% Catch exceptions where there may not be enough members.
+    try
+        Index = lasp_support:puniform(length(List)),
+        lists:nth(Index, List)
+    catch
+        _:_ ->
+            undefined
+    end.

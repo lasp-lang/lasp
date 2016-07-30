@@ -71,14 +71,14 @@ all() ->
 %% ===================================================================
 
 -define(MIN_POW, 2).
--define(MAX_POW, 3).
+-define(MAX_POW, 6).
 
 default_test(_Config) ->
     ok.
 
 client_server_divergence_test(Config) ->
-		lists:foreach(
-				fun(ClientNumber) ->
+    lists:foreach(
+        fun(ClientNumber) ->
             lasp_config:set(client_number, ClientNumber),
             EvaluationIdentifier = list_to_atom("client_server_divergence_" ++ integer_to_list(ClientNumber)),
 

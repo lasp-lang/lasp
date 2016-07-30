@@ -820,6 +820,11 @@ handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
 
+    PeerServiceManager = lasp_config:get(peer_service_manager,
+                                         partisan_peer_service),
+    lager:info("Manager is: ~p, Members are: ~p",
+               [PeerServiceManager, Members]),
+
     %% Remove ourself and compute exchange peers.
     Peers = compute_exchange(Members -- [node()]),
 

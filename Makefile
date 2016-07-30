@@ -40,7 +40,7 @@ eunit:
 ct:
 	${REBAR} as test ct --suite=lasp_SUITE
 
-simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation ad-counter-divergence
+simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation ad-counter-divergence ad-counter-partition-divergence
 
 peer-to-peer-ad-counter-simulation:
 	${REBAR} as test ct --suite=lasp_peer_to_peer_advertisement_counter_SUITE
@@ -50,6 +50,9 @@ client-server-ad-counter-simulation:
 
 ad-counter-divergence:
 	${REBAR} as test ct --suite=lasp_advertisement_counter_divergence_SUITE
+
+ad-counter-partition-divergence:
+	${REBAR} as test ct --suite=lasp_advertisement_counter_partition_divergence_SUITE
 
 ##
 ## Release targets
@@ -109,6 +112,11 @@ div:
 	pkill -9 beam.smp; \
 		clear; \
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_divergence_SUITE
+
+part-div:
+	pkill -9 beam.smp; \
+		clear; \
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_partition_divergence_SUITE
 
 evaluate-local: SHELL:=/bin/bash
 evaluate-local:

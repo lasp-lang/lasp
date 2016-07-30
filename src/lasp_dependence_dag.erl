@@ -46,6 +46,63 @@
 %%% Type definitions
 %%%===================================================================
 
+%% To make contractions reversible, we have to hold all the
+%% information about the removed vertices and the edges that were
+%% connecting them. When a contraction is reversed, we use this infomation
+%% to restart the intermediate processes, linking together the correct
+%% vertices. One a contraction is reversed, all this metadata is removed.
+%%
+%% Stored metadata for a lasp process.
+%% We don't store the input(s) and output vertices as that information
+%% is implicitly stored by edges in the graph.
+%%
+%% Used to represent the metadata of processes inside a contracted path,
+%% that only can have one parent and one child, hence why there is only
+%% a single read function.
+-record(process_metadata, {read :: function(),
+                           transform :: function(),
+                           write :: function()}).
+
+
+%% A process hash is defined as the hash of their metadata (process_args).
+%% This hash keeps constant through process restarts, and is used to uniquely
+%% identify a process that connects the endpoints of a contracted path.
+%% Removed vertices keep a reference to a process hash to identify in what path
+%% they were before being removed (vertex_label).
+-type process_hash() :: non_neg_integer().
+-record(vertex_label, {process_pointer :: process_hash()}).
+-type process_args() :: {[{lasp_vertex(), function()}],
+                         function(),
+                         {lasp_vertex(), function()}}.
+
+%% We monitor all lasp processes, but the only information we get once that
+%% happens is the process pid. This table keeps a mapping between hashes and
+%% pids, and is used to during a cleaving pass to get to the information in
+%% the optimized map.
+-type pid_table() :: dict:dict(pid(), process_hash()).
+
+%% This structure maps process hashes, identifying processes that connect
+%% endpoints in a contracted path, to a list of vertices representing
+%% the old path before being contracted, and a list of the metadata of
+%% the lasp processes that linked those vertices together.
+%% In this metadata list, each element at a position i represents the metadata
+%% connecting the i-th and (i+1)-th vertices in the vertex list.
+-type optimized_map() :: dict:dict(process_hash(),
+                                   {pid(),
+                                    contract_path(),
+                                    list(#process_metadata{})}).
+
+%% A step is defined as a call to add_edges. While we are defining our
+%% application topology, the graph is suitable to be changed regularly.
+%% See ?CONTRACTION_INTERVAL. One the step counter reaches that value,
+%% an optimization pass occurs, and then is reset to zero.
+-type contraction_step() :: non_neg_integer().
+
+%% Only used to represent paths suitable to be contracted. These paths
+%% consist of two necessary endpoints and a list of unnecessary vertices
+%% in between.
+-type contract_path() :: list(lasp_vertex()).
+
 %% We store a mapping Pid -> [{parent_node, child_node}] to
 %% find the edge labeled with it without traversing the graph.
 %%
@@ -54,44 +111,29 @@
 %% lets us quickly delete those edges.
 -type process_map() :: dict:dict(pid(), {id(), id()}).
 
-%% Stored metadata for a lasp process.
-%% We don't store the input(s) and output vertices as that information
-%% is implicitly stored by edges in the graph.
--record(process_metadata, {read :: function(),
-                           transform :: function(),
-                           write :: function()}).
-
-%% We store a mapping Id -> {Pid, Path, MetadataList} to identify the list of
-%% vertices and relationships that get removed as part of a path contraction.
-%%
-%% Used during the cleaving step.
--type contract_process_id() :: non_neg_integer().
--type pid_table() :: dict:dict(pid(), contract_process_id()).
--type optimized_map() :: dict:dict(contract_process_id(),
-                                   {pid(),
-                                    contract_path(),
-                                    list(#process_metadata{})}).
-
+%% State. The graph is constructed using the digraph module.
+%% See definitions above for further information.
 -record(state, {dag :: digraph:graph(),
                 process_map :: process_map(),
                 optimized_map :: optimized_map(),
                 pid_table :: pid_table(),
-                contraction_step :: non_neg_integer()}).
+                contraction_step :: contraction_step()}).
 
 %% We store the function metadata as the edge label.
+%% An edge in the graph represents a lasp process, and contains
+%% the various functions used by it.
+%%
+%% Processes that have n inputs are modeled by n edges, all with the same
+%% pid, connecting each input to the output. This means that we only have
+%% to collect a single read function.
+%% @todo merge with process_metadata record
 -record(edge_label, {pid :: pid(),
-                    read :: function(),
-                    transform :: function(),
-                    write :: function()}).
+                     read :: function(),
+                     transform :: function(),
+                     write :: function()}).
 
-%% @todo Move somewhere else
-%% A tuple of the arguments of a lasp process.
--type process_args() :: {[{lasp_vertex(), function()}],
-                         function(),
-                         {lasp_vertex(), function()}}.
-
--record(vertex_label, {process_pointer :: contract_process_id()}).
-
+%% A vertex in the dag represents either a crdt value or a lasp process pid
+%% Pids are used to model reads and updates to a value.
 -type lasp_vertex() :: id() | pid().
 
 %% Return type of digraph:edge/2
@@ -99,8 +141,6 @@
                       digraph:vertex(),
                       digraph:vertex(),
                       #edge_label{}}.
-
--type contract_path() :: list(lasp_vertex()).
 
 %%%===================================================================
 %%% API
@@ -121,6 +161,19 @@ add_vertices(Vs) ->
     gen_server:call(?MODULE, {add_vertices, Vs}, infinity).
 
 %% @doc Check if linking the given vertices will form a loop.
+%%
+%%      The user may accidentally form a loop while writing a dataflow
+%%      computation.
+%%
+%%      Imagine this example:
+%%
+%%      A = declare(),
+%%      B = declare(),
+%%      map(A, \x.x+1, B)
+%%      bind_to(A, B
+%%
+%%      As soon as A is given a value, it will start to grow in size,
+%%      as its own internal value is incremented forever.
 -spec will_form_cycle(list(lasp_vertex()), lasp_vertex()) -> boolean().
 will_form_cycle(Src, Dst) ->
     gen_server:call(?MODULE, {will_form_cycle, Src, Dst}, infinity).
@@ -713,7 +766,7 @@ contract(G, VSeq) ->
 %%      all unnecessary vertices with the given Pid, that should
 %%      represent the resulting lasp process of the path contraction.
 %%
--spec remove_edges(digraph:graph(), contract_path(), contract_process_id(), pid(), optimized_map()) -> optimized_map().
+-spec remove_edges(digraph:graph(), contract_path(), process_hash(), pid(), optimized_map()) -> optimized_map().
 remove_edges(Dag, VSeq, Id, Pid, OptMap) ->
     %% Store process metadata in the optimized map
     Metadata = get_metadata(Dag, VSeq),
@@ -797,7 +850,7 @@ optimized_cycle(G, From, To, OptMap) ->
     end.
 
 %% @doc Get the tail of the process that contracted a path.
--spec get_process_tail(contract_process_id(), optimized_map()) -> lasp_vertex().
+-spec get_process_tail(process_hash(), optimized_map()) -> lasp_vertex().
 get_process_tail(Id, OptMap) ->
     {_, [Tail | _], _} = dict:fetch(Id, OptMap),
     Tail.
@@ -1011,7 +1064,7 @@ apply_sequentially(X, [H | T], Int, Final) ->
     apply_sequentially(Int(H(X)), T, Int, Final).
 
 %% @doc Get an unique identifier for a process in the graph.
--spec process_hash(process_args()) -> contract_process_id().
+-spec process_hash(process_args()) -> process_hash().
 process_hash(Args) ->
     erlang:phash2(Args).
 

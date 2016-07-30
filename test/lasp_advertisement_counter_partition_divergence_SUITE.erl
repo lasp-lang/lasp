@@ -127,6 +127,7 @@ code_peer_to_peer_partition_divergence_test(Config) ->
     lists:foreach(
         fun(PartitionProbability) ->
             lasp_config:set(client_number, ?CLIENTS),
+            lasp_config:set(partition_probability, PartitionProbability),
             EvaluationIdentifier = list_to_atom("code_peer_to_peer_partition_divergence_" ++ integer_to_list(PartitionProbability)),
 
             lasp_simulation_support:run(code_peer_to_peer_partition_divergence_test,

@@ -823,25 +823,16 @@ handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
     %% Remove ourself.
     Peers = Members -- [node()],
 
-    ExchangePeers = case SyncCounter rem 2 == 0 of
-        true ->
-            %% @todo Change defaults
-            case lasp_config:get(random_partition, true) of
+    %% @todo Change defaults
+    ExchangePeers = case lasp_config:get(random_partition, true) of
                 true ->
-                    case select_random(Peers, []) of
-                        undefined ->
-                            Peers;
-                        Random ->
-                            lager:info("Partitioning ~p from ~p during sync.",
-                                       [Random, Peers]),
-                            Peers -- [Random]
-                    end;
+                    K = lasp_support:puniform(round(length(Peers) / 2)),
+                    Random = select_random_sublist(Peers, K),
+                    lager:info("Partitioning ~p from ~p during sync.", [Random, Peers -- Random]),
+                    Peers -- Random;
                 false ->
                     Peers
-            end;
-        false ->
-            Peers
-    end,
+            end,
 
     lager:info("Beginning sync for peers: ~p", [ExchangePeers]),
     case length(ExchangePeers) of
@@ -1178,14 +1169,9 @@ membership() ->
     lasp_peer_service:members().
 
 %% @private
-select_random(Members, Omit) ->
-    List = Members -- lists:flatten([Omit]),
+select_random_sublist(List, K) ->
+    lists:sublist(shuffle(List), K).
 
-    %% Catch exceptions where there may not be enough members.
-    try
-        Index = lasp_support:puniform(length(List)),
-        lists:nth(Index, List)
-    catch
-        _:_ ->
-            undefined
-    end.
+%% @reference http://stackoverflow.com/questions/8817171/shuffling-elements-in-a-list-randomly-re-arrange-list-elements/8820501#8820501
+shuffle(L) ->
+    [X || {_, X} <- lists:sort([{lasp_support:puniform(65535), N} || N <- L])].

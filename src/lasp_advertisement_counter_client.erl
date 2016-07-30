@@ -87,9 +87,7 @@ handle_info(log, #state{impressions=Impressions}=State) ->
     %% Get current value of the list of advertisements.
     {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
 
-    lager:info("Impressions: ~p", [Impressions]),
-
-    lager:info("Current advertisement list size: ~p", [sets:size(Ads)]),
+    lager:info("Impressions: ~p, current ad size: ~p", [Impressions, sets:size(Ads)]),
 
     %% Schedule advertisement counter impression.
     schedule_logging(),

@@ -71,7 +71,7 @@ all() ->
 %% ===================================================================
 
 -define(MIN_POW, 2).
--define(MAX_POW, 6).
+-define(MAX_POW, 3).
 
 default_test(_Config) ->
     ok.

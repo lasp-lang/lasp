@@ -153,4 +153,4 @@ code_peer_to_peer_partition_divergence_test(Config) ->
 
 %% @private
 partitions() ->
-    [0, 25, 50, 75, 90].
+    [0, 25, 50, 75].

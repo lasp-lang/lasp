@@ -1171,17 +1171,29 @@ shuffle(L) ->
 
 %% @private
 compute_exchange(Peers) ->
+    PeerServiceManager = lasp_config:get(peer_service_manager,
+                                         partisan_peer_service),
+
     Probability = lasp_config:get(partition_probability, 0),
     lager:info("Probability of partition: ~p", [Probability]),
     case lasp_support:puniform(100) =< Probability of
         true ->
-            Percent = lasp_support:puniform(100),
-            lager:info("Partitioning ~p% of the network.", [Percent]),
-            K = round((Percent / 100) * length(Peers)),
-            lager:info("Partitioning ~p percent, or ~p nodes.", [Percent, K]),
-            Random = select_random_sublist(Peers, K),
-            lager:info("Partitioning ~p from ~p during sync.", [Random, Peers -- Random]),
-            Peers -- Random;
+            case PeerServiceManager of
+                partisan_client_server_peer_service_manager ->
+                    lager:info("Partitioning from server."),
+                    [];
+                _ ->
+                    Percent = lasp_support:puniform(100),
+                    lager:info("Partitioning ~p% of the network.",
+                               [Percent]),
+                    K = round((Percent / 100) * length(Peers)),
+                    lager:info("Partitioning ~p percent, or ~p nodes.",
+                               [Percent, K]),
+                    Random = select_random_sublist(Peers, K),
+                    lager:info("Partitioning ~p from ~p during sync.",
+                               [Random, Peers -- Random]),
+                    Peers -- Random
+            end;
         false ->
             Peers
     end.

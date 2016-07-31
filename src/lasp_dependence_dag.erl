@@ -310,10 +310,10 @@ handle_call(get_process_map, _From, #state{process_map=PM}=State) ->
     {reply, {ok, dict:to_list(PM)}, State};
 
 handle_call(contract, _From, #state{dag=Dag}=State) ->
-    lists:foreach(fun(P) ->
-        contract(Dag, P)
-    end, contraction_paths(Dag)),
-    {reply, ok, State};
+    NewState = lists:foldl(fun(P, S) ->
+        contract(Dag, P, S)
+    end, State, contraction_paths(Dag)),
+    {reply, ok, NewState};
 
 handle_call({cleave, Vertex}, _From, #state{dag=Dag, optimized_map=OptMap}=State) ->
     cleave_if_contracted(Dag, Vertex, OptMap),
@@ -365,7 +365,7 @@ handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag, optimized_map=Op
 %%      We monitor all edge Pids to know when they die or get restarted.
 %%
 handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, WriteFun}, _From, State) ->
-    {Reply, NewState} = add_edges(Src, Dst, Pid,
+    {Reply, NewState} = add_edges(step, Src, Dst, Pid,
                                   ReadFuns, TransFun, WriteFun, State),
     {reply, Reply, NewState}.
 
@@ -410,18 +410,6 @@ handle_info({'DOWN', _, process, Pid, Reason}, #state{dag=Dag,
     {noreply, NewState#state{dag=NewDag,
                              process_map=dict:erase(Pid, PM)}};
 
-handle_info({process_created, Id, Pid, VSeq}, #state{dag=Dag,
-                                                     optimized_map=OptMap,
-                                                     pid_table =PidTable}=State) ->
-    %% @todo Assume the dag didn't change since last call.
-    %%       Test it once the cleaving has been implemented.
-    %%
-    %%       If data races happen even with the cleaving step, we should
-    %%       perform a check here, before removing the edges.
-    %%
-    NewOptMap = remove_edges(Dag, VSeq, Id, Pid, OptMap),
-    {noreply, State#state{optimized_map=NewOptMap, pid_table=dict:store(Pid, Id, PidTable)}};
-
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages ~p", [Msg]),
     {noreply, State}.
@@ -440,7 +428,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-add_edges(Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
+add_edges(StepSetting, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
 
     Dag      = State#state.dag,
     Pm       = State#state.process_map,
@@ -497,8 +485,8 @@ add_edges(Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
             {ok, State#state{process_map=ProcessMap}}
     end,
 
-    St = case CtStep of
-        ?CONTRACTION_INTERVAL ->
+    St = case {StepSetting, CtStep} of
+        {step, ?CONTRACTION_INTERVAL} ->
               %% @todo Contraction step
               %%
               %%       How do we prevent a contraction from happening
@@ -725,8 +713,9 @@ replace_if_restarted(OptMap, PidTable, Pid, ProcessArgs) ->
 %%      where ( . ) is defined as the usual composition operator.
 %%      The result of this operation is a new edge h = (v1, v3).
 %%
--spec contract(digraph:graph(), contract_path()) -> ok.
-contract(G, VSeq) ->
+-spec contract(digraph:graph(), contract_path(), #state{}) -> #state{}.
+contract(G, VSeq, State) ->
+
     [First, Second | _] = VSeq,
     Last = lists:last(VSeq),
     SndLast = lists:nth(length(VSeq) - 1, VSeq),
@@ -756,16 +745,20 @@ contract(G, VSeq) ->
         end, fun({_, _, _, V}) ->  V  end)
     end,
 
-    %% Since creating a new process involves calling ourselves,
-    %% we must start it in another process and handle the result
-    %% asynchronously.
-    Self = self(),
-    Id = process_hash({[Read], TransFun, Write}),
-    spawn_link(fun() ->
-        {ok, Pid} = lasp_process:start_dag_link([[Read], TransFun, Write]),
-        Self ! {process_created, Id, Pid, VSeq}
-    end),
-    ok.
+    ProcessHash = process_hash({[Read], TransFun, Write}),
+
+    %% Manually start a new lasp process and add the edges to the graph.
+    {ok, Pid} = lasp_process:start_manual_process([[Read], TransFun, Write]),
+    {ok, NewState} = add_edges(nostep, [First], Last, Pid,
+                               [Read], TransFun, Write, State),
+
+    OptMap = NewState#state.optimized_map,
+    PidTable = NewState#state.pid_table,
+
+    %% Remove the intermediate edges by terminating the associated processes.
+    NewOptMap = remove_edges(G, VSeq, ProcessHash, Pid, OptMap),
+
+    NewState#state{optimized_map = NewOptMap, pid_table = dict:store(Pid, ProcessHash, PidTable)}.
 
 %% @doc Remove intermediate edges in a contracted path.
 %%

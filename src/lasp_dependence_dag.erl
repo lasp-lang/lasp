@@ -752,11 +752,12 @@ contract(G, VSeq, State) ->
     {ok, NewState} = add_edges(nostep, [First], Last, Pid,
                                [Read], TransFun, Write, State),
 
-    OptMap = NewState#state.optimized_map,
+    NewDag   = NewState#state.dag,
+    OptMap   = NewState#state.optimized_map,
     PidTable = NewState#state.pid_table,
 
     %% Remove the intermediate edges by terminating the associated processes.
-    NewOptMap = remove_edges(G, VSeq, ProcessHash, Pid, OptMap),
+    NewOptMap = remove_edges(NewDag, VSeq, ProcessHash, Pid, OptMap),
 
     NewState#state{optimized_map = NewOptMap, pid_table = dict:store(Pid, ProcessHash, PidTable)}.
 

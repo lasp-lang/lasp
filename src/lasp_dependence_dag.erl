@@ -395,20 +395,23 @@ handle_info({'DOWN', _, process, Pid, Reason}, #state{dag=Dag,
 
     %% If terminated by supervisor, cleave any associated paths.
     NewState = case dict:find(Pid, PidTable) of
-        {ok, Id} -> case Reason of
+        {ok, Hash} -> case Reason of
             shutdown ->
-                cleave_associated_path(Dag, Id, OptMap),
-                State#state{optimized_map=dict:erase(Id, OptMap),
-                            pid_table=dict:erase(Pid, PidTable)};
+                CleavedState = cleave_associated_path(NewDag, Hash, State),
+                CleavedState#state{optimized_map=dict:erase(Hash, OptMap),
+                                   pid_table=dict:erase(Pid, PidTable),
+                                   process_map=dict:erase(Pid, CleavedState#state.process_map)};
 
             _ ->
-                State#state{pid_table=dict:erase(Pid, PidTable)}
+                State#state{dag=NewDag,
+                            process_map=dict:erase(Pid, PM),
+                            pid_table=dict:erase(Pid, PidTable)}
         end;
-        _ -> State
+        _ -> State#state{dag=NewDag,
+                         process_map=dict:erase(Pid, PM)}
     end,
 
-    {noreply, NewState#state{dag=NewDag,
-                             process_map=dict:erase(Pid, PM)}};
+    {noreply, NewState};
 
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages ~p", [Msg]),
@@ -883,18 +886,20 @@ cleave_if_contracted(G, Vertex, OptMap) ->
 %%      start all the intermediate processes of the path,
 %%      and then kill the given Pid.
 %%
-cleave_associated_path(G, Id, OptMap) ->
-    case dict:find(Id, OptMap) of
-        error -> ok;
+cleave_associated_path(G, Hash, #state{optimized_map=OptMap}=State) ->
+    case dict:find(Hash, OptMap) of
+        error -> State;
         {ok, {_, VSeq, MetadataList}} ->
             ProcessArgs = unpack_optimized_map(VSeq, MetadataList),
             UnnecesaryVertices = lists:sublist(VSeq, 2, length(VSeq) - 2),
             tag_vertices(G, UnnecesaryVertices, []),
-            spawn_link(fun() ->
-                lists:foreach(fun({_Reads, _TransForms, _Write}=Args) ->
-                    lasp_process:start_dag_link(tuple_to_list(Args))
-                end, ProcessArgs)
-            end)
+            lists:foldl(fun({Reads, Transform, {Dst, Write}}=Args, St) ->
+                Src = [To || {To, _} <- Reads],
+                {ok, Pid} = lasp_process:start_manual_process(tuple_to_list(Args)),
+                {ok, NewState} = add_edges(nostep, Src, Dst, Pid,
+                                           Reads, Transform, {Dst, Write}, St),
+                NewState
+            end, State, ProcessArgs)
     end.
 
 %% @doc Get the process arguments of the given optimized map inner dict.

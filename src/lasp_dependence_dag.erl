@@ -364,89 +364,10 @@ handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag, optimized_map=Op
 %%
 %%      We monitor all edge Pids to know when they die or get restarted.
 %%
-handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}}, _From, State) ->
-
-    Dag      = State#state.dag,
-    Pm       = State#state.process_map,
-    CtStep   = State#state.contraction_step,
-    OptMap   = State#state.optimized_map,
-    PidTable = State#state.pid_table,
-
-    %% Add vertices only if they are either sources or sinks. (See add_if)
-    %% All user-defined variables are tracked through the `declare` function.
-    lists:foreach(fun(V) -> add_if_pid(Dag, V) end, Src),
-    add_if_pid(Dag, Dst),
-
-    %% Check if this edge is the replacement for an old edge in the graph.
-    {NewOptMap, NewPidTable} = replace_if_restarted(OptMap, PidTable, Pid,
-                                                                      {ReadFuns,
-                                                                       TransFun,
-                                                                       {Dst, WriteFun}}),
-
-
-    %% @todo This should happen before creating the process
-    %%
-    %%       Otherwise the process acts on old data. This is only a problem
-    %%       with queries and reads, since they return the value of the vertex.
-    %%       Binds and updates are ok, since values will eventually propagate
-    %%       through the graph.
-    %%
-    %% Undo any optimizations involving these vertices.
-    lists:foreach(fun(V) ->
-        cleave_if_contracted(Dag, V, NewOptMap)
-    end, [Dst | Src]),
-
-    %% For all V in Src, make edge (V, Dst) with label {Pid, Read, Trans, Write}
-    %% (where {Id, Read} = ReadFuns s.t. Id = V)
-    Status = lists:map(fun(V) ->
-        Read = lists:nth(1, [ReadF || {Id, ReadF} <- ReadFuns, Id =:= V]),
-        digraph:add_edge(Dag, V, Dst, #edge_label{pid=Pid,
-                                                  read=Read,
-                                                  transform=TransFun,
-                                                  write=WriteFun})
-    end, Src),
-
-    {R, St0} = case lists:any(fun is_graph_error/1, Status) of
-        true -> {error, State};
-        false ->
-            erlang:monitor(process, Pid),
-
-            %% For all V in Src, append Pid -> {V, Dst}
-            %% in the process map.
-            ProcessMap = lists:foldl(fun(El, D) ->
-                dict:append(Pid, {El, Dst}, D)
-            end, Pm, Src),
-
-            {ok, State#state{process_map=ProcessMap}}
-    end,
-
-    St = case CtStep of
-        ?CONTRACTION_INTERVAL ->
-            %% @todo Contraction step
-            %%
-            %%       How do we prevent a contraction from happening
-            %%       as part of the edges created from another contraction?
-            %%
-            %%       If the dag starts a new contraction step as part of
-            %%       another contraction, multiple path contractions may
-            %%       happen, leading to multiple edges between vertices.
-            %%
-            %%       Either make contractions manual, or measure the
-            %%       probability of a vertex to be updated if it has been
-            %%       changed recently. Paths that contain "active" vertices
-            %%       won't be contracted, as they are determined to be changed
-            %%       often. Only contract paths that are relatively stable
-            %%       (haven't changed in X ticks).
-            %%
-            %%       Another option is to implement a special function to
-            %%       create edges in the graph that don't count towards
-            %%       the contraction step count.
-            %%
-            St0#state{contraction_step=0};
-        _ ->
-            St0#state{contraction_step = CtStep + 1}
-    end,
-    {reply, R, St#state{optimized_map = NewOptMap, pid_table = NewPidTable}}.
+handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, WriteFun}, _From, State) ->
+    {Reply, NewState} = add_edges(Src, Dst, Pid,
+                                  ReadFuns, TransFun, WriteFun, State),
+    {reply, Reply, NewState}.
 
 %% @private
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
@@ -518,6 +439,92 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+add_edges(Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
+
+    Dag      = State#state.dag,
+    Pm       = State#state.process_map,
+    CtStep   = State#state.contraction_step,
+    OptMap   = State#state.optimized_map,
+    PidTable = State#state.pid_table,
+
+    %% Add vertices only if they are either sources or sinks. (See add_if)
+    %% All user-defined variables are tracked through the `declare` function.
+    lists:foreach(fun(V) -> add_if_pid(Dag, V) end, Src),
+    add_if_pid(Dag, Dst),
+
+    %% Check if this edge is the replacement for an old edge in the graph.
+    {NewOptMap, NewPidTable} = replace_if_restarted(OptMap, PidTable, Pid,
+                                                                      {ReadFuns,
+                                                                       TransFun,
+                                                                       {Dst, WriteFun}}),
+
+
+    %% @todo This should happen before creating the process
+    %%
+    %%       Otherwise the process acts on old data. This is only a problem
+    %%       with queries and reads, since they return the value of the vertex.
+    %%       Binds and updates are ok, since values will eventually propagate
+    %%       through the graph.
+    %%
+    %% Undo any optimizations involving these vertices.
+    lists:foreach(fun(V) ->
+        cleave_if_contracted(Dag, V, NewOptMap)
+    end, [Dst | Src]),
+
+    %% For all V in Src, make edge (V, Dst) with label {Pid, Read, Trans, Write}
+    %% (where {Id, Read} = ReadFuns s.t. Id = V)
+    Status = lists:map(fun(V) ->
+        Read = lists:nth(1, [ReadF || {Id, ReadF} <- ReadFuns, Id =:= V]),
+        digraph:add_edge(Dag, V, Dst, #edge_label{pid=Pid,
+                                                  read=Read,
+                                                  transform=TransFun,
+                                                  write=WriteFun})
+    end, Src),
+
+    {R, St0} = case lists:any(fun is_graph_error/1, Status) of
+        true -> {error, State};
+        false ->
+            erlang:monitor(process, Pid),
+
+
+            %% For all V in Src, append Pid -> {V, Dst}
+            %% in the process map.
+            ProcessMap = lists:foldl(fun(El, D) ->
+                dict:append(Pid, {El, Dst}, D)
+            end, Pm, Src),
+
+            {ok, State#state{process_map=ProcessMap}}
+    end,
+
+    St = case CtStep of
+        ?CONTRACTION_INTERVAL ->
+              %% @todo Contraction step
+              %%
+              %%       How do we prevent a contraction from happening
+              %%       as part of the edges created from another contraction?
+              %%
+              %%       If the dag starts a new contraction step as part of
+              %%       another contraction, multiple path contractions may
+              %%       happen, leading to multiple edges between vertices.
+              %%
+              %%       Either make contractions manual, or measure the
+              %%       probability of a vertex to be updated if it has been
+              %%       changed recently. Paths that contain "active" vertices
+              %%       won't be contracted, as they are determined to be changed
+              %%       often. Only contract paths that are relatively stable
+              %%       (haven't changed in X ticks).
+              %%
+              %%       Another option is to implement a special function to
+              %%       create edges in the graph that don't count towards
+              %%       the contraction step count.
+              %%
+              St0#state{contraction_step=0};
+        _ ->
+            St0#state{contraction_step = CtStep + 1}
+    end,
+    {R, St#state{optimized_map = NewOptMap, pid_table = NewPidTable}}.
+
 
 is_graph_error({error, _}) ->
     true;

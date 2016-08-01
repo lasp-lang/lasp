@@ -23,7 +23,7 @@
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 %% common_test callbacks
--export([%% suite/0,
+-export([suite/0,
          init_per_suite/1,
          end_per_suite/1,
          init_per_testcase/2,
@@ -43,6 +43,9 @@
 %% common_test callbacks
 %% ===================================================================
 
+suite() ->
+    [{timetrap, infinity}].
+
 init_per_suite(_Config) ->
     _Config.
 
@@ -51,7 +54,6 @@ end_per_suite(_Config) ->
 
 init_per_testcase(Case, _Config) ->
     ct:pal("Beginning test case ~p", [Case]),
-
     _Config.
 
 end_per_testcase(Case, _Config) ->
@@ -66,7 +68,7 @@ all() ->
      code_peer_to_peer_partition_divergence_test
     ].
 
--define(CLIENTS, 8).
+-define(CLIENTS, 4).
 
 %% ===================================================================
 %% tests
@@ -153,4 +155,4 @@ code_peer_to_peer_partition_divergence_test(Config) ->
 
 %% @private
 partitions() ->
-    [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 95].
+   [0, 10, 20, 30, 40, 50, 60, 70, 80].

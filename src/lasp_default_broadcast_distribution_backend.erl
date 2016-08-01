@@ -1186,13 +1186,27 @@ compute_exchange(Peers) ->
                     Percent = lasp_support:puniform(100),
                     lager:info("Partitioning ~p% of the network.",
                                [Percent]),
+
+                    %% Select percentage, minus one node which will be
+                    %% the server node.
                     K = round((Percent / 100) * length(Peers)),
-                    lager:info("Partitioning ~p percent, or ~p nodes.",
+                    lager:info("Partitioning ~p%: ~p nodes.",
                                [Percent, K]),
+                    ServerNodes = case PeerServiceManager:active(server) of
+                        {ok, undefined} ->
+                            [];
+                        {ok, Server} ->
+                            [Server];
+                        error ->
+                            []
+                    end,
+                    lager:info("ServerNodes: ~p", [ServerNodes]),
+
                     Random = select_random_sublist(Peers, K),
+                    RandomAndServer = lists:usort(ServerNodes ++ Random),
                     lager:info("Partitioning ~p from ~p during sync.",
-                               [Random, Peers -- Random]),
-                    Peers -- Random
+                               [RandomAndServer, Peers -- RandomAndServer]),
+                    Peers -- RandomAndServer
             end;
         false ->
             Peers

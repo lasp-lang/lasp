@@ -40,7 +40,7 @@ eunit:
 ct:
 	${REBAR} as test ct --suite=lasp_SUITE
 
-simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation music-festival-simulation
+simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation ad-counter-divergence ad-counter-partition-divergence
 
 peer-to-peer-ad-counter-simulation:
 	${REBAR} as test ct --suite=lasp_peer_to_peer_advertisement_counter_SUITE
@@ -48,8 +48,11 @@ peer-to-peer-ad-counter-simulation:
 client-server-ad-counter-simulation:
 	${REBAR} as test ct --suite=lasp_client_server_advertisement_counter_SUITE
 
-music-festival-simulation:
-	${REBAR} as test ct --suite=lasp_music_festival_SUITE
+ad-counter-divergence:
+	${REBAR} as test ct --suite=lasp_advertisement_counter_divergence_SUITE
+
+ad-counter-partition-divergence:
+	${REBAR} as test ct --suite=lasp_advertisement_counter_partition_divergence_SUITE
 
 ##
 ## Release targets
@@ -104,6 +107,16 @@ plots:
 		./rebar3 ct --readable=false --suite=test/lasp_peer_to_peer_advertisement_counter_SUITE; \
 		./rebar3 ct --readable=false --suite=test/lasp_client_server_advertisement_counter_SUITE; \
 		cd priv/evaluation && make plots
+
+div:
+	pkill -9 beam.smp; \
+		clear; \
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_divergence_SUITE
+
+part-div:
+	pkill -9 beam.smp; \
+		clear; \
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_partition_divergence_SUITE
 
 evaluate-local: SHELL:=/bin/bash
 evaluate-local:

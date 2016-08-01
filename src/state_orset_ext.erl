@@ -74,9 +74,9 @@ new() ->
 
 %% @private
 causal_product(Xs, Ys) ->
-    lists:foldl(fun({X, XDeleted}, XAcc) ->
-                lists:foldl(fun({Y, YDeleted}, YAcc) ->
-                            [{[X, Y], XDeleted orelse YDeleted}] ++ YAcc
+    lists:foldl(fun({X, XActive}, XAcc) ->
+                lists:foldl(fun({Y, YActive}, YAcc) ->
+                            [{[X, Y], XActive andalso YActive}] ++ YAcc
                     end, [], Ys) ++ XAcc
         end, [], Xs).
 

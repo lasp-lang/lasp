@@ -63,6 +63,14 @@ init([]) ->
     %% Schedule advertisement counter impression.
     schedule_impression(),
 
+    %% Build DAG.
+    case lasp_config:get(heavy_client, false) of
+        true ->
+            build_dag();
+        false ->
+            ok
+    end,
+
     %% Schedule logging.
     schedule_logging(),
 
@@ -223,6 +231,23 @@ log_convergence() ->
         false ->
             ok
     end.
+
+%% @private
+build_dag() ->
+    %% Compute the Cartesian product of both ads and contracts.
+    {AdsContractsId, AdsContractsType} = ?ADS_CONTRACTS,
+    {ok, _} = lasp:declare(AdsContractsId, AdsContractsType),
+    ok = lasp:product(?ADS, ?CONTRACTS, ?ADS_CONTRACTS),
+
+    %% Filter items by join on item it.
+    {AdsWithContractsId, AdsWithContractsType} = ?ADS_WITH_CONTRACTS,
+    {ok, _} = lasp:declare(AdsWithContractsId, AdsWithContractsType),
+    FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
+        Id1 =:= Id2
+    end,
+    ok = lasp:filter(?ADS_CONTRACTS, FilterFun, ?ADS_WITH_CONTRACTS),
+
+    ok.
 
 %% @private
 trigger(#ad{counter=CounterId} = Ad, Actor) ->

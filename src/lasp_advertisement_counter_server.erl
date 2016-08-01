@@ -180,7 +180,8 @@ create_ads_and_contracts(Ads, Contracts) ->
 %% @private
 build_dag() ->
     %% For each identifier, generate a contract.
-    {ok, {Contracts, _, _, _}} = lasp:declare(?SET_TYPE),
+    {ContractsId, ContractsType} = ?CONTRACTS,
+    {ok, {Contracts, _, _, _}} = lasp:declare(ContractsId, ContractsType),
 
     %% Generate Rovio's advertisements.
     {ok, {RovioAds, _, _, _}} = lasp:declare(?SET_TYPE),
@@ -199,16 +200,17 @@ build_dag() ->
     ok = lasp:union(RovioAds, RiotAds, ?ADS),
 
     %% Compute the Cartesian product of both ads and contracts.
-    {ok, {AdsContracts, _, _, _}} = lasp:declare(?SET_TYPE),
-    ok = lasp:product(?ADS, Contracts, AdsContracts),
+    {AdsContractsId, AdsContractsType} = ?ADS_CONTRACTS,
+    {ok, _} = lasp:declare(AdsContractsId, AdsContractsType),
+    ok = lasp:product(?ADS, ?CONTRACTS, ?ADS_CONTRACTS),
 
     %% Filter items by join on item it.
-    {AdsContractsId, AdsContractsType} = ?ADS_WITH_CONTRACTS,
-    {ok, _} = lasp:declare(AdsContractsId, AdsContractsType),
+    {AdsWithContractsId, AdsWithContractsType} = ?ADS_WITH_CONTRACTS,
+    {ok, _} = lasp:declare(AdsWithContractsId, AdsWithContractsType),
     FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
         Id1 =:= Id2
     end,
-    ok = lasp:filter(AdsContracts, FilterFun, ?ADS_WITH_CONTRACTS),
+    ok = lasp:filter(?ADS_CONTRACTS, FilterFun, ?ADS_WITH_CONTRACTS),
 
     {ok, AdList}.
 

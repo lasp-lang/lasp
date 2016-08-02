@@ -13,6 +13,6 @@ RUN cd /tmp && \
 CMD cd /opt && \
     git clone https://github.com/lasp-lang/lasp.git -b env_for_dcos && \
     cd lasp && \
-    (cd priv/ && ./evaluate-mesos-setup.sh) && \
+    ./priv/evaluate-mesos-setup.sh && \
     make stage && \
     /opt/lasp/_build/default/rel/lasp/bin/env

@@ -373,6 +373,6 @@ push_logs() ->
             ok;
         _ ->
             lager:info("Will push logs"),
-            Result = os:cmd("cd " ++ code:priv_dir(?APP) ++ " ; ./push_logs.sh"),
+            Result = os:cmd("cd " ++ code:priv_dir(?APP) ++ " ; ./evaluate-mesos-push.sh"),
             lager:info("Logs pushed. Output ~p", [Result])
     end.

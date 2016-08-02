@@ -374,5 +374,5 @@ push_logs() ->
         _ ->
             lager:info("Will push logs"),
             Result = os:cmd("cd " ++ code:priv_dir(?APP) ++ " ; ./push_logs.sh"),
-            lager:info("Logs pushed. Output ~p", [Result]);
+            lager:info("Logs pushed. Output ~p", [Result])
     end.

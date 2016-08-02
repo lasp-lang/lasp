@@ -41,13 +41,12 @@ echo "Checking in results."
 ( cd priv/evaluation ; git commit -m 'Adding evaluation data.' )
 ( cd priv/evaluation ; git status )
 
-RETRIES=10
+RETRIES=100
 R=0
 (cd priv/evaluation ; GIT_SSH=../$GIT_SSH git push -u origin)
 
 while [ $R -lt $RETRIES -a $? -ne 0 ]
 do
-  echo "R $R"
   sleep 1
   R=$[$R+1]
   (cd priv/evaluation ; GIT_SSH=../$GIT_SSH git pull --rebase && GIT_SSH=../$GIT_SSH git push -u origin)

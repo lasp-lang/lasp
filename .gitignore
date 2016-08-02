@@ -4,6 +4,7 @@ deps/*
 ebin/*
 dev
 bin/*.swp
+priv/*.swp
 src/*.swp
 test/*.swp
 tags

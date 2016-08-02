@@ -211,6 +211,12 @@ configure_defaults() ->
                                        ClientNumberDefault),
     lasp_config:set(client_number, ClientNumber),
 
+    HeavyClientsDefault = list_to_atom(os:getenv("HEAVY_CLIENTS", "false")),
+    HeavyClients = application:get_env(?APP,
+                                       heavy_clients,
+                                       HeavyClientsDefault),
+    lasp_config:set(heavy_clients, HeavyClients),
+
     %% Peer service.
     PeerService = application:get_env(plumtree,
                                       peer_service,

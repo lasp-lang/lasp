@@ -44,8 +44,9 @@ echo "Checking in results."
 RETRIES=10
 R=0
 OK=$(cd priv/evaluation ; GIT_SSH=../$GIT_SSH git push -u origin)
+echo "OK: $OK"
 
-while [ $R -lt $RETRIES -a $OK -ne 0 ]
+while [ $R -lt $RETRIES -a ${OK} -ne 0 ]
 do
   sleep 1
   echo "BEFORE PUSH:"

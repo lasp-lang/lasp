@@ -19,11 +19,11 @@
 %% -------------------------------------------------------------------
 %%
 
--module(lasp_advertisement_counter_divergence_SUITE).
--author("Vitor Enes Duarte <vitorenesduarte@gmail.com>").
+-module(lasp_advertisement_counter_partition_overcounting_SUITE).
+-author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 %% common_test callbacks
--export([%% suite/0,
+-export([suite/0,
          init_per_suite/1,
          end_per_suite/1,
          init_per_testcase/2,
@@ -43,6 +43,9 @@
 %% common_test callbacks
 %% ===================================================================
 
+suite() ->
+    [{timetrap, infinity}].
+
 init_per_suite(_Config) ->
     _Config.
 
@@ -51,7 +54,6 @@ end_per_suite(_Config) ->
 
 init_per_testcase(Case, _Config) ->
     ct:pal("Beginning test case ~p", [Case]),
-
     _Config.
 
 end_per_testcase(Case, _Config) ->
@@ -61,84 +63,89 @@ end_per_testcase(Case, _Config) ->
 
 all() ->
     [
-     client_server_divergence_test,
-     peer_to_peer_divergence_test,
-     code_peer_to_peer_divergence_test
+     client_server_partition_overcounting_test,
+     peer_to_peer_partition_overcounting_test,
+     code_peer_to_peer_partition_overcounting_test
     ].
+
+-define(CLIENTS, 4).
 
 %% ===================================================================
 %% tests
 %% ===================================================================
 
--define(MIN_POW, 2).
--define(MAX_POW, 3).
-
 default_test(_Config) ->
     ok.
 
-client_server_divergence_test(Config) ->
+client_server_partition_overcounting_test(Config) ->
     lists:foreach(
-        fun(ClientNumber) ->
-            lasp_config:set(client_number, ClientNumber),
-            EvaluationIdentifier = list_to_atom("client_server_divergence_" ++ integer_to_list(ClientNumber)),
+        fun(PartitionProbability) ->
+            lasp_config:set(client_number, ?CLIENTS),
+            lasp_config:set(partition_probability, PartitionProbability),
+            EvaluationIdentifier = list_to_atom("client_server_partition_overcounting_" ++ integer_to_list(PartitionProbability)),
 
-            lasp_simulation_support:run(client_server_divergence_test,
+            lasp_simulation_support:run(client_server_partition_overcounting_test,
                 Config,
                 [{mode, delta_based},
-                 {simulation, ad_counter_divergence},
+                 {simulation, ad_counter_partition_overcounting},
                  {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
                  {set, orset},
                  {broadcast, false},
                  {instrumentation, false},
                  {heavy_client, false},
+                 {partition_probability, PartitionProbability},
                  {evaluation_identifier, EvaluationIdentifier}]
             )
         end,
-        clients()
+        partitions()
     ),
     ok.
 
-peer_to_peer_divergence_test(Config) ->
+peer_to_peer_partition_overcounting_test(Config) ->
     lists:foreach(
-        fun(ClientNumber) ->
-            lasp_config:set(client_number, ClientNumber),
-            EvaluationIdentifier = list_to_atom("peer_to_peer_divergence_" ++ integer_to_list(ClientNumber)),
+        fun(PartitionProbability) ->
+            lasp_config:set(client_number, ?CLIENTS),
+            lasp_config:set(partition_probability, PartitionProbability),
+            EvaluationIdentifier = list_to_atom("peer_to_peer_partition_overcounting_" ++ integer_to_list(PartitionProbability)),
 
-            lasp_simulation_support:run(peer_to_peer_divergence_test,
+            lasp_simulation_support:run(peer_to_peer_partition_overcounting_test,
                 Config,
                 [{mode, delta_based},
-                 {simulation, ad_counter_divergence},
+                 {simulation, ad_counter_partition_overcounting},
                  {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
                  {set, orset},
                  {broadcast, false},
                  {instrumentation, false},
                  {heavy_client, false},
+                 {partition_probability, PartitionProbability},
                  {evaluation_identifier, EvaluationIdentifier}]
             )
         end,
-        clients()
+        partitions()
     ),
     ok.
 
-code_peer_to_peer_divergence_test(Config) ->
+code_peer_to_peer_partition_overcounting_test(Config) ->
     lists:foreach(
-        fun(ClientNumber) ->
-            lasp_config:set(client_number, ClientNumber),
-            EvaluationIdentifier = list_to_atom("code_peer_to_peer_divergence_" ++ integer_to_list(ClientNumber)),
+        fun(PartitionProbability) ->
+            lasp_config:set(client_number, ?CLIENTS),
+            lasp_config:set(partition_probability, PartitionProbability),
+            EvaluationIdentifier = list_to_atom("code_peer_to_peer_partition_overcounting_" ++ integer_to_list(PartitionProbability)),
 
-            lasp_simulation_support:run(code_peer_to_peer_divergence_test,
+            lasp_simulation_support:run(code_peer_to_peer_partition_overcounting_test,
                 Config,
                 [{mode, delta_based},
-                 {simulation, ad_counter_divergence},
+                 {simulation, ad_counter_partition_overcounting},
                  {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
                  {set, orset},
                  {broadcast, false},
                  {instrumentation, false},
                  {heavy_client, true},
+                 {partition_probability, PartitionProbability},
                  {evaluation_identifier, EvaluationIdentifier}]
             )
         end,
-        clients()
+        partitions()
     ),
     ok.
 
@@ -146,11 +153,6 @@ code_peer_to_peer_divergence_test(Config) ->
 %% Internal functions
 %% ===================================================================
 
-clients() ->
-    lists:map(
-        fun(Power) ->
-            round(math:pow(2, Power))
-        end,
-        lists:seq(?MIN_POW, ?MAX_POW)
-    ).
-
+%% @private
+partitions() ->
+   [0, 10, 20, 30, 40, 50, 60, 70].

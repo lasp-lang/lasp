@@ -127,7 +127,7 @@ handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
             lager:info("All nodes have pushed their logs"),
             log_convergence(),
             lasp_support:push_logs(),
-            log_divergence(AdList),
+            log_overcounting(AdList),
             lasp_config:set(simulation_end, true);
         false ->
             schedule_check_simulation_end()
@@ -262,9 +262,9 @@ log_convergence() ->
     end.
 
 %% @private
-log_divergence(AdList) ->
+log_overcounting(AdList) ->
     Filename = filename(),
-    Divergence = compute_divergence(AdList),
+    Divergence = compute_overcounting(AdList),
     lager:info("Divergence ~p", [Divergence]),
 
     ok = file:write_file(
@@ -280,7 +280,7 @@ filename() ->
     EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
     Id = atom_to_list(Simulation) ++ "/" ++ atom_to_list(EvalIdentifier),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
-    Filename = "divergence",
+    Filename = "overcounting",
     Dir = code:priv_dir(?APP) ++ "/evaluation/logs/"
         ++ Id ++ "/"
         ++ integer_to_list(EvalTimestamp) ++ "/",
@@ -288,15 +288,16 @@ filename() ->
     Dir ++ Filename.
 
 %% @private
-compute_divergence(AdList) ->
-    DivergenceSum = lists:foldl(
+compute_overcounting(AdList) ->
+    OvercountingSum = lists:foldl(
         fun(#ad{counter=CounterId} = _Ad, Acc) ->
             {ok, Value} = lasp:query(CounterId),
-            Divergence = Value - ?MAX_IMPRESSIONS,
-            Acc + Divergence
+            Overcounting = Value - ?MAX_IMPRESSIONS,
+            OvercountingPercentage = (Overcounting * 100) / ?MAX_IMPRESSIONS,
+            Acc + OvercountingPercentage
         end,
         0,
         AdList
     ),
 
-    DivergenceSum / length(AdList).
+    OvercountingSum / length(AdList).

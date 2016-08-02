@@ -246,6 +246,13 @@ configure_defaults() ->
     lasp_config:set(aae_interval, AAEInterval),
     application:set_env(plumtree, broadcast_exchange_timer, AAEInterval),
 
+    %% Delta interval.
+    DeltaIntervalDefault = list_to_integer(os:getenv("DELTA_INTERVAL", "10000")),
+    DeltaInterval = application:get_env(?APP,
+                                        delta_interval,
+                                        DeltaIntervalDefault),
+    lasp_config:set(delta_interval, DeltaInterval),
+
     %% Backend configurations.
     StorageBackend = application:get_env(
                        ?APP,

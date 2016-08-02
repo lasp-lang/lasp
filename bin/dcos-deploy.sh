@@ -3,10 +3,20 @@
 ENV_VARS=(
   DCOS
   TOKEN
-  ELB_HOST
   EVALUATION_PASSPHRASE
+  ELB_HOST
+  PEER_SERVICE
   MODE
   BROADCAST
+  SIMULATION
+  EVAL_ID
+  EVAL_TIMESTAMP
+  CLIENT_NUMBER
+  HEAVY_CLIENTS
+  PARTITION_PROBABILITY
+  AAE_INTERVAL
+  DELTA_INTERVAL
+  INSTRUMENTATION
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -47,12 +57,21 @@ cat <<EOF > lasp-server.json
   "ports": [0, 0],
   "env": {
     "AD_COUNTER_SIM_SERVER": "true",
-    "AD_COUNTER_SIM_CLIENT": "true",
+    "DCOS": "$DCOS",
+    "TOKEN": "$TOKEN",
+    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
+    "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",
     "BROADCAST": "$BROADCAST",
-    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
-    "DCOS": "$DCOS",
-    "TOKEN": "$TOKEN"
+    "SIMULATION": "$SIMULATION",
+    "EVAL_ID": "$EVAL_ID",
+    "EVAL_TIMESTAMP": "$EVAL_TIMESTAMP",
+    "CLIENT_NUMBER": "$CLIENT_NUMBER",
+    "HEAVY_CLIENTS": "$HEAVY_CLIENTS",
+    "PARTITION_PROBABILITY": "$PARTITION_PROBABILITY",
+    "AAE_INTERVAL": "$AAE_INTERVAL",
+    "DELTA_INTERVAL": "$DELTA_INTERVAL",
+    "INSTRUMENTATION": "$INSTRUMENTATION"
   },
   "labels": {
       "HAPROXY_GROUP":"external",
@@ -91,7 +110,7 @@ cat <<EOF > lasp-client.json
   "dependencies": [],
   "cpus": 1.0,
   "mem": 2048.0,
-  "instances": 5,
+  "instances": $CLIENT_NUMBER,
   "container": {
     "type": "DOCKER",
     "docker": {
@@ -106,11 +125,21 @@ cat <<EOF > lasp-client.json
   "ports": [0, 0],
   "env": {
     "AD_COUNTER_SIM_CLIENT": "true",
+    "DCOS": "$DCOS",
+    "TOKEN": "$TOKEN",
+    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
+    "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",
     "BROADCAST": "$BROADCAST",
-    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
-    "DCOS": "$DCOS",
-    "TOKEN": "$TOKEN"
+    "SIMULATION": "$SIMULATION",
+    "EVAL_ID": "$EVAL_ID",
+    "EVAL_TIMESTAMP": "$EVAL_TIMESTAMP",
+    "CLIENT_NUMBER": "$CLIENT_NUMBER",
+    "HEAVY_CLIENTS": "$HEAVY_CLIENTS",
+    "PARTITION_PROBABILITY": "$PARTITION_PROBABILITY",
+    "AAE_INTERVAL": "$AAE_INTERVAL",
+    "DELTA_INTERVAL": "$DELTA_INTERVAL",
+    "INSTRUMENTATION": "$INSTRUMENTATION"
   },
   "healthChecks": [
     {

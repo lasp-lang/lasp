@@ -238,6 +238,14 @@ configure_defaults() ->
                                 normal)
     end,
 
+    %% AAE interval.
+    AAEIntervalDefault = list_to_integer(os:getenv("AAE_INTERVAL", "10000")),
+    AAEInterval = application:get_env(?APP,
+                                      aae_interval,
+                                      AAEIntervalDefault),
+    lasp_config:set(aae_interval, AAEInterval),
+    application:set_env(plumtree, broadcast_exchange_timer, AAEInterval),
+
     %% Backend configurations.
     StorageBackend = application:get_env(
                        ?APP,

@@ -155,4 +155,4 @@ code_peer_to_peer_partition_overcounting_test(Config) ->
 
 %% @private
 partitions() ->
-   [0, 10, 20, 30, 40, 50, 60, 70, 80].
+   [0, 10, 20, 30, 40, 50, 60, 70].

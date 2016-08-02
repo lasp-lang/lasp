@@ -296,7 +296,8 @@ compute_overcounting(AdList) ->
         fun(#ad{counter=CounterId} = _Ad, Acc) ->
             {ok, Value} = lasp:query(CounterId),
             Overcounting = Value - ?MAX_IMPRESSIONS,
-            Acc + Overcounting
+            OvercountingPercentage = (Overcounting * 100) / ?MAX_IMPRESSIONS,
+            Acc + OvercountingPercentage
         end,
         0,
         AdList

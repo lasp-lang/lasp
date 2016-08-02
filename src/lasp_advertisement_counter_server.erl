@@ -276,16 +276,13 @@ log_divergence(AdList) ->
 
 %% @private
 filename() ->
-    EvalIdentifier = case lasp_config:get(evaluation_identifier, undefined) of
-        undefined ->
-            "undefined";
-        {Simulation, Id} ->
-            atom_to_list(Simulation) ++ "/" ++ atom_to_list(Id)
-    end,
+    Simulation = lasp_config:get(simulation, undefined),
+    EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
+    Id = atom_to_list(Simulation) ++ "/" ++ atom_to_list(EvalIdentifier),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     Filename = "divergence",
     Dir = code:priv_dir(?APP) ++ "/evaluation/logs/"
-        ++ EvalIdentifier ++ "/"
+        ++ Id ++ "/"
         ++ integer_to_list(EvalTimestamp) ++ "/",
     filelib:ensure_dir(Dir),
     Dir ++ Filename.

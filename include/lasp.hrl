@@ -129,6 +129,9 @@
 
 -define(DEFAULT_DISTRIBUTION_BACKEND, lasp_default_broadcast_distribution_backend).
 
-%% Ad counter.
+%% Lexer and parser.
+-define(SQL_LEXER, lasp_sql_lexer).
+-define(SQL_PARSER, lasp_sql_parser).
+
 -record(ad, {id, name, image, counter}).
 -record(contract, {id}).

@@ -217,6 +217,12 @@ configure_defaults() ->
                                        HeavyClientsDefault),
     lasp_config:set(heavy_clients, HeavyClients),
 
+    PartitionProbabilityDefault = list_to_integer(os:getenv("PARTITION_PROBABILITY", "0")),
+    PartitionProbability = application:get_env(?APP,
+                                               partition_probability,
+                                               PartitionProbabilityDefault),
+    lasp_config:set(partition_probability, PartitionProbability),
+
     %% Peer service.
     PeerService = application:get_env(plumtree,
                                       peer_service,

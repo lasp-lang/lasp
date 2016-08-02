@@ -69,13 +69,11 @@ init(_Args) ->
     end,
 
     %% Configure the peer service.
-    case partisan_config:get(partisan_peer_service_manager, false) of
-        false ->
-            partisan_config:set(partisan_peer_service_manager,
-                                partisan_client_server_peer_service_manager);
-        _ ->
-            ok
-    end,
+    PeerServiceDefault = list_to_atom(os:getevn("PEER_SERVICE", "partisan_hyparview_peer_service_manager")),
+    PeerService = application:get_env(?APP,
+                                      partisan_peer_service_manager,
+                                      PeerServiceDefault),
+    lasp_config:set(partisan_peer_service_manager, PeerService),
 
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},

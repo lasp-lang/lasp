@@ -81,6 +81,12 @@ all() ->
      contracted_latency_test,
      uncontracted_latency_test,
      latency_with_reads_test,
+     sql_parser_test,
+     sql_combined_view_test,
+     sql_simple_contracted_latency_test,
+     sql_simple_uncontracted_latency_test,
+     sql_join_contracted_latency_test,
+     sql_join_uncontracted_latency_test,
      stream_test,
      query_test,
      ivar_test,
@@ -104,11 +110,38 @@ all() ->
 
 -define(AWSET_PS, awset_ps).
 -define(COUNTER, pncounter).
-
--define(ID, <<"myidentifier">>).
 -define(LATENCY_ITERATIONS, 1000).
 
-parser_test(_Config) ->
+-define(ID, <<"myidentifier">>).
+
+contracted_latency_test(_Config) ->
+    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
+        true ->
+            Res = latency_test_case(5, contraction, no_read, ?LATENCY_ITERATIONS),
+            write_csv(path_contraction, contraction, Res);
+
+        _ -> ok
+    end.
+
+uncontracted_latency_test(_Config) ->
+    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
+        true ->
+            Res = latency_test_case(5, no_contraction, no_read, ?LATENCY_ITERATIONS),
+            write_csv(path_contraction, no_contraction, Res);
+
+        _ -> ok
+    end.
+
+latency_with_reads_test(_Config) ->
+    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
+        true ->
+            Res = latency_test_case(5, contraction, random_reads, ?LATENCY_ITERATIONS),
+            write_csv(path_contraction, contraction_with_reads, Res);
+
+        _ -> ok
+    end.
+
+sql_parser_test(_Config) ->
     ok = lasp_sql_materialized_view:create_table_with_values(users, [
         [{name, "Foo"}, {age, 22}],
         [{name, "Bar"}, {age, 9}],
@@ -154,7 +187,7 @@ parser_test(_Config) ->
 
     ok.
 
-combined_view_test(_Config) ->
+sql_combined_view_test(_Config) ->
     ok = lasp_sql_materialized_view:create_table_with_values(classics, [
         [{title, "Breathless"}, {year, 1960}, {rating, 80}],
         [{title, "A Woman Is a Woman"}, {year, 1961}, {rating, 76}],
@@ -232,28 +265,83 @@ latency_run_case(Iterations, Acc, RandomReadsConfig,
     latency_run_case(Iterations - 1, [Time | Acc], RandomReadsConfig,
                      From, Intermediate, To, Mutator, NewThreshold).
 
-contracted_latency_test(_Config) ->
-    case lasp_config:get(dag_enabled, false) of
-        false -> ok;
+
+sql_simple_contracted_latency_test(_Config) ->
+    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
         true ->
-            Res = latency_test_case(5, contraction, no_read, ?LATENCY_ITERATIONS),
-            write_csv(contraction, Res)
+            %% Topology.
+            Initial = lasp_sql_materialized_view:create_empty_table(initial),
+            Middle = lasp_sql_materialized_view:create_empty_table(middle),
+            Final = lasp_sql_materialized_view:create_empty_table(final),
+
+            {ok, _} = lasp_sql_materialized_view:create(Middle,
+                                                        "select a, b, c from initial where a > 0"),
+
+            {ok, _} = lasp_sql_materialized_view:create(Final,
+                                                        "select b, c from middle where b = 'foo'"),
+
+            {ok, ResultTable} = lasp_sql_materialized_view:create("select c from final where c < 20"),
+
+            Res = sql_latency_test_case(contraction, ?LATENCY_ITERATIONS, Initial, ResultTable, [{a, 1}, {b, "foo"}, {c, 0}]),
+            write_csv(sql_simple_queries, contraction, Res);
+
+        _ -> ok
     end.
 
-uncontracted_latency_test(_Config) ->
-    case lasp_config:get(dag_enabled, false) of
-        false -> ok;
+sql_simple_uncontracted_latency_test(_Config) ->
+    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
         true ->
-            Res = latency_test_case(5, no_contraction, no_read, ?LATENCY_ITERATIONS),
-            write_csv(no_contraction, Res)
+            %% Topology.
+            Initial = lasp_sql_materialized_view:create_empty_table(initial),
+            Middle = lasp_sql_materialized_view:create_empty_table(middle),
+            Final = lasp_sql_materialized_view:create_empty_table(final),
+
+            {ok, _} = lasp_sql_materialized_view:create(Middle,
+                                                        "select a, b, c from initial where a > 0"),
+
+            {ok, _} = lasp_sql_materialized_view:create(Final,
+                                                        "select b, c from middle where b = 'foo'"),
+
+            {ok, ResultTable} = lasp_sql_materialized_view:create("select c from final where c < 20"),
+
+            Res = sql_latency_test_case(no_contraction, ?LATENCY_ITERATIONS, Initial, ResultTable, [{a, 1}, {b, "foo"}, {c, 0}]),
+            write_csv(sql_simple_queries, no_contraction, Res);
+
+        _ -> ok
     end.
 
-latency_with_reads_test(_Config) ->
-    case lasp_config:get(dag_enabled, false) of
-        false -> ok;
+sql_join_contracted_latency_test(_Config) ->
+    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
         true ->
-            Res = latency_test_case(5, contraction, random_reads, ?LATENCY_ITERATIONS),
-            write_csv(contraction_with_reads, Res)
+            %% Topology.
+            Initial = lasp_sql_materialized_view:create_empty_table(initial),
+            Final = lasp_sql_materialized_view:create_empty_table(final),
+            {ok, _} = lasp_sql_materialized_view:create(Final,
+                                                        "select a, b, c from initial where a > 0 and b = 'foo'"),
+
+            {ok, ResultTable} = lasp_sql_materialized_view:create("select c from final where c < 20"),
+
+            Res = sql_latency_test_case(contraction, ?LATENCY_ITERATIONS, Initial, ResultTable, [{a, 1}, {b, "foo"}, {c, 0}]),
+            write_csv(sql_join_queries, contraction, Res);
+
+        _ -> ok
+    end.
+
+sql_join_uncontracted_latency_test(_Config) ->
+    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
+        true ->
+            %% Topology.
+            Initial = lasp_sql_materialized_view:create_empty_table(initial),
+            Final = lasp_sql_materialized_view:create_empty_table(final),
+            {ok, _} = lasp_sql_materialized_view:create(Final,
+                                                        "select a, b, c from initial where a > 0 and b = 'foo'"),
+
+            {ok, ResultTable} = lasp_sql_materialized_view:create("select c from final where c < 20"),
+
+            Res = sql_latency_test_case(no_contraction, ?LATENCY_ITERATIONS, Initial, ResultTable, [{a, 1}, {b, "foo"}, {c, 0}]),
+            write_csv(sql_join_queries, no_contraction, Res);
+
+        _ -> ok
     end.
 
 generate_path(N, Type) ->
@@ -271,15 +359,36 @@ zipwith(Fn, [X | Xs], [Y | Ys]) ->
 
 zipwith(Fn, _, _) when is_function(Fn, 2) -> [].
 
-write_csv(Option, Cases) ->
+sql_latency_test_case(Optimization, Iterations, From, To, Mutation) ->
+    case Optimization of
+        contraction -> lasp_dependence_dag:contract();
+        _ -> ok
+    end,
+    sql_run_case(Iterations, [], From, To, Mutation, undefined).
+
+sql_run_case(0, Acc, _, _, _, _) -> lists:reverse(Acc);
+sql_run_case(Iterations, Acc, From, To, Row, Threshold0) ->
+    Threshold = case Threshold0 of
+        undefined -> {strict, undefined};
+        _ -> {strict, Threshold0}
+    end,
+    MutateAndRead = fun(F, T, R, Th) ->
+        lasp_sql_materialized_view:insert_row(F, R),
+        lasp:read(T, Th)
+    end,
+    {Time, {ok, {_, _, _, NewThreshold}}} = timer:tc(MutateAndRead, [From, To, Row, Threshold]),
+    sql_run_case(Iterations - 1, [Time | Acc], From, To, Row, NewThreshold).
+
+write_csv(Dir, Option, Cases) ->
     Path = code:priv_dir(lasp)
-           ++ "/evaluation/logs/path_contraction/"
+           ++ "/evaluation/logs/"
+           ++ atom_to_list(Dir) ++ "/"
            ++ atom_to_list(Option) ++ "/"
            ++ integer_to_list(timestamp()) ++ "/",
     ok = filelib:ensure_dir(Path),
-    lists:foreach(fun(Case) ->
-        file:write_file(Path ++ "runner.csv", io_lib:fwrite("~p\n", [Case]), [append])
-    end, Cases).
+   lists:foreach(fun(Case) ->
+       file:write_file(Path ++ "runner.csv", io_lib:fwrite("~p\n", [Case]), [append])
+   end, Cases).
 
 timestamp() ->
     {Mega, Sec, _Micro} = erlang:timestamp(),

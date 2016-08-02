@@ -168,16 +168,13 @@ log_dir() ->
 
 %% @private
 create_dir() ->
-    EvalIdentifier = case lasp_config:get(evaluation_identifier, undefined) of
-        undefined ->
-            "undefined";
-        {Simulation, Id} ->
-            atom_to_list(Simulation) ++ "/" ++ atom_to_list(Id)
-    end,
+    Simulation = lasp_config:get(simulation, undefined),
+    EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
+    Id = atom_to_list(Simulation) ++ "/" ++ atom_to_list(EvalIdentifier),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     Filename = io_lib:format("~s.csv", [node()]),
     Path = log_dir() ++ "/"
-        ++ EvalIdentifier ++ "/"
+        ++ Id ++ "/"
         ++ integer_to_list(EvalTimestamp) ++ "/",
     filelib:ensure_dir(Path),
     Path ++ Filename.

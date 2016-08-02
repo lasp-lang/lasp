@@ -1,34 +1,21 @@
 #!/bin/bash
 
-if [ -z "$DCOS" ]; then
-  echo ">>> DCOS is not configured; please export DCOS."
-  exit 1
-fi
+ENV_VARS=(
+  DCOS
+  TOKEN
+  ELB_HOST
+  EVALUATION_PASSPHRASE
+  MODE
+  BROADCAST
+)
 
-if [ -z "$MODE" ]; then
-  echo ">>> MODE is not configured; please export MODE."
-  exit 1
-fi
-
-if [ -z "$BROADCAST" ]; then
-  echo ">>> BROADCAST is not configured; please export BROADCAST."
-  exit 1
-fi
-
-if [ -z "$TOKEN" ]; then
-  echo ">>> TOKEN is not configured; please export TOKEN."
-  exit 1
-fi
-
-if [ -z "$ELB_HOST" ]; then
-  echo ">>> ELB_HOST is not configured; please export ELB_HOST."
-  exit 1
-fi
-
-if [ -z "$EVALUATION_PASSPHRASE" ]; then
-  echo ">>> EVALUATION_PASSPHRASE is not configured; please export EVALUATION_PASSPHRASE."
-  exit 1
-fi
+for ENV_VAR in "${ENV_VARS[@]}"
+do
+  if [ -z "${!ENV_VAR}" ]; then
+    echo ">>> ${ENV_VAR} is not configured; please export it."
+    exit 1
+  fi
+done
 
 echo ">>> Beginning deployment!"
 

@@ -3,6 +3,7 @@
 deps/*
 ebin/*
 dev
+bin/*.swp
 src/*.swp
 test/*.swp
 tags

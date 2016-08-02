@@ -1,4 +1,4 @@
-%% -------------------------------------------------------------------
+%% ------------------------------------------------------------------
 %%
 %% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
 %%
@@ -25,29 +25,27 @@
 -include("lasp.hrl").
 
 -export([run/3]).
--export([should_push_logs/0, push_logs/0]).
 
 run(Case, Config, Options) ->
+    ClientNumber = lasp_config:get(client_number, 3),
+    NodeNames = node_list(ClientNumber),
+
+    ct:pal("Running ~p with nodes ~p", [Case, NodeNames]),
+
     lists:foreach(
         fun(_EvalNumber) ->
-            Nodes = start(
+            Server = start(
               Case,
               Config,
-              [{evaluation_timestamp, timestamp()} | Options]
+              [{client_number, ClientNumber},
+               {nodes, NodeNames},
+               {evaluation_timestamp, timestamp()} | Options]
             ),
-            wait_for_completion(Nodes),
-            stop(Nodes)
+            wait_for_completion(Server),
+            stop(NodeNames)
         end,
         lists:seq(1, ?EVAL_NUMBER)
     ).
-
-should_push_logs() ->
-    DCOS = os:getenv("DCOS", "false"),
-    list_to_atom(DCOS).
-
-push_logs() ->
-    Result = os:cmd("cd " ++ code:priv_dir(?APP) ++ " ; ./push_logs.sh"),
-    ct:pal("Logs pushed. Output: ~p", [Result]).
 
 %% @private
 start(_Case, _Config, Options) ->
@@ -87,7 +85,9 @@ start(_Case, _Config, Options) ->
                                     ct:fail(Error)
                             end
                      end,
-    [First|_] = Nodes = lists:map(InitializerFun, ?CT_SLAVES),
+
+    NodeNames = proplists:get_value(nodes, Options),
+    [Server | _] = Nodes = lists:map(InitializerFun, NodeNames),
 
     %% Load Lasp on all of the nodes.
     LoaderFun = fun(Node) ->
@@ -140,33 +140,15 @@ start(_Case, _Config, Options) ->
                         ok = rpc:call(Node, application, set_env,
                                       [plumtree, broadcast_exchange_timer, ?AAE_INTERVAL]),
 
-                        %% Configure number of impressions.
-                        ok = rpc:call(Node, lasp_config, set,
-                                      [simulation_event_number, ?IMPRESSION_NUMBER]),
-
                         %% Configure who should be the server and who's
                         %% the client.
-                        Simulation = proplists:get_value(simulation, Options),
-
-                        case Simulation of
-                            ad_counter ->
-                                case Node of
-                                    First ->
-                                        ok = rpc:call(Node, lasp_config, set,
-                                                      [ad_counter_simulation_server, true]);
-                                    _ ->
-                                        ok = rpc:call(Node, lasp_config, set,
-                                                      [ad_counter_simulation_client, true])
-                                end;
-                            music_festival ->
-                                case Node of
-                                    First ->
-                                        ok = rpc:call(Node, lasp_config, set,
-                                                      [music_festival_simulation_server, true]);
-                                    _ ->
-                                        ok = rpc:call(Node, lasp_config, set,
-                                                      [music_festival_simulation_client, true])
-                                end
+                        case Node of
+                            Server ->
+                                ok = rpc:call(Node, lasp_config, set,
+                                              [ad_counter_simulation_server, true]);
+                            _ ->
+                                ok = rpc:call(Node, lasp_config, set,
+                                              [ad_counter_simulation_client, true])
                         end,
 
                         %% Configure the peer service.
@@ -178,6 +160,14 @@ start(_Case, _Config, Options) ->
                         Mode = proplists:get_value(mode, Options),
                         ok = rpc:call(Node, lasp_config, set, [mode, Mode]),
 
+                        %% Configure where code should run.
+                        HeavyClient = proplists:get_value(heavy_client, Options, false),
+                        ok = rpc:call(Node, lasp_config, set, [heavy_client, HeavyClient]),
+
+                        %% Configure partitions.
+                        PartitionProbability = proplists:get_value(partition_probability, Options, 0),
+                        ok = rpc:call(Node, lasp_config, set, [partition_probability, PartitionProbability]),
+
                         %% Configure broadcast settings.
                         Broadcast = proplists:get_value(broadcast, Options),
                         ok = rpc:call(Node, lasp_config, set,
@@ -188,6 +178,7 @@ start(_Case, _Config, Options) ->
                         ok = rpc:call(Node, lasp_config, set, [set, Set]),
 
                         %% Configure evaluation identifier.
+                        Simulation = proplists:get_value(simulation, Options),
                         EvalIdentifier = proplists:get_value(evaluation_identifier, Options),
                         ok = rpc:call(Node, lasp_config, set,
                                       [evaluation_identifier, {Simulation, EvalIdentifier}]),
@@ -198,8 +189,14 @@ start(_Case, _Config, Options) ->
                                       [evaluation_timestamp, EvalTimestamp]),
 
                         %% Configure instrumentation.
+                        Instrumentation = proplists:get_value(instrumentation, Options, true),
                         ok = rpc:call(Node, lasp_config, set,
-                                      [instrumentation, true])
+                                      [instrumentation, Instrumentation]),
+
+                        %% Configure client number.
+                        ClientNumber = proplists:get_value(client_number, Options),
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [client_number, ClientNumber])
                    end,
     lists:map(ConfigureFun, Nodes),
 
@@ -216,7 +213,7 @@ start(_Case, _Config, Options) ->
 
     ct:pal("Lasp fully initialized."),
 
-    Nodes.
+    Server.
 
 %% @private
 %%
@@ -239,7 +236,7 @@ cluster(Node, OtherNode) ->
                   [{OtherNode, {127, 0, 0, 1}, PeerPort}]).
 
 %% @private
-stop(_Nodes) ->
+stop(Nodes) ->
     StopFun = fun(Node) ->
         case ct_slave:stop(Node) of
             {ok, _} ->
@@ -248,21 +245,20 @@ stop(_Nodes) ->
                 ct:fail(Error)
         end
     end,
-    lists:map(StopFun, ?CT_SLAVES),
+    lists:map(StopFun, Nodes),
     ok.
 
 %% @private
-wait_for_completion([Server | _] = _Nodes) ->
-    ct:pal("Waiting for convergence"),
-    case lasp_support:wait_until(
-        fun() ->
-            Convergence = rpc:call(Server, lasp_config, get, [convergence, false]),
-            Convergence == true
-        end, 60*4, ?CONVERGENCE_INTERVAL) of
+wait_for_completion(Server) ->
+    ct:pal("Waiting for simulation to end"),
+    case lasp_support:wait_until(fun() ->
+                SimulationEnd = rpc:call(Server, lasp_config, get, [simulation_end, false]),
+                SimulationEnd == true
+        end, 60*10, ?STATUS_INTERVAL) of
         ok ->
-            ct:pal("Convergence reached!");
+            ct:pal("Simulation ended with success");
         Error ->
-            ct:fail("Convergence not reached: ~p", [Error])
+            ct:fail("Simulation failed: ~p", [Error])
     end.
 
 %% @private
@@ -273,3 +269,13 @@ codepath() ->
 timestamp() ->
     {Mega, Sec, _Micro} = erlang:timestamp(),
     Mega * 1000000 + Sec.
+
+%% @private
+node_list(ClientNumber) ->
+    Clients = client_list(ClientNumber),
+    [server | Clients].
+
+%% @private
+client_list(0) -> [];
+client_list(N) -> lists:append(client_list(N - 1), [list_to_atom("client_" ++ integer_to_list(N))]).
+

@@ -76,6 +76,7 @@
 %% State record.
 -record(state, {store :: store(),
                 actor :: binary(),
+                sync_counter :: non_neg_integer(),
                 counter :: non_neg_integer(),
                 gc_counter :: non_neg_integer()}).
 
@@ -88,7 +89,7 @@
 
 -define(MEMORY_INTERVAL, 10000).
 -define(DELTA_INTERVAL, 10000).
--define(DELTA_GC_INTERVAL, 30000).
+-define(DELTA_GC_INTERVAL, 60000).
 
 %% Definitions for the bind/read fun abstraction.
 
@@ -496,7 +497,11 @@ init([]) ->
     %% Schedule report.
     schedule_memory_report(),
 
-    {ok, #state{actor=Actor, counter=Counter, store=Store, gc_counter=GCCounter}}.
+    {ok, #state{actor=Actor,
+                counter=Counter,
+                sync_counter=0,
+                store=Store,
+                gc_counter=GCCounter}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -809,24 +814,33 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     schedule_aae_synchronization(),
 
     {noreply, State};
-handle_info(delta_sync, State) ->
+handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
     % lager:info("Beginning delta synchronization."),
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
 
-    %% Remove ourself.
-    Peers = Members -- [node()],
+    PeerServiceManager = lasp_config:get(peer_service_manager,
+                                         partisan_peer_service),
+    lager:info("Manager is: ~p, Members are: ~p",
+               [PeerServiceManager, Members]),
 
-    % lager:info("Beginning sync for peers: ~p", [Peers]),
+    %% Remove ourself and compute exchange peers.
+    Peers = compute_exchange(Members -- [node()]),
 
-    %% Ship buffered updates for the fanout value.
-    lists:foreach(fun(Peer) -> init_delta_sync(Peer) end, Peers),
+    lager:info("Beginning sync for peers: ~p", [Peers]),
+    case length(Peers) of
+        0 ->
+            ok;
+        _ ->
+            %% Ship buffered updates for the fanout value.
+            lists:foreach(fun(Peer) -> init_delta_sync(Peer) end, Peers)
+    end,
 
     %% Schedule next synchronization.
     schedule_delta_synchronization(),
 
-    {noreply, State};
+    {noreply, State#state{sync_counter=SyncCounter+1}};
 handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
     MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
     Function =
@@ -1005,7 +1019,7 @@ collect_deltas(Destination, Type, DeltaMap, Min0, Max) ->
     %% @todo should we remove this once we know everything is working fine?
     case lasp_type:is_delta(Type, Deltas) of
         false ->
-            lager:info("Folded delta group is not a delta ~p", [Deltas]);
+            lager:info("Folded delta group is not a delta");
         true ->
             ok
     end,
@@ -1146,3 +1160,54 @@ init_delta_sync(Peer) ->
 %% @private
 membership() ->
     lasp_peer_service:members().
+
+%% @private
+select_random_sublist(List, K) ->
+    lists:sublist(shuffle(List), K).
+
+%% @reference http://stackoverflow.com/questions/8817171/shuffling-elements-in-a-list-randomly-re-arrange-list-elements/8820501#8820501
+shuffle(L) ->
+    [X || {_, X} <- lists:sort([{lasp_support:puniform(65535), N} || N <- L])].
+
+%% @private
+compute_exchange(Peers) ->
+    PeerServiceManager = lasp_config:get(peer_service_manager,
+                                         partisan_peer_service),
+
+    Probability = lasp_config:get(partition_probability, 0),
+    lager:info("Probability of partition: ~p", [Probability]),
+    case lasp_support:puniform(100) =< Probability of
+        true ->
+            case PeerServiceManager of
+                partisan_client_server_peer_service_manager ->
+                    lager:info("Partitioning from server."),
+                    [];
+                _ ->
+                    Percent = lasp_support:puniform(100),
+                    lager:info("Partitioning ~p% of the network.",
+                               [Percent]),
+
+                    %% Select percentage, minus one node which will be
+                    %% the server node.
+                    K = round((Percent / 100) * length(Peers)),
+                    lager:info("Partitioning ~p%: ~p nodes.",
+                               [Percent, K]),
+                    ServerNodes = case PeerServiceManager:active(server) of
+                        {ok, undefined} ->
+                            [];
+                        {ok, Server} ->
+                            [Server];
+                        error ->
+                            []
+                    end,
+                    lager:info("ServerNodes: ~p", [ServerNodes]),
+
+                    Random = select_random_sublist(Peers, K),
+                    RandomAndServer = lists:usort(ServerNodes ++ Random),
+                    lager:info("Partitioning ~p from ~p during sync.",
+                               [RandomAndServer, Peers -- RandomAndServer]),
+                    Peers -- RandomAndServer
+            end;
+        false ->
+            Peers
+    end.

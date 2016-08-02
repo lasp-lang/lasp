@@ -373,6 +373,8 @@ push_logs() ->
             ok;
         _ ->
             lager:info("Will push logs"),
-            Result = os:cmd("cd /opt/lasp && ./priv/evaluate-mesos-push.sh"),
+            SSHAuthSock = os:getenv("SSH_AUTH_SOCK", "undefined"),
+            lager:info("SSH_AUTH_SOCK=~p", [SSHAuthSock]),
+            Result = os:cmd("SSH_AUTH_SOCK=" ++ SSHAuthSock ++ " cd /opt/lasp && ./priv/evaluate-mesos-push.sh"),
             lager:info("Logs pushed. Output ~p", [Result])
     end.

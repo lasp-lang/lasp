@@ -69,7 +69,7 @@ init(_Args) ->
     end,
 
     %% Configure the peer service.
-    PeerServiceDefault = list_to_atom(os:getenv("PEER_SERVICE", "partisan_hyparview_peer_service_manager")),
+    PeerServiceDefault = list_to_atom(os:getenv("PEER_SERVICE", "partisan_client_server_peer_service_manager")),
     PeerService = application:get_env(?APP,
                                       partisan_peer_service_manager,
                                       PeerServiceDefault),

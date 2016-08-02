@@ -39,8 +39,14 @@ git config --global user.name "Lasp Language Evaluation Bot"
 echo "Checking in results."
 ( cd priv/evaluation ; git add . )
 ( cd priv/evaluation ; git commit -m 'Adding evaluation data.' )
-until ( cd priv/evaluation ; GIT_SSH=../$GIT_SSH git pull --rebase && git push)
+
+RETRIES=100
+R=0
+OK=1
+
+while [ $R -lt RETRIES -o $OK -ne 0 ]
 do
-  sleep 1
+  OK=$(cd priv/evaluation ; GIT_SSH=../$GIT_SSH git pull --rebase && git push)
+  R=$[$R+1]
 done
 

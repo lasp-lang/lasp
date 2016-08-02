@@ -40,7 +40,7 @@ eunit:
 ct:
 	${REBAR} as test ct --suite=lasp_SUITE
 
-simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation ad-counter-divergence ad-counter-partition-divergence
+simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation ad-counter-overcounting ad-counter-partition-overcounting
 
 peer-to-peer-ad-counter-simulation:
 	${REBAR} as test ct --suite=lasp_peer_to_peer_advertisement_counter_SUITE
@@ -48,11 +48,11 @@ peer-to-peer-ad-counter-simulation:
 client-server-ad-counter-simulation:
 	${REBAR} as test ct --suite=lasp_client_server_advertisement_counter_SUITE
 
-ad-counter-divergence:
-	${REBAR} as test ct --suite=lasp_advertisement_counter_divergence_SUITE
+ad-counter-overcounting:
+	${REBAR} as test ct --suite=lasp_advertisement_counter_overcounting_SUITE
 
-ad-counter-partition-divergence:
-	${REBAR} as test ct --suite=lasp_advertisement_counter_partition_divergence_SUITE
+ad-counter-partition-overcounting:
+	${REBAR} as test ct --suite=lasp_advertisement_counter_partition_overcounting_SUITE
 
 ##
 ## Release targets
@@ -111,12 +111,12 @@ plots:
 div:
 	pkill -9 beam.smp; \
 		clear; \
-		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_divergence_SUITE
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_overcounting_SUITE
 
 part-div:
 	pkill -9 beam.smp; \
 		clear; \
-		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_partition_divergence_SUITE
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_partition_overcounting_SUITE
 
 evaluate-local: SHELL:=/bin/bash
 evaluate-local:

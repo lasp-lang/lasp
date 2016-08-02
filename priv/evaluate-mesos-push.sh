@@ -43,17 +43,16 @@ echo "Checking in results."
 
 RETRIES=10
 R=0
-OK=1
+OK=$(cd priv/evaluation ; GIT_SSH=../$GIT_SSH git push -u origin)
 
 while [ $R -lt $RETRIES -a $OK -ne 0 ]
 do
   sleep 1
   echo "BEFORE PUSH:"
   ( cd priv/evaluation ; git status )
-  OK=$(cd priv/evaluation ; GIT_SSH=../$GIT_SSH git pull --rebase && git push -u origin)
+  OK=$(cd priv/evaluation ; GIT_SSH=../$GIT_SSH git pull --rebase && GIT_SSH=../$GIT_SSH git push -u origin)
   echo "AFTER PUSH:"
   ( cd priv/evaluation ; git status )
-
   echo "OK: $OK"
   R=$[$R+1]
 done

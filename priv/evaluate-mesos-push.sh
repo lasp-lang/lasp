@@ -46,6 +46,7 @@ OK=1
 
 while [ $R -lt RETRIES -o $OK -ne 0 ]
 do
+  sleep 1
   OK=$(cd priv/evaluation ; GIT_SSH=../$GIT_SSH git pull --rebase && git push)
   R=$[$R+1]
 done

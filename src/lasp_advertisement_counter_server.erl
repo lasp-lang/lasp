@@ -127,9 +127,10 @@ handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
             lager:info("All nodes have pushed their logs"),
             log_convergence(),
             lasp_transmission_instrumentation:stop(),
-            lasp_support:push_logs(),
             log_overcounting(AdList),
-            lasp_config:set(simulation_end, true);
+            lasp_support:push_logs(),
+            lasp_config:set(simulation_end, true),
+            stop_simulation();
         false ->
             schedule_check_simulation_end()
     end,
@@ -302,3 +303,29 @@ compute_overcounting(AdList) ->
     ),
 
     OvercountingSum / length(AdList).
+
+stop_simulation() ->
+    DCOS = os:getenv("DCOS", "false"),
+    Token = os:getenv("TOKEN", "undefined"),
+
+    case list_to_atom(DCOS) of
+        false ->
+            ok;
+        _ ->
+            lists:foreach(
+                fun(AppName) ->
+                    delete_marathon_app(DCOS, Token, AppName)
+                end,
+                ["lasp-server", "lasp-client"]
+            )
+    end.
+
+delete_marathon_app(DCOS, Token, AppName) ->
+    Headers = [{"Authorization", "token=" ++ Token}],
+    Url = DCOS ++ "/marathon/v2/apps/lasp-client",
+    case httpc:request(delete, {Url, Headers}, [], [{body_format, binary}]) of
+        {ok, {{_, 200, _}, _, _Body}} ->
+            ok;
+        Other ->
+            lager:info("Delete app ~p request failed: ~p", [AppName, Other])
+    end.

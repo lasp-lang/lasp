@@ -316,13 +316,13 @@ stop_simulation() ->
                 fun(AppName) ->
                     delete_marathon_app(DCOS, Token, AppName)
                 end,
-                ["lasp-server", "lasp-client"]
+                ["lasp-client", "lasp-server"]
             )
     end.
 
 delete_marathon_app(DCOS, Token, AppName) ->
     Headers = [{"Authorization", "token=" ++ Token}],
-    Url = DCOS ++ "/marathon/v2/apps/lasp-client",
+    Url = DCOS ++ "/marathon/v2/apps/" ++ AppName,
     case httpc:request(delete, {Url, Headers}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, _Body}} ->
             ok;

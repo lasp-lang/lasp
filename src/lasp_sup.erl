@@ -201,7 +201,7 @@ configure_defaults() ->
     EvaluationTimestamp = application:get_env(?APP,
                                               evaluation_timestamp,
                                               EvaluationTimestampDefault),
-    lasp_config:set(evaluation_timstamp, EvaluationTimestamp),
+    lasp_config:set(evaluation_timestamp, EvaluationTimestamp),
 
     ClientNumberDefault = list_to_integer(os:getenv("CLIENT_NUMBER", "3")),
     ClientNumber = application:get_env(?APP,

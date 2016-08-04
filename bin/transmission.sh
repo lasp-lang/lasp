@@ -25,55 +25,24 @@ DELTA_INTERVAL=10000
 INSTRUMENTATION=true
 
 declare -A EVALUATIONS
-declare -A CONFIG
 
 ## client_server_state_based_with_aae_test
-CONFIG=(
-  ["peer_service"]="partisan_client_server_peer_service_manager"
-  ["mode"]="state_based"
-  ["broadcast"]="false"
-)
-EVALUATIONS["client_server_state_based_with_aae"]=$CONFIG
+EVALUATIONS["client_server_state_based_with_aae"]="partisan_client_server_peer_service_manager state_based false"
 
 ## client_server_state_based_with_aae_and_tree_test
-CONFIG=(
-  ["peer_service"]="partisan_client_server_peer_service_manager"
-  ["mode"]="state_based"
-  ["broadcast"]="true"
-)
-EVALUATIONS["client_server_state_based_with_aae_and_tree"]=$CONFIG
+EVALUATIONS["client_server_state_based_with_aae_and_tree"]="partisan_client_server_peer_service_manager state_based true"
 
 ## client_server_delta_based_with_aae_test
-CONFIG=(
-  ["peer_service"]="partisan_client_server_peer_service_manager"
-  ["mode"]="delta_based"
-  ["broadcast"]="false"
-)
-EVALUATIONS["client_server_delta_based_with_aae"]=$CONFIG
+EVALUATIONS["client_server_delta_based_with_aae"]="partisan_client_server_peer_service_manager delta_based false"
 
 ## peer_to_peer_state_based_with_aae_test
-CONFIG=(
-  ["peer_service"]="partisan_hyparview_peer_service_manager"
-  ["mode"]="state_based"
-  ["broadcast"]="false"
-)
-EVALUATIONS["peer_to_peer_state_based_with_aae"]=$CONFIG
+EVALUATIONS["peer_to_peer_state_based_with_aae"]="partisan_hyparview_peer_service_manager state_based false"
 
 ## peer_to_peer_state_based_with_aae_and_tree_test
-CONFIG=(
-  ["peer_service"]="partisan_hyparview_peer_service_manager"
-  ["mode"]="state_based"
-  ["broadcast"]="true"
-)
-EVALUATIONS["peer_to_peer_state_based_with_aae_and_tree"]=$CONFIG
+EVALUATIONS["peer_to_peer_state_based_with_aae_and_tree"]="partisan_hyparview_peer_service_manager state_based true"
 
 ## peer_to_peer_delta_based_with_aae_test
-CONFIG=(
-  ["peer_service"]="partisan_hyparview_peer_service_manager"
-  ["mode"]="delta_based"
-  ["broadcast"]="false"
-)
-EVALUATIONS["peer_to_peer_delta_based_with_aae"]=$CONFIG
+EVALUATIONS["peer_to_peer_delta_based_with_aae"]="partisan_hyparview_peer_service_manager delta_based false"
 
 function wait_for_completion {
   DONE=0
@@ -93,10 +62,11 @@ for i in $(seq 1 $EVAL_NUMBER)
 do
   for EVAL_ID in "${!EVALUATIONS[@]}"
   do
-    CONFIG=${EVALUATIONS["$EVAL_ID"]}
-    PEER_SERVICE=${CONFIG["peer_service"]}
-    MODE=${CONFIG["mode"]}
-    BROADCAST=${CONFIG["broadcast"]}
+    STR=${EVALUATIONS["$EVAL_ID"]}
+    IFS=' ' read -a CONFIG <<< "$STR"
+    PEER_SERVICE=${CONFIG[0]}
+    MODE=${CONFIG[1]}
+    BROADCAST=${CONFIG[2]}
     TIMESTAMP=$(date +%s)
 
     PEER_SERVICE=$PEER_SERVICE MODE=$MODE BROADCAST=$BROADCAST SIMULATION=$SIMULATION EVAL_ID=$EVAL_ID EVAL_TIMESTAMP=$TIMESTAMP CLIENT_NUMBER=$CLIENT_NUMBER HEAVY_CLIENTS=$HEAVY_CLIENTS PARTITION_PROBABILITY=$PARTITION_PROBABILITY AAE_INTERVAL=$AAE_INTERVAL DELTA_INTERVAL=$DELTA_INTERVAL INSTRUMENTATION=$INSTRUMENTATION ./dcos-deploy.sh

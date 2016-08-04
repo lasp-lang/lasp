@@ -76,8 +76,6 @@ end_per_testcase(Case, Config) ->
 
 all() ->
     [
-     parser_test,
-     combined_view_test,
      contracted_latency_test,
      uncontracted_latency_test,
      latency_with_reads_test,
@@ -361,17 +359,22 @@ zipwith(Fn, _, _) when is_function(Fn, 2) -> [].
 
 sql_latency_test_case(Optimization, Iterations, From, To, Mutation) ->
     case Optimization of
-        contraction -> lasp_dependence_dag:contract();
-        _ -> ok
+        no_contraction ->
+            %% Disable automatic contraction
+            lasp_config:set(automatic_contraction, false),
+            %% Force a full cleaving before starting the test
+            lasp_dependence_dag:cleave_all();
+        contraction ->
+            %% Enable automatic contraction
+            lasp_config:set(automatic_contraction, true),
+            %% Force a contraction before starting the test
+            lasp_dependence_dag:contract()
     end,
     sql_run_case(Iterations, [], From, To, Mutation, undefined).
 
 sql_run_case(0, Acc, _, _, _, _) -> lists:reverse(Acc);
 sql_run_case(Iterations, Acc, From, To, Row, Threshold0) ->
-    Threshold = case Threshold0 of
-        undefined -> {strict, undefined};
-        _ -> {strict, Threshold0}
-    end,
+    Threshold = {strict, Threshold0},
     MutateAndRead = fun(F, T, R, Th) ->
         lasp_sql_materialized_view:insert_row(F, R),
         lasp:read(T, Th)

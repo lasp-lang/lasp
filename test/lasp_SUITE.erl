@@ -386,9 +386,9 @@ write_csv(Dir, Option, Cases) ->
            ++ atom_to_list(Option) ++ "/"
            ++ integer_to_list(timestamp()) ++ "/",
     ok = filelib:ensure_dir(Path),
-   lists:foreach(fun(Case) ->
-       file:write_file(Path ++ "runner.csv", io_lib:fwrite("~p\n", [Case]), [append])
-   end, Cases).
+    lists:foreach(fun(Case) ->
+        file:write_file(Path ++ "runner.csv", io_lib:fwrite("~p\n", [Case]), [append])
+    end, Cases).
 
 timestamp() ->
     {Mega, Sec, _Micro} = erlang:timestamp(),

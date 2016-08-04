@@ -39,8 +39,7 @@
          code_change/3]).
 
 %% Defines how often an optimization pass happens.
-%% A value of 0 means the optimization happens every time.
--define(CONTRACTION_INTERVAL, 0).
+-define(CONTRACTION_INTERVAL, 1000).
 
 %%%===================================================================
 %%% Type definitions
@@ -92,12 +91,6 @@
                                     contract_path(),
                                     list(#process_metadata{})}).
 
-%% A step is defined as a call to add_edges. While we are defining our
-%% application topology, the graph is suitable to be changed regularly.
-%% See ?CONTRACTION_INTERVAL. One the step counter reaches that value,
-%% an optimization pass occurs, and then is reset to zero.
--type contraction_step() :: non_neg_integer().
-
 %% Only used to represent paths suitable to be contracted. These paths
 %% consist of two necessary endpoints and a list of unnecessary vertices
 %% in between.
@@ -117,7 +110,7 @@
                 process_map :: process_map(),
                 optimized_map :: optimized_map(),
                 pid_table :: pid_table(),
-                contraction_step :: contraction_step()}).
+                contraction_timer :: timer:tref()}).
 
 %% We store the function metadata as the edge label.
 %% An edge in the graph represents a lasp process, and contains
@@ -263,11 +256,19 @@ cleave_all() ->
 
 %% @doc Initialize state.
 init([]) ->
+    Timer = case lasp_config:get(automatic_contraction, false) of
+        true ->
+            {ok, Tref} = timer:send_after(?CONTRACTION_INTERVAL, contract),
+            Tref;
+
+        _ ->
+            undefined
+    end,
     {ok, #state{dag=digraph:new([acyclic]),
                 process_map=dict:new(),
                 optimized_map=dict:new(),
                 pid_table=dict:new(),
-                contraction_step=0}}.
+                contraction_timer=Timer}}.
 
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
@@ -309,10 +310,8 @@ handle_call({export_dot, Path}, _From, #state{dag=Dag}=State) ->
 handle_call(get_process_map, _From, #state{process_map=PM}=State) ->
     {reply, {ok, dict:to_list(PM)}, State};
 
-handle_call(contract, _From, #state{dag=Dag}=State) ->
-    NewState = lists:foldl(fun(P, S) ->
-        contract(Dag, P, S)
-    end, State, contraction_paths(Dag)),
+handle_call(contract, _From, State) ->
+    NewState = contract_all(State),
     {reply, ok, NewState};
 
 handle_call({cleave, Vertex}, _From, #state{dag=Dag, optimized_map=OptMap}=State) ->
@@ -365,7 +364,7 @@ handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag, optimized_map=Op
 %%      We monitor all edge Pids to know when they die or get restarted.
 %%
 handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, WriteFun}, _From, State) ->
-    {Reply, NewState} = add_edges(step, Src, Dst, Pid,
+    {Reply, NewState} = add_edges(Src, Dst, Pid,
                                   ReadFuns, TransFun, WriteFun, State),
     {reply, Reply, NewState}.
 
@@ -413,6 +412,12 @@ handle_info({'DOWN', _, process, Pid, Reason}, #state{dag=Dag,
 
     {noreply, NewState};
 
+handle_info(contract, #state{contraction_timer=OldTRef}=State) ->
+    timer:cancel(OldTRef),
+    NewState = contract_all(State),
+    {ok, TRef} = timer:send_after(?CONTRACTION_INTERVAL, contract),
+    {noreply, NewState#state{contraction_timer=TRef}};
+
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages ~p", [Msg]),
     {noreply, State}.
@@ -431,11 +436,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-add_edges(StepSetting, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
+add_edges(Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
 
     Dag      = State#state.dag,
     Pm       = State#state.process_map,
-    CtStep   = State#state.contraction_step,
     OptMap   = State#state.optimized_map,
     PidTable = State#state.pid_table,
 
@@ -449,7 +453,6 @@ add_edges(StepSetting, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State
                                                                       {ReadFuns,
                                                                        TransFun,
                                                                        {Dst, WriteFun}}),
-
 
     %% @todo This should happen before creating the process
     %%
@@ -473,7 +476,7 @@ add_edges(StepSetting, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State
                                                   write=WriteFun})
     end, Src),
 
-    {R, St0} = case lists:any(fun is_graph_error/1, Status) of
+    {R, St} = case lists:any(fun is_graph_error/1, Status) of
         true -> {error, State};
         false ->
             erlang:monitor(process, Pid),
@@ -488,32 +491,6 @@ add_edges(StepSetting, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State
             {ok, State#state{process_map=ProcessMap}}
     end,
 
-    St = case {StepSetting, CtStep} of
-        {step, ?CONTRACTION_INTERVAL} ->
-              %% @todo Contraction step
-              %%
-              %%       How do we prevent a contraction from happening
-              %%       as part of the edges created from another contraction?
-              %%
-              %%       If the dag starts a new contraction step as part of
-              %%       another contraction, multiple path contractions may
-              %%       happen, leading to multiple edges between vertices.
-              %%
-              %%       Either make contractions manual, or measure the
-              %%       probability of a vertex to be updated if it has been
-              %%       changed recently. Paths that contain "active" vertices
-              %%       won't be contracted, as they are determined to be changed
-              %%       often. Only contract paths that are relatively stable
-              %%       (haven't changed in X ticks).
-              %%
-              %%       Another option is to implement a special function to
-              %%       create edges in the graph that don't count towards
-              %%       the contraction step count.
-              %%
-              St0#state{contraction_step=0};
-        _ ->
-            St0#state{contraction_step = CtStep + 1}
-    end,
     {R, St#state{optimized_map = NewOptMap, pid_table = NewPidTable}}.
 
 
@@ -695,6 +672,13 @@ replace_if_restarted(OptMap, PidTable, Pid, ProcessArgs) ->
           {dict:store(Id, {Pid, VSeq, Metadata}, OptMap), dict:store(Pid, Id, PidTable)}
     end.
 
+%% @doc Find and contract all suitable paths to be contracted in the graph.
+-spec contract_all(#state{}) -> #state{}.
+contract_all(#state{dag=Dag}=State) ->
+    lists:foldl(fun(P, S) ->
+        contract(Dag, P, S)
+    end, State, contraction_paths(Dag)).
+
 %% @doc Perform path contraction in the given sequence of vertices.
 %%
 %%      The resulting edge represents a lasp process with the read
@@ -752,7 +736,7 @@ contract(G, VSeq, State) ->
 
     %% Manually start a new lasp process and add the edges to the graph.
     {ok, Pid} = lasp_process:start_manual_process([[Read], TransFun, Write]),
-    {ok, NewState} = add_edges(nostep, [First], Last, Pid,
+    {ok, NewState} = add_edges([First], Last, Pid,
                                [Read], TransFun, Write, State),
 
     NewDag   = NewState#state.dag,
@@ -896,7 +880,7 @@ cleave_associated_path(G, Hash, #state{optimized_map=OptMap}=State) ->
             lists:foldl(fun({Reads, Transform, {Dst, Write}}=Args, St) ->
                 Src = [To || {To, _} <- Reads],
                 {ok, Pid} = lasp_process:start_manual_process(tuple_to_list(Args)),
-                {ok, NewState} = add_edges(nostep, Src, Dst, Pid,
+                {ok, NewState} = add_edges(Src, Dst, Pid,
                                            Reads, Transform, {Dst, Write}, St),
                 NewState
             end, State, ProcessArgs)

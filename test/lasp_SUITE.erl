@@ -78,7 +78,8 @@ all() ->
     [
      parser_test,
      combined_view_test,
-     latency_test,
+     contracted_latency_test,
+     uncontracted_latency_test,
      latency_with_reads_test,
      stream_test,
      query_test,
@@ -105,6 +106,7 @@ all() ->
 -define(COUNTER, pncounter).
 
 -define(ID, <<"myidentifier">>).
+-define(LATENCY_ITERATIONS, 1000).
 
 parser_test(_Config) ->
     ok = lasp_sql_materialized_view:create_table_with_values(users, [
@@ -180,82 +182,78 @@ combined_view_test(_Config) ->
 
     ok.
 
-latency_test(_Config) ->
+latency_test_case(NVertices, Optimization, RandomReadsConfig, Iterations) ->
+    Ids = generate_path(NVertices, ?COUNTER),
+    case Optimization of
+        no_contraction ->
+            %% Disable automatic contraction
+            lasp_config:set(automatic_contraction, false),
+            %% Force a full cleaving before starting the test
+            lasp_dependence_dag:cleave_all();
+        _ ->
+            %% Enable automatic contraction
+            lasp_config:set(automatic_contraction, true),
+            %% Force a contraction before starting the test
+            lasp_dependence_dag:contract()
+    end,
+    First = lists:nth(1, Ids),
+    Intermediate = case RandomReadsConfig of
+        random_reads ->
+            lists:sublist(Ids, 2, length(Ids) - 2);
+        _ -> []
+    end,
+    Last = lists:last(Ids),
+    latency_run_case(Iterations, [], RandomReadsConfig,
+                     First, Intermediate, Last, increment, undefined).
+
+latency_run_case(0, Acc, _, _, _, _, _, _) -> lists:reverse(Acc);
+latency_run_case(Iterations, Acc, RandomReadsConfig,
+                 From, Intermediate, To, Mutator, Threshold0) ->
+
+    Threshold = {strict, Threshold0},
+    MutateAndRead = fun(Src, Dst, Mutation, Thr) ->
+        lasp:update(Src, Mutation, a),
+        lasp:read(Dst, Thr)
+    end,
+    case RandomReadsConfig of
+        no_read -> ok;
+        random_reads ->
+            %% Read from a random intermediate vertex every 10 iterations
+            case (Iterations rem 10) =:= 0 of
+                true ->
+                    RPos = lasp_support:puniform(length(Intermediate)),
+                    RandomChoice = lists:nth(RPos, Intermediate),
+                    lasp:read(RandomChoice, undefined);
+                _ -> ok
+            end
+    end,
+    {Time, {ok, {_, _, _, NewThreshold}}} = timer:tc(MutateAndRead, [From, To, Mutator, Threshold]),
+
+    latency_run_case(Iterations - 1, [Time | Acc], RandomReadsConfig,
+                     From, Intermediate, To, Mutator, NewThreshold).
+
+contracted_latency_test(_Config) ->
     case lasp_config:get(dag_enabled, false) of
         false -> ok;
         true ->
-            RunCase = fun
-                RC(0, Acc, _, _, _, _) ->
-                    lists:reverse(Acc);
-                RC(Iterations, Acc, From, To, Mutator, Threshold0) ->
-                    Threshold = case Threshold0 of
-                        undefined ->
-                            {strict, undefined};
-                        _ ->
-                            {strict, Threshold0}
-                    end,
-                    MutateAndRead = fun(F, T, M, Th) ->
-                        lasp:update(F, M, a),
-                        lasp:read(T, Th)
-                    end,
-                    {Time, {ok, {_, _, _, NewThreshold}}} = timer:tc(MutateAndRead, [From, To, Mutator, Threshold]),
-                    RC(Iterations - 1, [Time | Acc], From, To, Mutator, NewThreshold)
-            end,
-            TestCase = fun(Vertices, Optimization, Iterations) ->
-                Ids = generate_path(Vertices, ?COUNTER),
-                case Optimization of
-                    contraction -> lasp_dependence_dag:contract();
-                    _ -> ok
-                end,
-                RunCase(Iterations, [], lists:nth(1, Ids), lists:last(Ids), increment, undefined)
-            end,
-            write_csv(contraction, TestCase(5, contraction, 1000)),
-            write_csv(no_contraction, TestCase(5, no_contraction, 1000))
+            Res = latency_test_case(5, contraction, no_read, ?LATENCY_ITERATIONS),
+            write_csv(contraction, Res)
+    end.
+
+uncontracted_latency_test(_Config) ->
+    case lasp_config:get(dag_enabled, false) of
+        false -> ok;
+        true ->
+            Res = latency_test_case(5, no_contraction, no_read, ?LATENCY_ITERATIONS),
+            write_csv(no_contraction, Res)
     end.
 
 latency_with_reads_test(_Config) ->
     case lasp_config:get(dag_enabled, false) of
         false -> ok;
         true ->
-            RunCase = fun
-                RC(0, Acc, _, _, _, _, _) ->
-                    lists:reverse(Acc);
-                RC(Iterations, Acc, From, To, Intermediate, Mutator, Threshold0) ->
-                    Threshold = case Threshold0 of
-                        undefined ->
-                            {strict, undefined};
-                        _ ->
-                            {strict, Threshold0}
-                    end,
-                    case ((Iterations + 1) rem 10) =:= 0 of
-                        true -> lasp_dependence_dag:contract();
-                        _ -> ok
-                    end,
-                    case (Iterations rem 10) =:= 0 of
-                        true ->
-                            RandomChoice = lists:nth(lasp_support:puniform(length(Intermediate)), Intermediate),
-                            _ = lasp:read(RandomChoice, undefined);
-                        _ -> ok
-                    end,
-                    MutateAndRead = fun(F, T, M, Th) ->
-                        lasp:update(F, M, a),
-                        lasp:read(T, Th)
-                    end,
-                    {Time, {ok, {_, _, _, NewThreshold}}} = timer:tc(MutateAndRead, [From, To, Mutator, Threshold]),
-                    RC(Iterations - 1, [Time | Acc], From, To, Intermediate, Mutator, NewThreshold)
-            end,
-            TestCase = fun(Vertices, Optimization, Iterations) ->
-                Ids = generate_path(Vertices, ?COUNTER),
-                case Optimization of
-                    contraction -> lasp_dependence_dag:contract();
-                    _ -> ok
-                end,
-                First = lists:nth(1, Ids),
-                Last = lists:last(Ids),
-                Intermediate = lists:sublist(Ids, 2, erlang:length(Ids) - 2),
-                RunCase(Iterations, [], First, Last, Intermediate, increment, undefined)
-            end,
-            write_csv(contraction_with_reads, TestCase(5, contraction, 1000))
+            Res = latency_test_case(5, contraction, random_reads, ?LATENCY_ITERATIONS),
+            write_csv(contraction_with_reads, Res)
     end.
 
 generate_path(N, Type) ->

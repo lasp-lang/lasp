@@ -78,9 +78,6 @@ all() ->
     [
      parser_test,
      combined_view_test,
-     contracted_latency_test,
-     uncontracted_latency_test,
-     latency_with_reads_test,
      stream_test,
      query_test,
      ivar_test,
@@ -181,109 +178,6 @@ combined_view_test(_Config) ->
     ?assertMatch([["Breathless"]], lasp_sql_materialized_view:get_value(Id2, [title])),
 
     ok.
-
-latency_test_case(NVertices, Optimization, RandomReadsConfig, Iterations) ->
-    Ids = generate_path(NVertices, ?COUNTER),
-    case Optimization of
-        no_contraction ->
-            %% Disable automatic contraction
-            lasp_config:set(automatic_contraction, false),
-            %% Force a full cleaving before starting the test
-            lasp_dependence_dag:cleave_all();
-        _ ->
-            %% Enable automatic contraction
-            lasp_config:set(automatic_contraction, true),
-            %% Force a contraction before starting the test
-            lasp_dependence_dag:contract()
-    end,
-    First = lists:nth(1, Ids),
-    Intermediate = case RandomReadsConfig of
-        random_reads ->
-            lists:sublist(Ids, 2, length(Ids) - 2);
-        _ -> []
-    end,
-    Last = lists:last(Ids),
-    latency_run_case(Iterations, [], RandomReadsConfig,
-                     First, Intermediate, Last, increment, undefined).
-
-latency_run_case(0, Acc, _, _, _, _, _, _) -> lists:reverse(Acc);
-latency_run_case(Iterations, Acc, RandomReadsConfig,
-                 From, Intermediate, To, Mutator, Threshold0) ->
-
-    Threshold = {strict, Threshold0},
-    MutateAndRead = fun(Src, Dst, Mutation, Thr) ->
-        lasp:update(Src, Mutation, a),
-        lasp:read(Dst, Thr)
-    end,
-    case RandomReadsConfig of
-        no_read -> ok;
-        random_reads ->
-            %% Read from a random intermediate vertex every 10 iterations
-            case (Iterations rem 10) =:= 0 of
-                true ->
-                    RPos = lasp_support:puniform(length(Intermediate)),
-                    RandomChoice = lists:nth(RPos, Intermediate),
-                    lasp:read(RandomChoice, undefined);
-                _ -> ok
-            end
-    end,
-    {Time, {ok, {_, _, _, NewThreshold}}} = timer:tc(MutateAndRead, [From, To, Mutator, Threshold]),
-
-    latency_run_case(Iterations - 1, [Time | Acc], RandomReadsConfig,
-                     From, Intermediate, To, Mutator, NewThreshold).
-
-contracted_latency_test(_Config) ->
-    case lasp_config:get(dag_enabled, false) of
-        false -> ok;
-        true ->
-            Res = latency_test_case(5, contraction, no_read, ?LATENCY_ITERATIONS),
-            write_csv(contraction, Res)
-    end.
-
-uncontracted_latency_test(_Config) ->
-    case lasp_config:get(dag_enabled, false) of
-        false -> ok;
-        true ->
-            Res = latency_test_case(5, no_contraction, no_read, ?LATENCY_ITERATIONS),
-            write_csv(no_contraction, Res)
-    end.
-
-latency_with_reads_test(_Config) ->
-    case lasp_config:get(dag_enabled, false) of
-        false -> ok;
-        true ->
-            Res = latency_test_case(5, contraction, random_reads, ?LATENCY_ITERATIONS),
-            write_csv(contraction_with_reads, Res)
-    end.
-
-generate_path(N, Type) ->
-    [_|Tail]=Ids = lists:map(fun(_) ->
-        {ok, {Id, _, _, _}} = lasp:declare(Type),
-        Id
-    end, lists:seq(1, N)),
-    zipwith(fun(L, R) ->
-        lasp:bind_to(R, L)
-    end, Ids, Tail),
-    Ids.
-
-zipwith(Fn, [X | Xs], [Y | Ys]) ->
-    [Fn(X, Y) | zipwith(Fn, Xs, Ys)];
-
-zipwith(Fn, _, _) when is_function(Fn, 2) -> [].
-
-write_csv(Option, Cases) ->
-    Path = code:priv_dir(lasp)
-           ++ "/evaluation/logs/path_contraction/"
-           ++ atom_to_list(Option) ++ "/"
-           ++ integer_to_list(timestamp()) ++ "/",
-    ok = filelib:ensure_dir(Path),
-    lists:foreach(fun(Case) ->
-        file:write_file(Path ++ "runner.csv", io_lib:fwrite("~p\n", [Case]), [append])
-    end, Cases).
-
-timestamp() ->
-    {Mega, Sec, _Micro} = erlang:timestamp(),
-    Mega * 1000000 + Sec.
 
 %% @doc Increment counter and test stream behaviour.
 stream_test(_Config) ->

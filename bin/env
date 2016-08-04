@@ -12,15 +12,15 @@ if [ ! -z "$MESOS_TASK_ID" ]; then
   # that's only resolvable with resolv.conf won't work for long names.
   if [ ! -z "$HOSTNAME" ]; then
     if /usr/bin/dig ${HOSTNAME} | grep -q 'NXDOMAIN'
-      export NODE_NAME=lasp-${PORT0}@${HOSTNAME}
+      export NODE_NAME=lasp-${PORT1}@${HOSTNAME}
     then
-      export NODE_NAME=lasp-${PORT0}@${IP}
+      export NODE_NAME=lasp-${PORT1}@${IP}
     fi
   fi
 
   # Else, default to IP.
   if [ -z "$NODE_NAME" ]; then
-    export NODE_NAME=lasp-${PORT0}@${IP}
+    export NODE_NAME=lasp-${PORT1}@${IP}
   fi
 
   # The running port should be used as the name, given this is the

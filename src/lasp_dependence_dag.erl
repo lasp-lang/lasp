@@ -214,14 +214,10 @@ handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag}=State) ->
 handle_call({add_edges, Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}},
             _From, #state{dag=Dag, process_map=Pm}=State) ->
 
-    %% All other vertices are tracked at the `declare` level, but
-    %% stream is a special case. We check if it is already a vertex
-    %% in the graph since adding an already existing vertex removes
-    %% any previous vertex labels.
-    case (Dst =:= stream) andalso (digraph:vertex(Dag, Dst) =:= false) of
-        true -> digraph:add_vertex(Dag, Dst);
-        _ -> ok
-    end,
+    %% Add vertices only if they are either sources or sinks. (See add_if)
+    %% All user-defined variables are tracked through the `declare` function.
+    lists:foreach(fun(V) -> add_if_pid(Dag, V) end, Src),
+    add_if_pid(Dag, Dst),
 
     %% For all V in Src, make edge (V, Dst) with label {Pid, Read, Trans, Write}
     %% (where {Id, Read} = ReadFuns s.t. Id = V)
@@ -326,6 +322,22 @@ get_direct_edges(G, V1, V2) ->
         end
     end, digraph:out_edges(G, V1)).
 
+%% @doc Add a vertex only if it is a pid
+%%
+%%      We only add it if it isn't already present on the dag,
+%%      as adding the same vertex multiple times removes any
+%%      metadata (labels).
+%%
+-spec add_if_pid(digraph:graph(), pid()) -> ok.
+add_if_pid(Dag, Pid) when is_pid(Pid) ->
+   case digraph:vertex(Dag, Pid) of
+      false -> digraph:add_vertex(Dag, Pid);
+      _ -> ok
+   end;
+
+add_if_pid(_, _) ->
+    ok.
+
 to_dot(Graph) ->
     case digraph_utils:topsort(Graph) of
         [] -> {error, no_data};
@@ -356,5 +368,5 @@ write_edges(_G, [], _Visited, Result) ->
 v_str({Id, _}) ->
     erlang:integer_to_list(erlang:phash2(Id));
 
-v_str(stream) ->
-    erlang:atom_to_list(stream).
+v_str(V) when is_pid(V)->
+    pid_to_list(V).

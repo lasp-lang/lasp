@@ -1,4 +1,3 @@
-%% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
 %% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
@@ -69,14 +68,23 @@ init(_Args) ->
             ok
     end,
 
+    %% Configure the peer service.
+    case partisan_config:get(partisan_peer_service_manager, false) of
+        false ->
+            partisan_config:set(partisan_peer_service_manager,
+                                partisan_client_server_peer_service_manager);
+        _ ->
+            ok
+    end,
+
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},
                  permanent, infinity, supervisor, [partisan_sup]},
 
-    PlumtreeBackend = {lasp_plumtree_broadcast_distribution_backend,
-                       {lasp_plumtree_broadcast_distribution_backend, start_link, []},
-                        permanent, 5000, worker,
-                        [lasp_plumtree_broadcast_distribution_backend]},
+    DistributionBackend = {lasp_default_broadcast_distribution_backend,
+                           {lasp_default_broadcast_distribution_backend, start_link, []},
+                            permanent, 5000, worker,
+                            [lasp_default_broadcast_distribution_backend]},
 
     Plumtree = {plumtree_sup,
                 {plumtree_sup, start_link, []},
@@ -91,7 +99,7 @@ init(_Args) ->
 
     BaseSpecs0 = [Unique,
                   Partisan,
-                  PlumtreeBackend,
+                  DistributionBackend,
                   Plumtree,
                   MarathonPeerRefresh,
                   Process] ++ WebSpecs,
@@ -123,10 +131,7 @@ init(_Args) ->
     %% Setup the advertisement counter example, if necessary.
     AdSpecs = advertisement_counter_child_specs(),
 
-    %% Setup the music festival example, if necessary.
-    MusicSpecs = music_festival_child_specs(),
-
-    Children = Children0 ++ AdSpecs ++ MusicSpecs,
+    Children = Children0 ++ AdSpecs,
 
     %% Configure defaults.
     configure_defaults(),
@@ -194,6 +199,12 @@ configure_defaults() ->
                                                   EvaluationTimestampDefault),
     lasp_config:set(evaluation_timstamp, EvaluationTimestampEnabled),
 
+    ClientNumberDefault = list_to_integer(os:getenv("CLIENT_NUMBER", "3")),
+    ClientNumber = application:get_env(?APP,
+                                       client_number,
+                                       ClientNumberDefault),
+    lasp_config:set(client_number, ClientNumber),
+
     %% Peer service.
     PeerService = application:get_env(plumtree,
                                       peer_service,
@@ -221,7 +232,7 @@ configure_defaults() ->
     DistributionBackend = application:get_env(
                             ?APP,
                             distribution_backend,
-                            lasp_plumtree_broadcast_distribution_backend),
+                            lasp_default_broadcast_distribution_backend),
     lasp_config:set(distribution_backend, DistributionBackend),
 
     %% Delta specific configuration values.
@@ -234,50 +245,6 @@ configure_defaults() ->
                                incremental_computation_mode,
                                false),
     lasp_config:set(incremental_computation_mode, IncrementalComputation).
-
-%% @private
-music_festival_child_specs() ->
-    %% Figure out who is acting as the client.
-    MusicClientDefault = list_to_atom(os:getenv("MUSIC_FESTIVAL_SIM_CLIENT", "false")),
-    MusicClientEnabled = application:get_env(?APP,
-                                             music_festival_client,
-                                             MusicClientDefault),
-    lasp_config:set(music_festival_client, MusicClientEnabled),
-    lager:info("MusicClientEnabled: ~p", [MusicClientEnabled]),
-
-    ClientSpecs = case MusicClientEnabled of
-        true ->
-            %% Start one advertisement counter client process per node.
-            MusicFestivalClient = {lasp_music_festival_client,
-                                   {lasp_music_festival_client, start_link, []},
-                                    permanent, 5000, worker,
-                                    [lasp_music_festival_client]},
-
-            [MusicFestivalClient];
-        false ->
-            []
-    end,
-
-    %% Figure out who is acting as the server.
-    MusicServerDefault = list_to_atom(os:getenv("MUSIC_FESTIVAL_SIM_SERVER", "false")),
-    MusicServerEnabled = application:get_env(?APP,
-                                             music_festival_server,
-                                             MusicServerDefault),
-    lasp_config:set(music_festival_server, MusicServerEnabled),
-    lager:info("MusicServerEnabled: ~p", [MusicServerEnabled]),
-
-    ServerSpecs = case MusicServerEnabled of
-        true ->
-            MusicFestivalServer = {lasp_music_festival_server,
-                                   {lasp_music_festival_server, start_link, []},
-                                    permanent, 5000, worker,
-                                    [lasp_music_festival_server]},
-            [MusicFestivalServer];
-        false ->
-            []
-    end,
-
-    ClientSpecs ++ ServerSpecs.
 
 %% @private
 advertisement_counter_child_specs() ->
@@ -297,6 +264,11 @@ advertisement_counter_child_specs() ->
                                 permanent, 5000, worker,
                                 [lasp_advertisement_counter_client]},
 
+            %% Configure proper partisan tag.
+            partisan_config:set(tag, client),
+
+            %% Configure reserved slots.
+            partisan_config:set(reservations, [server]),
 
             [AdCounterClient];
         false ->
@@ -317,6 +289,10 @@ advertisement_counter_child_specs() ->
                                {lasp_advertisement_counter_server, start_link, []},
                                 permanent, 5000, worker,
                                 [lasp_advertisement_counter_server]},
+
+            %% Configure proper partisan tag.
+            partisan_config:set(tag, server),
+
             [AdCounterServer];
         false ->
             []

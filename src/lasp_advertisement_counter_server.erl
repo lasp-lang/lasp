@@ -25,7 +25,7 @@
 
 %% API
 -export([start_link/0,
-         trigger/3]).
+         trigger/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -37,18 +37,8 @@
 
 -include("lasp.hrl").
 
-%% Macros.
--define(MAX_IMPRESSIONS, 100).
--define(LOG_INTERVAL, 10000).
--define(CONVERGENCE_INTERVAL, 1000).
--define(ADS, 10).
-
 %% State record.
--record(state, {actor, ads}).
-
--record(ad, {id, image, counter}).
-
--record(contract, {id}).
+-record(state, {actor, adlist}).
 
 %%%===================================================================
 %%% API
@@ -68,8 +58,8 @@ start_link() ->
 init([]) ->
     lager:info("Advertisement counter server initialized."),
 
-    %% Track whether convergence is reached or not.
-    lasp_config:set(convergence, false),
+    %% Track whether simulation has ended or not.
+    lasp_config:set(simulation_end, false),
 
     %% Generate actor identifier.
     Actor = self(),
@@ -78,16 +68,19 @@ init([]) ->
     schedule_logging(),
 
     %% Build DAG.
-    {ok, Ads, AdList} = build_dag(),
+    {ok, AdList} = build_dag(),
 
     %% Initialize triggers.
-    launch_triggers(AdList, Ads, Actor),
+    launch_triggers(AdList, Actor),
 
-    %% Create instance for convergence tracking
-    %% Also schedule check convergence
-    track_convergence(),
+    %% Create instance for simulation status tracking
+    {Id, Type} = ?SIM_STATUS_ID,
+    {ok, _} = lasp:declare(Id, Type),
 
-    {ok, #state{actor=Actor, ads=Ads}}.
+    %% Schedule check simulation end
+    schedule_check_simulation_end(),
+
+    {ok, #state{actor=Actor, adlist=AdList}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -104,35 +97,40 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(log, #state{ads=Ads}=State) ->
+handle_info(log, #state{}=State) ->
     %% Print number of enabled ads.
-    {ok, AdList} = lasp:query(Ads),
-    Size = sets:size(AdList),
+    {ok, Ads} = lasp:query(?ADS),
 
-    lager:info("Enabled advertisements: ~p", [Size]),
+    lager:info("Enabled advertisements: ~p", [sets:size(Ads)]),
 
     %% Schedule advertisement counter impression.
     schedule_logging(),
 
     {noreply, State};
 
-handle_info(check_convergence, #state{}=State) ->
-    {ok, {_, Convergence}} = lasp:query(convergence_id()),
+handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
+    %% A simulation ends for the server when all clients have
+    %% observed that all clients observed all ads disabled and
+    %% pushed their logs (second component of the map in
+    %% the simulation status instance is true for all clients)
+    {ok, AdsDisabledAndLogs} = lasp:query(?SIM_STATUS_ID),
 
-    NodesWithAllEvents = lists:filter(
-        fun({_Node, AllEvents}) ->
-            AllEvents
+    NodesWithLogsPushed = lists:filter(
+        fun({_Node, {_AdsDisabled, LogsPushed}}) ->
+            LogsPushed
         end,
-        Convergence
+        AdsDisabledAndLogs
     ),
 
-    case length(NodesWithAllEvents) == client_number() of
+    case length(NodesWithLogsPushed) == client_number() of
         true ->
-            lager:info("Convergence reached on all clients"),
-            lasp_config:set(convergence, true),
-            lasp_transmission_instrumentation:convergence();
+            lager:info("All nodes have pushed their logs"),
+            log_convergence(),
+            lasp_support:push_logs(),
+            log_overcounting(AdList),
+            lasp_config:set(simulation_end, true);
         false ->
-            schedule_check_convergence()
+            schedule_check_simulation_end()
     end,
 
     {noreply, State};
@@ -160,7 +158,7 @@ create_ads_and_contracts(Ads, Contracts) ->
     AdIds = lists:map(fun(_) ->
                               {ok, Unique} = lasp_unique:unique(),
                               Unique
-                      end, lists:seq(1, ?ADS)),
+                      end, lists:seq(1, ?ADS_NUMBER)),
     lists:map(fun(Id) ->
                 {ok, _} = lasp:update(Contracts,
                                       {add, #contract{id=Id}},
@@ -170,7 +168,7 @@ create_ads_and_contracts(Ads, Contracts) ->
                 %% Generate a G-Counter.
                 {ok, {CounterId, _, _, _}} = lasp:declare(?COUNTER_TYPE),
 
-                Ad = #ad{id=Id, counter=CounterId},
+                Ad = #ad{id=Id, name=Id, counter=CounterId},
 
                 %% Add it to the advertisement set.
                 {ok, _} = lasp:update(Ads, {add, Ad}, node()),
@@ -182,7 +180,8 @@ create_ads_and_contracts(Ads, Contracts) ->
 %% @private
 build_dag() ->
     %% For each identifier, generate a contract.
-    {ok, {Contracts, _, _, _}} = lasp:declare(?SET_TYPE),
+    {ContractsId, ContractsType} = ?CONTRACTS,
+    {ok, {Contracts, _, _, _}} = lasp:declare(ContractsId, ContractsType),
 
     %% Generate Rovio's advertisements.
     {ok, {RovioAds, _, _, _}} = lasp:declare(?SET_TYPE),
@@ -196,32 +195,40 @@ build_dag() ->
     AdList = RovioAdList ++ RiotAdList,
 
     %% Union ads.
-    {ok, {Ads, _, _, _}} = lasp:declare(?SET_TYPE),
-    ok = lasp:union(RovioAds, RiotAds, Ads),
+    {AdsId, AdsType} = ?ADS,
+    {ok, _} = lasp:declare(AdsId, AdsType),
+    ok = lasp:union(RovioAds, RiotAds, ?ADS),
 
     %% Compute the Cartesian product of both ads and contracts.
-    {ok, {AdsContracts, _, _, _}} = lasp:declare(?SET_TYPE),
-    ok = lasp:product(Ads, Contracts, AdsContracts),
+    {AdsContractsId, AdsContractsType} = ?ADS_CONTRACTS,
+    {ok, _} = lasp:declare(AdsContractsId, AdsContractsType),
+    ok = lasp:product(?ADS, ?CONTRACTS, ?ADS_CONTRACTS),
 
     %% Filter items by join on item it.
-    {ok, {AdsWithContracts, _, _, _}} = lasp:declare(?ADS_WITH_CONTRACTS, ?SET_TYPE),
+    {AdsWithContractsId, AdsWithContractsType} = ?ADS_WITH_CONTRACTS,
+    {ok, _} = lasp:declare(AdsWithContractsId, AdsWithContractsType),
     FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
         Id1 =:= Id2
     end,
-    ok = lasp:filter(AdsContracts, FilterFun, AdsWithContracts),
+    ok = lasp:filter(?ADS_CONTRACTS, FilterFun, ?ADS_WITH_CONTRACTS),
 
-    {ok, Ads, AdList}.
-
-%% @private
-launch_triggers(AdList, Ads, Actor) ->
-    lists:map(fun(Ad) ->
-                      spawn_link(fun() ->
-                                         trigger(Ad, Ads, Actor)
-                                 end)
-              end, AdList).
+    {ok, AdList}.
 
 %% @private
-trigger(#ad{counter=CounterId} = Ad, Ads, Actor) ->
+launch_triggers(AdList, Actor) ->
+    lists:map(
+        fun(Ad) ->
+            spawn_link(
+                fun() ->
+                    trigger(Ad, Actor)
+                end
+            )
+        end,
+        AdList
+    ).
+
+%% @private
+trigger(#ad{counter=CounterId} = Ad, Actor) ->
     %% Blocking threshold read for max advertisement impressions.
     {ok, Value} = lasp:read(CounterId, {value, ?MAX_IMPRESSIONS}),
 
@@ -229,34 +236,71 @@ trigger(#ad{counter=CounterId} = Ad, Ads, Actor) ->
     lager:info("Counter: ~p", [Value]),
 
     %% Remove the advertisement.
-    {ok, _} = lasp:update(Ads, {rmv, Ad}, Actor),
+    {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor),
 
     ok.
 
 %% @private
-client_number() ->
-    ?NUM_NODES.
-
-%% @private
-convergence_id() ->
-    PairType = {?PAIR_TYPE,
-                    [
-                        ?COUNTER_TYPE,
-                        {?GMAP_TYPE, [?BOOLEAN_TYPE]}
-                    ]
-                },
-    {?CONVERGENCE_TRACKING, PairType}.
-
-%% @private
-track_convergence() ->
-    {Id, Type} = convergence_id(),
-    {ok, _} = lasp:declare(Id, Type),
-    schedule_check_convergence().
-
-%% @private
-schedule_check_convergence() ->
-    erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_convergence).
-
-%% @private
 schedule_logging() ->
     erlang:send_after(?LOG_INTERVAL, self(), log).
+
+%% @private
+schedule_check_simulation_end() ->
+    erlang:send_after(?STATUS_INTERVAL, self(), check_simulation_end).
+
+%% @private
+client_number() ->
+    lasp_config:get(client_number, 3).
+
+%% @private
+log_convergence() ->
+    case lasp_config:get(instrumentation, false) of
+        true ->
+            lasp_transmission_instrumentation:convergence();
+        false ->
+            ok
+    end.
+
+%% @private
+log_overcounting(AdList) ->
+    Filename = filename(),
+    Divergence = compute_overcounting(AdList),
+    lager:info("Divergence ~p", [Divergence]),
+
+    ok = file:write_file(
+        Filename,
+        io_lib:format("~w", [Divergence]),
+        [write]
+    ),
+    ok.
+
+%% @private
+filename() ->
+    EvalIdentifier = case lasp_config:get(evaluation_identifier, undefined) of
+        undefined ->
+            "undefined";
+        {Simulation, Id} ->
+            atom_to_list(Simulation) ++ "/" ++ atom_to_list(Id)
+    end,
+    EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
+    Filename = "overcounting",
+    Dir = code:priv_dir(?APP) ++ "/evaluation/logs/"
+        ++ EvalIdentifier ++ "/"
+        ++ integer_to_list(EvalTimestamp) ++ "/",
+    filelib:ensure_dir(Dir),
+    Dir ++ Filename.
+
+%% @private
+compute_overcounting(AdList) ->
+    OvercountingSum = lists:foldl(
+        fun(#ad{counter=CounterId} = _Ad, Acc) ->
+            {ok, Value} = lasp:query(CounterId),
+            Overcounting = Value - ?MAX_IMPRESSIONS,
+            OvercountingPercentage = (Overcounting * 100) / ?MAX_IMPRESSIONS,
+            Acc + OvercountingPercentage
+        end,
+        0,
+        AdList
+    ),
+
+    OvercountingSum / length(AdList).

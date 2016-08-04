@@ -5,7 +5,7 @@ ERLANG_BIN       = $(shell dirname $(shell which erl))
 REBAR            = $(shell pwd)/rebar3
 MAKE						 = make
 
-.PHONY: rel deps test eqc plots dcos
+.PHONY: rel deps test plots dcos
 
 all: compile
 
@@ -27,21 +27,32 @@ packageclean:
 ## Test targets
 ##
 
-check: test xref dialyzer lint
+check: test xref dialyzer
 
-test: ct eunit
+test: ct eunit simulations
 
 lint:
 	${REBAR} as lint lint
-
-eqc:
-	${REBAR} as test eqc
 
 eunit:
 	${REBAR} as test eunit
 
 ct:
-	${REBAR} as test ct
+	${REBAR} as test ct --suite=lasp_SUITE
+
+simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation ad-counter-overcounting ad-counter-partition-overcounting
+
+peer-to-peer-ad-counter-simulation:
+	${REBAR} as test ct --suite=lasp_peer_to_peer_advertisement_counter_SUITE
+
+client-server-ad-counter-simulation:
+	${REBAR} as test ct --suite=lasp_client_server_advertisement_counter_SUITE
+
+ad-counter-overcounting:
+	${REBAR} as test ct --suite=lasp_advertisement_counter_overcounting_SUITE
+
+ad-counter-partition-overcounting:
+	${REBAR} as test ct --suite=lasp_advertisement_counter_partition_overcounting_SUITE
 
 ##
 ## Release targets
@@ -93,16 +104,27 @@ plots:
 	  clear; \
 		rm -rf priv/lager/ priv/evaluation; \
 		(cd priv/ && git clone https://github.com/lasp-lang/evaluation); \
-		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE; \
-		cd priv/evaluation && ./lasp_plot_gen.sh
+		./rebar3 ct --readable=false --suite=test/lasp_peer_to_peer_advertisement_counter_SUITE; \
+		./rebar3 ct --readable=false --suite=test/lasp_client_server_advertisement_counter_SUITE; \
+		cd priv/evaluation && make plots
 
-ads: SHELL:=/bin/bash
-ads:
-	priv/ads.sh
+div:
+	pkill -9 beam.smp; \
+		clear; \
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_overcounting_SUITE
 
-docker-ads: SHELL:=/bin/bash
-docker-ads:
-	priv/docker-ads.sh
+part-div:
+	pkill -9 beam.smp; \
+		clear; \
+		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_partition_overcounting_SUITE
+
+evaluate-local: SHELL:=/bin/bash
+evaluate-local:
+	priv/evaluate-local.sh
+
+evaluate-docker: SHELL:=/bin/bash
+evaluate-docker:
+	priv/evaluate-docker.sh
 
 logs:
 	tail -F priv/lager/*/log/*.log

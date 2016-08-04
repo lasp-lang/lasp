@@ -41,11 +41,14 @@ echo "Cloning evaluation code."
 echo "Terminating old instances."
 pkill -9 beam.smp
 
-echo "Running evaluation."
-./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_SUITE
+echo "Running peer-to-peer ads evaluation."
+./rebar3 ct --readable=false --suite=test/lasp_peer_to_peer_advertisement_counter_SUITE
+
+echo "Running client-server ads evaluation."
+./rebar3 ct --readable=false --suite=test/lasp_client_server_advertisement_counter_SUITE
 
 echo "Generating plots."
-( cd priv/evaluation ; ./lasp_plot_gen.sh )
+( cd priv/evaluation ; make plots )
 
 echo "Configuring git."
 git config --global user.email "christopher.meiklejohn+lasp-lang-evaluator@gmail.com"

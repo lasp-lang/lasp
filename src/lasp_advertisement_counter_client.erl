@@ -36,13 +36,8 @@
 
 -include("lasp.hrl").
 
-%% Macros.
--define(IMPRESSION_INTERVAL, 1000).
--define(LOG_INTERVAL, 10000).
--define(CONVERGENCE_INTERVAL, 500).
-
 %% State record.
--record(state, {actor, impressions}).
+-record(state, {actor, impressions, triggers}).
 
 %%%===================================================================
 %%% API
@@ -68,13 +63,18 @@ init([]) ->
     %% Schedule advertisement counter impression.
     schedule_impression(),
 
+    %% Build DAG.
+    case lasp_config:get(heavy_client, false) of
+        true ->
+            build_dag();
+        false ->
+            ok
+    end,
+
     %% Schedule logging.
     schedule_logging(),
 
-    %% Schedule check convergence
-    schedule_check_convergence(),
-
-    {ok, #state{actor=Actor, impressions=0}}.
+    {ok, #state{actor=Actor, impressions=0, triggers=dict:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -93,68 +93,96 @@ handle_cast(Msg, State) ->
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(log, #state{impressions=Impressions}=State) ->
     %% Get current value of the list of advertisements.
-    {ok, Ads} = lasp:query({?ADS_WITH_CONTRACTS, ?SET_TYPE}),
-    AdList = sets:to_list(Ads),
+    {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
 
-    lager:info("Impressions: ~p", [Impressions]),
-
-    lager:info("Current advertisement list size: ~p", [length(AdList)]),
+    lager:info("Impressions: ~p, current ad size: ~p", [Impressions, sets:size(Ads)]),
 
     %% Schedule advertisement counter impression.
     schedule_logging(),
 
     {noreply, State};
 
-handle_info(view, #state{actor=Actor, impressions=Impressions0}=State) ->
+handle_info(view, #state{actor=Actor,
+                         impressions=Impressions0,
+                         triggers=Triggers0}=State) ->
     %% Get current value of the list of advertisements.
-    {ok, Ads} = lasp:query({?ADS_WITH_CONTRACTS, ?SET_TYPE}),
+    {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
 
     %% Make sure we have ads...
-    Impressions1 = case sets:size(Ads) of
+    {Impressions1, Triggers1} = case sets:size(Ads) of
         0 ->
             %% Do nothing.
-            Impressions0;
+            {Impressions0, Triggers0};
         Size ->
             %% Select random.
             Random = lasp_support:puniform(Size),
 
-            %% @todo Exposes internal details of record.
-            {{ad, _, _, Counter},
-             _Contract} = lists:nth(Random, sets:to_list(Ads)),
+            {#ad{counter=Counter} = Ad, _Contract} =
+                lists:nth(Random, sets:to_list(Ads)),
+
+            %% Spawn a process to disable the advertisement if it goes
+            %% above the maximum number of impressions.
+            %%
+            Triggers = case lasp_config:get(heavy_client, false) of
+                true ->
+                    case dict:find(Ad, Triggers0) of
+                        {ok, _Pid} ->
+                            Triggers0;
+                        error ->
+                            Pid = spawn_link(fun() -> trigger(Ad, Actor) end),
+                            dict:store(Ad, Pid, Triggers0)
+                    end;
+                false ->
+                    Triggers0
+            end,
 
             %% Increment counter.
             {ok, _} = lasp:update(Counter, increment, Actor),
 
-            %% Update CT instance
-            {ok, _} = lasp:update(convergence_id(), {fst, increment}, Actor),
-
             %% Increment impressions.
-            Impressions0 + 1
+            {Impressions0 + 1, Triggers}
     end,
 
-    %% Schedule advertisement counter impression.
-    case Impressions1 < max_impressions() of
+    %% - If I did nothing (`Impressions0 == Impressions1`),
+    %% and the `Impressions1 > 0` (meaning I did something before)
+    %% then all ads are disabled and simulation has ended
+    %%      (If we don't check for `Impressions1 > 0` it might mean that
+    %%      the experiment hasn't started yet)
+    %% - Else, keep doing impressions
+    case Impressions0 == Impressions1 andalso Impressions1 > 0 of
         true ->
-            schedule_impression();
+            lager:info("All ads are disabled. Node: ~p", [node()]),
+
+            %% Update Simulation Status Instance
+            lasp:update(?SIM_STATUS_ID, {Actor, {fst, true}}, Actor),
+            log_convergence(),
+            schedule_check_simulation_end();
         false ->
-            lager:info("Max number of impressions reached. Node: ~p", [node()])
+            schedule_impression()
     end,
 
-    {noreply, State#state{impressions=Impressions1}};
+    {noreply, State#state{impressions=Impressions1, triggers=Triggers1}};
 
-handle_info(check_convergence, #state{actor=Actor}=State) ->
-    MaxEvents = max_impressions() * client_number(),
-    {ok, {TotalEvents, _}} = lasp:query(convergence_id()),
-    %lager:info("Total number of events observed so far ~p of ~p", [TotalEvents, MaxEvents]),
+handle_info(check_simulation_end, #state{actor=Actor}=State) ->
+    %% A simulation ends for clients when all clients have
+    %% observed all ads disabled (first component of the map in
+    %% the simulation status instance is true for all clients)
+    {ok, AdsDisabledAndLogs} = lasp:query(?SIM_STATUS_ID),
 
-    case TotalEvents == MaxEvents of
+    NodesWithAdsDisabled = lists:filter(
+        fun({_Node, {AdsDisabled, _LogsPushed}}) ->
+            AdsDisabled
+        end,
+        AdsDisabledAndLogs
+    ),
+
+    case length(NodesWithAdsDisabled) == client_number() of
         true ->
-            lager:info("Convergence reached on node ~p", [node()]),
-            %% Update CT instance
-            lasp:update(convergence_id(), {snd, {Actor, true}}, Actor),
-            lasp_transmission_instrumentation:convergence();
+            lager:info("All nodes observed ads disabled. Node ~p", [node()]),
+            lasp:update(?SIM_STATUS_ID, {Actor, {snd, true}}, Actor),
+            lasp_support:push_logs();
         false ->
-            schedule_check_convergence()
+            schedule_check_simulation_end()
     end,
 
     {noreply, State};
@@ -188,23 +216,48 @@ schedule_logging() ->
     erlang:send_after(?LOG_INTERVAL, self(), log).
 
 %% @private
-schedule_check_convergence() ->
-    erlang:send_after(?CONVERGENCE_INTERVAL, self(), check_convergence).
-
-%% @private
-max_impressions() ->
-    lasp_config:get(simulation_event_number, 10).
+schedule_check_simulation_end() ->
+    erlang:send_after(?STATUS_INTERVAL, self(), check_simulation_end).
 
 %% @private
 client_number() ->
-    ?NUM_NODES.
+    lasp_config:get(client_number, 3).
 
 %% @private
-convergence_id() ->
-    PairType = {?PAIR_TYPE,
-                    [
-                        ?COUNTER_TYPE,
-                        {?GMAP_TYPE, [?BOOLEAN_TYPE]}
-                    ]
-                },
-    {?CONVERGENCE_TRACKING, PairType}.
+log_convergence() ->
+    case lasp_config:get(instrumentation, false) of
+        true ->
+            lasp_transmission_instrumentation:convergence();
+        false ->
+            ok
+    end.
+
+%% @private
+build_dag() ->
+    %% Compute the Cartesian product of both ads and contracts.
+    {AdsContractsId, AdsContractsType} = ?ADS_CONTRACTS,
+    {ok, _} = lasp:declare(AdsContractsId, AdsContractsType),
+    ok = lasp:product(?ADS, ?CONTRACTS, ?ADS_CONTRACTS),
+
+    %% Filter items by join on item it.
+    {AdsWithContractsId, AdsWithContractsType} = ?ADS_WITH_CONTRACTS,
+    {ok, _} = lasp:declare(AdsWithContractsId, AdsWithContractsType),
+    FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
+        Id1 =:= Id2
+    end,
+    ok = lasp:filter(?ADS_CONTRACTS, FilterFun, ?ADS_WITH_CONTRACTS),
+
+    ok.
+
+%% @private
+trigger(#ad{counter=CounterId} = Ad, Actor) ->
+    %% Blocking threshold read for max advertisement impressions.
+    {ok, Value} = lasp:read(CounterId, {value, ?MAX_IMPRESSIONS}),
+
+    lager:info("Threshold for ~p reached; disabling!", [Ad]),
+    lager:info("Counter: ~p", [Value]),
+
+    %% Remove the advertisement.
+    {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor),
+
+    ok.

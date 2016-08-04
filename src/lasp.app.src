@@ -16,5 +16,5 @@
           {web_ip,"0.0.0.0"},
           {web_port,8080},
           {peer_service,lasp_partisan_peer_service},
-          {distribution_backend,lasp_plumtree_broadcast_distribution_backend},
+          {distribution_backend,lasp_default_broadcast_distribution_backend},
           {storage_backend,lasp_ets_storage_backend}]}]}.

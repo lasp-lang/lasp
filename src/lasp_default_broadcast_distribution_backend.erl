@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_plumtree_broadcast_distribution_backend).
+-module(lasp_default_broadcast_distribution_backend).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).
@@ -76,6 +76,7 @@
 %% State record.
 -record(state, {store :: store(),
                 actor :: binary(),
+                sync_counter :: non_neg_integer(),
                 counter :: non_neg_integer(),
                 gc_counter :: non_neg_integer()}).
 
@@ -88,7 +89,7 @@
 
 -define(MEMORY_INTERVAL, 10000).
 -define(DELTA_INTERVAL, 10000).
--define(DELTA_GC_INTERVAL, 30000).
+-define(DELTA_GC_INTERVAL, 60000).
 
 %% Definitions for the bind/read fun abstraction.
 
@@ -98,12 +99,12 @@
 
 -define(WRITE, fun(_Store) ->
                  fun(_AccId, _AccValue) ->
-                   {ok, _} = ?CORE:bind(_AccId, _AccValue, _Store)
+                   {ok, _} = ?CORE:bind_var(_AccId, _AccValue, _Store)
                  end
                end).
 
 -define(READ, fun(_Id, _Threshold) ->
-                ?CORE:read(_Id, _Threshold, Store)
+                ?CORE:read_var(_Id, _Threshold, Store)
               end).
 
 -define(BLOCKING, fun() -> {noreply, State} end).
@@ -168,8 +169,11 @@ start_link(Opts) ->
 %% @doc Returns from the broadcast message the identifier and the payload.
 -spec broadcast_data(broadcast_message()) ->
     {{broadcast_id(), broadcast_clock()}, broadcast_payload()}.
-broadcast_data(#broadcast{id=Id, type=Type, clock=Clock,
-                          metadata=Metadata, value=Value}) ->
+broadcast_data(#broadcast{id=Id,
+                          type=Type,
+                          clock=Clock,
+                          metadata=Metadata,
+                          value=Value}) ->
     {{Id, Clock}, {Id, Type, Metadata, Value}}.
 
 %% @doc Perform a merge of an incoming object with an object in the
@@ -182,9 +186,13 @@ merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
         true ->
             false;
         false ->
+            %% Bind information.
             {ok, _} = ?MODULE:local_bind(Id, Type, Metadata, Value),
             true
-    end.
+    end;
+merge(BroadcastId, Payload) ->
+    lager:error("Incoming merge didn't match; broadcast_id: ~p payload: ~p", [BroadcastId, Payload]),
+    false.
 
 %% @doc Use the clock on the object to determine if this message is
 %%      stale or not.
@@ -489,7 +497,11 @@ init([]) ->
     %% Schedule report.
     schedule_memory_report(),
 
-    {ok, #state{actor=Actor, counter=Counter, store=Store, gc_counter=GCCounter}}.
+    {ok, #state{actor=Actor,
+                counter=Counter,
+                sync_counter=0,
+                store=Store,
+                gc_counter=GCCounter}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -785,7 +797,7 @@ handle_info(memory_report, State) ->
     {noreply, State};
 
 handle_info(aae_sync, #state{store=Store} = State) ->
-    lager:info("Beginning AAE synchronization."),
+    % lager:info("Beginning AAE synchronization."),
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
@@ -793,7 +805,7 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     %% Remove ourself.
     Peers = Members -- [node()],
 
-    lager:info("Beginning sync for peers: ~p", [Peers]),
+    % lager:info("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
     lists:foreach(fun(Peer) -> init_aae_sync(Peer, Store) end, Peers),
@@ -802,26 +814,33 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     schedule_aae_synchronization(),
 
     {noreply, State};
-handle_info(delta_sync, State) ->
-    lager:info("Beginning delta synchronization."),
+handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
+    % lager:info("Beginning delta synchronization."),
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
 
-    %% Remove ourself.
-    Peers = Members -- [node()],
+    PeerServiceManager = lasp_config:get(peer_service_manager,
+                                         partisan_peer_service),
+    lager:info("Manager is: ~p, Members are: ~p",
+               [PeerServiceManager, Members]),
+
+    %% Remove ourself and compute exchange peers.
+    Peers = compute_exchange(Members -- [node()]),
 
     lager:info("Beginning sync for peers: ~p", [Peers]),
-
-    %% Ship buffered updates for the fanout value.
-    lists:foreach(fun(Peer) ->
-                          init_delta_sync(Peer)
-                  end, Peers),
+    case length(Peers) of
+        0 ->
+            ok;
+        _ ->
+            %% Ship buffered updates for the fanout value.
+            lists:foreach(fun(Peer) -> init_delta_sync(Peer) end, Peers)
+    end,
 
     %% Schedule next synchronization.
     schedule_delta_synchronization(),
 
-    {noreply, State};
+    {noreply, State#state{sync_counter=SyncCounter+1}};
 handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
     MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
     Function =
@@ -931,8 +950,11 @@ broadcast({Id, Type, Metadata, Value}=Payload) ->
             PeerCount = length(plumtree_broadcast:broadcast_members()),
             log_transmission({broadcast, Payload}, PeerCount),
             Clock = orddict:fetch(clock, Metadata),
-            Broadcast = #broadcast{id=Id, clock=Clock, type=Type,
-                                   metadata=Metadata, value=Value},
+            Broadcast = #broadcast{id=Id,
+                                   clock=Clock,
+                                   type=Type,
+                                   metadata=Metadata,
+                                   value=Value},
             plumtree_broadcast:broadcast(Broadcast, ?MODULE);
         false ->
             ok
@@ -992,7 +1014,15 @@ collect_deltas(Destination, Type, DeltaMap, Min0, Max) ->
                                       _ ->
                                         lasp_type:merge(Type, Deltas0, Delta)
                                   end
-                          end, lasp_type:new(Type), SmallDeltaMap),
+                          end, lasp_type:new_delta(Type), SmallDeltaMap),
+
+    %% @todo should we remove this once we know everything is working fine?
+    case lasp_type:is_delta(Type, Deltas) of
+        false ->
+            lager:info("Folded delta group is not a delta");
+        true ->
+            ok
+    end,
     Deltas.
 
 %% @private
@@ -1010,7 +1040,7 @@ schedule_memory_report() ->
 
 %% @private
 memory_report() ->
-    case lasp_config:get(memory_report, true) of
+    case lasp_config:get(memory_report, false) of
         true ->
             PlumtreeBroadcast = erlang:whereis(plumtree_broadcast),
             lager:info("Plumtree message queue: ~p",
@@ -1094,8 +1124,8 @@ send(Msg, Peer) ->
     case PeerServiceManager:forward_message(Peer, ?MODULE, Msg) of
         ok ->
             ok;
-        Error ->
-            lager:error("Failed send to ~p for reason ~p", [Peer, Error]),
+        _Error ->
+            % lager:error("Failed send to ~p for reason ~p", [Peer, Error]),
             ok
     end.
 
@@ -1107,7 +1137,7 @@ extract_type_and_payload({Type, _From, Payload, _Count}) ->
 
 %% @private
 init_aae_sync(Peer, Store) ->
-    lager:info("Initializing AAE synchronization with peer: ~p", [Peer]),
+    % lager:info("Initializing AAE synchronization with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
@@ -1118,8 +1148,9 @@ init_aae_sync(Peer, Store) ->
                             [{ok, {Id, Type, Metadata, Value}}|Acc0]
                     end
                end,
-    {ok, Result} = do(fold, [Store, Function, []]),
-    lager:info("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]).
+    {ok, _Result} = do(fold, [Store, Function, []]),
+    % lager:info("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]).
+    ok.
 
 %% @private
 init_delta_sync(Peer) ->
@@ -1129,3 +1160,54 @@ init_delta_sync(Peer) ->
 %% @private
 membership() ->
     lasp_peer_service:members().
+
+%% @private
+select_random_sublist(List, K) ->
+    lists:sublist(shuffle(List), K).
+
+%% @reference http://stackoverflow.com/questions/8817171/shuffling-elements-in-a-list-randomly-re-arrange-list-elements/8820501#8820501
+shuffle(L) ->
+    [X || {_, X} <- lists:sort([{lasp_support:puniform(65535), N} || N <- L])].
+
+%% @private
+compute_exchange(Peers) ->
+    PeerServiceManager = lasp_config:get(peer_service_manager,
+                                         partisan_peer_service),
+
+    Probability = lasp_config:get(partition_probability, 0),
+    lager:info("Probability of partition: ~p", [Probability]),
+    case lasp_support:puniform(100) =< Probability of
+        true ->
+            case PeerServiceManager of
+                partisan_client_server_peer_service_manager ->
+                    lager:info("Partitioning from server."),
+                    [];
+                _ ->
+                    Percent = lasp_support:puniform(100),
+                    lager:info("Partitioning ~p% of the network.",
+                               [Percent]),
+
+                    %% Select percentage, minus one node which will be
+                    %% the server node.
+                    K = round((Percent / 100) * length(Peers)),
+                    lager:info("Partitioning ~p%: ~p nodes.",
+                               [Percent, K]),
+                    ServerNodes = case PeerServiceManager:active(server) of
+                        {ok, undefined} ->
+                            [];
+                        {ok, Server} ->
+                            [Server];
+                        error ->
+                            []
+                    end,
+                    lager:info("ServerNodes: ~p", [ServerNodes]),
+
+                    Random = select_random_sublist(Peers, K),
+                    RandomAndServer = lists:usort(ServerNodes ++ Random),
+                    lager:info("Partitioning ~p from ~p during sync.",
+                               [RandomAndServer, Peers -- RandomAndServer]),
+                    Peers -- RandomAndServer
+            end;
+        false ->
+            Peers
+    end.

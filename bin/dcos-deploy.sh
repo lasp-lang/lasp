@@ -5,6 +5,16 @@ if [ -z "$DCOS" ]; then
   exit 1
 fi
 
+if [ -z "$MODE" ]; then
+  echo ">>> MODE is not configured; please export MODE."
+  exit 1
+fi
+
+if [ -z "$BROADCAST" ]; then
+  echo ">>> BROADCAST is not configured; please export BROADCAST."
+  exit 1
+fi
+
 if [ -z "$TOKEN" ]; then
   echo ">>> TOKEN is not configured; please export TOKEN."
   exit 1
@@ -15,17 +25,22 @@ if [ -z "$ELB_HOST" ]; then
   exit 1
 fi
 
+if [ -z "$EVALUATION_PASSPHRASE" ]; then
+  echo ">>> EVALUATION_PASSPHRASE is not configured; please export EVALUATION_PASSPHRASE."
+  exit 1
+fi
+
 echo ">>> Beginning deployment!"
 
 echo ">>> Configuring Lasp"
 cd /tmp
 
-cat <<EOF > lasp-orchestrator.json
+cat <<EOF > lasp-server.json
 {
   "acceptedResourceRoles": [
     "slave_public"
   ],
-  "id": "lasp-orchestrator",
+  "id": "lasp-server",
   "dependencies": [],
   "constraints": [["hostname", "UNIQUE", ""]],
   "cpus": 1.0,
@@ -46,7 +61,9 @@ cat <<EOF > lasp-orchestrator.json
   "env": {
     "AD_COUNTER_SIM_SERVER": "true",
     "AD_COUNTER_SIM_CLIENT": "true",
-    "MODE": "delta_based",
+    "MODE": "$MODE",
+    "BROADCAST": "$BROADCAST",
+    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"
   },
@@ -69,21 +86,21 @@ cat <<EOF > lasp-orchestrator.json
 }
 EOF
 
-echo ">>> Removing orchestrator from Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-orchestrator
+echo ">>> Removing lasp-server from Marathon"
+curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-server
 sleep 2
 
-echo ">>> Adding orchestrator to Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-orchestrator.json $DCOS/service/marathon/v2/apps
+echo ">>> Adding lasp-server to Marathon"
+curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-server.json $DCOS/service/marathon/v2/apps
 echo
 sleep 10
 
-cat <<EOF > lasp.json
+cat <<EOF > lasp-client.json
 {
   "acceptedResourceRoles": [
     "slave_public"
   ],
-  "id": "lasp",
+  "id": "lasp-client",
   "dependencies": [],
   "cpus": 1.0,
   "mem": 2048.0,
@@ -102,7 +119,9 @@ cat <<EOF > lasp.json
   "ports": [0, 0],
   "env": {
     "AD_COUNTER_SIM_CLIENT": "true",
-    "MODE": "delta_based",
+    "MODE": "$MODE",
+    "BROADCAST": "$BROADCAST",
+    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN"
   },
@@ -121,11 +140,11 @@ cat <<EOF > lasp.json
 }
 EOF
 
-echo ">>> Removing lasp from Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp
+echo ">>> Removing lasp-client from Marathon"
+curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client
 sleep 2
 
-echo ">>> Adding lasp to Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp.json $DCOS/service/marathon/v2/apps
+echo ">>> Adding lasp-client to Marathon"
+curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-client.json $DCOS/service/marathon/v2/apps
 echo
 sleep 10

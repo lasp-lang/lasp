@@ -1,4 +1,4 @@
-%% -------------------------------------------------------------------
+%% ------------------------------------------------------------------
 %%
 %% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
 %%
@@ -19,152 +19,30 @@
 %% -------------------------------------------------------------------
 %%
 
--module(lasp_advertisement_counter_SUITE).
--author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
-
-%% common_test callbacks
--export([%% suite/0,
-         init_per_suite/1,
-         end_per_suite/1,
-         init_per_testcase/2,
-         end_per_testcase/2,
-         all/0]).
-
-%% tests
--compile([export_all]).
+-module(lasp_simulation_support).
+-author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -include("lasp.hrl").
 
--include_lib("common_test/include/ct.hrl").
--include_lib("eunit/include/eunit.hrl").
--include_lib("kernel/include/inet.hrl").
-
--define(EXCHANGE_TIMER, 120).
--define(CT_SLAVES, [rita, sue, bob, jerome]).
-
-%% ===================================================================
-%% common_test callbacks
-%% ===================================================================
-
-init_per_suite(_Config) ->
-    _Config.
-
-end_per_suite(_Config) ->
-    _Config.
-
-init_per_testcase(Case, _Config) ->
-    ct:pal("Beginning test case ~p", [Case]),
-
-    _Config.
-
-end_per_testcase(Case, _Config) ->
-    ct:pal("Ending test case ~p", [Case]),
-
-    _Config.
-
-all() ->
-    [
-     default_test,
-     state_based_with_aae_test,
-     state_based_with_aae_and_tree_test,
-     delta_based_with_aae_test,
-     state_based_ps_with_aae_test,
-     state_based_ps_with_aae_and_tree_test,
-     delta_based_ps_with_aae_test
-    ].
-
-%% ===================================================================
-%% tests
-%% ===================================================================
-
--define(AAE_INTERVAL, 10000).
--define(EVAL_NUMBER, 2).
--define(IMPRESSION_NUMBER, 10).
--define(CONVERGENCE_INTERVAL, 10000).
-
-default_test(_Config) ->
-    ok.
-
-state_based_with_aae_test(Config) ->
-    run(state_based_with_aae_test,
-        Config,
-        [{mode, state_based},
-         {set, orset},
-         {broadcast, false},
-         {evaluation_identifier, state_based_with_aae}]),
-    ok.
-
-state_based_with_aae_and_tree_test(Config) ->
-    case os:getenv("OMIT_HIGH_ULIMIT", "false") of
-        "false" ->
-            run(state_based_with_aae_and_tree_test,
-                Config,
-                [{mode, state_based},
-                 {set, orset},
-                 {broadcast, true},
-                 {evaluation_identifier, state_based_with_aae_and_tree}]),
-            ok;
-        _ ->
-            %% Omit.
-            ok
-    end.
-
-delta_based_with_aae_test(Config) ->
-    run(delta_based_with_aae_test,
-        Config,
-        [{mode, delta_based},
-         {set, orset},
-         {broadcast, false},
-         {evaluation_identifier, delta_based_with_aae}]),
-    ok.
-
-state_based_ps_with_aae_test(Config) ->
-    run(state_based_ps_with_aae_test,
-        Config,
-        [{mode, state_based},
-         {set, awset_ps},
-         {broadcast, false},
-         {evaluation_identifier, state_based_ps_with_aae}]),
-    ok.
-
-state_based_ps_with_aae_and_tree_test(Config) ->
-    case os:getenv("OMIT_HIGH_ULIMIT", "false") of
-        "false" ->
-            run(state_based_ps_with_aae_and_tree_test,
-                Config,
-                [{mode, state_based},
-                 {set, awset_ps},
-                 {broadcast, true},
-                 {evaluation_identifier, state_based_ps_with_aae_and_tree}]),
-            ok;
-        _ ->
-            %% Omit.
-            ok
-    end.
-
-delta_based_ps_with_aae_test(Config) ->
-    run(delta_based_ps_with_aae_test,
-        Config,
-        [{mode, delta_based},
-         {set, awset_ps},
-         {broadcast, false},
-         {evaluation_identifier, delta_based_ps_with_aae}]),
-    ok.
-
-%% ===================================================================
-%% Internal functions
-%% ===================================================================
+-export([run/3]).
 
 run(Case, Config, Options) ->
+    ClientNumber = lasp_config:get(client_number, 3),
+    NodeNames = node_list(ClientNumber),
+
+    ct:pal("Running ~p with nodes ~p", [Case, NodeNames]),
+
     lists:foreach(
         fun(_EvalNumber) ->
-            Nodes = start(
+            Server = start(
               Case,
               Config,
-              [{evaluation_timestamp, timestamp()} | Options]
+              [{client_number, ClientNumber},
+               {nodes, NodeNames},
+               {evaluation_timestamp, timestamp()} | Options]
             ),
-            wait_for_completion(Nodes),
-            stop(Nodes)
+            wait_for_completion(Server),
+            stop(NodeNames)
         end,
         lists:seq(1, ?EVAL_NUMBER)
     ).
@@ -207,7 +85,9 @@ start(_Case, _Config, Options) ->
                                     ct:fail(Error)
                             end
                      end,
-    [First|_] = Nodes = lists:map(InitializerFun, ?CT_SLAVES),
+
+    NodeNames = proplists:get_value(nodes, Options),
+    [Server | _] = Nodes = lists:map(InitializerFun, NodeNames),
 
     %% Load Lasp on all of the nodes.
     LoaderFun = fun(Node) ->
@@ -242,11 +122,8 @@ start(_Case, _Config, Options) ->
                                                                        peer_service,
                                                                        partisan_peer_service]),
                             ok = rpc:call(Node, application, set_env, [plumtree,
-                                                                       broadcast_exchange_timer,
-                                                                       ?EXCHANGE_TIMER]),
-                            ok = rpc:call(Node, application, set_env, [plumtree,
                                                                        broadcast_mods,
-                                                                       [lasp_plumtree_broadcast_distribution_backend]]),
+                                                                       [lasp_default_broadcast_distribution_backend]]),
                             ok = rpc:call(Node, application, set_env, [lasp,
                                                                        data_root,
                                                                        NodeDir])
@@ -261,20 +138,12 @@ start(_Case, _Config, Options) ->
 
                         %% Configure plumtree AAE interval to be the same.
                         ok = rpc:call(Node, application, set_env,
-                                      [broadcast_exchange_timer, ?AAE_INTERVAL]),
-
-                        %% Confgure broadcast
-                        ok = rpc:call(Node, lasp_config, set,
-                                      [aae_interval, ?AAE_INTERVAL]),
-
-                        %% Configure number of impressions.
-                        ok = rpc:call(Node, lasp_config, set,
-                                      [simulation_event_number, ?IMPRESSION_NUMBER]),
+                                      [plumtree, broadcast_exchange_timer, ?AAE_INTERVAL]),
 
                         %% Configure who should be the server and who's
                         %% the client.
                         case Node of
-                            First ->
+                            Server ->
                                 ok = rpc:call(Node, lasp_config, set,
                                               [ad_counter_simulation_server, true]);
                             _ ->
@@ -282,9 +151,22 @@ start(_Case, _Config, Options) ->
                                               [ad_counter_simulation_client, true])
                         end,
 
+                        %% Configure the peer service.
+                        PeerService = proplists:get_value(partisan_peer_service_manager, Options),
+                        ok = rpc:call(Node, partisan_config, set,
+                                      [partisan_peer_service_manager, PeerService]),
+
                         %% Configure the operational mode.
                         Mode = proplists:get_value(mode, Options),
                         ok = rpc:call(Node, lasp_config, set, [mode, Mode]),
+
+                        %% Configure where code should run.
+                        HeavyClient = proplists:get_value(heavy_client, Options, false),
+                        ok = rpc:call(Node, lasp_config, set, [heavy_client, HeavyClient]),
+
+                        %% Configure partitions.
+                        PartitionProbability = proplists:get_value(partition_probability, Options, 0),
+                        ok = rpc:call(Node, lasp_config, set, [partition_probability, PartitionProbability]),
 
                         %% Configure broadcast settings.
                         Broadcast = proplists:get_value(broadcast, Options),
@@ -296,9 +178,10 @@ start(_Case, _Config, Options) ->
                         ok = rpc:call(Node, lasp_config, set, [set, Set]),
 
                         %% Configure evaluation identifier.
+                        Simulation = proplists:get_value(simulation, Options),
                         EvalIdentifier = proplists:get_value(evaluation_identifier, Options),
                         ok = rpc:call(Node, lasp_config, set,
-                                      [evaluation_identifier, EvalIdentifier]),
+                                      [evaluation_identifier, {Simulation, EvalIdentifier}]),
 
                         %% Configure evaluation timestamp.
                         EvalTimestamp = proplists:get_value(evaluation_timestamp, Options),
@@ -306,8 +189,14 @@ start(_Case, _Config, Options) ->
                                       [evaluation_timestamp, EvalTimestamp]),
 
                         %% Configure instrumentation.
+                        Instrumentation = proplists:get_value(instrumentation, Options, true),
                         ok = rpc:call(Node, lasp_config, set,
-                                      [instrumentation, true])
+                                      [instrumentation, Instrumentation]),
+
+                        %% Configure client number.
+                        ClientNumber = proplists:get_value(client_number, Options),
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [client_number, ClientNumber])
                    end,
     lists:map(ConfigureFun, Nodes),
 
@@ -320,26 +209,34 @@ start(_Case, _Config, Options) ->
     lists:map(StartFun, Nodes),
 
     ct:pal("Custering nodes..."),
-    ClusterFun = fun(Node) ->
-                        PeerPort = rpc:call(Node,
-                                            partisan_config,
-                                            get,
-                                            [peer_port, ?PEER_PORT]),
-                        ct:pal("Joining node: ~p to ~p at port ~p",
-                               [Node, First, PeerPort]),
-                        ok = rpc:call(First,
-                                      lasp_peer_service,
-                                      join,
-                                      [{Node, {127, 0, 0, 1}, PeerPort}])
-                   end,
-    lists:map(ClusterFun, Nodes),
+    lists:map(fun(Node) -> cluster(Node, Nodes) end, Nodes),
 
     ct:pal("Lasp fully initialized."),
 
-    Nodes.
+    Server.
 
 %% @private
-stop(_Nodes) ->
+%%
+%% We have to cluster each node with all other nodes to compute the
+%% correct overlay: for instance, sometimes you'll want to establish a
+%% client/server topology, which requires all nodes talk to every other
+%% node to correctly compute the overlay.
+%%
+cluster(Node, Nodes) when is_list(Nodes) ->
+    lists:map(fun(OtherNode) -> cluster(Node, OtherNode) end, Nodes -- [Node]);
+cluster(Node, OtherNode) ->
+    PeerPort = rpc:call(OtherNode,
+                        partisan_config,
+                        get,
+                        [peer_port, ?PEER_PORT]),
+    ct:pal("Joining node: ~p to ~p at port ~p", [Node, OtherNode, PeerPort]),
+    ok = rpc:call(Node,
+                  lasp_peer_service,
+                  join,
+                  [{OtherNode, {127, 0, 0, 1}, PeerPort}]).
+
+%% @private
+stop(Nodes) ->
     StopFun = fun(Node) ->
         case ct_slave:stop(Node) of
             {ok, _} ->
@@ -348,20 +245,20 @@ stop(_Nodes) ->
                 ct:fail(Error)
         end
     end,
-    lists:map(StopFun, ?CT_SLAVES),
+    lists:map(StopFun, Nodes),
     ok.
 
 %% @private
-wait_for_completion([Server | _] = _Nodes) ->
+wait_for_completion(Server) ->
+    ct:pal("Waiting for simulation to end"),
     case lasp_support:wait_until(fun() ->
-                Convergence = rpc:call(Server, lasp_config, get, [convergence, false]),
-                ct:pal("Waiting for convergence: ~p", [Convergence]),
-                Convergence == true
-        end, 60*2, ?CONVERGENCE_INTERVAL) of
+                SimulationEnd = rpc:call(Server, lasp_config, get, [simulation_end, false]),
+                SimulationEnd == true
+        end, 60*10, ?STATUS_INTERVAL) of
         ok ->
-            ct:pal("Convergence reached!");
+            ct:pal("Simulation ended with success");
         Error ->
-            ct:fail("Convergence not reached: ~p", [Error])
+            ct:fail("Simulation failed: ~p", [Error])
     end.
 
 %% @private
@@ -372,3 +269,13 @@ codepath() ->
 timestamp() ->
     {Mega, Sec, _Micro} = erlang:timestamp(),
     Mega * 1000000 + Sec.
+
+%% @private
+node_list(ClientNumber) ->
+    Clients = client_list(ClientNumber),
+    [server | Clients].
+
+%% @private
+client_list(0) -> [];
+client_list(N) -> lists:append(client_list(N - 1), [list_to_atom("client_" ++ integer_to_list(N))]).
+

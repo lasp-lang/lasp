@@ -44,7 +44,8 @@
          partition_cluster/2,
          heal_cluster/2,
          load_lasp/3,
-         start_lasp/2]).
+         start_lasp/2,
+         push_logs/0]).
 
 -define(EXCHANGE_TIMER, 120).
 
@@ -171,7 +172,7 @@ heal_cluster(ANodes, BNodes) ->
 nodelist() ->
     lists:map(fun(X) ->
                       list_to_atom("node-" ++ integer_to_list(X))
-              end, lists:seq(1, ?NUM_NODES)).
+              end, lists:seq(1, lasp_config:get(client_number, 3))).
 
 start_nodes(Case, Config0) ->
     StartedConfig = lists:foldl(fun(N, Config) ->
@@ -258,7 +259,7 @@ start_runner() ->
                              ?EXCHANGE_TIMER),
     ok = application:set_env(plumtree,
                              broadcast_mods,
-                             [lasp_plumtree_broadcast_distribution_backend]),
+                             [lasp_default_broadcast_distribution_backend]),
 
     {ok, _} = application:ensure_all_started(lasp),
 
@@ -313,7 +314,7 @@ load_lasp(Node, Config, Case) ->
                                                ?EXCHANGE_TIMER]),
     ok = rpc:call(Node, application, set_env, [plumtree,
                                                broadcast_mods,
-                                               [lasp_plumtree_broadcast_distribution_backend]]),
+                                               [lasp_default_broadcast_distribution_backend]]),
     ok = rpc:call(Node, application, set_env, [lasp,
                                                data_root,
                                                NodeDir]).
@@ -361,4 +362,15 @@ start_slave(Name, NodeConfig, _Case) ->
                 Error ->
                     ct:fail(Error)
             end
+    end.
+
+push_logs() ->
+    DCOS = os:getenv("DCOS", "false"),
+    ShouldPush = list_to_atom(DCOS),
+
+    case ShouldPush of
+        true ->
+            _Result = os:cmd("cd " ++ code:priv_dir(?APP) ++ " ; ./push_logs.sh");
+        false ->
+            ok
     end.

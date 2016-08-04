@@ -7,9 +7,6 @@
 %% Peer service port.
 -define(PEER_PORT, 9000).
 
-%% Number of additional nodes to run for the test suite.
--define(NUM_NODES, 3).
-
 %% Code which connects the storage backends to the implementation.
 -define(CORE, lasp_core).
 
@@ -96,10 +93,45 @@
 -type object() :: crdt().
 
 %% Test identifiers.
--define(ADS_WITH_CONTRACTS, <<"ads_with_contracts">>).
--define(CONVERGENCE_TRACKING, <<"convergence_tracking">>).
+-define(ADS, {<<"ads">>, ?SET_TYPE}).
+-define(CONTRACTS, {<<"contracts">>, ?SET_TYPE}).
+-define(ADS_CONTRACTS, {<<"ads_contracts">>, ?SET_TYPE}).
+-define(ADS_WITH_CONTRACTS, {<<"ads_with_contracts">>, ?SET_TYPE}).
 -define(BOOLEAN_TYPE, boolean).
 -define(COUNTER_TYPE, gcounter).
 -define(GMAP_TYPE, gmap).
 -define(SET_TYPE, lasp_config:get(set, orset)).
 -define(PAIR_TYPE, pair).
+
+%% Simulation status tracking code.
+-define(SIM_STATUS_TRACKING, <<"status_tracking">>).
+
+-define(SIM_STATUS_STRUCTURE,
+        {?GMAP_TYPE, [
+            {?PAIR_TYPE, [
+                ?BOOLEAN_TYPE, %% observed ads disabled
+                ?BOOLEAN_TYPE  %% logs pushed
+            ]}
+        ]}).
+
+-define(SIM_STATUS_ID,
+        {?SIM_STATUS_TRACKING, ?SIM_STATUS_STRUCTURE}).
+
+%% Simulation helpers.
+-define(AAE_INTERVAL, 10000).
+-define(IMPRESSION_INTERVAL, 500).
+-define(STATUS_INTERVAL, 1000).
+-define(EVAL_NUMBER, 1).
+-define(MAX_IMPRESSIONS, 50).
+-define(LOG_INTERVAL, 10000).
+-define(VOTING_INTERVAL, 1000).
+-define(ADS_NUMBER, 5).
+
+-define(DEFAULT_DISTRIBUTION_BACKEND, lasp_default_broadcast_distribution_backend).
+
+%% Lexer and parser.
+-define(SQL_LEXER, lasp_sql_lexer).
+-define(SQL_PARSER, lasp_sql_parser).
+
+-record(ad, {id, name, image, counter}).
+-record(contract, {id}).

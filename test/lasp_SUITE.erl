@@ -37,8 +37,6 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/inet.hrl").
 
--define(PEER_SERVICE, partisan_hyparview_peer_service_manager).
-
 %% ===================================================================
 %% common_test callbacks
 %% ===================================================================
@@ -78,6 +76,8 @@ end_per_testcase(Case, Config) ->
 
 all() ->
     [
+     parser_test,
+     combined_view_test,
      stream_test,
      query_test,
      ivar_test,
@@ -93,15 +93,90 @@ all() ->
      membership_test
     ].
 
+-include("lasp.hrl").
+
 %% ===================================================================
 %% tests
 %% ===================================================================
 
--define(SET, orset).
 -define(AWSET_PS, awset_ps).
 -define(COUNTER, pncounter).
 
 -define(ID, <<"myidentifier">>).
+
+parser_test(_Config) ->
+    ok = lasp_sql_materialized_view:create_table_with_values(users, [
+        [{name, "Foo"}, {age, 22}],
+        [{name, "Bar"}, {age, 9}],
+        [{name, "Baz"}, {age, 20}]
+    ]),
+
+    ?assertMatch([["Baz", 20], ["Bar", 9], ["Foo", 22]], lasp_sql_materialized_view:get_value(users, [name, age])),
+
+    {ok, Id1} = lasp_sql_materialized_view:create("select name from users where age = 22 or age < 10"),
+
+    %% Stabilize
+    timer:sleep(100),
+
+    ?assertMatch([["Bar"], ["Foo"]], lasp_sql_materialized_view:get_value(Id1, [name])),
+
+    {ok, Id2} = lasp_sql_materialized_view:create("select name from users where age <= 22 and age => 10"),
+
+    %% Stabilize
+    timer:sleep(100),
+
+    ?assertMatch([["Baz"], ["Foo"]], lasp_sql_materialized_view:get_value(Id2, [name])),
+
+    {ok, Id3} = lasp_sql_materialized_view:create("select name from users where age < 22 and age > 19"),
+
+    %% Stabilize
+    timer:sleep(100),
+
+    ?assertMatch([["Baz"]], lasp_sql_materialized_view:get_value(Id3, [name])),
+
+    {ok, Id4} = lasp_sql_materialized_view:create("select name, age from users where age < 22 and age > 19"),
+
+    %% Stabilize
+    timer:sleep(100),
+
+    ?assertMatch([["Baz", 20]], lasp_sql_materialized_view:get_value(Id4, [name, age])),
+
+    {ok, Id5} = lasp_sql_materialized_view:create("select name, age from users where name = 'Foo' or name = 'Baz'"),
+
+    %% Stabilize
+    timer:sleep(100),
+
+    ?assertMatch([["Baz", 20], ["Foo", 22]], lasp_sql_materialized_view:get_value(Id5, [name, age])),
+
+    ok.
+
+combined_view_test(_Config) ->
+    ok = lasp_sql_materialized_view:create_table_with_values(classics, [
+        [{title, "Breathless"}, {year, 1960}, {rating, 80}],
+        [{title, "A Woman Is a Woman"}, {year, 1961}, {rating, 76}],
+        [{title, "Masculin Feminin"}, {year, 1966}, {rating, 77}],
+        [{title, "La Chinoise"}, {year, 1967}, {rating, 73}]
+    ]),
+
+    {OutputId, Type}=Output = lasp_sql_materialized_view:generate_identifier(filtered),
+    %% have to declare the value explicitly, otherwise query will fail on write
+    lasp:declare(OutputId, Type),
+    {ok, Id1} = lasp_sql_materialized_view:create(Output,
+                                                  "select title, rating from classics where year => 1960 and year <= 1965"),
+
+    %% Stabilize
+    timer:sleep(100),
+
+    ?assertMatch([["A Woman Is a Woman"], ["Breathless"]], lasp_sql_materialized_view:get_value(Id1, [title])),
+
+    {ok, Id2} = lasp_sql_materialized_view:create("select title from filtered where rating => 80"),
+
+    %% Stabilize
+    timer:sleep(100),
+
+    ?assertMatch([["Breathless"]], lasp_sql_materialized_view:get_value(Id2, [title])),
+
+    ok.
 
 %% @doc Increment counter and test stream behaviour.
 stream_test(_Config) ->
@@ -478,6 +553,9 @@ orset_test(_Config) ->
 
 %% @doc Membership test.
 membership_test(Config) ->
+    Manager = lasp_peer_service:manager(),
+    ct:pal("Manager: ~p", [Manager]),
+
     Nodes = proplists:get_value(nodes, Config),
     lager:info("Nodes: ~p", [Nodes]),
     Sorted = lists:usort(Nodes),
@@ -485,23 +563,39 @@ membership_test(Config) ->
     lager:info("Waiting for cluster to stabilize."),
     timer:sleep(10000),
 
-    lists:foreach(fun(Node) ->
-                        {ok, {state, _Myself, Active, Passive, _, _, _}} = rpc:call(Node, ?PEER_SERVICE, state, []),
+    case Manager of
+        partisan_hyparview_peer_service_manager ->
+            lists:foreach(fun(Node) ->
+                                {ok, Active} = rpc:call(Node, Manager, active, []),
+                                {ok, Passive} = rpc:call(Node, Manager, passive, []),
 
-                        case lists:usort([Name || {Name, _, _} <- sets:to_list(Active)]) of
-                            Sorted ->
-                                ok;
-                            _ ->
-                                ct:fail("Incorrect nodes!")
-                        end,
+                                case lists:usort([Name || {Name, _, _} <- sets:to_list(Active)]) of
+                                    Sorted ->
+                                        ok;
+                                    WrongActive ->
+                                        ct:fail("Incorrect nodes in active view on node ~p: ~p should be ~p!",
+                                                [Node, WrongActive, Sorted])
+                                end,
 
-                        case sets:to_list(Passive) of
-                            [] ->
-                                ok;
-                            _ ->
-                                ct:fail("Incorrect nodes!")
-                        end
-                  end, Nodes),
+                                case sets:to_list(Passive) of
+                                    [] ->
+                                        ok;
+                                    WrongPassive ->
+                                        ct:fail("Incorrect nodes in passive view: ~p!",
+                                                [WrongPassive])
+                                end
+                          end, Nodes);
+        partisan_default_peer_service_manager ->
+            lists:foreach(fun(Node) ->
+                                {ok, Members} = rpc:call(Node, Manager, members, []),
+                                lists:usort(Members) =:= lists:usort(Nodes)
+                          end, Nodes);
+        partisan_client_server_peer_service_manager ->
+            lists:foreach(fun(Node) ->
+                                {ok, Members} = rpc:call(Node, Manager, members, []),
+                                lists:usort(Members) =:= lists:usort(Nodes)
+                          end, Nodes)
+    end,
 
     ok.
 

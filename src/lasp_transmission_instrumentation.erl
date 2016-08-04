@@ -91,14 +91,15 @@ init([]) ->
     {reply, term(), #state{}}.
 
 handle_call({log, Type, Payload, PeerCount}, _From, #state{size_per_type=Map0}=State) ->
+    LogType = get_log_type(Type),
     Size = termsize(Payload) * PeerCount,
-    Current = case orddict:find(Type, Map0) of
+    Current = case orddict:find(LogType, Map0) of
         {ok, Value} ->
             Value;
         error ->
             0
     end,
-    Map = orddict:store(Type, Current + Size, Map0),
+    Map = orddict:store(LogType, Current + Size, Map0),
     {reply, ok, State#state{size_per_type=Map}};
 
 handle_call(convergence, _From, #state{filename=Filename}=State) ->
@@ -167,11 +168,16 @@ log_dir() ->
 
 %% @private
 create_dir() ->
-    EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
+    EvalIdentifier = case lasp_config:get(evaluation_identifier, undefined) of
+        undefined ->
+            "undefined";
+        {Simulation, Id} ->
+            atom_to_list(Simulation) ++ "/" ++ atom_to_list(Id)
+    end,
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     Filename = io_lib:format("~s.csv", [node()]),
     Path = log_dir() ++ "/"
-        ++ atom_to_list(EvalIdentifier) ++ "/"
+        ++ EvalIdentifier ++ "/"
         ++ integer_to_list(EvalTimestamp) ++ "/",
     filelib:ensure_dir(Path),
     Path ++ Filename.
@@ -224,3 +230,9 @@ write_file(Filename, Line, Mode) ->
 timestamp() ->
     {Mega, Sec, _Micro} = erlang:timestamp(),
     Mega * 1000000 + Sec.
+
+%% @private
+get_log_type(aae_send) -> aae_send;
+get_log_type(broadcast) -> aae_send;
+get_log_type(delta_send) -> delta_send;
+get_log_type(delta_ack) -> delta_send.

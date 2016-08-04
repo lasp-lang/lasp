@@ -279,8 +279,16 @@ log_overcounting(AdList) ->
 %% @private
 filename() ->
     Simulation = lasp_config:get(simulation, undefined),
+    LocalOrDCOS = case os:getenv("DCOS", "false") of
+        "false" ->
+            "local";
+        _ ->
+            "dcos"
+    end,
     EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
-    Id = atom_to_list(Simulation) ++ "/" ++ atom_to_list(EvalIdentifier),
+    Id = atom_to_list(Simulation) ++ "/"
+      ++ LocalOrDCOS ++ "/"
+      ++ atom_to_list(EvalIdentifier),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     Filename = "overcounting",
     Dir = code:priv_dir(?APP) ++ "/evaluation/logs/"

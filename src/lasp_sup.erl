@@ -57,8 +57,15 @@ init(_Args) ->
                [lasp_unique]},
 
     %% Before initializing the partisan backend, be sure to configure it
-    %% to use the proper ports.
-    %%
+    %% to use the proper ip and ports.
+    case os:getenv("IP", "false") of
+        "false" ->
+            ok;
+        IP ->
+            {ok, IPAddress} = inet_parse:address(IP),
+            partisan_config:set(peer_ip, IPAddress),
+            ok
+    end,
     case os:getenv("PEER_PORT", "false") of
         "false" ->
             partisan_config:set(peer_port, random_port()),

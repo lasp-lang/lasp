@@ -103,6 +103,7 @@ all() ->
 -define(COUNTER, pncounter).
 
 -define(ID, <<"myidentifier">>).
+-define(LATENCY_ITERATIONS, 1000).
 
 parser_test(_Config) ->
     ok = lasp_sql_materialized_view:create_table_with_values(users, [

@@ -30,6 +30,7 @@
 %% API
 -export([start_link/1,
          start_dag_link/1,
+         start_manual_process/1,
          single_fire_function/4,
          start_single_fire_process/1]).
 
@@ -49,14 +50,28 @@
 %%% API
 %%%===================================================================
 
-start_link(Args) ->
-    lasp_process_sup:start_child(Args).
+start_link([ReadFuns, TransFun]) ->
+    start_manual_process([ReadFuns, TransFun, undefined]).
+
+%% @doc A lasp process that shouldn't be automatically managed by the dag
+%%
+%%      When using this function, the resulting process isn't tracked by
+%%      the runtime. Only useful when we want to manually introduce the
+%%      dependencies in the graph, or for functions that aren't currently
+%%      supported (fold and stream).
+%%
+start_manual_process([_ReadFuns, _TransFun, _WriteFun]=Args) ->
+    lasp_process_sup:start_child([nodag | Args]).
 
 %% @todo rename to start_link once all functions are tracked
 start_dag_link(Args) ->
     start_tracked_process(undefined, Args).
 
 %% @doc Starts a single-fire lasp process.
+%%
+%%      These processes only run until their transform functions complete
+%%      succesfully one time. Used to model reads and binds on values.
+%%
 start_single_fire_process(Args) ->
     start_tracked_process(1, Args).
 
@@ -72,7 +87,7 @@ start_tracked_process(EventCount, [ReadFuns, TransFun, {To, _}=WriteFun]) ->
         true -> case lasp_dependence_dag:will_form_cycle(From, To) of
             false -> lasp_process_sup:start_child(EventCount, [ReadFuns, TransFun, WriteFun]);
             true ->
-                lager:warning("dependence dag edge from ~w to ~w forms a cycle~n", [From, To]),
+                lager:warning("dependence dag edge from ~w to ~w would form a cycle~n", [From, To]),
                 %% @todo propagate errors
                 {ok, ignore}
         end
@@ -115,10 +130,10 @@ single_fire_function(From, To, Fn, Args) ->
 %%%===================================================================
 
 %% @doc Initialize state.
-init([ReadFuns, Function]) ->
+init([nodag, ReadFuns, Function, WriteFun]) ->
     {ok, #state{read_funs=ReadFuns,
                 trans_fun=Function,
-                write_fun=undefined}};
+                write_fun=WriteFun}};
 
 init([ReadFuns, TransFun, {To, _}=WriteFun]) ->
     From = [Id || {Id, _} <- ReadFuns],

@@ -282,7 +282,16 @@ configure_defaults() ->
                                ?APP,
                                incremental_computation_mode,
                                false),
-    lasp_config:set(incremental_computation_mode, IncrementalComputation).
+
+    %% Automatic contraction configuration.
+    %% Only makes sense if the dag is enabled.
+    lasp_config:set(incremental_computation_mode, IncrementalComputation),
+    case lasp_config:get(dag_enabled, false) of
+        true ->
+            AutomaticContraction = application:get_env(?APP, automatic_contraction, false),
+            lasp_config:set(automatic_contraction, AutomaticContraction);
+        _ -> ok
+    end.
 
 %% @private
 advertisement_counter_child_specs() ->

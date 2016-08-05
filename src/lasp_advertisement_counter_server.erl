@@ -126,9 +126,11 @@ handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
         true ->
             lager:info("All nodes have pushed their logs"),
             log_convergence(),
-            lasp_support:push_logs(),
+            lasp_transmission_instrumentation:stop(),
             log_overcounting(AdList),
-            lasp_config:set(simulation_end, true);
+            lasp_support:push_logs(),
+            lasp_config:set(simulation_end, true),
+            stop_simulation();
         false ->
             schedule_check_simulation_end()
     end,
@@ -276,16 +278,21 @@ log_overcounting(AdList) ->
 
 %% @private
 filename() ->
-    EvalIdentifier = case lasp_config:get(evaluation_identifier, undefined) of
-        undefined ->
-            "undefined";
-        {Simulation, Id} ->
-            atom_to_list(Simulation) ++ "/" ++ atom_to_list(Id)
+    Simulation = lasp_config:get(simulation, undefined),
+    LocalOrDCOS = case os:getenv("DCOS", "false") of
+        "false" ->
+            "local";
+        _ ->
+            "dcos"
     end,
+    EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
+    Id = atom_to_list(Simulation) ++ "/"
+      ++ LocalOrDCOS ++ "/"
+      ++ atom_to_list(EvalIdentifier),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     Filename = "overcounting",
     Dir = code:priv_dir(?APP) ++ "/evaluation/logs/"
-        ++ EvalIdentifier ++ "/"
+        ++ Id ++ "/"
         ++ integer_to_list(EvalTimestamp) ++ "/",
     filelib:ensure_dir(Dir),
     Dir ++ Filename.
@@ -304,3 +311,29 @@ compute_overcounting(AdList) ->
     ),
 
     OvercountingSum / length(AdList).
+
+stop_simulation() ->
+    DCOS = os:getenv("DCOS", "false"),
+    Token = os:getenv("TOKEN", "undefined"),
+
+    case list_to_atom(DCOS) of
+        false ->
+            ok;
+        _ ->
+            lists:foreach(
+                fun(AppName) ->
+                    delete_marathon_app(DCOS, Token, AppName)
+                end,
+                ["lasp-client", "lasp-server"]
+            )
+    end.
+
+delete_marathon_app(DCOS, Token, AppName) ->
+    Headers = [{"Authorization", "token=" ++ Token}],
+    Url = DCOS ++ "/marathon/v2/apps/" ++ AppName,
+    case httpc:request(delete, {Url, Headers}, [], [{body_format, binary}]) of
+        {ok, {{_, 200, _}, _, _Body}} ->
+            ok;
+        Other ->
+            lager:info("Delete app ~p request failed: ~p", [AppName, Other])
+    end.

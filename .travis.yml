@@ -7,8 +7,6 @@ install:
 script:
   - make eunit
   - make xref
-  - make dialyzer
-  - make lint
   - make ct
   - make peer-to-peer-ad-counter-simulation
   - make client-server-ad-counter-simulation

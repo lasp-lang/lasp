@@ -88,7 +88,6 @@
                     value :: value()}).
 
 -define(MEMORY_INTERVAL, 10000).
--define(DELTA_INTERVAL, 10000).
 -define(DELTA_GC_INTERVAL, 60000).
 
 %% Definitions for the bind/read fun abstraction.
@@ -1085,9 +1084,11 @@ log_transmission({Type, Payload}, PeerCount) ->
 
 %% @private
 schedule_delta_synchronization() ->
+    DeltaInterval = lasp_config:get(delta_interval, 10000),
+
     case lasp_config:get(mode, state_based) of
         delta_based ->
-            erlang:send_after(?DELTA_INTERVAL, self(), delta_sync);
+            erlang:send_after(DeltaInterval, self(), delta_sync);
         state_based ->
             ok
     end.

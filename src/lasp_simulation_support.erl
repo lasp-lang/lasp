@@ -177,11 +177,15 @@ start(_Case, _Config, Options) ->
                         Set = proplists:get_value(set, Options),
                         ok = rpc:call(Node, lasp_config, set, [set, Set]),
 
-                        %% Configure evaluation identifier.
+                        %% Configure simulation.
                         Simulation = proplists:get_value(simulation, Options),
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [simulation, Simulation]),
+
+                        %% Configure evaluation identifier.
                         EvalIdentifier = proplists:get_value(evaluation_identifier, Options),
                         ok = rpc:call(Node, lasp_config, set,
-                                      [evaluation_identifier, {Simulation, EvalIdentifier}]),
+                                      [evaluation_identifier, EvalIdentifier]),
 
                         %% Configure evaluation timestamp.
                         EvalTimestamp = proplists:get_value(evaluation_timestamp, Options),

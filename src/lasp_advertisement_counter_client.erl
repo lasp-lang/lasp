@@ -95,7 +95,7 @@ handle_info(log, #state{impressions=Impressions}=State) ->
     %% Get current value of the list of advertisements.
     {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
 
-    lager:info("Impressions: ~p, current ad size: ~p", [Impressions, sets:size(Ads)]),
+    lager:info("Impressions: ~p, current ad size: ~p, node: ~p", [Impressions, sets:size(Ads), node()]),
 
     %% Schedule advertisement counter impression.
     schedule_logging(),
@@ -179,8 +179,9 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     case length(NodesWithAdsDisabled) == client_number() of
         true ->
             lager:info("All nodes observed ads disabled. Node ~p", [node()]),
-            lasp:update(?SIM_STATUS_ID, {Actor, {snd, true}}, Actor),
-            lasp_support:push_logs();
+            lasp_transmission_instrumentation:stop(),
+            lasp_support:push_logs(),
+            lasp:update(?SIM_STATUS_ID, {Actor, {snd, true}}, Actor);
         false ->
             schedule_check_simulation_end()
     end,

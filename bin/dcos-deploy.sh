@@ -1,34 +1,31 @@
 #!/bin/bash
 
-if [ -z "$DCOS" ]; then
-  echo ">>> DCOS is not configured; please export DCOS."
-  exit 1
-fi
+ENV_VARS=(
+  DCOS
+  TOKEN
+  EVALUATION_PASSPHRASE
+  ELB_HOST
+  PEER_SERVICE
+  MODE
+  BROADCAST
+  SIMULATION
+  EVAL_ID
+  EVAL_TIMESTAMP
+  CLIENT_NUMBER
+  HEAVY_CLIENTS
+  PARTITION_PROBABILITY
+  AAE_INTERVAL
+  DELTA_INTERVAL
+  INSTRUMENTATION
+)
 
-if [ -z "$MODE" ]; then
-  echo ">>> MODE is not configured; please export MODE."
-  exit 1
-fi
-
-if [ -z "$BROADCAST" ]; then
-  echo ">>> BROADCAST is not configured; please export BROADCAST."
-  exit 1
-fi
-
-if [ -z "$TOKEN" ]; then
-  echo ">>> TOKEN is not configured; please export TOKEN."
-  exit 1
-fi
-
-if [ -z "$ELB_HOST" ]; then
-  echo ">>> ELB_HOST is not configured; please export ELB_HOST."
-  exit 1
-fi
-
-if [ -z "$EVALUATION_PASSPHRASE" ]; then
-  echo ">>> EVALUATION_PASSPHRASE is not configured; please export EVALUATION_PASSPHRASE."
-  exit 1
-fi
+for ENV_VAR in "${ENV_VARS[@]}"
+do
+  if [ -z "${!ENV_VAR}" ]; then
+    echo ">>> ${ENV_VAR} is not configured; please export it."
+    exit 1
+  fi
+done
 
 echo ">>> Beginning deployment!"
 
@@ -49,7 +46,7 @@ cat <<EOF > lasp-server.json
   "container": {
     "type": "DOCKER",
     "docker": {
-      "image": "cmeiklejohn/lasp-dev",
+      "image": "vitorenesduarte/lasp-dev",
       "network": "HOST",
       "forcePullImage": true,
       "parameters": [
@@ -60,12 +57,21 @@ cat <<EOF > lasp-server.json
   "ports": [0, 0],
   "env": {
     "AD_COUNTER_SIM_SERVER": "true",
-    "AD_COUNTER_SIM_CLIENT": "true",
+    "DCOS": "$DCOS",
+    "TOKEN": "$TOKEN",
+    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
+    "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",
     "BROADCAST": "$BROADCAST",
-    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
-    "DCOS": "$DCOS",
-    "TOKEN": "$TOKEN"
+    "SIMULATION": "$SIMULATION",
+    "EVAL_ID": "$EVAL_ID",
+    "EVAL_TIMESTAMP": "$EVAL_TIMESTAMP",
+    "CLIENT_NUMBER": "$CLIENT_NUMBER",
+    "HEAVY_CLIENTS": "$HEAVY_CLIENTS",
+    "PARTITION_PROBABILITY": "$PARTITION_PROBABILITY",
+    "AAE_INTERVAL": "$AAE_INTERVAL",
+    "DELTA_INTERVAL": "$DELTA_INTERVAL",
+    "INSTRUMENTATION": "$INSTRUMENTATION"
   },
   "labels": {
       "HAPROXY_GROUP":"external",
@@ -104,11 +110,11 @@ cat <<EOF > lasp-client.json
   "dependencies": [],
   "cpus": 1.0,
   "mem": 2048.0,
-  "instances": 5,
+  "instances": $CLIENT_NUMBER,
   "container": {
     "type": "DOCKER",
     "docker": {
-      "image": "cmeiklejohn/lasp-dev",
+      "image": "vitorenesduarte/lasp-dev",
       "network": "HOST",
       "forcePullImage": true,
       "parameters": [
@@ -119,11 +125,21 @@ cat <<EOF > lasp-client.json
   "ports": [0, 0],
   "env": {
     "AD_COUNTER_SIM_CLIENT": "true",
+    "DCOS": "$DCOS",
+    "TOKEN": "$TOKEN",
+    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
+    "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",
     "BROADCAST": "$BROADCAST",
-    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
-    "DCOS": "$DCOS",
-    "TOKEN": "$TOKEN"
+    "SIMULATION": "$SIMULATION",
+    "EVAL_ID": "$EVAL_ID",
+    "EVAL_TIMESTAMP": "$EVAL_TIMESTAMP",
+    "CLIENT_NUMBER": "$CLIENT_NUMBER",
+    "HEAVY_CLIENTS": "$HEAVY_CLIENTS",
+    "PARTITION_PROBABILITY": "$PARTITION_PROBABILITY",
+    "AAE_INTERVAL": "$AAE_INTERVAL",
+    "DELTA_INTERVAL": "$DELTA_INTERVAL",
+    "INSTRUMENTATION": "$INSTRUMENTATION"
   },
   "healthChecks": [
     {

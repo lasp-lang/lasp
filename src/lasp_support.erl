@@ -369,8 +369,10 @@ push_logs() ->
     ShouldPush = list_to_atom(DCOS),
 
     case ShouldPush of
-        true ->
-            _Result = os:cmd("cd " ++ code:priv_dir(?APP) ++ " ; ./push_logs.sh");
         false ->
-            ok
+            ok;
+        _ ->
+            lager:info("Will push logs"),
+            Result = os:cmd("cd /opt/lasp && ./priv/evaluate-mesos-push.sh"),
+            lager:info("Logs pushed. Output ~p", [Result])
     end.

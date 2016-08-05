@@ -57,8 +57,15 @@ init(_Args) ->
                [lasp_unique]},
 
     %% Before initializing the partisan backend, be sure to configure it
-    %% to use the proper ports.
-    %%
+    %% to use the proper ip and ports.
+    case os:getenv("IP", "false") of
+        "false" ->
+            ok;
+        IP ->
+            {ok, IPAddress} = inet_parse:address(IP),
+            partisan_config:set(peer_ip, IPAddress),
+            ok
+    end,
     case os:getenv("PEER_PORT", "false") of
         "false" ->
             partisan_config:set(peer_port, random_port()),
@@ -69,13 +76,11 @@ init(_Args) ->
     end,
 
     %% Configure the peer service.
-    case partisan_config:get(partisan_peer_service_manager, false) of
-        false ->
-            partisan_config:set(partisan_peer_service_manager,
-                                partisan_client_server_peer_service_manager);
-        _ ->
-            ok
-    end,
+    PeerServiceDefault = list_to_atom(os:getenv("PEER_SERVICE", "partisan_client_server_peer_service_manager")),
+    PeerService = application:get_env(?APP,
+                                      partisan_peer_service_manager,
+                                      PeerServiceDefault),
+    lasp_config:set(partisan_peer_service_manager, PeerService),
 
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},
@@ -187,23 +192,41 @@ configure_defaults() ->
                                            BroadcastDefault),
     lasp_config:set(broadcast, BroadcastEnabled),
 
+    SimulationDefault = list_to_atom(os:getenv("SIMULATION", "undefined")),
+    Simulation = application:get_env(?APP,
+                                       simulation,
+                                       SimulationDefault),
+    lasp_config:set(simulation, Simulation),
+
     EvaluationIdDefault = list_to_atom(os:getenv("EVAL_ID", "undefined")),
-    EvaluationIdEnabled = application:get_env(?APP,
-                                              evaluation_identifier,
-                                              EvaluationIdDefault),
-    lasp_config:set(evaluation_identifier, EvaluationIdEnabled),
+    EvaluationId = application:get_env(?APP,
+                                       evaluation_identifier,
+                                       EvaluationIdDefault),
+    lasp_config:set(evaluation_identifier, EvaluationId),
 
     EvaluationTimestampDefault = list_to_integer(os:getenv("EVAL_TIMESTAMP", "0")),
-    EvaluationTimestampEnabled = application:get_env(?APP,
-                                                  evaluation_timestamp,
-                                                  EvaluationTimestampDefault),
-    lasp_config:set(evaluation_timstamp, EvaluationTimestampEnabled),
+    EvaluationTimestamp = application:get_env(?APP,
+                                              evaluation_timestamp,
+                                              EvaluationTimestampDefault),
+    lasp_config:set(evaluation_timestamp, EvaluationTimestamp),
 
     ClientNumberDefault = list_to_integer(os:getenv("CLIENT_NUMBER", "3")),
     ClientNumber = application:get_env(?APP,
                                        client_number,
                                        ClientNumberDefault),
     lasp_config:set(client_number, ClientNumber),
+
+    HeavyClientsDefault = list_to_atom(os:getenv("HEAVY_CLIENTS", "false")),
+    HeavyClients = application:get_env(?APP,
+                                       heavy_clients,
+                                       HeavyClientsDefault),
+    lasp_config:set(heavy_clients, HeavyClients),
+
+    PartitionProbabilityDefault = list_to_integer(os:getenv("PARTITION_PROBABILITY", "0")),
+    PartitionProbability = application:get_env(?APP,
+                                               partition_probability,
+                                               PartitionProbabilityDefault),
+    lasp_config:set(partition_probability, PartitionProbability),
 
     %% Peer service.
     PeerService = application:get_env(plumtree,
@@ -221,6 +244,21 @@ configure_defaults() ->
             application:set_env(plumtree, exchange_selection,
                                 normal)
     end,
+
+    %% AAE interval.
+    AAEIntervalDefault = list_to_integer(os:getenv("AAE_INTERVAL", "10000")),
+    AAEInterval = application:get_env(?APP,
+                                      aae_interval,
+                                      AAEIntervalDefault),
+    lasp_config:set(aae_interval, AAEInterval),
+    application:set_env(plumtree, broadcast_exchange_timer, AAEInterval),
+
+    %% Delta interval.
+    DeltaIntervalDefault = list_to_integer(os:getenv("DELTA_INTERVAL", "10000")),
+    DeltaInterval = application:get_env(?APP,
+                                        delta_interval,
+                                        DeltaIntervalDefault),
+    lasp_config:set(delta_interval, DeltaInterval),
 
     %% Backend configurations.
     StorageBackend = application:get_env(

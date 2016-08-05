@@ -201,20 +201,26 @@ handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
     sets:fold(GraphFun, Graph, Nodes),
 
     %% Verify connectedness.
-    ConnectedFun = fun({Name, _, _}, _Graph) ->
-                        sets:fold(fun({N, _, _}, __Graph) ->
+    ConnectedFun = fun({Name, _, _}, Result0) ->
+                        sets:fold(fun({N, _, _}, Result1) ->
                                            Path = digraph:get_short_path(Graph, Name, N),
                                            case Path of
                                                false ->
-                                                   lager:info("Node ~p can not find shortest path to: ~p", [Name, N]);
+                                                   lager:info("Node ~p can not find shortest path to: ~p", [Name, N]),
+                                                   Result1 andalso true;
                                                _ ->
-                                                   ok
+                                                   Result1 andalso false
                                            end
-                                      end, Graph, Nodes)
+                                      end, Result0, Nodes)
                  end,
-    sets:fold(ConnectedFun, Graph, Nodes),
+    Connected = sets:fold(ConnectedFun, true, Nodes),
 
-    lager:info("Graph is connected!"),
+    case Connected of
+        true ->
+            lager:info("Graph is connected!");
+        false ->
+            lager:info("Graph is not connected!")
+    end,
 
     timer:send_after(?GRAPH_INTERVAL, ?GRAPH_MESSAGE),
     {noreply, State};

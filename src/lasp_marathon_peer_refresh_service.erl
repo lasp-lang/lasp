@@ -86,6 +86,8 @@ init([]) ->
             AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
             SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
             erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
+            lager:info("Key ~p", [AccessKeyId]),
+            lager:info("Secret ~p", [SecretAccessKey]),
 
             %% Create S3 bucket.
             BucketName = bucket_name(),

@@ -197,7 +197,7 @@ handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
                            end
                        catch
                            _:_ ->
-                               lager:info("Could not get information for node; ~p",
+                               lager:info("Could not process information for node; ~p",
                                           [Node]),
                                Graph
                        end
@@ -324,7 +324,7 @@ get_request(Url, DecodeFun) ->
     end.
 
 %% @private
-populate_graph({Name, _, _}, Membership, Graph) ->
+populate_graph(Name, Membership, Graph) ->
     %% Add node to graph.
     lager:info("Adding vertex ~p", [Name]),
     digraph:add_vertex(Graph, Name),

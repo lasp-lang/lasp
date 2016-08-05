@@ -46,6 +46,9 @@
 -define(NODES_INTERVAL, 20000).
 -define(NODES_MESSAGE,  nodes).
 
+-define(GRAPH_INTERVAL, 20000).
+-define(GRAPH_MESSAGE,  graph).
+
 %% State record.
 -record(state, {nodes}).
 
@@ -77,6 +80,7 @@ init([]) ->
         _ ->
             %% Stall messages; Plumtree has a race on startup, again.
             timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
+            timer:send_after(?GRAPH_INTERVAL, ?GRAPH_MESSAGE),
             timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE)
     end,
     {ok, #state{nodes=sets:new()}}.
@@ -114,8 +118,13 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
     %% Generate URL.
     Url = generate_task_url(Task),
 
+    %% Generate decode function.
+    DecodeFun = fun(Body) ->
+                        jsx:decode(Body, [return_maps])
+                end,
+
     %% Return list of nodes.
-    Nodes = case request(get, Url) of
+    Nodes = case request(get, Url, DecodeFun) of
         {ok, Response} ->
             generate_nodes(Response);
         Other ->
@@ -131,6 +140,21 @@ handle_info(?NODES_MESSAGE, State) ->
     {ok, Nodes} = lasp_peer_service:members(),
     _ = lager:info("Currently connected nodes via peer service: ~p", [Nodes]),
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
+    {noreply, State};
+handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
+    GraphFun = fun(Node, Graph) ->
+                    Url = generate_artifact_url(Node),
+                    DecodeFun = fun(Body) -> binary_to_term(Body) end,
+                    case request(get, Url, DecodeFun) of
+                        {ok, Membership} ->
+                            populate_graph(Node, Membership, Graph);
+                        Other ->
+                            _ = lager:info("Invalid Marathon response: ~p", [Other]),
+                            Graph
+                    end
+               end,
+    sets:fold(GraphFun, digraph:new(), Nodes),
+    timer:send_after(?GRAPH_INTERVAL, ?GRAPH_MESSAGE),
     {noreply, State};
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -196,6 +220,18 @@ ip() ->
     os:getenv("IP", "127.0.0.1").
 
 %% @private
+generate_artifact_url({Name, _, _}) ->
+    IP = ip(),
+    DCOS = dcos(),
+    Filename = atom_to_list(Name),
+    case DCOS of
+        "false" ->
+          "http://" ++ IP ++ ":8080/v2/artifacts/" ++ Filename;
+        _ ->
+          DCOS ++ "/marathon/v2/artifacts/" ++ Filename
+    end.
+
+%% @private
 generate_task_url(Task) ->
     IP = ip(),
     DCOS = dcos(),
@@ -207,7 +243,7 @@ generate_task_url(Task) ->
     end.
 
 %% @private
-request(Type, Url) ->
+request(Type, Url, DecodeFun) ->
     DCOS = dcos(),
     Headers = case DCOS of
                 "false" ->
@@ -218,8 +254,24 @@ request(Type, Url) ->
     end,
     case httpc:request(Type, {Url, Headers}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, Body}} ->
-            {ok, jsx:decode(Body, [return_maps])};
+            {ok, DecodeFun(Body)};
         Other ->
             _ = lager:info("Request failed; ~p", [Other]),
             {error, invalid}
     end.
+
+%% @private
+populate_graph({Name, _, _}, Membership, Graph) ->
+    %% Add node to graph.
+    digraph:add_vertex(Graph, Name),
+
+    lists:foldl(fun({N, _, _}, _) ->
+
+                        %% Add node to graph.
+                        digraph:add_vertex(Graph, N),
+
+                        %% Add edge to graph.
+                        digraph:add_edge(Graph, Name, N)
+
+                end, Graph, Membership).
+

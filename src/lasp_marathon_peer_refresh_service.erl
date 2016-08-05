@@ -154,7 +154,10 @@ handle_info(?ARTIFACT_INTERVAL, #state{nodes=Nodes}=State) ->
     timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
     {noreply, State};
 handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
-    GraphFun = fun(Node, Graph) ->
+    %% Build the graph.
+    Graph = digraph:new(),
+
+    GraphFun = fun(Node, _Graph) ->
                     Url = generate_artifact_url(Node),
                     DecodeFun = fun(Body) -> binary_to_term(Body) end,
                     case get_request(Url, DecodeFun) of
@@ -165,7 +168,22 @@ handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
                             Graph
                     end
                end,
-    sets:fold(GraphFun, digraph:new(), Nodes),
+    sets:fold(GraphFun, Graph, Nodes),
+
+    %% Verify connectedness.
+    ConnectedFun = fun({Name, _, _}, _Graph) ->
+                        sets:fold(fun({N, _, _}, __Graph) ->
+                                           Path = digraph:get_short_path(Graph, Name, N),
+                                           case Path of
+                                               false ->
+                                                   lager:info("Node ~p can not find shortest path to: ~p", [Name, N]);
+                                               _ ->
+                                                   ok
+                                           end
+                                      end, Nodes)
+                 end,
+    sets:fold(ConnectedFun, Graph, Nodes),
+
     timer:send_after(?GRAPH_INTERVAL, ?GRAPH_MESSAGE),
     {noreply, State};
 handle_info(Msg, State) ->

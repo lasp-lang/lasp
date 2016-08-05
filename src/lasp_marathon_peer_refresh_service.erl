@@ -335,7 +335,7 @@ populate_graph({Name, _, _}, Membership, Graph) ->
                         digraph:add_vertex(Graph, N),
 
                         %% Add edge to graph.
-                        lager:info("Adding edge from ~p", [Name, N]),
+                        lager:info("Adding edge from ~p to ~p", [Name, N]),
                         digraph:add_edge(Graph, Name, N)
                 end, Graph, Membership).
 

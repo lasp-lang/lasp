@@ -82,7 +82,7 @@ init([]) ->
             ok;
         _ ->
             %% Configure erlcloud.
-            S3Host = "s3.us-west-2.amazonaws.com",
+            S3Host = "s3.amazonaws.com",
             AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
             SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
             erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),

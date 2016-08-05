@@ -88,6 +88,8 @@ init([]) ->
             lager:info("Access Key Id: ~p", [AccessKeyId]),
             lager:info("Secret Access Key: ~p", [SecretAccessKey]),
             erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
+            lager:info("Key ~p", [AccessKeyId]),
+            lager:info("Secret ~p", [SecretAccessKey]),
 
             %% Create S3 bucket.
             BucketName = bucket_name(),

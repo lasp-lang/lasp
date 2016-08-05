@@ -193,7 +193,7 @@ handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
                                _ ->
                                 Membership = binary_to_term(Body),
                                 lager:info("Membership information for node ~p is ~p", [Node, Membership]),
-                                populate_graph(Node, Membership, Graph)
+                                populate_graph(N, Membership, Graph)
                            end
                        catch
                            _:_ ->

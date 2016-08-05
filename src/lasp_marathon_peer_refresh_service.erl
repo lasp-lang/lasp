@@ -180,7 +180,7 @@ handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
                                                _ ->
                                                    ok
                                            end
-                                      end, Nodes)
+                                      end, Graph, Nodes)
                  end,
     sets:fold(ConnectedFun, Graph, Nodes),
 

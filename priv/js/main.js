@@ -1,68 +1,40 @@
 $(document).ready(function() {
-  $("#header").hide();
-  $("#controls").hide();
-  $("#graph").hide();
+  // var updateDag = function(data, cache) {
+  //       var cacheStatus, cacheContents;
 
-  $.ajax({
-      type: "GET",
-      url: "/api/plots",
-      dataType: "json",
-      success: function (data) {
-        $.each(data.plots, function(i, data) {
-          var elem = "<li class='plot'><object type='application/pdf' data='/plots/" + data + "' width='100%' height='100%'><p>hi</p></object></li>";
-          $(elem).appendTo('#plots');
-        });
-    }
-  });
+  //       var present = data.present || false;
+  //       var contents = data.dot_content || [];
 
-  $.ajax({
-      type: "GET",
-      url: "/api/logs",
-      dataType: "json",
-      success: function (data) {
-        $.each(data.logs, function(i, data) {
-          var elem = "<li><a href='/logs/" + data + "'>"+data+"</a></li>";
-          $(elem).appendTo('#logs');
-        });
-    }
-  });
+  //       if (cache !== undefined) {
+  //           cacheStatus = cache.status || false;
+  //           cacheContents = cache.dot_content || [];
+  //       }
 
-  var updateDag = function(data, cache) {
-        var cacheStatus, cacheContents;
+  //       if ((present === cacheStatus) && (contents.length === cacheContents.length)) {
+  //           return;
+  //       }
 
-        var present = data.present || false;
-        var contents = data.dot_content || [];
+  //       $(".dag").empty();
 
-        if (cache !== undefined) {
-            cacheStatus = cache.status || false;
-            cacheContents = cache.dot_content || [];
-        }
+  //       if (!present) {
+  //           $(".dag").append("<p>No graph data.</p>")
+  //           return;
+  //       }
 
-        if ((present === cacheStatus) && (contents.length === cacheContents.length)) {
-            return;
-        }
+  //       var stringContents = contents.map(function(e) {
+  //           return String.fromCharCode(e);
+  //       }).join("");
+  //       $(".dag").append(Viz(stringContents));
+  // };
 
-        $(".dag").empty();
-
-        if (!present) {
-            $(".dag").append("<p>No graph data.</p>")
-            return;
-        }
-
-        var stringContents = contents.map(function(e) {
-            return String.fromCharCode(e);
-        }).join("");
-        $(".dag").append(Viz(stringContents));
-  };
-
-  $.get("/api/dag", function(data) {
-      updateDag(data, undefined);
-      setInterval(function(cache) {
-          $.get("/api/dag", function(data) {
-              updateDag(data, cache)
-          });
-        }, 10000, data);
-  });
+  // $.get("/api/dag", function(data) {
+  //     updateDag(data, undefined);
+  //     setInterval(function(cache) {
+  //         $.get("/api/dag", function(data) {
+  //             updateDag(data, cache)
+  //         });
+  //       }, 10000, data);
+  // });
 
   $("#logo").fadeOut("slow", function() {
 

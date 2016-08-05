@@ -28,7 +28,8 @@
 
 %% API
 -export([start_link/0,
-         start_link/1]).
+         start_link/1,
+         graph/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -46,14 +47,14 @@
 -define(NODES_INTERVAL, 20000).
 -define(NODES_MESSAGE,  nodes).
 
--define(GRAPH_INTERVAL, 20000).
--define(GRAPH_MESSAGE,  graph).
+-define(BUILD_GRAPH_INTERVAL, 20000).
+-define(BUILD_GRAPH_MESSAGE,  build_graph).
 
 -define(ARTIFACT_INTERVAL, 20000).
 -define(ARTIFACT_MESSAGE,  artifact).
 
 %% State record.
--record(state, {nodes}).
+-record(state, {nodes, graph}).
 
 %%%===================================================================
 %%% API
@@ -68,6 +69,9 @@ start_link() ->
 -spec start_link(list())-> {ok, pid()} | ignore | {error, term()}.
 start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
+
+graph() ->
+    gen_server:call(?MODULE, graph, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -98,17 +102,24 @@ init([]) ->
 
             %% Stall messages; Plumtree has a race on startup, again.
             timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
-            timer:send_after(?GRAPH_INTERVAL, ?GRAPH_MESSAGE),
+            timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE),
             timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
             timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE)
     end,
-    {ok, #state{nodes=sets:new()}}.
+    {ok, #state{nodes=sets:new(), graph=digraph:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
 %% @private
+handle_call(graph, _From, #state{graph=Graph}=State) ->
+    Vertices = digraph:vertices(Graph),
+    Edges = lists:map(fun(Edge) ->
+                      {_E, V1, V2, _Label} = digraph:edge(Graph, Edge),
+                      {V1, V2}
+              end, digraph:edges(Graph)),
+    {reply, {ok, {Vertices, Edges}}, State};
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
@@ -174,7 +185,7 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
 
     timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
     {noreply, State};
-handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
+handle_info(?BUILD_GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
     %% Build the graph.
     Graph = digraph:new(),
 
@@ -226,8 +237,8 @@ handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
             lager:info("Graph is not connected!")
     end,
 
-    timer:send_after(?GRAPH_INTERVAL, ?GRAPH_MESSAGE),
-    {noreply, State};
+    timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE),
+    {noreply, State#state{graph=Graph}};
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.

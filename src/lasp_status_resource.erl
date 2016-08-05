@@ -54,26 +54,10 @@ generate_links(NodeList) ->
 -else.
 
 to_json(ReqData, State) ->
-    {ok, Membership} = lasp_peer_service:members(),
-    Nodes = [#{id => Name, group => 1} || Name <- Membership],
-    Links = lists:flatten(generate_links(Membership)),
+    {ok, {Vertices, Edges}} = lasp_marathon_peer_refresh_service:graph(),
+    Nodes = [#{id => Name, group => 1} || Name <- Vertices],
+    Links = [#{source => V1, target => V2} || {V1, V2} <- Edges],
     Encoded = jsx:encode(#{nodes => Nodes, links => Links}),
     {Encoded, ReqData, State}.
-
-%% @todo Re-write as a fold later, this is the easy way out because we
-%%       just flatmap anyway.  We also don't want to be making these RPC
-%%       calls either.
-generate_links(NodeList) ->
-    lists:map(fun(Source) ->
-                lists:map(fun(Target) ->
-                            case rpc:call(Source, net_adm, ping, [Target]) of
-                                pong ->
-                                    [#{source => Source, target => Target}];
-                                pang ->
-                                    [];
-                                {badrpc, _} ->
-                                    []
-                            end
-                    end, NodeList) end, NodeList).
 
 -endif.

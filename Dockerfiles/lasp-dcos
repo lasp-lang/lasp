@@ -11,7 +11,7 @@ RUN cd /tmp && \
     apt-get -y install erlang
 
 CMD cd /opt && \
-    git clone https://github.com/lasp-lang/lasp.git -b env_for_dcos && \
+    git clone https://github.com/lasp-lang/lasp.git -b unstable && \
     cd lasp && \
     ./priv/evaluate-mesos-setup.sh && \
     make stage && \

@@ -183,14 +183,19 @@ handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
 
     GraphFun = fun({N, _, _}, _Graph) ->
                        Node = atom_to_list(N),
-                       Result = erlcloud_s3:get_object(BucketName, Node),
-                       Body = proplists:get_value(content, Result, undefined),
-                       case Body of
-                           undefined ->
-                               Graph;
-                           _ ->
-                            Membership = binary_to_term(Body),
-                            populate_graph(Node, Membership, Graph)
+                       try
+                           Result = erlcloud_s3:get_object(BucketName, Node),
+                           Body = proplists:get_value(content, Result, undefined),
+                           case Body of
+                               undefined ->
+                                   Graph;
+                               _ ->
+                                Membership = binary_to_term(Body),
+                                populate_graph(Node, Membership, Graph)
+                           end
+                       catch
+                           _:_ ->
+                               Graph
                        end
                end,
     sets:fold(GraphFun, Graph, Nodes),

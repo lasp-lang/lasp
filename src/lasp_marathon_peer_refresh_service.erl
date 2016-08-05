@@ -326,16 +326,17 @@ get_request(Url, DecodeFun) ->
 %% @private
 populate_graph({Name, _, _}, Membership, Graph) ->
     %% Add node to graph.
+    lager:info("Adding vertex ~p", [Name]),
     digraph:add_vertex(Graph, Name),
 
     lists:foldl(fun(N, _) ->
-
                         %% Add node to graph.
+                        lager:info("Adding vertex ~p", [N]),
                         digraph:add_vertex(Graph, N),
 
                         %% Add edge to graph.
+                        lager:info("Adding edge from ~p", [Name, N]),
                         digraph:add_edge(Graph, Name, N)
-
                 end, Graph, Membership).
 
 %% @private

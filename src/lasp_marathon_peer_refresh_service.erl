@@ -211,9 +211,9 @@ handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
                                            case Path of
                                                false ->
                                                    lager:info("Node ~p can not find shortest path to: ~p", [Name, N]),
-                                                   Result1 andalso true;
+                                                   Result1 andalso false;
                                                _ ->
-                                                   Result1 andalso false
+                                                   Result1 andalso true
                                            end
                                       end, Result0, Nodes)
                  end,

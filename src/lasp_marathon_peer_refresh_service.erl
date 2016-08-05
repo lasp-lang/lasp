@@ -145,28 +145,38 @@ handle_info(?NODES_MESSAGE, State) ->
     _ = lager:info("Currently connected nodes via peer service: ~p", [Nodes]),
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
     {noreply, State};
-handle_info(?ARTIFACT_MESSAGE, #state{nodes=Nodes}=State) ->
+handle_info(?ARTIFACT_MESSAGE, State) ->
+    %% Create S3 bucket.
+    BucketName = bucket_name(),
+    ok = erlcloud_s3:create_bucket(BucketName),
+
+    %% Get current membership.
     {ok, Nodes} = lasp_peer_service:members(),
-    Url = generate_artifact_url(node()),
-    ContentType = "application/octet-string",
-    Body = term_to_binary(Nodes),
-    ok = post_request(Url, ContentType, Body),
+
+    %% Store membership.
+    Node = atom_to_list(node()),
+    Membership = term_to_binary(Nodes),
+    ok = erlcloud_s3:put_object(BucketName, Node, Membership),
+
     timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
     {noreply, State};
 handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
     %% Build the graph.
     Graph = digraph:new(),
 
-    GraphFun = fun(Node, _Graph) ->
-                    Url = generate_artifact_url(Node),
-                    DecodeFun = fun(Body) -> binary_to_term(Body) end,
-                    case get_request(Url, DecodeFun) of
-                        {ok, Membership} ->
-                            populate_graph(Node, Membership, Graph);
-                        Other ->
-                            _ = lager:info("Invalid Marathon response: ~p", [Other]),
-                            Graph
-                    end
+    %% Get bucket name.
+    BucketName = bucket_name(),
+
+    GraphFun = fun({Node, _, _}, _Graph) ->
+                       Result = erlcloud_s3:get_object(BucketName, Node),
+                       Body = proplists:get_value(content, Result, undefined),
+                       case Body of
+                           undefined ->
+                               Graph;
+                           _ ->
+                            Membership = binary_to_term(Body),
+                            populate_graph(Node, Membership, Graph)
+                       end
                end,
     sets:fold(GraphFun, Graph, Nodes),
 
@@ -250,20 +260,6 @@ ip() ->
     os:getenv("IP", "127.0.0.1").
 
 %% @private
-generate_artifact_url({Name, _, _}) ->
-    generate_artifact_url(Name);
-generate_artifact_url(Name) ->
-    IP = ip(),
-    DCOS = dcos(),
-    Filename = atom_to_list(Name),
-    case DCOS of
-        "false" ->
-          "http://" ++ IP ++ ":8080/v2/artifacts/" ++ Filename;
-        _ ->
-          DCOS ++ "/marathon/v2/artifacts/" ++ Filename
-    end.
-
-%% @private
 generate_task_url(Task) ->
     IP = ip(),
     DCOS = dcos(),
@@ -296,17 +292,6 @@ get_request(Url, DecodeFun) ->
     end.
 
 %% @private
-post_request(Url, ContentType, Body) ->
-    Headers = headers(),
-    case httpc:request(post, {Url, Headers, ContentType, Body}, [], [{body_format, binary}]) of
-        {ok, {{_, 200, _}, _, _Body}} ->
-            ok;
-        Other ->
-            _ = lager:info("Request failed; ~p", [Other]),
-            {error, invalid}
-    end.
-
-%% @private
 populate_graph({Name, _, _}, Membership, Graph) ->
     %% Add node to graph.
     digraph:add_vertex(Graph, Name),
@@ -321,3 +306,8 @@ populate_graph({Name, _, _}, Membership, Graph) ->
 
                 end, Graph, Membership).
 
+%% @private
+bucket_name() ->
+    Simulation = lasp_config:get(simulation, undefined),
+    EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
+    atom_to_list(Simulation) ++ "/" ++ atom_to_list(EvalIdentifier).

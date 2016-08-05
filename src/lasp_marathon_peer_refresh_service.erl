@@ -85,12 +85,15 @@ init([]) ->
             S3Host = "s3.amazonaws.com",
             AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
             SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
+            lager:info("Access Key Id: ~p", [AccessKeyId]),
+            lager:info("Secret Access Key: ~p", [SecretAccessKey]),
             erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
             lager:info("Key ~p", [AccessKeyId]),
             lager:info("Secret ~p", [SecretAccessKey]),
 
             %% Create S3 bucket.
             BucketName = bucket_name(),
+            lager:info("Creating bucket: ~p", [BucketName]),
             ok = erlcloud_s3:create_bucket(BucketName),
 
             %% Stall messages; Plumtree has a race on startup, again.

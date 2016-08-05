@@ -134,6 +134,12 @@ $(document).ready(function() {
 
       node = node.data(force.nodes(), function(d) { return d.id;});
       node.enter().append("circle").attr("class", function(d) { return "node " + d.id; }).attr("r", 8).style("fill", function(d) { return color(d.group); })
+
+      node.append("text")
+          .attr("dx", 12)
+          .attr("dy", ".35em")
+          .text(function(d) { return d.name });
+
       node.exit().remove();
 
       force.start();

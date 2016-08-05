@@ -40,7 +40,7 @@ content_types_provided(Req, Ctx) ->
 to_json(ReqData, State) ->
     NumNodes = rand_compat:uniform(2),
     NodeList = lists:seq(0, NumNodes),
-    Nodes = [#{id => Name, group => 1} || Name <- NodeList],
+    Nodes = [#{id => Name, name => Name, group => 1} || Name <- NodeList],
     Links = lists:flatten(generate_links(NodeList)),
     Encoded = jsx:encode(#{nodes => Nodes, links => Links}),
     {Encoded, ReqData, State}.

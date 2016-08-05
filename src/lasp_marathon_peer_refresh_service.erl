@@ -104,7 +104,14 @@ init([]) ->
             timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
             timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE),
             timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
-            timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE)
+
+            %% Only joins are initiated by the server.
+            case partisan_config:get(tag, client) of
+                server ->
+                    timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE);
+                client ->
+                    ok
+            end
     end,
     {ok, #state{nodes=sets:new(), graph=digraph:new()}}.
 

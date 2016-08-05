@@ -343,4 +343,5 @@ populate_graph(Name, Membership, Graph) ->
 bucket_name() ->
     Simulation = lasp_config:get(simulation, undefined),
     EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
-    atom_to_list(Simulation) ++ "-" ++ atom_to_list(EvalIdentifier).
+    EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
+    atom_to_list(Simulation) ++ "-" ++ atom_to_list(EvalIdentifier) ++ "-" ++ integer_to_list(EvalTimestamp).

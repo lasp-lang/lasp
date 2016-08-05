@@ -145,7 +145,7 @@ handle_info(?NODES_MESSAGE, State) ->
     _ = lager:info("Currently connected nodes via peer service: ~p", [Nodes]),
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
     {noreply, State};
-handle_info(?ARTIFACT_INTERVAL, #state{nodes=Nodes}=State) ->
+handle_info(?ARTIFACT_MESSAGE, #state{nodes=Nodes}=State) ->
     {ok, Nodes} = lasp_peer_service:members(),
     Url = generate_artifact_url(node()),
     ContentType = "application/octet-string",

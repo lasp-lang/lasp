@@ -47,7 +47,7 @@
 -define(NODES_MESSAGE,  nodes).
 
 %% State record.
--record(state, {nodes = [] :: [node()]}).
+-record(state, {nodes}).
 
 %%%===================================================================
 %%% API
@@ -79,7 +79,7 @@ init([]) ->
             timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
             timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE)
     end,
-    {ok, #state{}}.
+    {ok, #state{nodes=sets:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -114,10 +114,10 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
     %% Generate URL.
     Url = generate_task_url(Task),
 
+    %% Return list of nodes.
     Nodes = case request(get, Url) of
         {ok, Response} ->
-            Nodes1 = generate_nodes(Response),
-            Nodes1;
+            generate_nodes(Response);
         Other ->
             _ = lager:info("Invalid Marathon response: ~p", [Other]),
             SeenNodes
@@ -153,11 +153,12 @@ code_change(_OldVsn, State, _Extra) ->
 %% @doc Generate a list of Erlang node names.
 generate_nodes(#{<<"app">> := App}) ->
     #{<<"tasks">> := Tasks} = App,
-    lists:map(fun(Task) ->
+    Nodes = lists:map(fun(Task) ->
                 #{<<"host">> := Host,
-                  <<"ports">> := [_EPMDPort, PeerPort]} = Task,
+                  <<"ports">> := [_WebPort, PeerPort]} = Task,
         generate_node(Host, PeerPort)
-        end, Tasks).
+        end, Tasks),
+    sets:from_list(Nodes).
 
 %% @doc Generate a single Erlang node name.
 generate_node(Host, PeerPort) ->
@@ -172,18 +173,15 @@ maybe_connect(Nodes, SeenNodes) ->
     %% connect; only attempt to connect once, because node might be
     %% migrated to a passive view of the membership.
     %%
-    ToConnect = Nodes -- SeenNodes,
+    ToConnect = sets:subtract(Nodes, SeenNodes),
 
     %% Attempt connection to any new nodes.
-    case ToConnect of
-        [] ->
-            [];
-        _ ->
-            lists:map(fun connect/1, ToConnect)
-    end,
+    sets:fold(fun(Node, Acc) ->
+                      [connect(Node) | Acc]
+              end, [], ToConnect),
 
     %% Return list of seen nodes with the new node.
-    SeenNodes ++ Nodes.
+    sets:union(Nodes, SeenNodes).
 
 %% @private
 connect(Node) ->

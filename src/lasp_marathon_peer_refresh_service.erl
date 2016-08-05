@@ -111,7 +111,10 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
             "lasp-client"
     end,
 
-    Nodes = case request(Task) of
+    %% Generate URL.
+    Url = generate_task_url(Task),
+
+    Nodes = case request(get, Url) of
         {ok, Response} ->
             Nodes1 = generate_nodes(Response),
             Nodes1;
@@ -187,9 +190,27 @@ connect(Node) ->
     lasp_peer_service:join(Node).
 
 %% @private
-request(Task) ->
-    IP = os:getenv("IP", "127.0.0.1"),
-    DCOS = os:getenv("DCOS", "false"),
+dcos() ->
+    os:getenv("DCOS", "false").
+
+%% @private
+ip() ->
+    os:getenv("IP", "127.0.0.1").
+
+%% @private
+generate_task_url(Task) ->
+    IP = ip(),
+    DCOS = dcos(),
+    case DCOS of
+        "false" ->
+          "http://" ++ IP ++ ":8080/v2/apps/" ++ Task ++ "?embed=app.taskStats";
+        _ ->
+          DCOS ++ "/marathon/v2/apps/" ++ Task ++ "?embed=app.taskStats"
+    end.
+
+%% @private
+request(Type, Url) ->
+    DCOS = dcos(),
     Headers = case DCOS of
                 "false" ->
                     [];
@@ -197,13 +218,7 @@ request(Task) ->
                     Token = os:getenv("TOKEN", "undefined"),
                     [{"Authorization", "token=" ++ Token}]
     end,
-    Url = case DCOS of
-              "false" ->
-                "http://" ++ IP ++ ":8080/v2/apps/" ++ Task ++ "?embed=app.taskStats";
-              _ ->
-                DCOS ++ "/marathon/v2/apps/" ++ Task ++ "?embed=app.taskStats"
-          end,
-    case httpc:request(get, {Url, Headers}, [], [{body_format, binary}]) of
+    case httpc:request(Type, {Url, Headers}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, Body}} ->
             {ok, jsx:decode(Body, [return_maps])};
         Other ->

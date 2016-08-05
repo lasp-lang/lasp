@@ -81,6 +81,10 @@ init([]) ->
         false ->
             ok;
         _ ->
+            %% Create S3 bucket.
+            BucketName = bucket_name(),
+            ok = erlcloud_s3:create_bucket(BucketName),
+
             %% Stall messages; Plumtree has a race on startup, again.
             timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
             timer:send_after(?GRAPH_INTERVAL, ?GRAPH_MESSAGE),
@@ -146,9 +150,8 @@ handle_info(?NODES_MESSAGE, State) ->
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
     {noreply, State};
 handle_info(?ARTIFACT_MESSAGE, State) ->
-    %% Create S3 bucket.
+    %% Get bucket name.
     BucketName = bucket_name(),
-    ok = erlcloud_s3:create_bucket(BucketName),
 
     %% Get current membership.
     {ok, Nodes} = lasp_peer_service:members(),

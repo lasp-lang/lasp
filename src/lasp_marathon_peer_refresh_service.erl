@@ -188,13 +188,17 @@ handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
                            Body = proplists:get_value(content, Result, undefined),
                            case Body of
                                undefined ->
+                                   lager:info("No membership information for ~p", [Node]),
                                    Graph;
                                _ ->
                                 Membership = binary_to_term(Body),
+                                lager:info("Membership information for node ~p is ~p", [Node, Membership]),
                                 populate_graph(Node, Membership, Graph)
                            end
                        catch
                            _:_ ->
+                               lager:info("Could not get information for node; ~p",
+                                          [Node]),
                                Graph
                        end
                end,
@@ -213,8 +217,6 @@ handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
                                       end, Graph, Nodes)
                  end,
     sets:fold(ConnectedFun, Graph, Nodes),
-
-    lager:info("Graph is connected!"),
 
     timer:send_after(?GRAPH_INTERVAL, ?GRAPH_MESSAGE),
     {noreply, State};

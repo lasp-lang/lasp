@@ -55,7 +55,7 @@ generate_links(NodeList) ->
 
 to_json(ReqData, State) ->
     {ok, {Vertices, Edges}} = lasp_marathon_peer_refresh_service:graph(),
-    Nodes = [#{id => Name, group => 1} || Name <- Vertices],
+    Nodes = [#{id => Name, name => Name, group => 1} || Name <- Vertices],
     Links = [#{source => V1, target => V2} || {V1, V2} <- Edges],
     Encoded = jsx:encode(#{nodes => Nodes, links => Links}),
     {Encoded, ReqData, State}.

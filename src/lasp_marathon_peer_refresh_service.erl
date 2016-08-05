@@ -320,4 +320,4 @@ populate_graph({Name, _, _}, Membership, Graph) ->
 bucket_name() ->
     Simulation = lasp_config:get(simulation, undefined),
     EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
-    atom_to_list(Simulation) ++ "/" ++ atom_to_list(EvalIdentifier).
+    atom_to_list(Simulation) ++ "-" ++ atom_to_list(EvalIdentifier).

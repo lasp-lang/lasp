@@ -24,7 +24,7 @@ CREATOR=$(git config user.email)
 for EMAIL in "${EMAILS[@]}"
 do
   if [ ! "$EMAIL" == "$CREATOR" ]; then
-    curl -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X PUT -d '{"creator_uid":"$CREATOR","cluster_url":"$DCOS"}' $DCOS/acs/api/v1/users/$EMAIL
+    curl -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X PUT -d '{"creator_uid":"'$CREATOR'","cluster_url":"'$DCOS'"}' $DCOS/acs/api/v1/users/$EMAIL
   fi
 done
 

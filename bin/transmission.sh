@@ -7,6 +7,8 @@ ENV_VARS=(
   TOKEN
   EVALUATION_PASSPHRASE
   ELB_HOST
+  AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -29,19 +31,19 @@ INSTRUMENTATION=true
 declare -A EVALUATIONS
 
 ## client_server_state_based_with_aae_test
-EVALUATIONS["client_server_state_based_with_aae"]="partisan_client_server_peer_service_manager state_based false"
+#EVALUATIONS["client_server_state_based_with_aae"]="partisan_client_server_peer_service_manager state_based false"
 
 ## client_server_state_based_with_aae_and_tree_test
-EVALUATIONS["client_server_state_based_with_aae_and_tree"]="partisan_client_server_peer_service_manager state_based true"
+#EVALUATIONS["client_server_state_based_with_aae_and_tree"]="partisan_client_server_peer_service_manager state_based true"
 
 ## client_server_delta_based_with_aae_test
-EVALUATIONS["client_server_delta_based_with_aae"]="partisan_client_server_peer_service_manager delta_based false"
+#EVALUATIONS["client_server_delta_based_with_aae"]="partisan_client_server_peer_service_manager delta_based false"
 
 ## peer_to_peer_state_based_with_aae_test
-EVALUATIONS["peer_to_peer_state_based_with_aae"]="partisan_hyparview_peer_service_manager state_based false"
+#EVALUATIONS["peer_to_peer_state_based_with_aae"]="partisan_hyparview_peer_service_manager state_based false"
 
 ## peer_to_peer_state_based_with_aae_and_tree_test
-EVALUATIONS["peer_to_peer_state_based_with_aae_and_tree"]="partisan_hyparview_peer_service_manager state_based true"
+#EVALUATIONS["peer_to_peer_state_based_with_aae_and_tree"]="partisan_hyparview_peer_service_manager state_based true"
 
 ## peer_to_peer_delta_based_with_aae_test
 EVALUATIONS["peer_to_peer_delta_based_with_aae"]="partisan_hyparview_peer_service_manager delta_based false"
@@ -59,7 +61,7 @@ do
     BROADCAST=${CONFIG[2]}
     TIMESTAMP=$(date +%s)
 
-    PEER_SERVICE=$PEER_SERVICE MODE=$MODE BROADCAST=$BROADCAST SIMULATION=$SIMULATION EVAL_ID=$EVAL_ID EVAL_TIMESTAMP=$TIMESTAMP CLIENT_NUMBER=$CLIENT_NUMBER HEAVY_CLIENTS=$HEAVY_CLIENTS PARTITION_PROBABILITY=$PARTITION_PROBABILITY AAE_INTERVAL=$AAE_INTERVAL DELTA_INTERVAL=$DELTA_INTERVAL INSTRUMENTATION=$INSTRUMENTATION ./dcos-deploy.sh
+    PEER_SERVICE=$PEER_SERVICE MODE=$MODE BROADCAST=$BROADCAST SIMULATION=$SIMULATION EVAL_ID=$EVAL_ID EVAL_TIMESTAMP=$TIMESTAMP CLIENT_NUMBER=$CLIENT_NUMBER HEAVY_CLIENTS=$HEAVY_CLIENTS PARTITION_PROBABILITY=$PARTITION_PROBABILITY AAE_INTERVAL=$AAE_INTERVAL DELTA_INTERVAL=$DELTA_INTERVAL INSTRUMENTATION=$INSTRUMENTATION AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY ./dcos-deploy.sh
 
     echo "Running $EVAL_ID with $CLIENT_NUMBER clients"
 

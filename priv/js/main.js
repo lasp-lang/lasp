@@ -133,14 +133,11 @@ $(document).ready(function() {
       link.exit().remove();
 
       node = node.data(force.nodes(), function(d) { return d.id;});
-      node.enter().append("circle")
-                    .attr("class", function(d) { return "node " + d.id; })
-                    .attr("r", 8)
-                    .style("fill", function(d) { return color(d.group); })
-                  .append("text")
-                    .attr("dx", 12)
-                    .attr("dy", ".35em")
-                    .text(function(d) { return d.name });
+      node.enter()
+          .append("circle")
+            .attr("class", function(d) { return "node " + d.id; })
+            .attr("r", 8)
+            .style("fill", function(d) { return color(d.group); });
 
       node.exit().remove();
 
@@ -148,8 +145,7 @@ $(document).ready(function() {
     }
 
     function tick() {
-      node.attr("cx", function(d) { return d.x; })
-          .attr("cy", function(d) { return d.y; })
+      node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
 
       link.attr("x1", function(d) { return d.source.x; })
           .attr("y1", function(d) { return d.source.y; })

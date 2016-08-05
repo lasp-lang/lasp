@@ -170,7 +170,7 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
     %% Store membership.
     Node = atom_to_list(node()),
     Membership = term_to_binary(Nodes),
-    ok = erlcloud_s3:put_object(BucketName, Node, Membership),
+    erlcloud_s3:put_object(BucketName, Node, Membership),
 
     timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
     {noreply, State};
@@ -213,6 +213,8 @@ handle_info(?GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
                                       end, Graph, Nodes)
                  end,
     sets:fold(ConnectedFun, Graph, Nodes),
+
+    lager:info("Graph is connected!"),
 
     timer:send_after(?GRAPH_INTERVAL, ?GRAPH_MESSAGE),
     {noreply, State};

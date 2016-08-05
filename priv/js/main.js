@@ -43,7 +43,7 @@ $(document).ready(function() {
     $("#graph").fadeIn();
 
     var width = 1024,
-        height = 250;
+        height = 768;
 
     var color = d3.scale.category10();
 

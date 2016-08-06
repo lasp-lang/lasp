@@ -206,7 +206,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{running_nodes=Nodes}=State) ->
     %% Get bucket name.
     BucketName = bucket_name(),
 
-    GraphFun = fun({N, _, _}, _Graph) ->
+    GraphFun = fun({N, _, _}=Peer, _Graph) ->
                        Node = atom_to_list(N),
                        try
                            Result = erlcloud_s3:get_object(BucketName, Node),
@@ -215,9 +215,14 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{running_nodes=Nodes}=State) ->
                                undefined ->
                                    lager:info("No membership information for ~p", [Node]),
                                    Graph;
+                               [N] ->
+                                lager:info("Node ~p only contains itself, attempting repair with server join!", [N]),
+
+                                connect(Peer),
+                                Graph;
                                _ ->
                                 Membership = binary_to_term(Body),
-                                lager:info("Membership information for node ~p is ~p", [Node, Membership]),
+                                lager:info("Membership information for node ~p is ~p", [N, Membership]),
                                 populate_graph(N, Membership, Graph)
                            end
                        catch

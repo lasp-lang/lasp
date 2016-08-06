@@ -54,7 +54,7 @@
 -define(ARTIFACT_MESSAGE,  artifact).
 
 %% State record.
--record(state, {attempted_nodes, running_nodes, graph}).
+-record(state, {attempted_nodes, graph}).
 
 %%%===================================================================
 %%% API
@@ -123,9 +123,7 @@ init([]) ->
             %% All nodes should attempt to refresh the membership.
             timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE)
     end,
-    {ok, #state{attempted_nodes=sets:new(),
-                running_nodes=sets:new(),
-                graph=digraph:new()}}.
+    {ok, #state{attempted_nodes=sets:new(), graph=digraph:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -154,37 +152,44 @@ handle_cast(Msg, State) ->
 handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE),
 
-    %% Generate decode function.
-    DecodeFun = fun(Body) ->
-                        jsx:decode(Body, [return_maps])
-                end,
+    PeerServiceManager = lasp_config:get(peer_service_manager,
+                                         partisan_peer_service),
+    lager:info("PeerServiceManager: ~p", [PeerServiceManager]),
 
-    %% Get list of servers.
-    ServerNodes = case get_request(generate_task_url("lasp-server"), DecodeFun) of
-        {ok, Servers} ->
-            generate_nodes(Servers);
-        ServerError ->
-            _ = lager:info("Invalid Marathon response: ~p", [ServerError]),
-            []
+    Tag = partisan_config:get(tag, client),
+    lager:info("Tag: ~p", [Tag]),
+
+    %% Get list of nodes to connect to: this specialized logic isn't
+    %% required when the node count is small, but is required with a
+    %% larger node count to ensure the network stabilizes correctly
+    %% because HyParView doesn't guarantee graph connectivity: it is
+    %% only probabilistic.
+    %%
+    ToConnectNodes = case {Tag, PeerServiceManager} of
+        {client, partisan_client_server_peer_service_manager} ->
+            %% If we're a client, and we're in client/server mode, then
+            %% always connect with the server.
+            servers_from_marathon();
+        {server, partisan_client_server_peer_service_manager} ->
+            %% If we're a server, and we're in client/server mode, then
+            %% always initiate connections with clients.
+            clients_from_marathon();
+        {client, partisan_hyparview_peer_service_manager} ->
+            %% If we're in HyParView, and we're a client, only ever
+            %% do nothing -- force all connection to go through the
+            %% server.
+            [];
+        {server, partisan_hyparview_peer_service_manager} ->
+            %% If we're the server, and we're in HyParView, clients will
+            %% ask the server to join the overlay and force outbound
+            %% conenctions to the clients.
+            clients_from_marathon()
     end,
-
-    %% Get list of clients.
-    ClientNodes = case get_request(generate_task_url("lasp-client"), DecodeFun) of
-        {ok, Clients} ->
-            generate_nodes(Clients);
-        ClientError ->
-            _ = lager:info("Invalid Marathon response: ~p", [ClientError]),
-            []
-    end,
-
-    %% Running nodes.
-    RunningNodes = sets:union(ServerNodes, ClientNodes),
 
     %% Attempt to connect nodes that are not connected.
-    AttemptedNodes = maybe_connect(RunningNodes, SeenNodes),
+    AttemptedNodes = maybe_connect(ToConnectNodes, SeenNodes),
 
-    {noreply, State#state{attempted_nodes=AttemptedNodes,
-                          running_nodes=RunningNodes}};
+    {noreply, State#state{attempted_nodes=AttemptedNodes}};
 handle_info(?NODES_MESSAGE, State) ->
     {ok, Nodes} = lasp_peer_service:members(),
     _ = lager:info("Currently connected nodes via peer service: ~p", [Nodes]),
@@ -204,7 +209,11 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
 
     timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
     {noreply, State};
-handle_info(?BUILD_GRAPH_MESSAGE, #state{running_nodes=Nodes}=State) ->
+handle_info(?BUILD_GRAPH_MESSAGE, State) ->
+    %% Get all running nodes, because we need the list of *everything*
+    %% to analyze the graph for connectedness.
+    Nodes = sets:union(clients_from_marathon(), servers_from_marathon()),
+
     %% Build the graph.
     Graph = digraph:new(),
 
@@ -382,3 +391,27 @@ bucket_name() ->
     EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     atom_to_list(Simulation) ++ "-" ++ atom_to_list(EvalIdentifier) ++ "-" ++ integer_to_list(EvalTimestamp).
+
+%% @private
+clients_from_marathon() ->
+    DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
+
+    case get_request(generate_task_url("lasp-client"), DecodeFun) of
+        {ok, Clients} ->
+            generate_nodes(Clients);
+        ClientError ->
+            _ = lager:info("Invalid Marathon response: ~p", [ClientError]),
+            []
+    end.
+
+%% @private
+servers_from_marathon() ->
+    DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
+
+    case get_request(generate_task_url("lasp-server"), DecodeFun) of
+        {ok, Servers} ->
+            generate_nodes(Servers);
+        ServerError ->
+            _ = lager:info("Invalid Marathon response: ~p", [ServerError]),
+            []
+    end.

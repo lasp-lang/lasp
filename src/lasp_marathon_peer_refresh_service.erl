@@ -107,8 +107,20 @@ init([]) ->
 
             %% Stall messages; Plumtree has a race on startup, again.
             timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
-            timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE),
+
+            %% Only construct the graph and attempt to repair the graph
+            %% from the designated server node.
+            case partisan_config:get(tag, client) of
+                server ->
+                    timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE);
+                client ->
+                    ok
+            end,
+
+            %% All nodes should upload artifacts.
             timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
+
+            %% All nodes should attempt to refresh the membership.
             timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE)
     end,
     {ok, #state{attempted_nodes=sets:new(),

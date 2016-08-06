@@ -76,8 +76,6 @@ end_per_testcase(Case, Config) ->
 
 all() ->
     [
-     parser_test,
-     combined_view_test,
      contracted_latency_test,
      uncontracted_latency_test,
      latency_with_reads_test,

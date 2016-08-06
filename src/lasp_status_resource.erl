@@ -35,6 +35,8 @@ init(_) ->
 content_types_provided(Req, Ctx) ->
     {[{"application/json", to_json}], Req, Ctx}.
 
+-ifdef(TEST).
+
 to_json(ReqData, State) ->
     NumNodes = rand_compat:uniform(2),
     NodeList = lists:seq(0, NumNodes),
@@ -49,3 +51,13 @@ generate_links(NodeList) ->
                             #{source => Source, target => Target}
                     end, NodeList) end, NodeList).
 
+-else.
+
+to_json(ReqData, State) ->
+    {ok, {Vertices, Edges}} = lasp_marathon_peer_refresh_service:graph(),
+    Nodes = [#{id => Name, name => Name, group => 1} || Name <- Vertices],
+    Links = [#{source => V1, target => V2} || {V1, V2} <- Edges],
+    Encoded = jsx:encode(#{nodes => Nodes, links => Links}),
+    {Encoded, ReqData, State}.
+
+-endif.

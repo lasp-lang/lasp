@@ -26,6 +26,8 @@
 -export([create/1,
          create/2,
          get_value/2,
+         insert_row/2,
+         create_empty_table/1,
          create_table_with_values/2]).
 
 -ifdef(TEST).
@@ -38,6 +40,11 @@
 
 -define(DEFAULT, <<"hi">>).
 
+create_empty_table(TableName) when is_atom(TableName) ->
+    {Name, Type}=Identifier = generate_identifier(TableName),
+    lasp:declare(Name, Type),
+    Identifier.
+
 %% @doc Insert in a SQL table the given rows.
 create_table_with_values(TableName, Args) when is_atom(TableName) ->
     {Name, Type} = generate_identifier(TableName),
@@ -47,7 +54,15 @@ create_table_with_values(TableName, Args) when is_atom(TableName) ->
         lasp:update({Name, ?SET}, {add, RowMap}, a)
     end, Args).
 
+insert_row(TableName, Row) ->
+    Name = case is_atom(TableName) of
+        true -> generate_identifier(TableName);
+        _ -> TableName
+    end,
+    lasp:update(Name, {add, maps:from_list(Row)}, a).
+
 %% @doc Given a SQL table and a list of rows, return the values of those rows.
+get_value(_TableName, []) -> [];
 get_value(TableName, Rows) ->
     Name = case is_atom(TableName) of
         true -> generate_identifier(TableName);

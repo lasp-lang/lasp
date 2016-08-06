@@ -178,7 +178,7 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
             %% If we're in HyParView, and we're a client, only ever
             %% do nothing -- force all connection to go through the
             %% server.
-            [];
+            sets:new();
         {server, partisan_hyparview_peer_service_manager} ->
             %% If we're the server, and we're in HyParView, clients will
             %% ask the server to join the overlay and force outbound

@@ -54,7 +54,7 @@
 -define(ARTIFACT_MESSAGE,  artifact).
 
 %% State record.
--record(state, {nodes, graph}).
+-record(state, {attempted_nodes, running_nodes, graph}).
 
 %%%===================================================================
 %%% API
@@ -113,7 +113,9 @@ init([]) ->
                     ok
             end
     end,
-    {ok, #state{nodes=sets:new(), graph=digraph:new()}}.
+    {ok, #state{attempted_nodes=sets:new(),
+                running_nodes=sets:new(),
+                graph=digraph:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -139,7 +141,7 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
+handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE),
 
     %% Randomly get information from the server nodes and the
@@ -170,9 +172,9 @@ handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
     end,
 
     %% Attempt to connect nodes that are not connected.
-    ConnectedNodes = maybe_connect(Nodes, SeenNodes),
+    AttemptedNodes = maybe_connect(Nodes, SeenNodes),
 
-    {noreply, State#state{nodes=ConnectedNodes}};
+    {noreply, State#state{attempted_nodes=AttemptedNodes, running_nodes=Nodes}};
 handle_info(?NODES_MESSAGE, State) ->
     {ok, Nodes} = lasp_peer_service:members(),
     _ = lager:info("Currently connected nodes via peer service: ~p", [Nodes]),
@@ -192,7 +194,7 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
 
     timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
     {noreply, State};
-handle_info(?BUILD_GRAPH_MESSAGE, #state{nodes=Nodes}=State) ->
+handle_info(?BUILD_GRAPH_MESSAGE, #state{running_nodes=Nodes}=State) ->
     %% Build the graph.
     Graph = digraph:new(),
 

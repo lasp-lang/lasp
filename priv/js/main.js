@@ -133,11 +133,19 @@ $(document).ready(function() {
       link.exit().remove();
 
       node = node.data(force.nodes(), function(d) { return d.id;});
-      node.enter()
-          .append("circle")
-            .attr("class", function(d) { return "node " + d.id; })
-            .attr("r", 8)
-            .style("fill", function(d) { return color(d.group); });
+      node.enter().append("g");
+
+      node.append("image")
+           .attr("xlink:href", "images/lasp-logo-large.png")
+           .attr("x", -8)
+           .attr("y", -8)
+           .attr("width", 16)
+           .attr("height", 16);
+
+      node.append("text")
+          .attr("dx", 12)
+          .attr("dy", ".35em")
+          .text(function(d) { return d.name });
 
       node.exit().remove();
 

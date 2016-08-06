@@ -266,12 +266,12 @@ log_convergence() ->
 %% @private
 log_overcounting(AdList) ->
     Filename = filename(),
-    Divergence = compute_overcounting(AdList),
-    lager:info("Divergence ~p", [Divergence]),
+    Overcounting = compute_overcounting(AdList),
+    lager:info("Overcounting ~p%", [Overcounting]),
 
     ok = file:write_file(
         Filename,
-        io_lib:format("~w", [Divergence]),
+        io_lib:format("~w", [Overcounting]),
         [write]
     ),
     ok.

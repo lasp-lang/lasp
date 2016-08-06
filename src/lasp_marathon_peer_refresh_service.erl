@@ -166,10 +166,10 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     end,
 
     %% Running nodes.
-    RunningNodes = ServerNodes ++ ClientNodes,
+    RunningNodes = sets:union(ServerNodes, ClientNodes),
 
     %% Attempt to connect nodes that are not connected.
-    AttemptedNodes = maybe_connect(RunningNodes ++ SeenNodes, SeenNodes),
+    AttemptedNodes = maybe_connect(RunningNodes, SeenNodes),
 
     {noreply, State#state{attempted_nodes=AttemptedNodes,
                           running_nodes=RunningNodes}};

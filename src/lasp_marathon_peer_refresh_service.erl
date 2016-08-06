@@ -109,14 +109,7 @@ init([]) ->
             timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
             timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE),
             timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
-
-            %% Only joins are initiated by the server.
-            case partisan_config:get(tag, client) of
-                server ->
-                    timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE);
-                client ->
-                    ok
-            end
+            timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE)
     end,
     {ok, #state{attempted_nodes=sets:new(),
                 running_nodes=sets:new(),
@@ -149,37 +142,37 @@ handle_cast(Msg, State) ->
 handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE),
 
-    %% Randomly get information from the server nodes and the
-    %% regular nodes.
-    %%
-    Task = case rand_compat:uniform(10) rem 2 == 0 of
-        true ->
-            "lasp-server";
-        false ->
-            "lasp-client"
-    end,
-
-    %% Generate URL.
-    Url = generate_task_url(Task),
-
     %% Generate decode function.
     DecodeFun = fun(Body) ->
                         jsx:decode(Body, [return_maps])
                 end,
 
-    %% Return list of nodes.
-    Nodes = case get_request(Url, DecodeFun) of
-        {ok, Response} ->
-            generate_nodes(Response);
-        Other ->
-            _ = lager:info("Invalid Marathon response: ~p", [Other]),
-            SeenNodes
+    %% Get list of servers.
+    ServerNodes = case get_request(generate_task_url("lasp-server"), DecodeFun) of
+        {ok, Servers} ->
+            generate_nodes(Servers);
+        ServerError ->
+            _ = lager:info("Invalid Marathon response: ~p", [ServerError]),
+            []
     end,
 
-    %% Attempt to connect nodes that are not connected.
-    AttemptedNodes = maybe_connect(Nodes, SeenNodes),
+    %% Get list of clients.
+    ClientNodes = case get_request(generate_task_url("lasp-client"), DecodeFun) of
+        {ok, Clients} ->
+            generate_nodes(Clients);
+        ClientError ->
+            _ = lager:info("Invalid Marathon response: ~p", [ClientError]),
+            []
+    end,
 
-    {noreply, State#state{attempted_nodes=AttemptedNodes, running_nodes=Nodes}};
+    %% Running nodes.
+    RunningNodes = sets:union(ServerNodes, ClientNodes),
+
+    %% Attempt to connect nodes that are not connected.
+    AttemptedNodes = maybe_connect(RunningNodes, SeenNodes),
+
+    {noreply, State#state{attempted_nodes=AttemptedNodes,
+                          running_nodes=RunningNodes}};
 handle_info(?NODES_MESSAGE, State) ->
     {ok, Nodes} = lasp_peer_service:members(),
     _ = lager:info("Currently connected nodes via peer service: ~p", [Nodes]),

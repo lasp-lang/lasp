@@ -96,9 +96,14 @@ init([]) ->
             lager:info("Secret ~p", [SecretAccessKey]),
 
             %% Create S3 bucket.
-            BucketName = bucket_name(),
-            lager:info("Creating bucket: ~p", [BucketName]),
-            ok = erlcloud_s3:create_bucket(BucketName),
+            try
+                BucketName = bucket_name(),
+                lager:info("Creating bucket: ~p", [BucketName]),
+                ok = erlcloud_s3:create_bucket(BucketName)
+            catch
+                _:{aws_error, _} ->
+                    ok
+            end,
 
             %% Stall messages; Plumtree has a race on startup, again.
             timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
@@ -216,7 +221,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{running_nodes=Nodes}=State) ->
                                 populate_graph(N, Membership, Graph)
                            end
                        catch
-                           _:_ ->
+                           _:{aws_error, _} ->
                                lager:info("Could not process information for node; ~p",
                                           [Node]),
                                Graph
@@ -346,16 +351,16 @@ get_request(Url, DecodeFun) ->
 %% @private
 populate_graph(Name, Membership, Graph) ->
     %% Add node to graph.
-    lager:info("Adding vertex ~p", [Name]),
+    % lager:info("Adding vertex ~p", [Name]),
     digraph:add_vertex(Graph, Name),
 
     lists:foldl(fun(N, _) ->
                         %% Add node to graph.
-                        lager:info("Adding vertex ~p", [N]),
+                        % lager:info("Adding vertex ~p", [N]),
                         digraph:add_vertex(Graph, N),
 
                         %% Add edge to graph.
-                        lager:info("Adding edge from ~p to ~p", [Name, N]),
+                        % lager:info("Adding edge from ~p to ~p", [Name, N]),
                         digraph:add_edge(Graph, Name, N)
                 end, Graph, Membership).
 

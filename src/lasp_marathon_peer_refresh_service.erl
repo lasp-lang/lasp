@@ -89,11 +89,7 @@ init([]) ->
             S3Host = "s3.amazonaws.com",
             AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
             SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
-            lager:info("Access Key Id: ~p", [AccessKeyId]),
-            lager:info("Secret Access Key: ~p", [SecretAccessKey]),
             erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
-            lager:info("Key ~p", [AccessKeyId]),
-            lager:info("Secret ~p", [SecretAccessKey]),
 
             %% Create S3 bucket.
             try
@@ -152,12 +148,9 @@ handle_cast(Msg, State) ->
 handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE),
 
+    Tag = partisan_config:get(tag, client),
     PeerServiceManager = lasp_config:get(peer_service_manager,
                                          partisan_peer_service),
-    lager:info("PeerServiceManager: ~p", [PeerServiceManager]),
-
-    Tag = partisan_config:get(tag, client),
-    lager:info("Tag: ~p", [Tag]),
 
     %% Get list of nodes to connect to: this specialized logic isn't
     %% required when the node count is small, but is required with a
@@ -237,7 +230,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
                                            connect(Peer),
                                            Graph;
                                        _ ->
-                                           lager:info("Membership information for node ~p is ~p", [N, Membership]),
+                                           % lager:info("Membership information for node ~p is ~p", [N, Membership]),
                                            populate_graph(N, Membership, Graph)
                                    end
                            end

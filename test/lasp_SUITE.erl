@@ -108,7 +108,8 @@ all() ->
 
 -define(AWSET_PS, awset_ps).
 -define(COUNTER, pncounter).
--define(LATENCY_ITERATIONS, 1000).
+-define(LATENCY_ITERATIONS, 2200).
+-define(TRIM, {trim, 100, 100}).
 
 -define(ID, <<"myidentifier">>).
 
@@ -116,7 +117,7 @@ contracted_latency_test(_Config) ->
     case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
         true ->
             Res = latency_test_case(5, contraction, no_read, ?LATENCY_ITERATIONS),
-            write_csv(path_contraction, contraction, Res);
+            write_csv(path_contraction, contraction, Res, ?TRIM);
 
         _ -> ok
     end.
@@ -125,7 +126,7 @@ uncontracted_latency_test(_Config) ->
     case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
         true ->
             Res = latency_test_case(5, no_contraction, no_read, ?LATENCY_ITERATIONS),
-            write_csv(path_contraction, no_contraction, Res);
+            write_csv(path_contraction, no_contraction, Res, ?TRIM);
 
         _ -> ok
     end.
@@ -134,7 +135,7 @@ latency_with_reads_test(_Config) ->
     case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
         true ->
             Res = latency_test_case(5, contraction, random_reads, ?LATENCY_ITERATIONS),
-            write_csv(path_contraction, contraction_with_reads, Res);
+            write_csv(path_contraction, contraction_with_reads, Res, ?TRIM);
 
         _ -> ok
     end.
@@ -281,7 +282,7 @@ sql_simple_contracted_latency_test(_Config) ->
             {ok, ResultTable} = lasp_sql_materialized_view:create("select c from final where c < 20"),
 
             Res = sql_latency_test_case(contraction, ?LATENCY_ITERATIONS, Initial, ResultTable, [{a, 1}, {b, "foo"}, {c, 0}]),
-            write_csv(sql_simple_queries, contraction, Res);
+            write_csv(sql_simple_queries, contraction, Res, ?TRIM);
 
         _ -> ok
     end.
@@ -303,7 +304,7 @@ sql_simple_uncontracted_latency_test(_Config) ->
             {ok, ResultTable} = lasp_sql_materialized_view:create("select c from final where c < 20"),
 
             Res = sql_latency_test_case(no_contraction, ?LATENCY_ITERATIONS, Initial, ResultTable, [{a, 1}, {b, "foo"}, {c, 0}]),
-            write_csv(sql_simple_queries, no_contraction, Res);
+            write_csv(sql_simple_queries, no_contraction, Res, ?TRIM);
 
         _ -> ok
     end.
@@ -320,7 +321,7 @@ sql_join_contracted_latency_test(_Config) ->
             {ok, ResultTable} = lasp_sql_materialized_view:create("select c from final where c < 20"),
 
             Res = sql_latency_test_case(contraction, ?LATENCY_ITERATIONS, Initial, ResultTable, [{a, 1}, {b, "foo"}, {c, 0}]),
-            write_csv(sql_join_queries, contraction, Res);
+            write_csv(sql_join_queries, contraction, Res, ?TRIM);
 
         _ -> ok
     end.
@@ -337,7 +338,7 @@ sql_join_uncontracted_latency_test(_Config) ->
             {ok, ResultTable} = lasp_sql_materialized_view:create("select c from final where c < 20"),
 
             Res = sql_latency_test_case(no_contraction, ?LATENCY_ITERATIONS, Initial, ResultTable, [{a, 1}, {b, "foo"}, {c, 0}]),
-            write_csv(sql_join_queries, no_contraction, Res);
+            write_csv(sql_join_queries, no_contraction, Res, ?TRIM);
 
         _ -> ok
     end.
@@ -382,16 +383,20 @@ sql_run_case(Iterations, Acc, From, To, Row, Threshold0) ->
     {Time, {ok, {_, _, _, NewThreshold}}} = timer:tc(MutateAndRead, [From, To, Row, Threshold]),
     sql_run_case(Iterations - 1, [Time | Acc], From, To, Row, NewThreshold).
 
-write_csv(Dir, Option, Cases) ->
+write_csv(Dir, Option, Cases, Trim) ->
     Path = code:priv_dir(lasp)
            ++ "/evaluation/logs/"
            ++ atom_to_list(Dir) ++ "/"
            ++ atom_to_list(Option) ++ "/"
            ++ integer_to_list(timestamp()) ++ "/",
     ok = filelib:ensure_dir(Path),
+    Trimmed = case Trim of
+        {trim, Start, End} -> lists:sublist(Cases, Start + 1, (length(Cases) - (Start + End)));
+        _ -> Cases
+    end,
     lists:foreach(fun(Case) ->
         file:write_file(Path ++ "runner.csv", io_lib:fwrite("~p\n", [Case]), [append])
-    end, Cases).
+    end, Trimmed).
 
 timestamp() ->
     {Mega, Sec, _Micro} = erlang:timestamp(),

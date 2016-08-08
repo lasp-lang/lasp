@@ -331,32 +331,20 @@ handle_call(cleave_all, _From, #state{optimized_map=OptMap}=State) ->
 %%
 %%      Naive approach first: check if To is a member of From
 %%
-%%      Second approach: let the digraph module figure it out,
-%%      as digraph:add_edge/3 will return {error, {bad_edge, _}}.
-%%
-%%      As this second approach creates edges, we delete them all
-%%      after we're done (we don't want edges without an associated
-%%      pid).
+%%      Second approach: check if there is a path from `Dst` to
+%%      any of the vertices in `Src`.
 %%
 %%      We want to check this before spawning a lasp process, otherwise
 %%      an infinite loop can be created if the vertices form a loop.
 %%
-handle_call({will_form_cycle, From, To}, _From, #state{dag=Dag, optimized_map=OptMap}=State) ->
+handle_call({will_form_cycle, Src, Dst}, _From, #state{dag=Dag, optimized_map=OptMap}=State) ->
 
-    Response = case lists:member(To, From) orelse optimized_cycle(Dag, From, To, OptMap) of
-        true -> true;
-        false ->
-            Status = [digraph:add_edge(Dag, F, To) || F <- From],
-            {Ok, Filtered} = case lists:any(fun is_edge_error/1, Status) of
-                false -> {false, Status};
-                true ->
-                    {true, lists:filter(fun(X) ->
-                        not is_edge_error(X)
-                    end, Status)}
-            end,
-            digraph:del_edges(Dag, Filtered),
-            Ok
-    end,
+    DirectCycle = lists:member(Dst, Src) orelse lists:any(fun(V) ->
+        digraph:get_path(Dag, Dst, V) =/= false
+    end, Src),
+
+    Response = DirectCycle orelse optimized_cycle(Dag, Src, Dst, OptMap),
+
     {reply, Response, State};
 
 %% @doc For all V in Src, create an edge from V to Dst labelled with Pid.
@@ -498,12 +486,6 @@ is_graph_error({error, _}) ->
     true;
 
 is_graph_error(_) ->
-    false.
-
-is_edge_error({error, {bad_edge, _}}) ->
-    true;
-
-is_edge_error(_) ->
     false.
 
 %% @doc Delete all edges between Src and Dst with the given pid..

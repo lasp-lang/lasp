@@ -83,6 +83,7 @@ init([]) ->
     %% Don't start the timer if we're not running in Mesos.
     case os:getenv("MESOS_TASK_ID") of
         false ->
+            lager:info("Not running in Mesos; disabling Marathon service."),
             ok;
         _ ->
             %% Configure erlcloud.
@@ -208,6 +209,8 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
     timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
     {noreply, State};
 handle_info(?BUILD_GRAPH_MESSAGE, State) ->
+    _ = lager:info("Beginning graph analysis."),
+
     %% Get all running nodes, because we need the list of *everything*
     %% to analyze the graph for connectedness.
     Nodes = sets:union(clients_from_marathon(), servers_from_marathon()),

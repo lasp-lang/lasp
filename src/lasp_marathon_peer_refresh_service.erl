@@ -189,6 +189,8 @@ handle_info(?NODES_MESSAGE, State) ->
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
     {noreply, State};
 handle_info(?ARTIFACT_MESSAGE, State) ->
+    _ = lager:info("Artifact interval triggered."),
+
     %% Get bucket name.
     BucketName = bucket_name(),
 

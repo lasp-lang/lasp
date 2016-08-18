@@ -97,12 +97,11 @@ cat <<EOF > lasp-server.json
 EOF
 
 echo ">>> Removing lasp-server from Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-server
+curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-server > /dev/null
 sleep 2
 
 echo ">>> Adding lasp-server to Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-server.json $DCOS/service/marathon/v2/apps
-echo
+curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-server.json $DCOS/service/marathon/v2/apps > /dev/null
 sleep 10
 
 cat <<EOF > lasp-client.json
@@ -163,10 +162,9 @@ cat <<EOF > lasp-client.json
 EOF
 
 echo ">>> Removing lasp-client from Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client
+curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client > /dev/null
 sleep 2
 
 echo ">>> Adding lasp-client to Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-client.json $DCOS/service/marathon/v2/apps
-echo
+curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-client.json $DCOS/service/marathon/v2/apps > /dev/null
 sleep 10

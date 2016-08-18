@@ -320,7 +320,7 @@ advertisement_counter_child_specs() ->
             partisan_config:set(tag, client),
 
             %% Configure reserved slots.
-            partisan_config:set(reservations, [server]),
+            %% partisan_config:set(reservations, [server]),
 
             [AdCounterClient];
         false ->

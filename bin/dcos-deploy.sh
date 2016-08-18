@@ -51,7 +51,7 @@ cat <<EOF > lasp-server.json
   "container": {
     "type": "DOCKER",
     "docker": {
-      "image": "cmeiklejohn/lasp-dcos",
+      "image": "cmeiklejohn/lasp-hyparview-dcos",
       "network": "HOST",
       "forcePullImage": true,
       "parameters": [
@@ -120,7 +120,11 @@ cat <<EOF > lasp-client.json
   "container": {
     "type": "DOCKER",
     "docker": {
+<<<<<<< 6c3aecc7db2b955cf8c7fc35bbb4a88ca9a5b402
       "image": "cmeiklejohn/lasp-dcos",
+=======
+      "image": "cmeiklejohn/lasp-hyparview-dcos",
+>>>>>>> Switch container.
       "network": "HOST",
       "forcePullImage": true,
       "parameters": [

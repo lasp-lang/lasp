@@ -40,7 +40,7 @@ content_types_provided(Req, Ctx) ->
 to_json(ReqData, State) ->
     NumNodes = rand_compat:uniform(2),
     NodeList = lists:seq(0, NumNodes),
-    Nodes = [#{id => Name, group => 1} || Name <- NodeList],
+    Nodes = [#{id => Name, name => Name, group => 1} || Name <- NodeList],
     Links = lists:flatten(generate_links(NodeList)),
     Encoded = jsx:encode(#{nodes => Nodes, links => Links}),
     {Encoded, ReqData, State}.
@@ -54,26 +54,10 @@ generate_links(NodeList) ->
 -else.
 
 to_json(ReqData, State) ->
-    {ok, Membership} = lasp_peer_service:members(),
-    Nodes = [#{id => Name, group => 1} || Name <- Membership],
-    Links = lists:flatten(generate_links(Membership)),
+    {ok, {Vertices, Edges}} = lasp_marathon_peer_refresh_service:graph(),
+    Nodes = [#{id => Name, name => Name, group => 1} || Name <- Vertices],
+    Links = [#{source => V1, target => V2} || {V1, V2} <- Edges],
     Encoded = jsx:encode(#{nodes => Nodes, links => Links}),
     {Encoded, ReqData, State}.
-
-%% @todo Re-write as a fold later, this is the easy way out because we
-%%       just flatmap anyway.  We also don't want to be making these RPC
-%%       calls either.
-generate_links(NodeList) ->
-    lists:map(fun(Source) ->
-                lists:map(fun(Target) ->
-                            case rpc:call(Source, net_adm, ping, [Target]) of
-                                pong ->
-                                    [#{source => Source, target => Target}];
-                                pang ->
-                                    [];
-                                {badrpc, _} ->
-                                    []
-                            end
-                    end, NodeList) end, NodeList).
 
 -endif.

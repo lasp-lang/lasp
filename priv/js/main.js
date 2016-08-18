@@ -1,32 +1,4 @@
 $(document).ready(function() {
-  $("#header").hide();
-  $("#controls").hide();
-  $("#graph").hide();
-
-  $.ajax({
-      type: "GET",
-      url: "/api/plots",
-      dataType: "json",
-      success: function (data) {
-        $.each(data.plots, function(i, data) {
-          var elem = "<li class='plot'><object type='application/pdf' data='/plots/" + data + "' width='100%' height='100%'><p>hi</p></object></li>";
-          $(elem).appendTo('#plots');
-        });
-    }
-  });
-
-  $.ajax({
-      type: "GET",
-      url: "/api/logs",
-      dataType: "json",
-      success: function (data) {
-        $.each(data.logs, function(i, data) {
-          var elem = "<li><a href='/logs/" + data + "'>"+data+"</a></li>";
-          $(elem).appendTo('#logs');
-        });
-    }
-  });
-
   var updateDag = function(data, cache) {
         var cacheStatus, cacheContents;
 
@@ -70,8 +42,8 @@ $(document).ready(function() {
     $("#controls").fadeIn();
     $("#graph").fadeIn();
 
-    var width = 300,
-        height = 250;
+    var width = 1024,
+        height = 768;
 
     var color = d3.scale.category10();
 
@@ -161,15 +133,27 @@ $(document).ready(function() {
       link.exit().remove();
 
       node = node.data(force.nodes(), function(d) { return d.id;});
-      node.enter().append("circle").attr("class", function(d) { return "node " + d.id; }).attr("r", 8).style("fill", function(d) { return color(d.group); })
+      node.enter().append("g");
+
+      node.append("image")
+           .attr("xlink:href", "images/lasp-logo-large.png")
+           .attr("x", -8)
+           .attr("y", -8)
+           .attr("width", 16)
+           .attr("height", 16);
+
+      node.append("text")
+          .attr("dx", 12)
+          .attr("dy", ".35em")
+          .text(function(d) { return d.name });
+
       node.exit().remove();
 
       force.start();
     }
 
     function tick() {
-      node.attr("cx", function(d) { return d.x; })
-          .attr("cy", function(d) { return d.y; })
+      node.attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"; });
 
       link.attr("x1", function(d) { return d.source.x; })
           .attr("y1", function(d) { return d.source.y; })

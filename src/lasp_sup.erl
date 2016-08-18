@@ -303,6 +303,11 @@ advertisement_counter_child_specs() ->
     lasp_config:set(ad_counter_simulation_client, AdClientEnabled),
     lager:info("AdClientEnabled: ~p", [AdClientEnabled]),
 
+    %% Give each client at least 100 impressions.
+    ClientNumberDefault = list_to_integer(os:getenv("CLIENT_NUMBER", "3")),
+    ClientNumber = lasp_config:get(client_number, ClientNumberDefault),
+    lasp_config:set(max_impressions, 10 * ClientNumber),
+
     ClientSpecs = case AdClientEnabled of
         true ->
             %% Start one advertisement counter client process per node.

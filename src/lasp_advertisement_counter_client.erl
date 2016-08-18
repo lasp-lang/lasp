@@ -253,7 +253,9 @@ build_dag() ->
 %% @private
 trigger(#ad{counter=CounterId} = Ad, Actor) ->
     %% Blocking threshold read for max advertisement impressions.
-    {ok, Value} = lasp:read(CounterId, {value, ?MAX_IMPRESSIONS}),
+    MaxImpressions = lasp_config:get(max_impressions,
+                                     ?MAX_IMPRESSIONS_DEFAULT),
+    {ok, Value} = lasp:read(CounterId, {value, MaxImpressions}),
 
     lager:info("Threshold for ~p reached; disabling!", [Ad]),
     lager:info("Counter: ~p", [Value]),

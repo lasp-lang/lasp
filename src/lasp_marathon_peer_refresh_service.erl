@@ -28,7 +28,8 @@
 
 %% API
 -export([start_link/0,
-         start_link/1]).
+         start_link/1,
+         graph/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -46,8 +47,14 @@
 -define(NODES_INTERVAL, 20000).
 -define(NODES_MESSAGE,  nodes).
 
+-define(BUILD_GRAPH_INTERVAL, 20000).
+-define(BUILD_GRAPH_MESSAGE,  build_graph).
+
+-define(ARTIFACT_INTERVAL, 20000).
+-define(ARTIFACT_MESSAGE,  artifact).
+
 %% State record.
--record(state, {nodes = [] :: [node()]}).
+-record(state, {attempted_nodes, graph}).
 
 %%%===================================================================
 %%% API
@@ -63,6 +70,9 @@ start_link() ->
 start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
 
+graph() ->
+    gen_server:call(?MODULE, graph, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -75,17 +85,54 @@ init([]) ->
         false ->
             ok;
         _ ->
+            %% Configure erlcloud.
+            S3Host = "s3.amazonaws.com",
+            AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
+            SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
+            erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
+
+            %% Create S3 bucket.
+            try
+                BucketName = bucket_name(),
+                lager:info("Creating bucket: ~p", [BucketName]),
+                ok = erlcloud_s3:create_bucket(BucketName)
+            catch
+                _:{aws_error, _} ->
+                    ok
+            end,
+
             %% Stall messages; Plumtree has a race on startup, again.
             timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
+
+            %% Only construct the graph and attempt to repair the graph
+            %% from the designated server node.
+            case partisan_config:get(tag, client) of
+                server ->
+                    timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE);
+                client ->
+                    ok
+            end,
+
+            %% All nodes should upload artifacts.
+            timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
+
+            %% All nodes should attempt to refresh the membership.
             timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE)
     end,
-    {ok, #state{}}.
+    {ok, #state{attempted_nodes=sets:new(), graph=digraph:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
 %% @private
+handle_call(graph, _From, #state{graph=Graph}=State) ->
+    Vertices = digraph:vertices(Graph),
+    Edges = lists:map(fun(Edge) ->
+                      {_E, V1, V2, _Label} = digraph:edge(Graph, Edge),
+                      {V1, V2}
+              end, digraph:edges(Graph)),
+    {reply, {ok, {Vertices, Edges}}, State};
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
@@ -98,37 +145,128 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(?REFRESH_MESSAGE, #state{nodes=SeenNodes}=State) ->
+handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE),
 
-    %% Randomly get information from the server nodes and the
-    %% regular nodes.
-    %%
-    Task = case rand_compat:uniform(10) rem 2 == 0 of
-        true ->
-            "lasp-server";
-        false ->
-            "lasp-client"
-    end,
+    Tag = partisan_config:get(tag, client),
+    PeerServiceManager = lasp_config:get(peer_service_manager,
+                                         partisan_peer_service),
 
-    Nodes = case request(Task) of
-        {ok, Response} ->
-            Nodes1 = generate_nodes(Response),
-            Nodes1;
-        Other ->
-            _ = lager:info("Invalid Marathon response: ~p", [Other]),
-            SeenNodes
+    %% Get list of nodes to connect to: this specialized logic isn't
+    %% required when the node count is small, but is required with a
+    %% larger node count to ensure the network stabilizes correctly
+    %% because HyParView doesn't guarantee graph connectivity: it is
+    %% only probabilistic.
+    %%
+    ToConnectNodes = case {Tag, PeerServiceManager} of
+        {client, partisan_client_server_peer_service_manager} ->
+            %% If we're a client, and we're in client/server mode, then
+            %% always connect with the server.
+            servers_from_marathon();
+        {server, partisan_client_server_peer_service_manager} ->
+            %% If we're a server, and we're in client/server mode, then
+            %% always initiate connections with clients.
+            clients_from_marathon();
+        {client, partisan_hyparview_peer_service_manager} ->
+            %% If we're in HyParView, and we're a client, only ever
+            %% do nothing -- force all connection to go through the
+            %% server.
+            sets:new();
+        {server, partisan_hyparview_peer_service_manager} ->
+            %% If we're the server, and we're in HyParView, clients will
+            %% ask the server to join the overlay and force outbound
+            %% conenctions to the clients.
+            clients_from_marathon()
     end,
 
     %% Attempt to connect nodes that are not connected.
-    ConnectedNodes = maybe_connect(Nodes, SeenNodes),
+    AttemptedNodes = maybe_connect(ToConnectNodes, SeenNodes),
 
-    {noreply, State#state{nodes=ConnectedNodes}};
+    {noreply, State#state{attempted_nodes=AttemptedNodes}};
 handle_info(?NODES_MESSAGE, State) ->
     {ok, Nodes} = lasp_peer_service:members(),
     _ = lager:info("Currently connected nodes via peer service: ~p", [Nodes]),
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
     {noreply, State};
+handle_info(?ARTIFACT_MESSAGE, State) ->
+    %% Get bucket name.
+    BucketName = bucket_name(),
+
+    %% Get current membership.
+    {ok, Nodes} = lasp_peer_service:members(),
+
+    %% Store membership.
+    Node = atom_to_list(node()),
+    Membership = term_to_binary(Nodes),
+    erlcloud_s3:put_object(BucketName, Node, Membership),
+
+    timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
+    {noreply, State};
+handle_info(?BUILD_GRAPH_MESSAGE, State) ->
+    %% Get all running nodes, because we need the list of *everything*
+    %% to analyze the graph for connectedness.
+    Nodes = sets:union(clients_from_marathon(), servers_from_marathon()),
+
+    %% Build the graph.
+    Graph = digraph:new(),
+
+    %% Get bucket name.
+    BucketName = bucket_name(),
+
+    GraphFun = fun({N, _, _}=Peer, _Graph) ->
+                       Node = atom_to_list(N),
+                       try
+                           Result = erlcloud_s3:get_object(BucketName, Node),
+                           Body = proplists:get_value(content, Result, undefined),
+                           case Body of
+                               undefined ->
+                                   lager:info("No membership information for ~p", [Node]),
+                                   Graph;
+                               _ ->
+                                   Membership = binary_to_term(Body),
+                                   case Membership of
+                                       [N] ->
+                                           lager:info("Node ~p only contains itself, attempting repair with server join!", [N]),
+                                           connect(Peer),
+                                           Graph;
+                                       _ ->
+                                           % lager:info("Membership information for node ~p is ~p", [N, Membership]),
+                                           populate_graph(N, Membership, Graph)
+                                   end
+                           end
+                       catch
+                           _:{aws_error, _} ->
+                               lager:info("Could not process information for node; ~p",
+                                          [Node]),
+                               Graph
+                       end
+               end,
+    sets:fold(GraphFun, Graph, Nodes),
+
+    %% Verify connectedness.
+    ConnectedFun = fun({Name, _, _}, Result0) ->
+                        sets:fold(fun({N, _, _}, Result1) ->
+                                           Path = digraph:get_short_path(Graph, Name, N),
+                                           case Path of
+                                               false ->
+                                                   lager:info("Node ~p can not find shortest path to: ~p", [Name, N]),
+                                                   Result1 andalso false;
+                                               _ ->
+                                                   Result1 andalso true
+                                           end
+                                      end, Result0, Nodes)
+                 end,
+    Connected = sets:fold(ConnectedFun, true, Nodes),
+
+    case Connected of
+        true ->
+            lager:info("Graph is connected!");
+        false ->
+            lager:info("Graph is not connected!")
+    end,
+
+    timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE),
+    {noreply, State#state{graph=Graph}};
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
@@ -150,11 +288,12 @@ code_change(_OldVsn, State, _Extra) ->
 %% @doc Generate a list of Erlang node names.
 generate_nodes(#{<<"app">> := App}) ->
     #{<<"tasks">> := Tasks} = App,
-    lists:map(fun(Task) ->
+    Nodes = lists:map(fun(Task) ->
                 #{<<"host">> := Host,
-                  <<"ports">> := [_EPMDPort, PeerPort]} = Task,
+                  <<"ports">> := [_WebPort, PeerPort]} = Task,
         generate_node(Host, PeerPort)
-        end, Tasks).
+        end, Tasks),
+    sets:from_list(Nodes).
 
 %% @doc Generate a single Erlang node name.
 generate_node(Host, PeerPort) ->
@@ -169,44 +308,103 @@ maybe_connect(Nodes, SeenNodes) ->
     %% connect; only attempt to connect once, because node might be
     %% migrated to a passive view of the membership.
     %%
-    ToConnect = Nodes -- SeenNodes,
+    ToConnect = sets:subtract(Nodes, SeenNodes),
 
     %% Attempt connection to any new nodes.
-    case ToConnect of
-        [] ->
-            [];
-        _ ->
-            lists:map(fun connect/1, ToConnect)
-    end,
+    sets:fold(fun(Node, Acc) ->
+                      [connect(Node) | Acc]
+              end, [], ToConnect),
 
     %% Return list of seen nodes with the new node.
-    SeenNodes ++ Nodes.
+    sets:union(Nodes, SeenNodes).
 
 %% @private
 connect(Node) ->
     lasp_peer_service:join(Node).
 
 %% @private
-request(Task) ->
-    IP = os:getenv("IP", "127.0.0.1"),
-    DCOS = os:getenv("DCOS", "false"),
-    Headers = case DCOS of
-                "false" ->
-                    [];
-                _ ->
-                    Token = os:getenv("TOKEN", "undefined"),
-                    [{"Authorization", "token=" ++ Token}]
-    end,
-    Url = case DCOS of
-              "false" ->
-                "http://" ++ IP ++ ":8080/v2/apps/" ++ Task ++ "?embed=app.taskStats";
-              _ ->
-                DCOS ++ "/marathon/v2/apps/" ++ Task ++ "?embed=app.taskStats"
-          end,
+dcos() ->
+    os:getenv("DCOS", "false").
+
+%% @private
+ip() ->
+    os:getenv("IP", "127.0.0.1").
+
+%% @private
+generate_task_url(Task) ->
+    IP = ip(),
+    DCOS = dcos(),
+    case DCOS of
+        "false" ->
+          "http://" ++ IP ++ ":8080/v2/apps/" ++ Task ++ "?embed=app.taskStats";
+        _ ->
+          DCOS ++ "/marathon/v2/apps/" ++ Task ++ "?embed=app.taskStats"
+    end.
+
+%% @private
+headers() ->
+    case dcos() of
+        "false" ->
+            [];
+        _ ->
+            Token = os:getenv("TOKEN", "undefined"),
+            [{"Authorization", "token=" ++ Token}]
+    end.
+
+%% @private
+get_request(Url, DecodeFun) ->
+    Headers = headers(),
     case httpc:request(get, {Url, Headers}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, Body}} ->
-            {ok, jsx:decode(Body, [return_maps])};
+            {ok, DecodeFun(Body)};
         Other ->
             _ = lager:info("Request failed; ~p", [Other]),
             {error, invalid}
+    end.
+
+%% @private
+populate_graph(Name, Membership, Graph) ->
+    %% Add node to graph.
+    % lager:info("Adding vertex ~p", [Name]),
+    digraph:add_vertex(Graph, Name),
+
+    lists:foldl(fun(N, _) ->
+                        %% Add node to graph.
+                        % lager:info("Adding vertex ~p", [N]),
+                        digraph:add_vertex(Graph, N),
+
+                        %% Add edge to graph.
+                        % lager:info("Adding edge from ~p to ~p", [Name, N]),
+                        digraph:add_edge(Graph, Name, N)
+                end, Graph, Membership).
+
+%% @private
+bucket_name() ->
+    % Simulation = lasp_config:get(simulation, undefined),
+    % EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
+    EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
+    integer_to_list(EvalTimestamp).
+
+%% @private
+clients_from_marathon() ->
+    DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
+
+    case get_request(generate_task_url("lasp-client"), DecodeFun) of
+        {ok, Clients} ->
+            generate_nodes(Clients);
+        ClientError ->
+            _ = lager:info("Invalid Marathon response: ~p", [ClientError]),
+            []
+    end.
+
+%% @private
+servers_from_marathon() ->
+    DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
+
+    case get_request(generate_task_url("lasp-server"), DecodeFun) of
+        {ok, Servers} ->
+            generate_nodes(Servers);
+        ServerError ->
+            _ = lager:info("Invalid Marathon response: ~p", [ServerError]),
+            []
     end.

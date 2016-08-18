@@ -196,7 +196,7 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
     {ok, Nodes} = lasp_peer_service:members(),
 
     %% Store membership.
-    Node = atom_to_list(node()),
+    Node = prefix(atom_to_list(node())),
     Membership = term_to_binary(Nodes),
     erlcloud_s3:put_object(BucketName, Node, Membership),
 
@@ -214,7 +214,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
     BucketName = bucket_name(),
 
     GraphFun = fun({N, _, _}=Peer, _Graph) ->
-                       Node = atom_to_list(N),
+                       Node = prefix(atom_to_list(N)),
                        try
                            Result = erlcloud_s3:get_object(BucketName, Node),
                            Body = proplists:get_value(content, Result, undefined),
@@ -379,11 +379,15 @@ populate_graph(Name, Membership, Graph) ->
                 end, Graph, Membership).
 
 %% @private
-bucket_name() ->
+prefix(File) ->
     % Simulation = lasp_config:get(simulation, undefined),
     % EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
-    integer_to_list(EvalTimestamp).
+    integer_to_list(EvalTimestamp) ++ "/" ++ File.
+
+%% @private
+bucket_name() ->
+    "marathon".
 
 %% @private
 clients_from_marathon() ->

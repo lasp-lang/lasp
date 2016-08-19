@@ -104,7 +104,7 @@ curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' 
 sleep 2
 
 echo ">>> Adding lasp-server to Marathon"
-curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-server.json $DCOS/service/marathon/v2/apps > /dev/null
+curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-server.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
 sleep 10
 
 cat <<EOF > lasp-client.json
@@ -169,5 +169,5 @@ curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' 
 sleep 2
 
 echo ">>> Adding lasp-client to Marathon"
-curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-client.json $DCOS/service/marathon/v2/apps > /dev/null
+curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-client.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
 sleep 10

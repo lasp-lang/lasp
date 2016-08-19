@@ -190,6 +190,8 @@ handle_info(?NODES_MESSAGE, State) ->
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
     {noreply, State};
 handle_info(?ARTIFACT_MESSAGE, State) ->
+    _ = lager:info("Uploading artifact!"),
+
     %% Get bucket name.
     BucketName = bucket_name(),
 
@@ -200,6 +202,8 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
     Node = prefix(atom_to_list(node())),
     Membership = term_to_binary(Nodes),
     erlcloud_s3:put_object(BucketName, Node, Membership),
+
+    _ = lager:info("Uploading complete!"),
 
     timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
     {noreply, State};

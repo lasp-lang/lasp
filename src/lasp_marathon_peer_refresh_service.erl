@@ -97,7 +97,8 @@ init([]) ->
                 lager:info("Creating bucket: ~p", [BucketName]),
                 ok = erlcloud_s3:create_bucket(BucketName)
             catch
-                _:{aws_error, _} ->
+                _:{aws_error, Error} ->
+                    lager:info("Bucket creation failed: ~p", [Error]),
                     ok
             end,
 
@@ -387,7 +388,7 @@ prefix(File) ->
 
 %% @private
 bucket_name() ->
-    "marathon".
+    "lasp-marathon-peer-refresh-service-metadata".
 
 %% @private
 clients_from_marathon() ->

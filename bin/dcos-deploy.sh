@@ -34,6 +34,9 @@ echo ">>> Beginning deployment!"
 echo ">>> Configuring Lasp"
 cd /tmp
 
+# Memory of each VM.
+MEMORY=120.0
+
 cat <<EOF > lasp-server.json
 {
   "acceptedResourceRoles": [
@@ -43,7 +46,7 @@ cat <<EOF > lasp-server.json
   "dependencies": [],
   "constraints": [["hostname", "UNIQUE", ""]],
   "cpus": 1.0,
-  "mem": 2048.0,
+  "mem": $MEMORY,
   "instances": 1,
   "container": {
     "type": "DOCKER",
@@ -112,7 +115,7 @@ cat <<EOF > lasp-client.json
   "id": "lasp-client",
   "dependencies": [],
   "cpus": 1.0,
-  "mem": 2048.0,
+  "mem": $MEMORY,
   "instances": $CLIENT_NUMBER,
   "container": {
     "type": "DOCKER",

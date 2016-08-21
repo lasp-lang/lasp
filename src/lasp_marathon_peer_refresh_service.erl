@@ -50,7 +50,7 @@
 -define(BUILD_GRAPH_INTERVAL, 20000).
 -define(BUILD_GRAPH_MESSAGE,  build_graph).
 
--define(ARTIFACT_INTERVAL, 20000).
+-define(ARTIFACT_INTERVAL, 1000).
 -define(ARTIFACT_MESSAGE,  artifact).
 
 %% State record.

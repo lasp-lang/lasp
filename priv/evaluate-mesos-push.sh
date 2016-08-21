@@ -41,7 +41,9 @@ echo "Checking in results."
 ( cd priv/evaluation ; git commit -m 'Adding evaluation data.' )
 ( cd priv/evaluation ; git status )
 
-RETRIES=100
+# Retries has to be at least more than the allowed concurrency in the
+# system.
+RETRIES=10000
 R=0
 (cd priv/evaluation ; GIT_SSH=../$GIT_SSH git push -u origin)
 

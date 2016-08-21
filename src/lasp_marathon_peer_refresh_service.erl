@@ -322,9 +322,7 @@ maybe_connect(Nodes, SeenNodes) ->
     ToConnect = sets:subtract(Nodes, SeenNodes),
 
     %% Attempt connection to any new nodes.
-    sets:fold(fun(Node, Acc) ->
-                      [connect(Node) | Acc]
-              end, [], ToConnect),
+    sets:fold(fun(Node, Acc) -> [connect(Node) | Acc] end, [], ToConnect),
 
     %% Return list of seen nodes with the new node.
     sets:union(Nodes, SeenNodes).

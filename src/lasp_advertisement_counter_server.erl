@@ -122,9 +122,6 @@ handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
         AdsDisabledAndLogs
     ),
 
-    lager:info("Checking for simulation end: ~p nodes pushed logs.",
-               [length(NodesWithLogsPushed)]),
-
     NodesWithAdsDisabled = lists:filter(
         fun({_Node, {AdsDisabled, _LogsPushed}}) ->
             AdsDisabled
@@ -132,8 +129,8 @@ handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
         AdsDisabledAndLogs
     ),
 
-    lager:info("Checking for simulation end: ~p nodes with ads disabled.",
-               [length(NodesWithAdsDisabled)]),
+    lager:info("Checking for simulation end: ~p nodes with ads disabled and ~p nodes with logs pushed.",
+               [length(NodesWithAdsDisabled), length(NodesWithLogsPushed)]),
 
     case length(NodesWithLogsPushed) == client_number() of
         true ->

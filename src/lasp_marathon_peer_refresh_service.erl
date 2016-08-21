@@ -250,16 +250,17 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
 
     %% Verify connectedness.
     ConnectedFun = fun({Name, _, _}, Result0) ->
-                        sets:fold(fun({N, _, _}, Result1) ->
+                           {Ns, Result} = sets:fold(fun({N, _, _}, {Disconnected, Result1}) ->
                                            Path = digraph:get_short_path(Graph, Name, N),
                                            case Path of
                                                false ->
-                                                   lager:info("Node ~p can not find shortest path to: ~p", [Name, N]),
-                                                   Result1 andalso false;
+                                                   {[N|Disconnected], Result1 andalso false};
                                                _ ->
-                                                   Result1 andalso true
+                                                   {Disconnected, Result1 andalso true}
                                            end
-                                      end, Result0, Nodes)
+                                      end, {[], Result0}, Nodes),
+                           lager:info("Node ~p can not find shortest path to: ~p", [Name, Ns]),
+                           Result
                  end,
     Connected = sets:fold(ConnectedFun, true, Nodes),
 

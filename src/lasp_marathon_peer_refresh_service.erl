@@ -259,7 +259,12 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
                                                    {Disconnected, Result1 andalso true}
                                            end
                                       end, {[], Result0}, Nodes),
-                           lager:info("Node ~p can not find shortest path to: ~p", [Name, Ns]),
+                           case Ns of
+                               [] ->
+                                   ok;
+                               _ ->
+                                lager:info("Node ~p can not find shortest path to: ~p", [Name, Ns])
+                           end,
                            Result
                  end,
     Connected = sets:fold(ConnectedFun, true, Nodes),

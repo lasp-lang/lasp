@@ -218,7 +218,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
     %% Get bucket name.
     BucketName = bucket_name(),
 
-    GraphFun = fun({N, _, _}=Peer, _Graph) ->
+    GraphFun = fun({N, _, _}=Peer, OrphanedNodes) ->
                        Node = prefix(atom_to_list(N)),
                        try
                            Result = erlcloud_s3:get_object(BucketName, Node),
@@ -226,27 +226,27 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
                            case Body of
                                undefined ->
                                    lager:info("No membership information for ~p", [Node]),
-                                   Graph;
+                                   OrphanedNodes;
                                _ ->
                                    Membership = binary_to_term(Body),
                                    case Membership of
                                        [N] ->
                                            lager:info("Node ~p only contains itself, attempting repair with server join!", [N]),
-                                           connect(Peer),
-                                           Graph;
+                                           [Peer|OrphanedNodes];
                                        _ ->
                                            % lager:info("Membership information for node ~p is ~p", [N, Membership]),
-                                           populate_graph(N, Membership, Graph)
+                                           populate_graph(N, Membership, Graph),
+                                           OrphanedNodes
                                    end
                            end
                        catch
                            _:{aws_error, _} ->
                                lager:info("Could not process information for node; ~p",
                                           [Node]),
-                               Graph
+                               OrphanedNodes
                        end
                end,
-    sets:fold(GraphFun, Graph, Nodes),
+    Orphaned = sets:fold(GraphFun, [], Nodes),
 
     %% Verify connectedness.
     ConnectedFun = fun({Name, _, _}, Result0) ->
@@ -275,6 +275,9 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
         false ->
             lager:info("Graph is not connected!")
     end,
+
+    %% Connect to orphaned nodes.
+    [connect(Orphan) || Orphan <- Orphaned],
 
     timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE),
     {noreply, State#state{graph=Graph}};

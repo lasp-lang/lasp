@@ -37,6 +37,9 @@ cd /tmp
 # Memory of each VM.
 MEMORY=500.0
 
+# CPU of each VM.
+CPU=0.5
+
 cat <<EOF > lasp-server.json
 {
   "acceptedResourceRoles": [
@@ -45,7 +48,7 @@ cat <<EOF > lasp-server.json
   "id": "lasp-server",
   "dependencies": [],
   "constraints": [["hostname", "UNIQUE", ""]],
-  "cpus": 1.0,
+  "cpus": $CPU,
   "mem": $MEMORY,
   "instances": 1,
   "container": {
@@ -114,7 +117,7 @@ cat <<EOF > lasp-client.json
   ],
   "id": "lasp-client",
   "dependencies": [],
-  "cpus": 1.0,
+  "cpus": $CPU,
   "mem": $MEMORY,
   "instances": $CLIENT_NUMBER,
   "container": {

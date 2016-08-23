@@ -276,11 +276,11 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
         true ->
             lager:info("Graph is connected!");
         false ->
-            lager:info("Graph is not connected!")
+            lager:info("Graph is not connected!: ~p", [Orphaned])
     end,
 
     %% Connect to orphaned nodes.
-    [connect(Orphan) || Orphan <- Orphaned],
+    %[connect(Orphan) || Orphan <- Orphaned],
 
     timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE),
     {noreply, State#state{graph=Graph}};

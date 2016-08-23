@@ -33,9 +33,6 @@ declare -A EVALUATIONS
 ## client_server_state_based_with_aae_test
 EVALUATIONS["client_server_state_based_with_aae"]="partisan_client_server_peer_service_manager state_based false"
 
-## client_server_state_based_with_aae_and_tree_test
-EVALUATIONS["client_server_state_based_with_aae_and_tree"]="partisan_client_server_peer_service_manager state_based true"
-
 ## client_server_delta_based_with_aae_test
 EVALUATIONS["client_server_delta_based_with_aae"]="partisan_client_server_peer_service_manager delta_based false"
 

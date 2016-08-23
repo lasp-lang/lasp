@@ -41,7 +41,7 @@
 
 -include("lasp.hrl").
 
--define(REFRESH_INTERVAL, 1000).
+-define(REFRESH_INTERVAL, 2000).
 -define(REFRESH_MESSAGE,  refresh).
 
 -define(NODES_INTERVAL, 20000).
@@ -148,7 +148,9 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
-    timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE),
+    %% Add random jitter.
+    Jitter = rand_compat:uniform(?REFRESH_INTERVAL),
+    timer:send_after(?REFRESH_INTERVAL + Jitter, ?REFRESH_MESSAGE),
 
     Tag = partisan_config:get(tag, client),
     PeerServiceManager = lasp_config:get(peer_service_manager,

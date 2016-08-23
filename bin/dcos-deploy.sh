@@ -35,7 +35,7 @@ echo ">>> Configuring Lasp"
 cd /tmp
 
 # Memory of each VM.
-MEMORY=500.0
+MEMORY=1024.0
 
 # CPU of each VM.
 CPU=0.5

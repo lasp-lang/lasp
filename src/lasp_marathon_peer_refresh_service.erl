@@ -415,7 +415,7 @@ clients_from_marathon() ->
             generate_nodes(Clients);
         ClientError ->
             _ = lager:info("Invalid Marathon response: ~p", [ClientError]),
-            []
+            sets:new()
     end.
 
 %% @private

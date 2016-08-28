@@ -21,7 +21,7 @@
 %% @doc Read configuration information from Marathon and auto-cluster
 %%      Erlang nodes based on this.
 
--module(lasp_marathon_peer_refresh_service).
+-module(sprinter).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).

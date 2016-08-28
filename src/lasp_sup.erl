@@ -95,10 +95,10 @@ init(_Args) ->
                 {plumtree_sup, start_link, []},
                  permanent, infinity, supervisor, [plumtree_sup]},
 
-    MarathonPeerRefresh = {lasp_marathon_peer_refresh_service,
-                           {lasp_marathon_peer_refresh_service, start_link, []},
-                            permanent, 5000, worker,
-                            [lasp_marathon_peer_refresh_service]},
+    Sprinter = {sprinter,
+                {sprinter, start_link, []},
+                 permanent, 5000, worker,
+                 [sprinter]},
 
     WebSpecs = web_specs(),
 
@@ -106,7 +106,7 @@ init(_Args) ->
                   Partisan,
                   DistributionBackend,
                   Plumtree,
-                  MarathonPeerRefresh,
+                  Sprinter,
                   Process] ++ WebSpecs,
 
     DagEnabled = application:get_env(?APP, dag_enabled, false),

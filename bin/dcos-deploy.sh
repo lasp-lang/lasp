@@ -39,6 +39,9 @@ echo ">>> Removing lasp-client from Marathon"
 curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client > /dev/null
 sleep 2
 
+echo ">>> Sleeping 30 seconds."
+sleep 30
+
 echo ">>> Configuring Lasp"
 cd /tmp
 

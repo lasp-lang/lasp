@@ -408,7 +408,10 @@ push_logs() ->
                         Lines
                     ),
 
-                    erlcloud_s3:put_object(BucketName, S3Id, list_to_binary(Logs));
+                    Filename = S3Id,
+                    lager:info("Filename for logs: ~p", [Filename]),
+
+                    erlcloud_s3:put_object(BucketName, Filename, list_to_binary(Logs));
                 "git" ->
                     %% push to git
                     Result = os:cmd("cd /opt/lasp && ./priv/evaluate-mesos-push.sh"),

@@ -47,7 +47,7 @@
 -define(NODES_INTERVAL, 20000).
 -define(NODES_MESSAGE,  nodes).
 
--define(BUILD_GRAPH_INTERVAL, 60000).
+-define(BUILD_GRAPH_INTERVAL, 120000).
 -define(BUILD_GRAPH_MESSAGE,  build_graph).
 
 -define(ARTIFACT_INTERVAL, 1000).

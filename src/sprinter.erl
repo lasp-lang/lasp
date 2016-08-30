@@ -47,7 +47,7 @@
 -define(NODES_INTERVAL, 20000).
 -define(NODES_MESSAGE,  nodes).
 
--define(BUILD_GRAPH_INTERVAL, 20000).
+-define(BUILD_GRAPH_INTERVAL, 60000).
 -define(BUILD_GRAPH_MESSAGE,  build_graph).
 
 -define(ARTIFACT_INTERVAL, 1000).
@@ -148,10 +148,6 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
-    %% Add random jitter.
-    Jitter = rand_compat:uniform(?REFRESH_INTERVAL),
-    timer:send_after(?REFRESH_INTERVAL + Jitter, ?REFRESH_MESSAGE),
-
     Tag = partisan_config:get(tag, client),
     PeerServiceManager = lasp_config:get(peer_service_manager,
                                          partisan_peer_service),
@@ -187,6 +183,10 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
 
     %% Attempt to connect nodes that are not connected.
     AttemptedNodes = maybe_connect(ToConnectNodes, SeenNodes),
+
+    %% Add random jitter.
+    Jitter = rand_compat:uniform(?REFRESH_INTERVAL),
+    timer:send_after(?REFRESH_INTERVAL + Jitter, ?REFRESH_MESSAGE),
 
     {noreply, State#state{attempted_nodes=AttemptedNodes}};
 handle_info(?NODES_MESSAGE, State) ->
@@ -287,9 +287,6 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
         false ->
             lager:info("Graph is not connected!: ~p", [Orphaned])
     end,
-
-    %% Connect to orphaned nodes.
-    %[connect(Orphan) || Orphan <- Orphaned],
 
     timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE),
     {noreply, State#state{graph=Graph}};

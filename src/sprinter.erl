@@ -188,8 +188,7 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
 
     {noreply, State#state{attempted_nodes=AttemptedNodes}};
 handle_info(?NODES_MESSAGE, State) ->
-    {ok, Nodes} = lasp_peer_service:members(),
-    _ = lager:info("Currently connected nodes via peer service: ~p", [Nodes]),
+    %% Do nothing right now.
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
     {noreply, State};
 handle_info(?ARTIFACT_MESSAGE, State) ->

@@ -366,13 +366,45 @@ start_slave(Name, NodeConfig, _Case) ->
 
 push_logs() ->
     DCOS = os:getenv("DCOS", "false"),
-    ShouldPush = list_to_atom(DCOS),
+    GIT = os:getenv("DCOS", "false"),
 
-    case ShouldPush of
-        false ->
+    case DCOS of
+        "false" ->
             ok;
         _ ->
             lager:info("Will push logs"),
-            Result = os:cmd("cd /opt/lasp && ./priv/evaluate-mesos-push.sh"),
-            lager:info("Logs pushed. Output ~p", [Result])
+            case GIT of
+                "false" ->
+                    %% push to s3 (assumes a bucket named logs)
+                    {FilePath, S3Id} = lasp_transmission_instrumentation:log_file(),
+                    Logs = read_file(FilePath),
+                    S3Host = "s3.amazonaws.com",
+                    BucketName = "logs",
+                    AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
+                    SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
+                    erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
+                    erlcloud_s3:put_object(BucketName, S3Id, Logs);
+                _ ->
+                    %% push to git
+                    Result = os:cmd("cd /opt/lasp && ./priv/evaluate-mesos-push.sh"),
+                    lager:info("Logs pushed. Output ~p", [Result])
+            end
+    end.
+
+%% @private
+read_file(FilePath) ->
+    {ok, FileDescriptor} = file:open(FilePath, [read]),
+    Logs = read_lines(FilePath, FileDescriptor),
+    Logs.
+
+%% @private
+read_lines(FilePath, FileDescriptor) ->
+    case io:get_line(FileDescriptor, '') of
+        eof ->
+            [];
+        {error, Error} ->
+            lager:warning("Error while reading line from file ~p. Error: ~p", [FilePath, Error]),
+            [];
+        Line ->
+            [Line | read_lines(FilePath, FileDescriptor)]
     end.

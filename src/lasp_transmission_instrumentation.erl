@@ -188,7 +188,7 @@ dir_path_filename_and_s3_id() ->
       ++ LocalOrDCOS ++ "/"
       ++ atom_to_list(EvalIdentifier),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
-    Filename = io_lib:format("~p.csv", [atom_to_list(node())]),
+    Filename = atom_to_list(node()) ++ ".csv",
 
     DirPath = log_dir() ++ "/"
         ++ Id ++ "/"

@@ -366,15 +366,15 @@ start_slave(Name, NodeConfig, _Case) ->
 
 push_logs() ->
     DCOS = os:getenv("DCOS", "false"),
-    GIT = os:getenv("DCOS", "false"),
+    LOGS = os:getenv("LOGS", "git"),
 
     case DCOS of
         "false" ->
             ok;
         _ ->
             lager:info("Will push logs"),
-            case GIT of
-                "false" ->
+            case LOGS of
+                "s3" ->
                     %% push to s3 (assumes a bucket named logs)
                     {FilePath, S3Id} = lasp_transmission_instrumentation:log_file(),
                     Logs = read_file(FilePath),
@@ -384,7 +384,7 @@ push_logs() ->
                     SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
                     erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
                     erlcloud_s3:put_object(BucketName, S3Id, Logs);
-                _ ->
+                "git" ->
                     %% push to git
                     Result = os:cmd("cd /opt/lasp && ./priv/evaluate-mesos-push.sh"),
                     lager:info("Logs pushed. Output ~p", [Result])

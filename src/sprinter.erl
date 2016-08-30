@@ -431,5 +431,5 @@ servers_from_marathon() ->
             generate_nodes(Servers);
         ServerError ->
             _ = lager:info("Invalid Marathon response: ~p", [ServerError]),
-            []
+            sets:new()
     end.

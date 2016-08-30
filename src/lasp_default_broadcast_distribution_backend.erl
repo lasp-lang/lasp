@@ -715,7 +715,7 @@ handle_call(Msg, _From, State) ->
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
 handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) ->
-    % lager:info("Exchange starting for ~p", [Peer]),
+    lager:info("Exchange starting for ~p", [Peer]),
 
     Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
                             delta_counter=Counter, delta_map=DeltaMap,
@@ -752,7 +752,9 @@ handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=St
                                Acc0
                        end
                end,
-    spawn_link(fun() -> do(fold, [Store, Function, []]) end),
+    %% TODO: Should this be parallel?
+    {ok, Result} = do(fold, [Store, Function, []]),
+    lager:info("Finished exchange peer: ~p; sent ~p objects", [Peer, length(Result)]),
 
     {noreply, State#state{gc_counter=increment_counter(GCCounter)}};
 
@@ -1151,13 +1153,13 @@ init_aae_sync(Peer, Store) ->
                             [{ok, {Id, Type, Metadata, Value}}|Acc0]
                     end
                end,
+    %% TODO: Should this be parallel?
     {ok, Result} = do(fold, [Store, Function, []]),
     lager:info("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]),
     ok.
 
 %% @private
 init_delta_sync(Peer) ->
-    % lager:info("Initializing delta synchronization with peer: ~p", [Peer]),
     gen_server:cast(?MODULE, {delta_exchange, Peer}).
 
 %% @private

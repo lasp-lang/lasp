@@ -168,16 +168,14 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
             %% always initiate connections with clients.
             clients_from_marathon();
         {client, partisan_hyparview_peer_service_manager} ->
-            %% If we're in HyParView, and we're a client, only ever
-            %% do nothing -- force all connection to go through the
-            %% server.
-            %sets:new();
-            servers_from_marathon();
-        {server, partisan_hyparview_peer_service_manager} ->
             %% If we're the server, and we're in HyParView, clients will
             %% ask the server to join the overlay and force outbound
             %% conenctions to the clients.
-            %clients_from_marathon()
+            servers_from_marathon();
+        {server, partisan_hyparview_peer_service_manager} ->
+            %% If we're in HyParView, and we're a client, only ever
+            %% do nothing -- force all connection to go through the
+            %% server.
             sets:new()
     end,
 

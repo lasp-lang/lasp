@@ -27,7 +27,8 @@
 -export([start_link/0,
          log/3,
          convergence/0,
-         stop/0]).
+         stop/0,
+         log_file/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -68,6 +69,11 @@ convergence() ->
 stop() ->
     gen_server:call(?MODULE, stop, infinity).
 
+-spec log_file() -> {string(), string()}.
+log_file() ->
+    {_DirPath, FilePath, S3Id} = dir_path_filename_and_s3_id(),
+    {FilePath, S3Id}.
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -75,7 +81,9 @@ stop() ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([]) ->
-    Filename = create_dir(),
+    {DirPath, Filename, _S3Id} = dir_path_filename_and_s3_id(),
+    filelib:ensure_dir(DirPath),
+
     Line = io_lib:format("Type,Seconds,MegaBytes\n", []),
     write_to_file(Filename, Line),
 
@@ -167,7 +175,7 @@ log_dir() ->
     eval_dir() ++ "/logs".
 
 %% @private
-create_dir() ->
+dir_path_filename_and_s3_id() ->
     Simulation = lasp_config:get(simulation, undefined),
     LocalOrDCOS = case os:getenv("DCOS", "false") of
         "false" ->
@@ -181,11 +189,15 @@ create_dir() ->
       ++ atom_to_list(EvalIdentifier),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     Filename = io_lib:format("~s.csv", [node()]),
-    Path = log_dir() ++ "/"
+
+    DirPath = log_dir() ++ "/"
         ++ Id ++ "/"
         ++ integer_to_list(EvalTimestamp) ++ "/",
-    filelib:ensure_dir(Path),
-    Path ++ Filename.
+    FilePath = DirPath ++ Filename,
+    S3Id = Id ++ "/"
+              ++ integer_to_list(EvalTimestamp) ++ "/"
+              ++ Filename,
+    {DirPath, FilePath, S3Id}.
 
 %% @private
 megasize(Size) ->

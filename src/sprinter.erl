@@ -206,7 +206,12 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
     %% Store membership.
     Node = prefix(atom_to_list(node())),
     Membership = term_to_binary(Nodes),
-    erlcloud_s3:put_object(BucketName, Node, Membership),
+    try
+        erlcloud_s3:put_object(BucketName, Node, Membership)
+    catch
+        _:{aws_error, Error} ->
+            lager:info("Could not upload artifact: ~p", [Error])
+    end,
 
     % _ = lager:info("Uploading complete!"),
 

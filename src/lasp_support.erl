@@ -376,6 +376,8 @@ push_logs() ->
             case LOGS of
                 "s3" ->
                     %% push to s3 (assumes a bucket named logs)
+                    %% @todo this won't push the "overcounting" file
+                    %% created by the ad counter server
                     {FilePath, S3Id} = lasp_transmission_instrumentation:log_file(),
                     Logs = read_file(FilePath),
                     S3Host = "s3.amazonaws.com",

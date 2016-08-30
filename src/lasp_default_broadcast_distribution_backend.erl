@@ -1140,7 +1140,7 @@ extract_type_and_payload({Type, _From, Payload, _Count}) ->
 
 %% @private
 init_aae_sync(Peer, Store) ->
-    % lager:info("Initializing AAE synchronization with peer: ~p", [Peer]),
+    lager:info("Initializing AAE synchronization with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
@@ -1151,8 +1151,8 @@ init_aae_sync(Peer, Store) ->
                             [{ok, {Id, Type, Metadata, Value}}|Acc0]
                     end
                end,
-    {ok, _Result} = do(fold, [Store, Function, []]),
-    % lager:info("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]).
+    {ok, Result} = do(fold, [Store, Function, []]),
+    lager:info("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]),
     ok.
 
 %% @private

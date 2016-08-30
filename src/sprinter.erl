@@ -252,9 +252,8 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
                                    end
                            end
                        catch
-                           _:{aws_error, _} ->
-                               lager:info("Could not process information for node; ~p",
-                                          [Node]),
+                           _:{aws_error, Error} ->
+                               lager:info("Could not get graph object; ~p", [Error]),
                                OrphanedNodes
                        end
                end,

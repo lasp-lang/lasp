@@ -284,7 +284,14 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
         true ->
             lager:info("Graph is connected!");
         false ->
-            lager:info("Graph is not connected!: ~p", [Orphaned])
+            lager:info("Graph is not connected!")
+    end,
+
+    case length(Orphaned) of
+        0 ->
+            ok;
+        Length ->
+            lager:info("~p isolated nodes: ~p", [Length, Orphaned])
     end,
 
     timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE),

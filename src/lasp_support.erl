@@ -378,14 +378,37 @@ push_logs() ->
                     %% push to s3 (assumes a bucket named logs)
                     %% @todo this won't push the "overcounting" file
                     %% created by the ad counter server
-                    {FilePath, S3Id} = lasp_transmission_instrumentation:log_file(),
-                    Logs = read_file(FilePath),
+
+                    %% Configure erlcloud.
                     S3Host = "s3.amazonaws.com",
-                    BucketName = "logs",
                     AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
                     SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
                     erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
-                    erlcloud_s3:put_object(BucketName, S3Id, Logs);
+
+                    BucketName = "logs",
+                    %% Create S3 bucket.
+                    try
+                        lager:info("Creating bucket: ~p", [BucketName]),
+                        ok = erlcloud_s3:create_bucket(BucketName)
+                    catch
+                        _:{aws_error, Error} ->
+                        lager:info("Bucket creation failed: ~p", [Error]),
+                        ok
+                    end,
+
+                    %% Store logs on S3.
+                    {FilePath, S3Id} = lasp_transmission_instrumentation:log_file(),
+                    Lines = read_file(FilePath),
+                    
+                    Logs = lists:foldl(
+                        fun(Line, Acc) ->
+                            Acc++ Line ++ "\n"
+                        end,
+                        "",
+                        Lines
+                    ),
+
+                    erlcloud_s3:put_object(BucketName, S3Id, list_to_binary(Logs));
                 "git" ->
                     %% push to git
                     Result = os:cmd("cd /opt/lasp && ./priv/evaluate-mesos-push.sh"),
@@ -396,8 +419,8 @@ push_logs() ->
 %% @private
 read_file(FilePath) ->
     {ok, FileDescriptor} = file:open(FilePath, [read]),
-    Logs = read_lines(FilePath, FileDescriptor),
-    Logs.
+    Lines = read_lines(FilePath, FileDescriptor),
+    Lines.
 
 %% @private
 read_lines(FilePath, FileDescriptor) ->

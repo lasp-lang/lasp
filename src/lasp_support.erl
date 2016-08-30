@@ -402,7 +402,7 @@ push_logs() ->
                     
                     Logs = lists:foldl(
                         fun(Line, Acc) ->
-                            Acc ++ Line ++ "\n"
+                            Acc ++ Line
                         end,
                         "",
                         Lines

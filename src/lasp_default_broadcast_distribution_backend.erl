@@ -827,7 +827,8 @@ handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
     %% Remove ourself and compute exchange peers.
     Peers = compute_exchange(Members -- [node()]),
 
-    lager:info("Beginning sync for peers: ~p", [Peers]),
+    % lager:info("Beginning sync for peers: ~p", [Peers]),
+
     case length(Peers) of
         0 ->
             ok;

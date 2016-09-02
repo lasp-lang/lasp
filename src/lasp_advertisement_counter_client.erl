@@ -149,7 +149,7 @@ handle_info(view, #state{actor=Actor,
     %% - If there are no ads (`sets:size(Ads) == 0') 
     %%   it might mean the experiment hasn't started or it has started
     %%   and all ads are disabled.
-    %%   If `not lasp_type:is_bottom(AdsValue)' then the experiment
+    %%   If `not lasp_type:is_bottom(AdsType, AdsValue)' then the experiment
     %%   has started. With both, it means the experiement has ended
     %% - Else, keep doing impressions
     case sets:size(Ads) == 0 andalso not lasp_type:is_bottom(AdsType, AdsValue) of

@@ -157,7 +157,7 @@ handle_info(view, #state{actor=Actor,
             lager:info("All ads are disabled. Node: ~p", [node()]),
 
             %% Update Simulation Status Instance
-            lasp:update(?SIM_STATUS_ID, {Actor, {fst, true}}, Actor),
+            lasp:update(?SIM_STATUS_ID, {apply, Actor, {fst, true}}, Actor),
             log_convergence(),
             schedule_check_simulation_end();
         false ->
@@ -184,7 +184,7 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
             lager:info("All nodes observed ads disabled. Node ~p", [node()]),
             lasp_transmission_instrumentation:stop(),
             lasp_support:push_logs(),
-            lasp:update(?SIM_STATUS_ID, {Actor, {snd, true}}, Actor);
+            lasp:update(?SIM_STATUS_ID, {apply, Actor, {snd, true}}, Actor);
         false ->
             schedule_check_simulation_end()
     end,

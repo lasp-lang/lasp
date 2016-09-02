@@ -146,7 +146,7 @@ handle_info(view, #state{actor=Actor,
     {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
     {ok, AdsValue} = lasp:read(?ADS_WITH_CONTRACTS),
 
-    %% - If there no ads (`sets:size(Ads) == 0') 
+    %% - If there are no ads (`sets:size(Ads) == 0') 
     %%   it might mean the experiment hasn't started or it has started
     %%   and all ads are disabled.
     %%   If `not lasp_type:is_bottom(AdsValue)' then the experiment

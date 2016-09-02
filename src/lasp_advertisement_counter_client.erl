@@ -144,7 +144,7 @@ handle_info(view, #state{actor=Actor,
     end,
 
     {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
-    {ok, AdsValue} = lasp:read(?ADS_WITH_CONTRACTS),
+    {ok, AdsValue} = lasp:read(?ADS_WITH_CONTRACTS, undefined),
 
     %% - If there are no ads (`sets:size(Ads) == 0') 
     %%   it might mean the experiment hasn't started or it has started

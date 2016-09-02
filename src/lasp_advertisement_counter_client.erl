@@ -106,10 +106,10 @@ handle_info(view, #state{actor=Actor,
                          impressions=Impressions0,
                          triggers=Triggers0}=State) ->
     %% Get current value of the list of advertisements.
-    {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
+    {ok, Ads0} = lasp:query(?ADS_WITH_CONTRACTS),
 
     %% Make sure we have ads...
-    {Impressions1, Triggers1} = case sets:size(Ads) of
+    {Impressions1, Triggers1} = case sets:size(Ads0) of
         0 ->
             %% Do nothing.
             {Impressions0, Triggers0};
@@ -118,7 +118,7 @@ handle_info(view, #state{actor=Actor,
             Random = lasp_support:puniform(Size),
 
             {#ad{counter=Counter} = Ad, _Contract} =
-                lists:nth(Random, sets:to_list(Ads)),
+                lists:nth(Random, sets:to_list(Ads0)),
 
             %% Spawn a process to disable the advertisement if it goes
             %% above the maximum number of impressions.
@@ -143,13 +143,16 @@ handle_info(view, #state{actor=Actor,
             {Impressions0 + 1, Triggers}
     end,
 
-    %% - If I did nothing (`Impressions0 == Impressions1`),
-    %% and the `Impressions1 > 0` (meaning I did something before)
-    %% then all ads are disabled and simulation has ended
-    %%      (If we don't check for `Impressions1 > 0` it might mean that
-    %%      the experiment hasn't started yet)
+    {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
+    {ok, AdsValue} = lasp:read(?ADS_WITH_CONTRACTS),
+
+    %% - If there no ads (`sets:size(Ads) == 0') 
+    %%   it might mean the experiment hasn't started or it has started
+    %%   and all ads are disabled.
+    %%   If `not lasp_type:is_bottom(AdsValue)' then the experiment
+    %%   has started. With both, it means the experiement has ended
     %% - Else, keep doing impressions
-    case Impressions0 == Impressions1 andalso Impressions1 > 0 of
+    case sets:size(Ads) == 0 andalso not lasp_type:is_bottom(AdsValue) of
         true ->
             lager:info("All ads are disabled. Node: ~p", [node()]),
 

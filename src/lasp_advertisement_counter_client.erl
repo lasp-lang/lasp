@@ -144,7 +144,7 @@ handle_info(view, #state{actor=Actor,
     end,
 
     {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
-    {ok, AdsValue} = lasp:read(?ADS_WITH_CONTRACTS, undefined),
+    {ok, {_AdsId, AdsType, _AdsMetadata, AdsValue}} = lasp:read(?ADS_WITH_CONTRACTS, undefined),
 
     %% - If there are no ads (`sets:size(Ads) == 0') 
     %%   it might mean the experiment hasn't started or it has started
@@ -152,7 +152,7 @@ handle_info(view, #state{actor=Actor,
     %%   If `not lasp_type:is_bottom(AdsValue)' then the experiment
     %%   has started. With both, it means the experiement has ended
     %% - Else, keep doing impressions
-    case sets:size(Ads) == 0 andalso not lasp_type:is_bottom(AdsValue) of
+    case sets:size(Ads) == 0 andalso not lasp_type:is_bottom(AdsType, AdsValue) of
         true ->
             lager:info("All ads are disabled. Node: ~p", [node()]),
 

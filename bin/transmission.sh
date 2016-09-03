@@ -32,19 +32,21 @@ LOGS="s3"
 declare -A EVALUATIONS
 
 ## client_server_state_based_with_aae_test
-EVALUATIONS["client_server_state_based_with_aae"]="partisan_client_server_peer_service_manager state_based false"
+## EVALUATIONS["client_server_state_based_with_aae"]="partisan_client_server_peer_service_manager state_based false"
 
 ## client_server_delta_based_with_aae_test
-EVALUATIONS["client_server_delta_based_with_aae"]="partisan_client_server_peer_service_manager delta_based false"
+## EVALUATIONS["client_server_delta_based_with_aae"]="partisan_client_server_peer_service_manager delta_based false"
 
 ## peer_to_peer_state_based_with_aae_test
+## Passed 5 times.
 EVALUATIONS["peer_to_peer_state_based_with_aae"]="partisan_hyparview_peer_service_manager state_based false"
 
 ## peer_to_peer_state_based_with_aae_and_tree_test
-EVALUATIONS["peer_to_peer_state_based_with_aae_and_tree"]="partisan_hyparview_peer_service_manager state_based true"
+## EVALUATIONS["peer_to_peer_state_based_with_aae_and_tree"]="partisan_hyparview_peer_service_manager state_based true"
 
 ## peer_to_peer_delta_based_with_aae_test
-EVALUATIONS["peer_to_peer_delta_based_with_aae"]="partisan_hyparview_peer_service_manager delta_based false"
+## Passed 5 times; failed once because 3 nodes were partitioned.
+## EVALUATIONS["peer_to_peer_delta_based_with_aae"]="partisan_hyparview_peer_service_manager delta_based false"
 
 for i in $(seq 1 $EVAL_NUMBER)
 do

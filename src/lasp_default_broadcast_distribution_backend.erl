@@ -715,7 +715,7 @@ handle_call(Msg, _From, State) ->
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
 handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) ->
-    lager:info("Exchange starting for ~p", [Peer]),
+    % lager:info("Exchange starting for ~p", [Peer]),
 
     Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
                             delta_counter=Counter, delta_map=DeltaMap,
@@ -753,8 +753,8 @@ handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=St
                        end
                end,
     %% TODO: Should this be parallel?
-    {ok, Result} = do(fold, [Store, Function, []]),
-    lager:info("Finished exchange peer: ~p; sent ~p objects", [Peer, length(Result)]),
+    {ok, _Result} = do(fold, [Store, Function, []]),
+    % lager:info("Finished exchange peer: ~p; sent ~p objects", [Peer, length(Result)]),
 
     {noreply, State#state{gc_counter=increment_counter(GCCounter)}};
 
@@ -1142,7 +1142,7 @@ extract_type_and_payload({Type, _From, Payload, _Count}) ->
 
 %% @private
 init_aae_sync(Peer, Store) ->
-    lager:info("Initializing AAE synchronization with peer: ~p", [Peer]),
+    % lager:info("Initializing AAE synchronization with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
@@ -1154,8 +1154,8 @@ init_aae_sync(Peer, Store) ->
                     end
                end,
     %% TODO: Should this be parallel?
-    {ok, Result} = do(fold, [Store, Function, []]),
-    lager:info("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]),
+    {ok, _Result} = do(fold, [Store, Function, []]),
+    % lager:info("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]),
     ok.
 
 %% @private

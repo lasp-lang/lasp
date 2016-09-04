@@ -8,9 +8,11 @@ RUN cd /tmp && \
     wget http://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb && \
     dpkg -i erlang-solutions_1.0_all.deb && \
     apt-get update && \
-    apt-get -y install erlang
-
-CMD cd /opt && \
+    apt-get -y install erlang && \
+    cd /opt && \
     git clone https://github.com/lasp-lang/lasp.git -b partition_fix && \
     cd lasp && \
+    make stage
+
+CMD cd /opt/lasp && \
     make crdt-tutorial

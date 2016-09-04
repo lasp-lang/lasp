@@ -10,7 +10,7 @@ RUN cd /tmp && \
     apt-get update && \
     apt-get -y install erlang && \
     cd /opt && \
-    git clone https://github.com/lasp-lang/lasp.git -b partition_fix && \
+    git clone https://github.com/lasp-lang/lasp.git -b unstable && \
     cd lasp && \
     make stage
 

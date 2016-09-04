@@ -192,8 +192,6 @@ handle_info(?NODES_MESSAGE, State) ->
     timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
     {noreply, State};
 handle_info(?ARTIFACT_MESSAGE, State) ->
-    % _ = lager:info("Uploading artifact!"),
-
     %% Get bucket name.
     BucketName = bucket_name(),
 
@@ -209,8 +207,6 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
         _:{aws_error, Error} ->
             lager:info("Could not upload artifact: ~p", [Error])
     end,
-
-    % _ = lager:info("Uploading complete!"),
 
     timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
     {noreply, State};
@@ -386,23 +382,18 @@ get_request(Url, DecodeFun) ->
 %% @private
 populate_graph(Name, Membership, Graph) ->
     %% Add node to graph.
-    % lager:info("Adding vertex ~p", [Name]),
     digraph:add_vertex(Graph, Name),
 
     lists:foldl(fun(N, _) ->
                         %% Add node to graph.
-                        % lager:info("Adding vertex ~p", [N]),
                         digraph:add_vertex(Graph, N),
 
                         %% Add edge to graph.
-                        % lager:info("Adding edge from ~p to ~p", [Name, N]),
                         digraph:add_edge(Graph, Name, N)
                 end, Graph, Membership).
 
 %% @private
 prefix(File) ->
-    % Simulation = lasp_config:get(simulation, undefined),
-    % EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     integer_to_list(EvalTimestamp) ++ "/" ++ File.
 

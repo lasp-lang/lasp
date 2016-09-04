@@ -234,16 +234,13 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
                            Body = proplists:get_value(content, Result, undefined),
                            case Body of
                                undefined ->
-                                   lager:info("No membership information for ~p", [Node]),
                                    OrphanedNodes;
                                _ ->
                                    Membership = binary_to_term(Body),
                                    case Membership of
                                        [N] ->
-                                           lager:info("Node ~p only contains itself, attempting repair with server join!", [N]),
                                            [Peer|OrphanedNodes];
                                        _ ->
-                                           % lager:info("Membership information for node ~p is ~p", [N, Membership]),
                                            populate_graph(N, Membership, Graph),
                                            OrphanedNodes
                                    end

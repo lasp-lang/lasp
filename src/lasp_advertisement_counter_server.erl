@@ -247,7 +247,6 @@ trigger(#ad{counter=CounterId} = Ad, Actor) ->
     {ok, _Value} = lasp:read(CounterId, {value, MaxImpressions}),
 
     lager:info("Threshold for ~p reached; disabling!", [Ad]),
-    % lager:info("Counter: ~p", [Value]),
 
     %% Remove the advertisement.
     {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor),

@@ -114,10 +114,8 @@ handle_call(convergence, _From, #state{filename=Filename}=State) ->
     record_convergence(Filename),
     {reply, ok, State};
 
-handle_call(stop, _From, #state{size_per_type=Map,
-                                filename=Filename, tref=TRef}=State) ->
+handle_call(stop, _From, #state{tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
-    record(Map, Filename),
     _ = lager:info("Instrumentation timer disabled!"),
     {reply, ok, State#state{tref=undefined}};
 

@@ -67,7 +67,7 @@ cat <<EOF > lasp-server.json
   "container": {
     "type": "DOCKER",
     "docker": {
-      "image": "cmeiklejohn/lasp-dev",
+      "image": "cmeiklejohn/lasp-dcos",
       "network": "HOST",
       "forcePullImage": true,
       "parameters": [
@@ -134,7 +134,7 @@ cat <<EOF > lasp-client.json
   "container": {
     "type": "DOCKER",
     "docker": {
-      "image": "cmeiklejohn/lasp-dev",
+      "image": "cmeiklejohn/lasp-dcos",
       "network": "HOST",
       "forcePullImage": true,
       "parameters": [

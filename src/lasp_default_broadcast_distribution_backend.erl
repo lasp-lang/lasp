@@ -765,6 +765,13 @@ handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
                                {Id, Type, _Metadata, Value},
                                ?CLOCK_INCR(Actor),
                                ?CLOCK_INIT(Actor)}),
+    case lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager andalso
+         partisan_config:get(tag, undefined) == server of
+        true ->
+            init_aae_sync(From, Store);
+        _ ->
+            ok
+    end,
     {noreply, State};
 
 handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
@@ -1099,22 +1106,34 @@ schedule_delta_synchronization() ->
 
 %% @private
 schedule_aae_synchronization() ->
-    case lasp_config:get(mode, state_based) of
+    ShouldAAESync = case lasp_config:get(mode, state_based) of
         delta_based ->
-            ok;
+            false;
         state_based ->
             case lasp_config:get(tutorial, false) of
                 true ->
-                    ok;
+                    false;
                 false ->
                     case lasp_config:get(broadcast, false) of
                         false ->
-                            Interval = lasp_config:get(aae_interval, 10000),
-                            erlang:send_after(Interval, self(), aae_sync);
+                            case lasp_config:get(peer_service_manager, partisan_peer_service) of
+                                partisan_client_server_peer_service_manager ->
+                                    partisan_config:get(tag, client) == client;
+                                _ ->
+                                    true
+                            end;
                         true ->
-                            ok
+                            false
                     end
             end
+    end,
+
+    case ShouldAAESync of
+        true ->
+            Interval = lasp_config:get(aae_interval, 10000),
+            erlang:send_after(Interval, self(), aae_sync);
+        false ->
+            ok
     end.
 
 %% @private
@@ -1186,14 +1205,15 @@ compute_exchange(Peers) ->
 
     Probability = lasp_config:get(partition_probability, 0),
     lager:info("Probability of partition: ~p", [Probability]),
-    case lasp_support:puniform(100) =< Probability of
+    Percent = lasp_support:puniform(100),
+
+    case Percent =< Probability of
         true ->
             case PeerServiceManager of
                 partisan_client_server_peer_service_manager ->
                     lager:info("Partitioning from server."),
                     [];
                 _ ->
-                    Percent = lasp_support:puniform(100),
                     lager:info("Partitioning ~p% of the network.",
                                [Percent]),
 

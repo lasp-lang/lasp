@@ -170,6 +170,11 @@ web_specs() ->
 
 %% @private
 configure_defaults() ->
+    AAEFanoutDefault = list_to_atom(os:getenv("AAE_FANOUT", "10")),
+    AAEFanout = application:get_env(?APP, aae_fanout, AAEFanoutDefault),
+    lager:info("Setting aae fanout: ~p", [AAEFanout]),
+    lasp_config:set(aae_fanout, AAEFanout),
+
     TutorialDefault = list_to_atom(os:getenv("TUTORIAL", "false")),
     Tutorial = application:get_env(?APP, tutorial, TutorialDefault),
     lager:info("Setting tutorial: ~p", [Tutorial]),

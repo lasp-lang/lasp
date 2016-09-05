@@ -22,6 +22,7 @@
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -export([connect/0,
+         sync/0,
          mutate/3,
          query/2]).
 
@@ -83,3 +84,7 @@ identifier(Id, Type) ->
     Identifier = {BinaryId, Type},
 
     Identifier.
+
+sync() ->
+    Pid = whereis(lasp_default_broadcast_distribution_backend),
+    Pid ! aae_sync.

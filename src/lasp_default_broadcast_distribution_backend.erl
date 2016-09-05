@@ -809,7 +809,9 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
-    lists:foreach(fun(Peer) -> init_aae_sync(Peer, Store) end, Peers),
+    Fanout = lasp_config:get(aae_fanout, 10),
+    PeersFanout = lists:sublist(shuffle(Peers), Fanout),
+    lists:foreach(fun(Peer) -> init_aae_sync(Peer, Store) end, PeersFanout),
 
     %% Schedule next synchronization.
     schedule_aae_synchronization(),

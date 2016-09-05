@@ -131,4 +131,7 @@ logs:
 
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 
+crdt-tutorial: stage
+	tmux -f tmux.conf kill-server; tmux -f tmux.conf start-server; tmux -f tmux.conf attach -d -t lasp
+
 include tools.mk

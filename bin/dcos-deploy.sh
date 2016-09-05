@@ -17,6 +17,7 @@ ENV_VARS=(
   AAE_INTERVAL
   DELTA_INTERVAL
   INSTRUMENTATION
+  LOGS
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
 )
@@ -31,11 +32,25 @@ done
 
 echo ">>> Beginning deployment!"
 
+echo ">>> Removing lasp-server from Marathon"
+curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-server > /dev/null
+sleep 2
+
+echo ">>> Removing lasp-client from Marathon"
+curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client > /dev/null
+sleep 2
+
+echo ">>> Sleeping 120 seconds in an attempt to wait for Mesos to kill all tasks."
+sleep 120
+
 echo ">>> Configuring Lasp"
 cd /tmp
 
 # Memory of each VM.
-MEMORY=500.0
+MEMORY=1536.0
+
+# CPU of each VM.
+CPU=0.5
 
 cat <<EOF > lasp-server.json
 {
@@ -45,13 +60,13 @@ cat <<EOF > lasp-server.json
   "id": "lasp-server",
   "dependencies": [],
   "constraints": [["hostname", "UNIQUE", ""]],
-  "cpus": 1.0,
+  "cpus": $CPU,
   "mem": $MEMORY,
   "instances": 1,
   "container": {
     "type": "DOCKER",
     "docker": {
-      "image": "cmeiklejohn/lasp-dcos",
+      "image": "cmeiklejohn/lasp-hyparview-dcos",
       "network": "HOST",
       "forcePullImage": true,
       "parameters": [
@@ -77,6 +92,7 @@ cat <<EOF > lasp-server.json
     "AAE_INTERVAL": "$AAE_INTERVAL",
     "DELTA_INTERVAL": "$DELTA_INTERVAL",
     "INSTRUMENTATION": "$INSTRUMENTATION",
+    "LOGS": "$LOGS",
     "AWS_ACCESS_KEY_ID": "$AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY"
   },
@@ -99,10 +115,6 @@ cat <<EOF > lasp-server.json
 }
 EOF
 
-echo ">>> Removing lasp-server from Marathon"
-curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-server > /dev/null
-sleep 2
-
 echo ">>> Adding lasp-server to Marathon"
 curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-server.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
 sleep 10
@@ -114,13 +126,13 @@ cat <<EOF > lasp-client.json
   ],
   "id": "lasp-client",
   "dependencies": [],
-  "cpus": 1.0,
+  "cpus": $CPU,
   "mem": $MEMORY,
   "instances": $CLIENT_NUMBER,
   "container": {
     "type": "DOCKER",
     "docker": {
-      "image": "cmeiklejohn/lasp-dcos",
+      "image": "cmeiklejohn/lasp-hyparview-dcos",
       "network": "HOST",
       "forcePullImage": true,
       "parameters": [
@@ -146,6 +158,7 @@ cat <<EOF > lasp-client.json
     "AAE_INTERVAL": "$AAE_INTERVAL",
     "DELTA_INTERVAL": "$DELTA_INTERVAL",
     "INSTRUMENTATION": "$INSTRUMENTATION",
+    "LOGS": "$LOGS",
     "AWS_ACCESS_KEY_ID": "$AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY"
   },
@@ -163,10 +176,6 @@ cat <<EOF > lasp-client.json
   ]
 }
 EOF
-
-echo ">>> Removing lasp-client from Marathon"
-curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client > /dev/null
-sleep 2
 
 echo ">>> Adding lasp-client to Marathon"
 curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-client.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null

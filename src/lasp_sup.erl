@@ -95,10 +95,10 @@ init(_Args) ->
                 {plumtree_sup, start_link, []},
                  permanent, infinity, supervisor, [plumtree_sup]},
 
-    MarathonPeerRefresh = {lasp_marathon_peer_refresh_service,
-                           {lasp_marathon_peer_refresh_service, start_link, []},
-                            permanent, 5000, worker,
-                            [lasp_marathon_peer_refresh_service]},
+    Sprinter = {sprinter,
+                {sprinter, start_link, []},
+                 permanent, 5000, worker,
+                 [sprinter]},
 
     WebSpecs = web_specs(),
 
@@ -106,7 +106,7 @@ init(_Args) ->
                   Partisan,
                   DistributionBackend,
                   Plumtree,
-                  MarathonPeerRefresh,
+                  Sprinter,
                   Process] ++ WebSpecs,
 
     DagEnabled = application:get_env(?APP, dag_enabled, false),
@@ -170,6 +170,11 @@ web_specs() ->
 
 %% @private
 configure_defaults() ->
+    TutorialDefault = list_to_atom(os:getenv("MODE", "tutorial")),
+    Tutorial = application:get_env(?APP, tutorial, TutorialDefault),
+    lager:info("Setting tutorial: ~p", [Tutorial]),
+    lasp_config:set(tutorial, Tutorial),
+
     ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),
     Mode = application:get_env(?APP, mode, ModeDefault),
     lager:info("Setting operation mode: ~p", [Mode]),
@@ -318,9 +323,6 @@ advertisement_counter_child_specs() ->
 
             %% Configure proper partisan tag.
             partisan_config:set(tag, client),
-
-            %% Configure reserved slots.
-            %% partisan_config:set(reservations, [server]),
 
             [AdCounterClient];
         false ->

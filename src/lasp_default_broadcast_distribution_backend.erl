@@ -715,7 +715,7 @@ handle_call(Msg, _From, State) ->
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
 handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) ->
-    % lager:info("Exchange starting for ~p", [Peer]),
+    lasp_logger:extended("Exchange starting for ~p", [Peer]),
 
     Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
                             delta_counter=Counter, delta_map=DeltaMap,
@@ -752,7 +752,9 @@ handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=St
                                Acc0
                        end
                end,
-    spawn_link(fun() -> do(fold, [Store, Function, []]) end),
+    %% TODO: Should this be parallel?
+    {ok, Result} = do(fold, [Store, Function, []]),
+    lasp_logger:extended("Finished exchange peer: ~p; sent ~p objects", [Peer, length(Result)]),
 
     {noreply, State#state{gc_counter=increment_counter(GCCounter)}};
 
@@ -796,7 +798,7 @@ handle_info(memory_report, State) ->
     {noreply, State};
 
 handle_info(aae_sync, #state{store=Store} = State) ->
-    % lager:info("Beginning AAE synchronization."),
+    lasp_logger:extended("Beginning AAE synchronization."),
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
@@ -804,7 +806,7 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     %% Remove ourself.
     Peers = Members -- [node()],
 
-    % lager:info("Beginning sync for peers: ~p", [Peers]),
+    lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
     lists:foreach(fun(Peer) -> init_aae_sync(Peer, Store) end, Peers),
@@ -814,7 +816,7 @@ handle_info(aae_sync, #state{store=Store} = State) ->
 
     {noreply, State};
 handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
-    % lager:info("Beginning delta synchronization."),
+    lasp_logger:extended("Beginning delta synchronization."),
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
@@ -827,7 +829,8 @@ handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
     %% Remove ourself and compute exchange peers.
     Peers = compute_exchange(Members -- [node()]),
 
-    lager:info("Beginning sync for peers: ~p", [Peers]),
+    lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
+
     case length(Peers) of
         0 ->
             ok;
@@ -1100,12 +1103,17 @@ schedule_aae_synchronization() ->
         delta_based ->
             ok;
         state_based ->
-            case lasp_config:get(broadcast, false) of
-                false ->
-                    Interval = lasp_config:get(aae_interval, 10000),
-                    erlang:send_after(Interval, self(), aae_sync);
+            case lasp_config:get(tutorial, false) of
                 true ->
-                    ok
+                    ok;
+                false ->
+                    case lasp_config:get(broadcast, false) of
+                        false ->
+                            Interval = lasp_config:get(aae_interval, 10000),
+                            erlang:send_after(Interval, self(), aae_sync);
+                        true ->
+                            ok
+                    end
             end
     end.
 
@@ -1139,7 +1147,7 @@ extract_type_and_payload({Type, _From, Payload, _Count}) ->
 
 %% @private
 init_aae_sync(Peer, Store) ->
-    % lager:info("Initializing AAE synchronization with peer: ~p", [Peer]),
+    lasp_logger:extended("Initializing AAE synchronization with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
@@ -1150,13 +1158,13 @@ init_aae_sync(Peer, Store) ->
                             [{ok, {Id, Type, Metadata, Value}}|Acc0]
                     end
                end,
-    {ok, _Result} = do(fold, [Store, Function, []]),
-    % lager:info("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]).
+    %% TODO: Should this be parallel?
+    {ok, Result} = do(fold, [Store, Function, []]),
+    lasp_logger:extended("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]),
     ok.
 
 %% @private
 init_delta_sync(Peer) ->
-    % lager:info("Initializing delta synchronization with peer: ~p", [Peer]),
     gen_server:cast(?MODULE, {delta_exchange, Peer}).
 
 %% @private

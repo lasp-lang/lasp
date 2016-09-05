@@ -64,14 +64,18 @@ get_type(T) ->
     get_type(T, get_mode()).
 
 get_type(T, Mode) ->
-    {ok, {StateType, PureOpType}} = orddict:find(T, types()),
-    case Mode of
-        delta_based ->
-            StateType;
-        state_based ->
-            StateType;
-        pure_op_based ->
-            PureOpType
+    case orddict:find(T, types()) of
+        {ok, {StateType, PureOpType}} ->
+            case Mode of
+                delta_based ->
+                    StateType;
+                state_based ->
+                    StateType;
+                pure_op_based ->
+                    PureOpType
+            end;
+        error ->
+            T
     end.
 
 remove_args({T, _Args}) ->

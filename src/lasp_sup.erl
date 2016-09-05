@@ -170,7 +170,7 @@ web_specs() ->
 
 %% @private
 configure_defaults() ->
-    TutorialDefault = list_to_atom(os:getenv("MODE", "tutorial")),
+    TutorialDefault = list_to_atom(os:getenv("TUTORIAL", "false")),
     Tutorial = application:get_env(?APP, tutorial, TutorialDefault),
     lager:info("Setting tutorial: ~p", [Tutorial]),
     lasp_config:set(tutorial, Tutorial),

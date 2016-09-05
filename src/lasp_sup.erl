@@ -170,6 +170,11 @@ web_specs() ->
 
 %% @private
 configure_defaults() ->
+    TutorialDefault = list_to_atom(os:getenv("MODE", "tutorial")),
+    Tutorial = application:get_env(?APP, tutorial, TutorialDefault),
+    lager:info("Setting tutorial: ~p", [Tutorial]),
+    lasp_config:set(tutorial, Tutorial),
+
     ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),
     Mode = application:get_env(?APP, mode, ModeDefault),
     lager:info("Setting operation mode: ~p", [Mode]),

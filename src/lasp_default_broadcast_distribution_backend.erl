@@ -760,6 +760,8 @@ handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=St
 
 handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
             #state{store=Store, actor=Actor}=State) ->
+    lasp_logger:extended("Receive aae_send from ~p", [From]),
+
     ?CORE:receive_value(Store, {aae_send,
                                 From,
                                {Id, Type, _Metadata, Value},
@@ -769,6 +771,8 @@ handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
 
 handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
             #state{store=Store, actor=Actor}=State) ->
+    lasp_logger:extended("Receive delta_send from ~p", [From]),
+
     ?CORE:receive_delta(Store, {delta_send,
                                 From,
                                {Id, Type, _Metadata, Deltas},
@@ -778,6 +782,8 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
     {noreply, State};
 
 handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
+    lasp_logger:extended("Receive delta_ack from ~p", [From]),
+
     ?CORE:receive_delta(Store, {delta_ack, Id, From, Counter}),
     {noreply, State};
 

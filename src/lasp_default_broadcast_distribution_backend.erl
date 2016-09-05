@@ -1103,12 +1103,17 @@ schedule_aae_synchronization() ->
         delta_based ->
             ok;
         state_based ->
-            case lasp_config:get(broadcast, false) of
-                false ->
-                    Interval = lasp_config:get(aae_interval, 10000),
-                    erlang:send_after(Interval, self(), aae_sync);
+            case lasp_config:get(tutorial, false) of
                 true ->
-                    ok
+                    ok;
+                false ->
+                    case lasp_config:get(broadcast, false) of
+                        false ->
+                            Interval = lasp_config:get(aae_interval, 10000),
+                            erlang:send_after(Interval, self(), aae_sync);
+                        true ->
+                            ok
+                    end
             end
     end.
 

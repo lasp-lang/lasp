@@ -175,6 +175,11 @@ configure_defaults() ->
     lager:info("Setting tutorial: ~p", [Tutorial]),
     lasp_config:set(tutorial, Tutorial),
 
+    ExtendedLoggingDefault = list_to_atom(os:getenv("EXTENDED_LOGGING", "false")),
+    ExtendedLogging = application:get_env(?APP, extended_logging, ExtendedLoggingDefault),
+    lager:info("Setting extended logging: ~p", [ExtendedLogging]),
+    lasp_config:set(extended_logging, ExtendedLogging),
+
     ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),
     Mode = application:get_env(?APP, mode, ModeDefault),
     lager:info("Setting operation mode: ~p", [Mode]),

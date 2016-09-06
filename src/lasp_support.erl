@@ -375,7 +375,6 @@ push_logs() ->
             lager:info("Will push logs"),
             case LOGS of
                 "s3" ->
-                    %% push to s3 (assumes a bucket named logs)
                     %% @todo this won't push the "overcounting" file
                     %% created by the ad counter server
 

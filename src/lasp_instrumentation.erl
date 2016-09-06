@@ -26,6 +26,7 @@
 %% API
 -export([start_link/0,
          transmission/3,
+         memory/1,
          convergence/0,
          stop/0,
          log_file/0]).
@@ -60,6 +61,10 @@ start_link() ->
 -spec transmission(term(), term(), pos_integer()) -> ok | error().
 transmission(Type, Payload, PeerCount) ->
     gen_server:call(?MODULE, {transmission, Type, Payload, PeerCount}, infinity).
+
+-spec memory(pos_integer()) -> ok | error().
+memory(Size) ->
+    gen_server:call(?MODULE, {memory, Size}, infinity).
 
 -spec convergence() -> ok | error().
 convergence() ->
@@ -109,6 +114,10 @@ handle_call({transmission, Type, Payload, PeerCount}, _From, #state{size_per_typ
     end,
     Map = orddict:store(TransmissionType, Current + Size, Map0),
     {reply, ok, State#state{size_per_type=Map}};
+
+handle_call({memory, Size}, _From, #state{filename=Filename}=State) ->
+    record_memory(Size, Filename),
+    {reply, ok, State};
 
 handle_call(convergence, _From, #state{filename=Filename}=State) ->
     record_convergence(Filename),
@@ -214,6 +223,12 @@ record(Map, Filename) ->
         Map
     ),
     append_to_file(Filename, Lines).
+
+%% @private
+record_memory(Size, Filename) ->
+    Timestamp = timestamp(),
+    Line = get_line(memory, Timestamp, Size),
+    append_to_file(Filename, Line).
 
 %% @private
 record_convergence(Filename) ->

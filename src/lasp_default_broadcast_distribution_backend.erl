@@ -1171,7 +1171,8 @@ plumtree_memory_report() ->
 
 %% @private
 memory_utilization_report() ->
-    ok.
+    TotalBytes = orddict:fetch(total, erlang:memory()),
+    lasp_instrumentation:memory(TotalBytes).
 
 %% @private
 send(Msg, Peer) ->

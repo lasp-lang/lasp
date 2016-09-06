@@ -964,7 +964,11 @@ broadcast({Id, Type, Metadata, Value}=Payload) ->
                                    type=Type,
                                    metadata=Metadata,
                                    value=Value},
-            plumtree_broadcast:broadcast(Broadcast, ?MODULE);
+            {Time, Result} = timer:tc(plumtree_broadcast,
+                                      broadcast,
+                                      [Broadcast, ?MODULE]),
+            lasp_logger:extended("Time to broadcast: ~p", [Time]),
+            Result;
         false ->
             ok
     end.

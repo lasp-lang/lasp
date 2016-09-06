@@ -43,7 +43,7 @@ echo ">>> Removing lasp-client from Marathon"
 curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client > /dev/null
 sleep 2
 
-echo ">>> Waiting to kill all tasks."
+echo ">>> Waiting for Mesos to kill all tasks."
 wait_for_completion
 
 echo ">>> Configuring Lasp"

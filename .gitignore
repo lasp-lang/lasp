@@ -1,4 +1,5 @@
 *.beam
+*.swp
 .eunit
 deps/*
 ebin/*

@@ -130,15 +130,17 @@ start(_Case, _Config, Options) ->
                      end,
     lists:map(LoaderFun, Nodes),
 
+    SimulationsAAEInterval = 5000,
+
     %% Configure Lasp settings.
     ConfigureFun = fun(Node) ->
                         %% Configure timers.
                         ok = rpc:call(Node, lasp_config, set,
-                                      [aae_interval, ?AAE_INTERVAL]),
+                                      [aae_interval, SimulationsAAEInterval]),
 
                         %% Configure plumtree AAE interval to be the same.
                         ok = rpc:call(Node, application, set_env,
-                                      [plumtree, broadcast_exchange_timer, ?AAE_INTERVAL]),
+                                      [plumtree, broadcast_exchange_timer, SimulationsAAEInterval]),
 
                         %% Configure who should be the server and who's
                         %% the client.

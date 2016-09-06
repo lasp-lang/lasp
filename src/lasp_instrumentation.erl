@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_transmission_instrumentation).
+-module(lasp_instrumentation).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).

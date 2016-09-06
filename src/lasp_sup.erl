@@ -123,10 +123,10 @@ init(_Args) ->
     Children0 = case InstrEnabled of
         true ->
             lager:info("Instrumentation is enabled!"),
-            Transmission = {lasp_transmission_instrumentation,
-                            {lasp_transmission_instrumentation, start_link, []},
+            Transmission = {lasp_instrumentation,
+                            {lasp_instrumentation, start_link, []},
                              permanent, 5000, worker,
-                             [lasp_transmission_instrumentation]},
+                             [lasp_instrumentation]},
 
             BaseSpecs ++ [Transmission];
         false ->

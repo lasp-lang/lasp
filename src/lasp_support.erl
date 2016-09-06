@@ -397,7 +397,7 @@ push_logs() ->
                     end,
 
                     %% Store logs on S3.
-                    {FilePath, S3Id} = lasp_transmission_instrumentation:log_file(),
+                    {FilePath, S3Id} = lasp_instrumentation:log_file(),
                     Lines = read_file(FilePath),
                     
                     Logs = lists:foldl(

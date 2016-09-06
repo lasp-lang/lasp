@@ -25,7 +25,7 @@
 
 %% API
 -export([start_link/0,
-         log/3,
+         transmission/3,
          convergence/0,
          stop/0,
          log_file/0]).
@@ -57,9 +57,9 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec log(term(), term(), pos_integer()) -> ok | error().
-log(Type, Payload, PeerCount) ->
-    gen_server:call(?MODULE, {log, Type, Payload, PeerCount}, infinity).
+-spec transmission(term(), term(), pos_integer()) -> ok | error().
+transmission(Type, Payload, PeerCount) ->
+    gen_server:call(?MODULE, {transmission, Type, Payload, PeerCount}, infinity).
 
 -spec convergence() -> ok | error().
 convergence() ->
@@ -98,16 +98,16 @@ init([]) ->
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({log, Type, Payload, PeerCount}, _From, #state{size_per_type=Map0}=State) ->
-    LogType = get_log_type(Type),
+handle_call({transmission, Type, Payload, PeerCount}, _From, #state{size_per_type=Map0}=State) ->
+    TransmissionType = get_transmission_type(Type),
     Size = termsize(Payload) * PeerCount,
-    Current = case orddict:find(LogType, Map0) of
+    Current = case orddict:find(TransmissionType, Map0) of
         {ok, Value} ->
             Value;
         error ->
             0
     end,
-    Map = orddict:store(LogType, Current + Size, Map0),
+    Map = orddict:store(TransmissionType, Current + Size, Map0),
     {reply, ok, State#state{size_per_type=Map}};
 
 handle_call(convergence, _From, #state{filename=Filename}=State) ->
@@ -247,7 +247,7 @@ timestamp() ->
     Mega * 1000000 + Sec.
 
 %% @private
-get_log_type(aae_send) -> aae_send;
-get_log_type(broadcast) -> aae_send;
-get_log_type(delta_send) -> delta_send;
-get_log_type(delta_ack) -> delta_send.
+get_transmission_type(aae_send) -> aae_send;
+get_transmission_type(broadcast) -> aae_send;
+get_transmission_type(delta_send) -> delta_send;
+get_transmission_type(delta_ack) -> delta_send.

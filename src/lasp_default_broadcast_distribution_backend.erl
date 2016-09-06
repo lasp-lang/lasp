@@ -1131,7 +1131,9 @@ schedule_aae_synchronization() ->
     case ShouldAAESync of
         true ->
             Interval = lasp_config:get(aae_interval, 10000),
-            erlang:send_after(Interval, self(), aae_sync);
+            %% Add random jitter.
+            Jitter = rand_compat:uniform(Interval),
+            erlang:send_after(Interval + Jitter, self(), aae_sync);
         false ->
             ok
     end.

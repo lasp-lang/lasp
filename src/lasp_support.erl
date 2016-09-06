@@ -384,7 +384,7 @@ push_logs() ->
                     SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
                     erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
 
-                    BucketName = "lasp-transmission-instrumentation-logs",
+                    BucketName = "lasp-instrumentation-logs",
                     %% Create S3 bucket.
                     try
                         lager:info("Creating bucket: ~p", [BucketName]),

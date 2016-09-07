@@ -741,13 +741,8 @@ handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=St
                                collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
                        end,
 
-                       %%case lasp_type:is_bottom(Type, Deltas) of
-                       %%    true ->
-                       %%        Acc0;
-                       %%    false ->
-                               send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
-                               [{ok, Id}|Acc0]
-                       %%end
+                       send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
+                       [{ok, Id}|Acc0]
                end,
     %% TODO: Should this be parallel?
     {ok, Result} = do(fold, [Store, Function, []]),

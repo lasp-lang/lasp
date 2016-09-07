@@ -375,7 +375,6 @@ push_logs() ->
             lager:info("Will push logs"),
             case LOGS of
                 "s3" ->
-                    %% push to s3 (assumes a bucket named logs)
                     %% @todo this won't push the "overcounting" file
                     %% created by the ad counter server
 
@@ -385,7 +384,7 @@ push_logs() ->
                     SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
                     erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
 
-                    BucketName = "lasp-transmission-instrumentation-logs",
+                    BucketName = "lasp-instrumentation-logs",
                     %% Create S3 bucket.
                     try
                         lager:info("Creating bucket: ~p", [BucketName]),
@@ -397,7 +396,7 @@ push_logs() ->
                     end,
 
                     %% Store logs on S3.
-                    {FilePath, S3Id} = lasp_transmission_instrumentation:log_file(),
+                    {FilePath, S3Id} = lasp_instrumentation:log_file(),
                     Lines = read_file(FilePath),
                     
                     Logs = lists:foldl(

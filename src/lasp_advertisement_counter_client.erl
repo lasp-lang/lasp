@@ -182,7 +182,7 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     case length(NodesWithAdsDisabled) == client_number() of
         true ->
             lager:info("All nodes observed ads disabled. Node ~p", [node()]),
-            lasp_transmission_instrumentation:stop(),
+            lasp_instrumentation:stop(),
             lasp_support:push_logs(),
             lasp:update(?SIM_STATUS_ID, {apply, Actor, {snd, true}}, Actor);
         false ->
@@ -231,7 +231,7 @@ client_number() ->
 log_convergence() ->
     case lasp_config:get(instrumentation, false) of
         true ->
-            lasp_transmission_instrumentation:convergence();
+            lasp_instrumentation:convergence();
         false ->
             ok
     end.

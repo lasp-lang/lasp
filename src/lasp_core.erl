@@ -1012,8 +1012,22 @@ increment_counter(Counter) ->
     Counter + 1.
 
 %% @private
+%% @doc In a delta based environment, each peer stores a buffer of deltas
+%%      that can be used to compute a delta group, given what it knows
+%%      from a certain peer (what it knows the peer has received)
+%%      In a client-server topology, we don't follow this approach,
+%%      to avoid having the server storing this kind of information
+%%      for all the peers. The server will always have an empty delta
+%%      map, which means, it will always send the full state to the
+%%      clients.
 store_delta(Origin, Counter, Delta, DeltaMap0) ->
-    orddict:store(Counter, {Origin, Delta}, DeltaMap0).
+    case lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager andalso
+         partisan_config:get(tag, undefined) == server of
+        true ->
+            DeltaMap0;
+        false ->
+            orddict:store(Counter, {Origin, Delta}, DeltaMap0)
+    end.
 
 -ifdef(TEST).
 

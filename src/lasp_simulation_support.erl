@@ -130,17 +130,23 @@ start(_Case, _Config, Options) ->
                      end,
     lists:map(LoaderFun, Nodes),
 
-    SimulationsAAEInterval = 5000,
+    SimulationsSyncInterval = 5000,
 
     %% Configure Lasp settings.
     ConfigureFun = fun(Node) ->
+                        %% Configure extended logging.
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [extended_logging, true]),
+
                         %% Configure timers.
                         ok = rpc:call(Node, lasp_config, set,
-                                      [aae_interval, SimulationsAAEInterval]),
+                                      [aae_interval, SimulationsSyncInterval]),
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [delta_interval, SimulationsSyncInterval]),
 
                         %% Configure plumtree AAE interval to be the same.
                         ok = rpc:call(Node, application, set_env,
-                                      [plumtree, broadcast_exchange_timer, SimulationsAAEInterval]),
+                                      [plumtree, broadcast_exchange_timer, SimulationsSyncInterval]),
 
                         %% Configure who should be the server and who's
                         %% the client.

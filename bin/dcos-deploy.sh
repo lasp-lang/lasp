@@ -50,10 +50,12 @@ echo ">>> Configuring Lasp"
 cd /tmp
 
 # Memory of each VM.
-MEMORY=1536.0
+SERVER_MEMORY=5120.0
+CLIENT_MEMORY=1536.0
 
 # CPU of each VM.
-CPU=0.5
+SERVER_CPU=3
+CLIENT_CPU=0.5
 
 cat <<EOF > lasp-server.json
 {
@@ -63,8 +65,8 @@ cat <<EOF > lasp-server.json
   "id": "lasp-server",
   "dependencies": [],
   "constraints": [["hostname", "UNIQUE", ""]],
-  "cpus": $CPU,
-  "mem": $MEMORY,
+  "cpus": $SERVER_CPU,
+  "mem": $SERVER_MEMORY,
   "instances": 1,
   "container": {
     "type": "DOCKER",
@@ -130,8 +132,8 @@ cat <<EOF > lasp-client.json
   ],
   "id": "lasp-client",
   "dependencies": [],
-  "cpus": $CPU,
-  "mem": $MEMORY,
+  "cpus": $CLIENT_CPU,
+  "mem": $CLIENT_MEMORY,
   "instances": $CLIENT_NUMBER,
   "container": {
     "type": "DOCKER",

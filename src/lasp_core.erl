@@ -1024,7 +1024,7 @@ store_delta(Origin, Counter, Delta, DeltaMap0) ->
     case lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager andalso
          partisan_config:get(tag, undefined) == server of
         true ->
-            ok;
+            DeltaMap0;
         false ->
             orddict:store(Counter, {Origin, Delta}, DeltaMap0)
     end.

@@ -134,6 +134,10 @@ start(_Case, _Config, Options) ->
 
     %% Configure Lasp settings.
     ConfigureFun = fun(Node) ->
+                        %% Configure extended logging.
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [extended_logging, true]),
+
                         %% Configure timers.
                         ok = rpc:call(Node, lasp_config, set,
                                       [aae_interval, SimulationsSyncInterval]),

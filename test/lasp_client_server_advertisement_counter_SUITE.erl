@@ -62,9 +62,9 @@ end_per_testcase(Case, _Config) ->
 all() ->
     [
      client_server_state_based_with_aae_test,
-     client_server_delta_based_with_aae_test,
-     client_server_state_based_ps_with_aae_test,
-     client_server_delta_based_ps_with_aae_test
+     client_server_delta_based_with_aae_test%%,
+     %%client_server_state_based_ps_with_aae_test,
+     %%client_server_delta_based_ps_with_aae_test
     ].
 
 %% ===================================================================

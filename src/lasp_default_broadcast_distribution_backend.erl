@@ -87,8 +87,9 @@
                     metadata :: metadata(),
                     value :: value()}).
 
--define(MEMORY_INTERVAL, 10000).
 -define(DELTA_GC_INTERVAL, 60000).
+-define(PLUMTREE_MEMORY_INTERVAL, 10000).
+-define(MEMORY_UTILIZATION_INTERVAL, 10000).
 
 %% Definitions for the bind/read fun abstraction.
 
@@ -493,8 +494,9 @@ init([]) ->
             {error, Reason}
     end,
 
-    %% Schedule report.
-    schedule_memory_report(),
+    %% Schedule reports.
+    schedule_plumtree_memory_report(),
+    schedule_memory_utilization_report(),
 
     {ok, #state{actor=Actor,
                 counter=Counter,
@@ -794,12 +796,21 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(memory_report, State) ->
+handle_info(plumtree_memory_report, State) ->
     %% Log
-    memory_report(),
+    plumtree_memory_report(),
 
     %% Schedule report.
-    schedule_memory_report(),
+    schedule_plumtree_memory_report(),
+
+    {noreply, State};
+
+handle_info(memory_utilization_report, State) ->
+    %% Log
+    memory_utilization_report(),
+
+    %% Schedule report.
+    schedule_memory_utilization_report(),
 
     {noreply, State};
 
@@ -1042,24 +1053,6 @@ declare_if_not_found({error, not_found}, {StorageId, TypeId},
 declare_if_not_found(Result, _Id, _State, _Module, _Function, _Args) ->
     Result.
 
-%% @private
-schedule_memory_report() ->
-    erlang:send_after(?MEMORY_INTERVAL, self(), memory_report).
-
-%% @private
-memory_report() ->
-    case lasp_config:get(memory_report, false) of
-        true ->
-            PlumtreeBroadcast = erlang:whereis(plumtree_broadcast),
-            lager:info("Plumtree message queue: ~p",
-                       [process_info(PlumtreeBroadcast, message_queue_len)]),
-            lager:info("Our message queue: ~p",
-                       [process_info(self(), message_queue_len)]),
-            ok;
-        false ->
-            ok
-    end.
-
 -ifdef(TEST).
 
 do(Function, Args) ->
@@ -1080,7 +1073,7 @@ log_transmission({Type, Payload}, PeerCount) ->
     try
         case lasp_config:get(instrumentation, false) of
             true ->
-                ok = lasp_transmission_instrumentation:log(Type, Payload, PeerCount),
+                ok = lasp_instrumentation:transmission(Type, Payload, PeerCount),
                 ok;
             false ->
                 ok
@@ -1157,6 +1150,36 @@ schedule_delta_garbage_collection() ->
         state_based ->
             ok
     end.
+%% @private
+schedule_plumtree_memory_report() ->
+    case lasp_config:get(memory_report, false) of
+        true ->
+            erlang:send_after(?PLUMTREE_MEMORY_INTERVAL, self(), plumtree_memory_report);
+        false ->
+            ok
+    end.
+
+%% @private
+schedule_memory_utilization_report() ->
+    case lasp_config:get(instrumentation, false) of
+        true ->
+            erlang:send_after(?MEMORY_UTILIZATION_INTERVAL, self(), memory_utilization_report);
+        false ->
+            ok
+    end.
+
+%% @private
+plumtree_memory_report() ->
+    PlumtreeBroadcast = erlang:whereis(plumtree_broadcast),
+    lager:info("Plumtree message queue: ~p",
+               [process_info(PlumtreeBroadcast, message_queue_len)]),
+    lager:info("Our message queue: ~p",
+               [process_info(self(), message_queue_len)]).
+
+%% @private
+memory_utilization_report() ->
+    TotalBytes = orddict:fetch(total, erlang:memory()),
+    lasp_instrumentation:memory(TotalBytes).
 
 %% @private
 send(Msg, Peer) ->

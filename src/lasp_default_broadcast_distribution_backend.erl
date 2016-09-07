@@ -727,30 +727,27 @@ handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=St
                                  error ->
                                      0
                              end,
-                       case Ack < Counter of
+                       Min = case orddict:fetch_keys(DeltaMap) of
+                           [] ->
+                               0;
+                           Keys ->
+                               lists:min(Keys)
+                       end,
+
+                       Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
                            true ->
-                               Causality = case orddict:fetch_keys(DeltaMap) of
-                                               [] ->
-                                                   true;
-                                               Keys ->
-                                                   lists:min(Keys) > Ack
-                                           end,
-                               Deltas = case Causality of
-                                            true ->
-                                                Value;
-                                            false ->
-                                                collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
-                                        end,
-                               case lasp_type:is_bottom(Type, Deltas) of
-                                   true ->
-                                       ok;
-                                   false ->
-                                       send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer)
-                               end,
-                               [{ok, Id}|Acc0];
+                               Value;
                            false ->
-                               Acc0
-                       end
+                               collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
+                       end,
+
+                       %%case lasp_type:is_bottom(Type, Deltas) of
+                       %%    true ->
+                       %%        Acc0;
+                       %%    false ->
+                               send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
+                               [{ok, Id}|Acc0]
+                       %%end
                end,
     %% TODO: Should this be parallel?
     {ok, Result} = do(fold, [Store, Function, []]),

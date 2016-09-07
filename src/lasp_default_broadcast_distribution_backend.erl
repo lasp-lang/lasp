@@ -782,6 +782,13 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
                                ?CLOCK_INCR(Actor),
                                ?CLOCK_INIT(Actor)}),
     send({delta_ack, node(), Id, Counter}, From),
+    case lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager andalso
+         partisan_config:get(tag, undefined) == server of
+        true ->
+            init_delta_sync(From);
+        _ ->
+            ok
+    end,
     {noreply, State};
 
 handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
@@ -838,13 +845,8 @@ handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
 
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
-    case length(Peers) of
-        0 ->
-            ok;
-        _ ->
-            %% Ship buffered updates for the fanout value.
-            lists:foreach(fun(Peer) -> init_delta_sync(Peer) end, Peers)
-    end,
+    %% Ship buffered updates for the fanout value.
+    lists:foreach(fun(Peer) -> init_delta_sync(Peer) end, Peers),
 
     %% Schedule next synchronization.
     schedule_delta_synchronization(),
@@ -1098,17 +1100,6 @@ log_transmission({Type, Payload}, PeerCount) ->
     end.
 
 %% @private
-schedule_delta_synchronization() ->
-    DeltaInterval = lasp_config:get(delta_interval, 10000),
-
-    case lasp_config:get(mode, state_based) of
-        delta_based ->
-            erlang:send_after(DeltaInterval, self(), delta_sync);
-        state_based ->
-            ok
-    end.
-
-%% @private
 schedule_aae_synchronization() ->
     ShouldAAESync = case lasp_config:get(mode, state_based) of
         delta_based ->
@@ -1138,6 +1129,30 @@ schedule_aae_synchronization() ->
             %% Add random jitter.
             Jitter = rand_compat:uniform(Interval),
             erlang:send_after(Interval + Jitter, self(), aae_sync);
+        false ->
+            ok
+    end.
+
+%% @private
+schedule_delta_synchronization() ->
+    ShouldDeltaSync = case lasp_config:get(mode, state_based) of
+        delta_based ->
+            case lasp_config:get(peer_service_manager, partisan_peer_service) of
+                partisan_client_server_peer_service_manager ->
+                    partisan_config:get(tag, client) == client;
+                _ ->
+                    true
+            end;
+        state_based ->
+            false
+    end,
+
+    case ShouldDeltaSync of
+        true ->
+            Interval = lasp_config:get(delta_interval, 10000),
+            %% Add random jitter.
+            Jitter = rand_compat:uniform(Interval),
+            erlang:send_after(Interval + Jitter, self(), delta_sync);
         false ->
             ok
     end.

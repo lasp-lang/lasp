@@ -91,7 +91,6 @@ client_server_partition_overcounting_test(Config) ->
                  {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
                  {set, orset},
                  {broadcast, false},
-                 {instrumentation, false},
                  {heavy_client, false},
                  {partition_probability, PartitionProbability},
                  {evaluation_identifier, EvaluationIdentifier}]
@@ -115,7 +114,6 @@ peer_to_peer_partition_overcounting_test(Config) ->
                  {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
                  {set, orset},
                  {broadcast, false},
-                 {instrumentation, false},
                  {heavy_client, false},
                  {partition_probability, PartitionProbability},
                  {evaluation_identifier, EvaluationIdentifier}]
@@ -139,7 +137,6 @@ code_peer_to_peer_partition_overcounting_test(Config) ->
                  {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
                  {set, orset},
                  {broadcast, false},
-                 {instrumentation, false},
                  {heavy_client, true},
                  {partition_probability, PartitionProbability},
                  {evaluation_identifier, EvaluationIdentifier}]

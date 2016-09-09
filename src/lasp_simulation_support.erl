@@ -201,9 +201,8 @@ start(_Case, _Config, Options) ->
                                       [evaluation_timestamp, EvalTimestamp]),
 
                         %% Configure instrumentation.
-                        Instrumentation = proplists:get_value(instrumentation, Options, true),
                         ok = rpc:call(Node, lasp_config, set,
-                                      [instrumentation, Instrumentation]),
+                                      [instrumentation, true]),
 
                         %% Configure client number.
                         ClientNumber = proplists:get_value(client_number, Options),

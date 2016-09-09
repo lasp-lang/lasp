@@ -1113,7 +1113,7 @@ schedule_aae_synchronization() ->
             Interval = lasp_config:get(aae_interval, 10000),
             %% Add random jitter.
             Jitter = rand_compat:uniform(Interval),
-            erlang:send_after(Interval + Jitter, self(), aae_sync);
+            timer:send_after(Interval + Jitter, aae_sync);
         false ->
             ok
     end.
@@ -1137,7 +1137,7 @@ schedule_delta_synchronization() ->
             Interval = lasp_config:get(delta_interval, 10000),
             %% Add random jitter.
             Jitter = rand_compat:uniform(Interval),
-            erlang:send_after(Interval + Jitter, self(), delta_sync);
+            timer:send_after(Interval + Jitter, delta_sync);
         false ->
             ok
     end.
@@ -1146,7 +1146,7 @@ schedule_delta_synchronization() ->
 schedule_delta_garbage_collection() ->
     case lasp_config:get(mode, state_based) of
         delta_based ->
-            erlang:send_after(?DELTA_GC_INTERVAL, self(), delta_gc);
+            timer:send_after(?DELTA_GC_INTERVAL, delta_gc);
         state_based ->
             ok
     end.
@@ -1154,7 +1154,7 @@ schedule_delta_garbage_collection() ->
 schedule_plumtree_memory_report() ->
     case lasp_config:get(memory_report, false) of
         true ->
-            erlang:send_after(?PLUMTREE_MEMORY_INTERVAL, self(), plumtree_memory_report);
+            timer:send_after(?PLUMTREE_MEMORY_INTERVAL, plumtree_memory_report);
         false ->
             ok
     end.
@@ -1163,7 +1163,7 @@ schedule_plumtree_memory_report() ->
 schedule_memory_utilization_report() ->
     case lasp_config:get(instrumentation, false) of
         true ->
-            erlang:send_after(?MEMORY_UTILIZATION_INTERVAL, self(), memory_utilization_report);
+            timer:send_after(?MEMORY_UTILIZATION_INTERVAL, memory_utilization_report);
         false ->
             ok
     end.

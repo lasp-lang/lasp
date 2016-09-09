@@ -213,15 +213,15 @@ code_change(_OldVsn, State, _Extra) ->
 schedule_impression() ->
     %% Add random jitter.
     Jitter = rand_compat:uniform(?IMPRESSION_INTERVAL),
-    erlang:send_after(?IMPRESSION_INTERVAL + Jitter, self(), view).
+    timer:send_after(?IMPRESSION_INTERVAL + Jitter, view).
 
 %% @private
 schedule_logging() ->
-    erlang:send_after(?LOG_INTERVAL, self(), log).
+    timer:send_after(?LOG_INTERVAL, log).
 
 %% @private
 schedule_check_simulation_end() ->
-    erlang:send_after(?STATUS_INTERVAL, self(), check_simulation_end).
+    timer:send_after(?STATUS_INTERVAL, check_simulation_end).
 
 %% @private
 client_number() ->

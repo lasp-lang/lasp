@@ -204,7 +204,7 @@ root_log_dir() ->
 
 %% @private
 log_dir() ->
-    root_log_dir() ++ "/" + simulation_id().
+    root_log_dir() ++ "/" ++ simulation_id().
 
 %% @private
 simulation_id() ->

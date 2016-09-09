@@ -204,7 +204,7 @@ root_log_dir() ->
 
 %% @private
 log_dir() ->
-    root_log_dir() ++ "/" ++ simulation_id().
+    root_log_dir() ++ "/" ++ simulation_id() ++ "/".
 
 %% @private
 simulation_id() ->
@@ -226,7 +226,7 @@ simulation_id() ->
 
 %% @private
 main_log() ->
-    log_dir() ++ "/" ++ main_log_suffix().
+    log_dir() ++ main_log_suffix().
 
 %% @private
 main_log_suffix() ->
@@ -234,7 +234,7 @@ main_log_suffix() ->
 
 %% @private
 overcounting_log() ->
-    log_dir() ++ "/" ++ overcounting_log_suffix().
+    log_dir() ++ overcounting_log_suffix().
 
 %% @private
 overcounting_log_suffix() ->

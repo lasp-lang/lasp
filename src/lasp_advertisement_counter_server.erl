@@ -135,9 +135,8 @@ handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
     case length(NodesWithLogsPushed) == client_number() of
         true ->
             lager:info("All nodes have pushed their logs"),
-            log_convergence(),
+            log_overcounting_and_convergence(AdList),
             lasp_instrumentation:stop(),
-            log_overcounting(AdList),
             lasp_support:push_logs(),
             lasp_config:set(simulation_end, true),
             stop_simulation();
@@ -266,47 +265,16 @@ client_number() ->
     lasp_config:get(client_number, 3).
 
 %% @private
-log_convergence() ->
+log_overcounting_and_convergence(AdList) ->
     case lasp_config:get(instrumentation, false) of
         true ->
+            Overcounting = compute_overcounting(AdList),
+            lasp_instrumentation:overcounting(Overcounting),
             lasp_instrumentation:convergence();
+
         false ->
             ok
     end.
-
-%% @private
-log_overcounting(AdList) ->
-    Filename = filename(),
-    Overcounting = compute_overcounting(AdList),
-    lager:info("Overcounting ~p%", [Overcounting]),
-
-    ok = file:write_file(
-        Filename,
-        io_lib:format("~w", [Overcounting]),
-        [write]
-    ),
-    ok.
-
-%% @private
-filename() ->
-    Simulation = lasp_config:get(simulation, undefined),
-    LocalOrDCOS = case os:getenv("DCOS", "false") of
-        "false" ->
-            "local";
-        _ ->
-            "dcos"
-    end,
-    EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
-    Id = atom_to_list(Simulation) ++ "/"
-      ++ LocalOrDCOS ++ "/"
-      ++ atom_to_list(EvalIdentifier),
-    EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
-    Filename = "overcounting",
-    Dir = code:priv_dir(?APP) ++ "/evaluation/logs/"
-        ++ Id ++ "/"
-        ++ integer_to_list(EvalTimestamp) ++ "/",
-    filelib:ensure_dir(Dir),
-    Dir ++ Filename.
 
 %% @private
 compute_overcounting(AdList) ->

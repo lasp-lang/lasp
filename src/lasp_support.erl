@@ -375,9 +375,6 @@ push_logs() ->
             lager:info("Will push logs"),
             case LOGS of
                 "s3" ->
-                    %% @todo this won't push the "overcounting" file
-                    %% created by the ad counter server
-
                     %% Configure erlcloud.
                     S3Host = "s3.amazonaws.com",
                     AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
@@ -396,21 +393,20 @@ push_logs() ->
                     end,
 
                     %% Store logs on S3.
-                    {FilePath, S3Id} = lasp_instrumentation:log_file(),
-                    Lines = read_file(FilePath),
-                    
-                    Logs = lists:foldl(
-                        fun(Line, Acc) ->
-                            Acc ++ Line
+                    lists:foreach(
+                        fun({FilePath, S3Id}) ->
+                            Lines = read_file(FilePath),
+                            Logs = lists:foldl(
+                                fun(Line, Acc) ->
+                                    Acc ++ Line
+                                end,
+                                "",
+                                Lines
+                            ),
+                            erlcloud_s3:put_object(BucketName, S3Id, list_to_binary(Logs))
                         end,
-                        "",
-                        Lines
-                    ),
-
-                    Filename = S3Id,
-                    lager:info("Filename for logs: ~p", [Filename]),
-
-                    erlcloud_s3:put_object(BucketName, Filename, list_to_binary(Logs));
+                        lasp_instrumentation:log_files()
+                    );
                 "git" ->
                     %% push to git
                     Result = os:cmd("cd /opt/lasp && ./priv/evaluate-mesos-push.sh"),

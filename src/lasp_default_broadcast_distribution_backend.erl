@@ -533,7 +533,7 @@ handle_call(perform_broadcast,
                     ok
               end, ok, ToBroadcast0),
 
-    %% Buffer latest update for that state.
+    %% Reset state.
     ToBroadcast = dict:new(),
 
     %% Reschedule broadcast.

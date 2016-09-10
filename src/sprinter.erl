@@ -285,9 +285,11 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
 
     IsConnected = case Connected of
         true ->
-            lager:info("Graph is connected!");
+            lager:info("Graph is connected!"),
+            true;
         false ->
-            lager:info("Graph is not connected!")
+            lager:info("Graph is not connected!"),
+            false
     end,
 
     WasConnected = IsConnected orelse WasConnected0,

@@ -52,8 +52,7 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 -spec buffer(term()) -> ok | error().
-buffer({Id, _Type, _Metadata, _Value} = Payload) ->
-    lasp_logger:extended("Casting update for buffer of ~p", [Id]),
+buffer(Payload) ->
     gen_server:cast(?MODULE, {buffer, Payload}).
 
 %%%===================================================================

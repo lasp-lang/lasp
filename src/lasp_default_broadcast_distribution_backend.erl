@@ -76,7 +76,6 @@
 %% State record.
 -record(state, {store :: store(),
                 actor :: binary(),
-                to_broadcast :: list(),
                 sync_counter :: non_neg_integer(),
                 counter :: non_neg_integer(),
                 gc_counter :: non_neg_integer()}).
@@ -88,7 +87,6 @@
                     metadata :: metadata(),
                     value :: value()}).
 
--define(BROADCAST_INTERVAL, 30000).
 -define(DELTA_GC_INTERVAL, 60000).
 -define(PLUMTREE_MEMORY_INTERVAL, 10000).
 -define(MEMORY_UTILIZATION_INTERVAL, 10000).
@@ -251,7 +249,7 @@ declare(Id, Type) ->
         state_based ->
             {ok, Variable} = gen_server:call(?MODULE,
                                              {declare, Id, Type}, infinity),
-            broadcast(Variable),
+            buffer_broadcast(Variable),
             {ok, Variable}
     end.
 
@@ -265,7 +263,7 @@ declare_dynamic(Id, Type) ->
             {ok, Variable} = gen_server:call(?MODULE,
                                              {declare_dynamic, Id, Type},
                                              infinity),
-            broadcast(Variable),
+            buffer_broadcast(Variable),
             {ok, Variable}
     end.
 
@@ -305,7 +303,7 @@ update(Id, Operation, Actor) ->
                                   %% No broadcasting for the delta.
                                   Value;
                               state_based ->
-                                  broadcast({Id, Type, Metadata, Value}),
+                                  buffer_broadcast({Id, Type, Metadata, Value}),
                                   Value;
                               pure_op_based ->
                                   ok %% @todo
@@ -334,7 +332,7 @@ bind(Id, Value0) ->
                                   %% No broadcasting for the delta.
                                   Value;
                               state_based ->
-                                  broadcast({Id, Type, Metadata, Value}),
+                                  buffer_broadcast({Id, Type, Metadata, Value}),
                                   Value;
                               pure_op_based ->
                                   ok %% todo
@@ -476,7 +474,6 @@ init([]) ->
                      erlang:monotonic_time(),
                      erlang:unique_integer()),
 
-    schedule_broadcast(),
     schedule_aae_synchronization(),
     schedule_delta_synchronization(),
     schedule_delta_garbage_collection(),
@@ -486,7 +483,6 @@ init([]) ->
     Counter = 0,
     GCCounter = 0,
     Identifier = node(),
-    ToBroadcast = dict:new(),
 
     {ok, Store} = case ?CORE:start(Identifier) of
         {ok, Pid} ->
@@ -506,22 +502,11 @@ init([]) ->
                 counter=Counter,
                 sync_counter=0,
                 store=Store,
-                to_broadcast=ToBroadcast,
                 gc_counter=GCCounter}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
-
-%% Buffer broadcast messages to prevent overload.
-handle_call({buffer_broadcast, {Id, _Type, _Metadata, _Value} = Payload},
-            _From,
-            #state{to_broadcast=ToBroadcast0}=State) ->
-
-    %% Buffer latest update for that state.
-    ToBroadcast = dict:store(Id, Payload, ToBroadcast0),
-
-    {reply, ok, State#state{to_broadcast=ToBroadcast}};
 
 %% Reset all Lasp application state.
 handle_call(reset, _From, #state{store=Store}=State) ->
@@ -820,32 +805,6 @@ handle_info(plumtree_memory_report, State) ->
 
     {noreply, State};
 
-handle_info(perform_broadcast, #state{to_broadcast=ToBroadcast0}=State) ->
-
-    dict:fold(fun(Id, {Id, Type, Metadata, Value} = Payload, ok) ->
-                    PeerCount = length(plumtree_broadcast:broadcast_members()),
-                    log_transmission({broadcast, Payload}, PeerCount),
-                    Clock = orddict:fetch(clock, Metadata),
-                    Broadcast = #broadcast{id=Id,
-                                           clock=Clock,
-                                           type=Type,
-                                           metadata=Metadata,
-                                           value=Value},
-                    {Time, _Result} = timer:tc(plumtree_broadcast,
-                                              broadcast,
-                                              [Broadcast, ?MODULE]),
-                    lasp_logger:extended("Time to broadcast: ~p", [Time]),
-                    ok
-              end, ok, ToBroadcast0),
-
-    %% Reset state.
-    ToBroadcast = dict:new(),
-
-    %% Reschedule broadcast.
-    schedule_broadcast(),
-
-    {noreply, State#state{to_broadcast=ToBroadcast}};
-
 handle_info(memory_utilization_report, State) ->
     %% Log
     memory_utilization_report(),
@@ -999,10 +958,22 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-broadcast({_Id, _Type, _Metadata, _Value}=Payload) ->
+broadcast({Id, Type, Metadata, Value}=Payload) ->
     case lasp_config:get(broadcast, false) of
         true ->
-            gen_server:call(?MODULE, {buffer_broadcast, Payload}, infinity);
+            PeerCount = length(plumtree_broadcast:broadcast_members()),
+            log_transmission({broadcast, Payload}, PeerCount),
+            Clock = orddict:fetch(clock, Metadata),
+            Broadcast = #broadcast{id=Id,
+                                   clock=Clock,
+                                   type=Type,
+                                   metadata=Metadata,
+                                   value=Value},
+            {Time, Result} = timer:tc(plumtree_broadcast,
+                                      broadcast,
+                                      [Broadcast, ?MODULE]),
+            lasp_logger:extended("Time to broadcast: ~p", [Time]),
+            Result;
         false ->
             ok
     end.
@@ -1172,15 +1143,6 @@ schedule_delta_synchronization() ->
     end.
 
 %% @private
-schedule_broadcast() ->
-    case lasp_config:get(broadcast, false) of
-        true ->
-            timer:send_after(?BROADCAST_INTERVAL, perform_broadcast);
-        false ->
-            ok
-    end.
-
-%% @private
 schedule_delta_garbage_collection() ->
     case lasp_config:get(mode, state_based) of
         delta_based ->
@@ -1315,3 +1277,7 @@ compute_exchange(Peers) ->
         false ->
             Peers
     end.
+
+%% @private
+buffer_broadcast(Variable) ->
+    lasp_broadcast_buffer:buffer(Variable).

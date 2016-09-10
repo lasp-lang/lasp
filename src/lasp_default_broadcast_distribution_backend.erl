@@ -175,7 +175,6 @@ broadcast_data(#broadcast{id=Id,
                           clock=Clock,
                           metadata=Metadata,
                           value=Value}) ->
-    lager:info("Generating broadcast_data..."),
     {{Id, Clock}, {Id, Type, Metadata, Value}}.
 
 %% @doc Perform a merge of an incoming object with an object in the
@@ -186,14 +185,14 @@ broadcast_data(#broadcast{id=Id,
 merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
     case is_stale({Id, Clock}) of
         true ->
-            lager:info("Clock is stale!"),
+            lager:info("merge: clock is stale!"),
             false;
         false ->
             %% Bind information.
-            {ok, {Id, Type, NewMetadata, _Value}} = ?MODULE:local_bind(Id, Type, Metadata, Value),
-            OurClock = orddict:fetch(clock, NewMetadata),
-            lager:info("Local bind complete, their clock: ~p, our new clock: ~p",
-                       [Clock, OurClock]),
+            {ok, {_, _, NewMetadata, _}} = ?MODULE:local_bind(Id, Type, Metadata, Value),
+            NewClock = orddict:fetch(clock, NewMetadata),
+            lager:info("merge: Incoming clock: ~p", [Clock]),
+            lager:info("merge: Merged clock: ~p", [NewClock]),
             true
     end;
 merge(BroadcastId, Payload) ->
@@ -974,6 +973,7 @@ broadcast({Id, Type, Metadata, Value}) ->
                                    type=Type,
                                    metadata=Metadata,
                                    value=Value},
+            lager:info("broadcast: generating message with clock: ~p", [Clock]),
             ok = plumtree_broadcast:broadcast(Broadcast, ?MODULE),
             ok;
         false ->

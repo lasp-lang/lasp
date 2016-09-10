@@ -235,6 +235,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
                                    Membership = binary_to_term(Body),
                                    case Membership of
                                        [N] ->
+                                           populate_graph(N, [], Graph),
                                            [Peer|OrphanedNodes];
                                        _ ->
                                            populate_graph(N, Membership, Graph),
@@ -243,6 +244,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
                            end
                        catch
                            _:{aws_error, Error} ->
+                               populate_graph(N, [], Graph),
                                lager:info("Could not get graph object; ~p", [Error]),
                                OrphanedNodes
                        end

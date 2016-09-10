@@ -976,11 +976,9 @@ broadcast({Id, Type, Metadata, Value}=Payload) ->
                                    metadata=Metadata,
                                    value=Value},
             lager:info("Calling plumtree_broadcast..."),
-            {Time, Result} = timer:tc(plumtree_broadcast,
-                                      broadcast,
-                                      [Broadcast, ?MODULE]),
-            lager:info("Time: ~p; Result: ~p", [Time, Result]),
-            Result;
+            ok = plumtree_broadcast:broadcast(Broadcast, ?MODULE),
+            lager:info("Finished."),
+            ok;
         false ->
             ok
     end.

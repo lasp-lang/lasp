@@ -1279,5 +1279,6 @@ compute_exchange(Peers) ->
     end.
 
 %% @private
-buffer_broadcast(Variable) ->
-    lasp_broadcast_buffer:buffer(Variable).
+buffer_broadcast({Id, _Type, _Metadata, _Value} = Payload) ->
+    lasp_logger:extended("Buffering update for ~p", [Id]),
+    lasp_broadcast_buffer:buffer(Payload).

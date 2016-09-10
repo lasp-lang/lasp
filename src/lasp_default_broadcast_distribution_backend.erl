@@ -969,9 +969,7 @@ broadcast({Id, Type, Metadata, Value}) ->
                                    type=Type,
                                    metadata=Metadata,
                                    value=Value},
-            lager:info("Calling plumtree_broadcast..."),
             ok = plumtree_broadcast:broadcast(Broadcast, ?MODULE),
-            lager:info("Finished."),
             ok;
         false ->
             ok

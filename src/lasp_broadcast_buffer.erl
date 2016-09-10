@@ -98,16 +98,15 @@ handle_cast(Msg, State) ->
 
 %% @private
 handle_info(perform_broadcast, #state{buffer=Buffer0}=State) ->
-    lager:info("Flushing broadcast buffer."),
+    Size = dict:size(Buffer0),
+    lager:info("Flushing broadcast buffer with ~p messages.", [Size]),
 
     Backend = lasp_config:get(distribution_backend,
                               ?DEFAULT_DISTRIBUTION_BACKEND),
 
     %% Call broadcast for latest buffered updates.
-    dict:fold(fun(Id, Payload, ok) ->
-                      lasp_logger:extended("Flushing update ~p", [Id]),
+    dict:fold(fun(_Id, Payload, ok) ->
                       ok = Backend:broadcast(Payload),
-                      lasp_logger:extended("Finished."),
                       ok
               end, ok, Buffer0),
 

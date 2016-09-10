@@ -448,8 +448,10 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                       delta_eager_map=DeltaEagerMap0,
                       delta_ack_map=AckMap}=Object) ->
             Metadata = MetadataFun(Metadata0),
-            case Value0 of
-                Value ->
+            case {Id, Type, Metadata0, Value0} of
+                %% As long as *both* the metadata and value haven't
+                %% changed, we can keep the same object.
+                {Id, Type, Metadata, Value} ->
                     {Object, {ok, {Id, Type, Metadata, Value}}};
                 _ ->
                 %% Merge may throw for invalid types.
@@ -457,6 +459,7 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                     Merged = lasp_type:merge(Type, Value0, Value),
                     case lasp_type:is_strict_inflation(Type, Value0, Merged) of
                         true ->
+                            %% Object inflation.
                             {ok, SW} = reply_to_all(WT, [],
                                                     {ok, {Id, Type, Metadata, Merged}}),
 
@@ -478,8 +481,9 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                             %% Return value is a delta state.
                             {NewObject, {ok, {Id, Type, Metadata, Merged}}};
                         false ->
-                            %% Given state is already merged, no update.
-                            {Object, {ok, {Id, Type, Metadata, Merged}}}
+                            %% Metadata change.
+                            NewObject = Object#dv{metadata=Metadata},
+                            {NewObject, {ok, {Id, Type, Metadata, Merged}}}
                     end
                 catch
                     _:_Reason ->

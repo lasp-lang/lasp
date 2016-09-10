@@ -124,8 +124,7 @@
 -define(EVAL_NUMBER, 1).
 -define(LOG_INTERVAL, 10000).
 -define(VOTING_INTERVAL, 1000).
-%% TODO: Revert me.
--define(ADS_NUMBER, 1).
+-define(ADS_NUMBER, 10).
 
 -define(DEFAULT_DISTRIBUTION_BACKEND, lasp_default_broadcast_distribution_backend).
 

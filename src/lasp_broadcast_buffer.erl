@@ -100,6 +100,8 @@ handle_cast(Msg, State) ->
 
 %% @private
 handle_info(perform_broadcast, #state{buffer=Buffer0}=State) ->
+    lager:info("Flushing broadcast buffer."),
+
     Backend = lasp_config:get(distribution_backend,
                               ?DEFAULT_DISTRIBUTION_BACKEND),
 
@@ -113,6 +115,8 @@ handle_info(perform_broadcast, #state{buffer=Buffer0}=State) ->
 
     %% Reschedule broadcast.
     schedule_broadcast(),
+
+    lager:info("Flushing broadcast buffer complete."),
 
     {noreply, State#state{buffer=Buffer}};
 

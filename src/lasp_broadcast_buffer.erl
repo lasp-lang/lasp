@@ -23,8 +23,6 @@
 
 -behaviour(gen_server).
 
--define(BROADCAST_INTERVAL, 30000).
-
 %% API
 -export([start_link/0,
          buffer/1]).
@@ -84,8 +82,6 @@ handle_call(Msg, _From, State) ->
 
 handle_cast({buffer, {Id, _Type, _Metadata, _Value} = Payload},
             #state{buffer=Buffer0}=State) ->
-    lasp_logger:extended("Buffering update for ~p", [Id]),
-
     Buffer = case lasp_config:get(broadcast, false) of
         true ->
             %% Buffer latest update for that state.
@@ -147,7 +143,10 @@ code_change(_OldVsn, State, _Extra) ->
 schedule_broadcast() ->
     case lasp_config:get(broadcast, false) of
         true ->
-            timer:send_after(?BROADCAST_INTERVAL, perform_broadcast);
+            Interval = lasp_config:get(aae_interval, 10000),
+            %% Add random jitter.
+            Jitter = rand_compat:uniform(Interval),
+            timer:send_after(Interval + Jitter, perform_broadcast);
         false ->
             ok
     end.

@@ -106,8 +106,11 @@ handle_info(perform_broadcast, #state{buffer=Buffer0}=State) ->
                               ?DEFAULT_DISTRIBUTION_BACKEND),
 
     %% Call broadcast for latest buffered updates.
-    dict:fold(fun(_Id, Payload, ok) ->
-                      ok = Backend:broadcast(Payload)
+    dict:fold(fun(Id, Payload, ok) ->
+                      lasp_logger:extended("Flushing update ~p", [Id]),
+                      ok = Backend:broadcast(Payload),
+                      lasp_logger:extended("Finished."),
+                      ok
               end, ok, Buffer0),
 
     %% Reset state.

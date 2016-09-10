@@ -582,8 +582,10 @@ handle_call({bind, Id, Value}, _From,
 handle_call({bind, Id, Metadata0, Value}, _From,
             #state{store=Store, counter=Counter}=State) ->
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
+    lager:info("binding value, result: ~p", [Result0]),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_MERG, Store]),
+    lager:info("declare if not found result, result: ~p", [Result]),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Bind two variables together.

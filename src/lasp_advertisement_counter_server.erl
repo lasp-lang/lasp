@@ -67,9 +67,9 @@ init([]) ->
     %% Schedule logging.
     schedule_logging(),
 
-    %% Delay for 30 seconds before creating objects.
+    %% Delay for 60 seconds before creating objects.
     %% TODO: Can we do better?
-    timer:sleep(30000),
+    timer:sleep(60000),
 
     %% Build DAG.
     {ok, AdList} = build_dag(),

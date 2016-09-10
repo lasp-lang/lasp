@@ -29,7 +29,8 @@
 %% API
 -export([start_link/0,
          start_link/1,
-         graph/0]).
+         graph/0,
+         was_connected/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -72,6 +73,9 @@ start_link(Opts) ->
 
 graph() ->
     gen_server:call(?MODULE, graph, infinity).
+
+was_connected() ->
+    gen_server:call(?MODULE, was_connected, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -131,6 +135,9 @@ init([]) ->
     {reply, term(), #state{}}.
 
 %% @private
+handle_call(was_connected, _From, #state{was_connected=WasConnected}=State) ->
+    {reply, {ok, WasConnected}, State};
+
 handle_call(graph, _From, #state{graph=Graph}=State) ->
     Vertices = digraph:vertices(Graph),
     Edges = lists:map(fun(Edge) ->
@@ -138,6 +145,7 @@ handle_call(graph, _From, #state{graph=Graph}=State) ->
                       {V1, V2}
               end, digraph:edges(Graph)),
     {reply, {ok, {Vertices, Edges}}, State};
+
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.

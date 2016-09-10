@@ -67,9 +67,8 @@ init([]) ->
     %% Schedule logging.
     schedule_logging(),
 
-    %% Delay for 60 seconds before creating objects.
-    %% TODO: Can we do better?
-    timer:sleep(60000),
+    %% Delay for graph connectedness.
+    wait_for_connectedness(),
 
     %% Build DAG.
     {ok, AdList} = build_dag(),
@@ -326,4 +325,14 @@ delete_marathon_app(DCOS, Token, AppName) ->
             ok;
         Other ->
             lager:info("Delete app ~p request failed: ~p", [AppName, Other])
+    end.
+
+%% @private
+wait_for_connectedness() ->
+    case sprinter:was_connected() of
+        true ->
+            ok;
+        false ->
+            timer:sleep(100),
+            wait_for_connectedness()
     end.

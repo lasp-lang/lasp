@@ -969,9 +969,11 @@ broadcast({Id, Type, Metadata, Value}=Payload) ->
                                    type=Type,
                                    metadata=Metadata,
                                    value=Value},
-            {_Time, Result} = timer:tc(plumtree_broadcast,
+            lager:info("Calling plumtree_broadcast..."),
+            {Time, Result} = timer:tc(plumtree_broadcast,
                                       broadcast,
                                       [Broadcast, ?MODULE]),
+            lager:info("Time: ~p; Result: ~p", [Time, Result]),
             Result;
         false ->
             ok
@@ -1278,6 +1280,5 @@ compute_exchange(Peers) ->
     end.
 
 %% @private
-buffer_broadcast({Id, _Type, _Metadata, _Value} = Payload) ->
-    lasp_logger:extended("Buffering update for ~p", [Id]),
+buffer_broadcast(Payload) ->
     lasp_broadcast_buffer:buffer(Payload).

@@ -186,12 +186,14 @@ broadcast_data(#broadcast{id=Id,
 merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
     case is_stale({Id, Clock}) of
         true ->
-            lager:info("Clock is not stale!"),
+            lager:info("Clock is stale!"),
             false;
         false ->
             %% Bind information.
-            {ok, _} = ?MODULE:local_bind(Id, Type, Metadata, Value),
-            lager:info("Local bind complete, returning true..."),
+            {ok, {Id, Type, NewMetadata, _Value}} = ?MODULE:local_bind(Id, Type, Metadata, Value),
+            OurClock = orddict:fetch(clock, NewMetadata),
+            lager:info("Local bind complete, their clock: ~p, our new clock: ~p",
+                       [Clock, OurClock]),
             true
     end;
 merge(BroadcastId, Payload) ->

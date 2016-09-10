@@ -185,14 +185,14 @@ broadcast_data(#broadcast{id=Id,
 merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
     case is_stale({Id, Clock}) of
         true ->
-            lager:info("merge: clock is stale!"),
+            lager:info("merge ~p: clock is stale!", [Id]),
             false;
         false ->
             %% Bind information.
             {ok, {_, _, NewMetadata, _}} = ?MODULE:local_bind(Id, Type, Metadata, Value),
             NewClock = orddict:fetch(clock, NewMetadata),
-            lager:info("merge: Incoming clock: ~p", [Clock]),
-            lager:info("merge: Merged clock: ~p", [NewClock]),
+            lager:info("merge ~p: Incoming clock: ~p", [Id, Clock]),
+            lager:info("merge ~p: Merged clock: ~p", [Id, NewClock]),
             true
     end;
 merge(BroadcastId, Payload) ->

@@ -175,6 +175,7 @@ broadcast_data(#broadcast{id=Id,
                           clock=Clock,
                           metadata=Metadata,
                           value=Value}) ->
+    lager:info("Generating broadcast_data..."),
     {{Id, Clock}, {Id, Type, Metadata, Value}}.
 
 %% @doc Perform a merge of an incoming object with an object in the
@@ -962,8 +963,10 @@ code_change(_OldVsn, State, _Extra) ->
 broadcast({Id, Type, Metadata, Value}=Payload) ->
     case lasp_config:get(broadcast, false) of
         true ->
+            lager:info("Logging transmission..."),
             PeerCount = length(plumtree_broadcast:broadcast_members()),
             log_transmission({broadcast, Payload}, PeerCount),
+            lager:info("Finished logging transmission..."),
             Clock = orddict:fetch(clock, Metadata),
             Broadcast = #broadcast{id=Id,
                                    clock=Clock,

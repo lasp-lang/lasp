@@ -122,6 +122,10 @@ init(_Args) ->
         false -> BaseSpecs0
     end,
 
+    %% Configure Plumtree logging.
+    TransLogMFA = {lasp_instrumentation, transmission, [broadcast]},
+    partisan_config:set(transmission_logging_mfa, TransLogMFA),
+
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
     InstrEnabled = application:get_env(?APP, instrumentation, InstrDefault),
     lasp_config:set(instrumentation, InstrEnabled),

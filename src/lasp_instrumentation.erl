@@ -25,6 +25,7 @@
 
 %% API
 -export([start_link/0,
+         transmission/2,
          transmission/3,
          memory/1,
          overcounting/1,
@@ -57,6 +58,10 @@
 -spec start_link()-> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+-spec transmission(term(), term()) -> ok | error().
+transmission(Type, Payload) ->
+    gen_server:call(?MODULE, {transmission, Type, Payload, 1}, infinity).
 
 -spec transmission(term(), term(), pos_integer()) -> ok | error().
 transmission(Type, Payload, PeerCount) ->
@@ -124,6 +129,7 @@ init([]) ->
 handle_call({transmission, Type, Payload, PeerCount}, _From, #state{size_per_type=Map0}=State) ->
     TransmissionType = get_transmission_type(Type),
     Size = termsize(Payload) * PeerCount,
+    lager:info("Received instrumentation for: ~p", [Size]),
     Current = case orddict:find(TransmissionType, Map0) of
         {ok, Value} ->
             Value;

@@ -960,15 +960,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-broadcast({Id, Type, Metadata, Value}=Payload) ->
+broadcast({Id, Type, Metadata, Value}) ->
     case lasp_config:get(broadcast, false) of
         true ->
-            lager:info("Getting peers..."),
-            PeerCount = length(plumtree_broadcast:broadcast_members()),
-            lager:info("Finished getting peers: ~p...", [PeerCount]),
-            lager:info("Logging transmission..."),
-            log_transmission({broadcast, Payload}, PeerCount),
-            lager:info("Finished logging transmission..."),
             Clock = orddict:fetch(clock, Metadata),
             Broadcast = #broadcast{id=Id,
                                    clock=Clock,

@@ -52,7 +52,8 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 -spec buffer(term()) -> ok | error().
-buffer(Payload) ->
+buffer({Id, _Type, _Metadata, _Value} = Payload) ->
+    lasp_logger:extended("Casting update for buffer of ~p", [Id]),
     gen_server:cast(?MODULE, {buffer, Payload}).
 
 %%%===================================================================
@@ -84,6 +85,8 @@ handle_call(Msg, _From, State) ->
 
 handle_cast({buffer, {Id, _Type, _Metadata, _Value} = Payload},
             #state{buffer=Buffer0}=State) ->
+    lasp_logger:extended("Buffering update for ~p", [Id]),
+
     Buffer = case lasp_config:get(broadcast, false) of
         true ->
             %% Buffer latest update for that state.

@@ -54,7 +54,7 @@
 -define(ARTIFACT_MESSAGE,  artifact).
 
 %% State record.
--record(state, {attempted_nodes, graph}).
+-record(state, {is_connected, was_connected, attempted_nodes, graph}).
 
 %%%===================================================================
 %%% API
@@ -121,7 +121,10 @@ init([]) ->
             %% All nodes should attempt to refresh the membership.
             timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE)
     end,
-    {ok, #state{attempted_nodes=sets:new(), graph=digraph:new()}}.
+    {ok, #state{is_connected=false,
+                was_connected=false,
+                attempted_nodes=sets:new(),
+                graph=digraph:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -210,7 +213,7 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
 
     timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
     {noreply, State};
-handle_info(?BUILD_GRAPH_MESSAGE, State) ->
+handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
     _ = lager:info("Beginning graph analysis."),
 
     %% Get all running nodes, because we need the list of *everything*
@@ -272,12 +275,14 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
                  end,
     Connected = sets:fold(ConnectedFun, true, Nodes),
 
-    case Connected of
+    IsConnected = case Connected of
         true ->
             lager:info("Graph is connected!");
         false ->
             lager:info("Graph is not connected!")
     end,
+
+    WasConnected = IsConnected orelse WasConnected0,
 
     case length(Orphaned) of
         0 ->
@@ -287,7 +292,10 @@ handle_info(?BUILD_GRAPH_MESSAGE, State) ->
     end,
 
     timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE),
-    {noreply, State#state{graph=Graph}};
+    {noreply, State#state{is_connected=IsConnected,
+                          was_connected=WasConnected,
+                          graph=Graph}};
+
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.

@@ -129,7 +129,6 @@ init([]) ->
 handle_call({transmission, Type, Payload, PeerCount}, _From, #state{size_per_type=Map0}=State) ->
     TransmissionType = get_transmission_type(Type),
     Size = termsize(Payload) * PeerCount,
-    lager:info("Received instrumentation for: ~p", [Size]),
     Current = case orddict:find(TransmissionType, Map0) of
         {ok, Value} ->
             Value;

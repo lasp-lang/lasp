@@ -69,6 +69,7 @@
 %% debug callbacks
 -export([local_bind/4]).
 
+%% broadcast interface
 -export([broadcast/1]).
 
 -include("lasp.hrl").

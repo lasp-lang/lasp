@@ -186,10 +186,12 @@ broadcast_data(#broadcast{id=Id,
 merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
     case is_stale({Id, Clock}) of
         true ->
+            lager:info("Clock is not stale!"),
             false;
         false ->
             %% Bind information.
             {ok, _} = ?MODULE:local_bind(Id, Type, Metadata, Value),
+            lager:info("Local bind complete, returning true..."),
             true
     end;
 merge(BroadcastId, Payload) ->
@@ -689,6 +691,7 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
         {ok, {_, _, Metadata, _}} ->
             OurClock = orddict:fetch(clock, Metadata),
             Stale = lasp_vclock:descends(OurClock, TheirClock),
+            lager:info("is_stale; stale: ~p our clock: ~p, their clock: ~p", [Stale, OurClock, TheirClock]),
             Stale;
         {error, _Error} ->
             false

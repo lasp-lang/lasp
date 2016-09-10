@@ -53,7 +53,7 @@ start_link() ->
 
 -spec buffer(term()) -> ok | error().
 buffer(Payload) ->
-    gen_server:call(?MODULE, {buffer, Payload}, infinity).
+    gen_server:cast(?MODULE, {buffer, Payload}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -74,8 +74,15 @@ init([]) ->
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({buffer, {Id, _Type, _Metadata, _Value} = Payload},
-            _From,
+%% @private
+handle_call(Msg, _From, State) ->
+    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    {reply, ok, State}.
+
+%% @private
+-spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
+
+handle_cast({buffer, {Id, _Type, _Metadata, _Value} = Payload},
             #state{buffer=Buffer0}=State) ->
     Buffer = case lasp_config:get(broadcast, false) of
         true ->
@@ -85,15 +92,8 @@ handle_call({buffer, {Id, _Type, _Metadata, _Value} = Payload},
             Buffer0
     end,
 
-    {reply, ok, State#state{buffer=Buffer}};
+    {noreply, State#state{buffer=Buffer}};
 
-%% @private
-handle_call(Msg, _From, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
-    {reply, ok, State}.
-
-%% @private
--spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 handle_cast(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.

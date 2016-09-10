@@ -185,14 +185,10 @@ broadcast_data(#broadcast{id=Id,
 merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
     case is_stale({Id, Clock}) of
         true ->
-            lager:info("merge ~p: clock is stale!", [Id]),
             false;
         false ->
             %% Bind information.
-            {ok, {_, _, NewMetadata, _}} = ?MODULE:local_bind(Id, Type, Metadata, Value),
-            NewClock = orddict:fetch(clock, NewMetadata),
-            lager:info("merge ~p: Incoming clock: ~p", [Id, Clock]),
-            lager:info("merge ~p: Merged clock: ~p", [Id, NewClock]),
+            {ok, _} = ?MODULE:local_bind(Id, Type, Metadata, Value),
             true
     end;
 merge(BroadcastId, Payload) ->
@@ -582,10 +578,8 @@ handle_call({bind, Id, Value}, _From,
 handle_call({bind, Id, Metadata0, Value}, _From,
             #state{store=Store, counter=Counter}=State) ->
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
-    lager:info("binding value, result: ~p", [Result0]),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_MERG, Store]),
-    lager:info("declare if not found result, result: ~p", [Result]),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
 %% Bind two variables together.
@@ -694,7 +688,6 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
         {ok, {_, _, Metadata, _}} ->
             OurClock = orddict:fetch(clock, Metadata),
             Stale = lasp_vclock:descends(OurClock, TheirClock),
-            lager:info("is_stale; stale: ~p our clock: ~p, their clock: ~p", [Stale, OurClock, TheirClock]),
             Stale;
         {error, _Error} ->
             false
@@ -975,7 +968,6 @@ broadcast({Id, Type, Metadata, Value}) ->
                                    type=Type,
                                    metadata=Metadata,
                                    value=Value},
-            lager:info("broadcast: generating message with clock: ~p", [Clock]),
             ok = plumtree_broadcast:broadcast(Broadcast, ?MODULE),
             ok;
         false ->

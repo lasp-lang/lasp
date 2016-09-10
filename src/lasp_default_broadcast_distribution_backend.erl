@@ -513,34 +513,6 @@ init([]) ->
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call(perform_broadcast,
-            _From,
-            #state{to_broadcast=ToBroadcast0}=State) ->
-
-    dict:fold(fun(Id, {Id, Type, Metadata, Value} = Payload, ok) ->
-                    PeerCount = length(plumtree_broadcast:broadcast_members()),
-                    log_transmission({broadcast, Payload}, PeerCount),
-                    Clock = orddict:fetch(clock, Metadata),
-                    Broadcast = #broadcast{id=Id,
-                                           clock=Clock,
-                                           type=Type,
-                                           metadata=Metadata,
-                                           value=Value},
-                    {Time, _Result} = timer:tc(plumtree_broadcast,
-                                              broadcast,
-                                              [Broadcast, ?MODULE]),
-                    lasp_logger:extended("Time to broadcast: ~p", [Time]),
-                    ok
-              end, ok, ToBroadcast0),
-
-    %% Reset state.
-    ToBroadcast = dict:new(),
-
-    %% Reschedule broadcast.
-    schedule_broadcast(),
-
-    {reply, ok, State#state{to_broadcast=ToBroadcast}};
-
 %% Buffer broadcast messages to prevent overload.
 handle_call({buffer_broadcast, {Id, _Type, _Metadata, _Value} = Payload},
             _From,
@@ -847,6 +819,32 @@ handle_info(plumtree_memory_report, State) ->
     schedule_plumtree_memory_report(),
 
     {noreply, State};
+
+handle_info(perform_broadcast, #state{to_broadcast=ToBroadcast0}=State) ->
+
+    dict:fold(fun(Id, {Id, Type, Metadata, Value} = Payload, ok) ->
+                    PeerCount = length(plumtree_broadcast:broadcast_members()),
+                    log_transmission({broadcast, Payload}, PeerCount),
+                    Clock = orddict:fetch(clock, Metadata),
+                    Broadcast = #broadcast{id=Id,
+                                           clock=Clock,
+                                           type=Type,
+                                           metadata=Metadata,
+                                           value=Value},
+                    {Time, _Result} = timer:tc(plumtree_broadcast,
+                                              broadcast,
+                                              [Broadcast, ?MODULE]),
+                    lasp_logger:extended("Time to broadcast: ~p", [Time]),
+                    ok
+              end, ok, ToBroadcast0),
+
+    %% Reset state.
+    ToBroadcast = dict:new(),
+
+    %% Reschedule broadcast.
+    schedule_broadcast(),
+
+    {noreply, State#state{to_broadcast=ToBroadcast}};
 
 handle_info(memory_utilization_report, State) ->
     %% Log

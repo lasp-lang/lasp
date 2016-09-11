@@ -62,7 +62,7 @@ init([]) ->
     lasp_config:set(simulation_end, false),
 
     %% Generate actor identifier.
-    Actor = self(),
+    Actor = node(),
 
     %% Schedule logging.
     schedule_logging(),
@@ -73,7 +73,7 @@ init([]) ->
     lasp_logger:extended("TBR Will create ads."),
 
     %% Build DAG.
-    {ok, AdList} = build_dag(),
+    {ok, AdList} = build_dag(Actor),
 
     %% Initialize triggers.
     launch_triggers(AdList, Actor),
@@ -173,7 +173,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-create_ads_and_contracts(Ads, Contracts) ->
+create_ads_and_contracts(Ads, Contracts, Actor) ->
     AdIds = lists:map(fun(_) ->
                               {ok, Unique} = lasp_unique:unique(),
                               Unique
@@ -181,7 +181,7 @@ create_ads_and_contracts(Ads, Contracts) ->
     lists:map(fun(Id) ->
                 {ok, _} = lasp:update(Contracts,
                                       {add, #contract{id=Id}},
-                                      node())
+                                      Actor)
                 end, AdIds),
     lists:map(fun(Id) ->
                 %% Generate a G-Counter.
@@ -190,25 +190,25 @@ create_ads_and_contracts(Ads, Contracts) ->
                 Ad = #ad{id=Id, name=Id, counter=CounterId},
 
                 %% Add it to the advertisement set.
-                {ok, _} = lasp:update(Ads, {add, Ad}, node()),
+                {ok, _} = lasp:update(Ads, {add, Ad}, Actor),
 
                 Ad
 
                 end, AdIds).
 
 %% @private
-build_dag() ->
+build_dag(Actor) ->
     %% For each identifier, generate a contract.
     {ContractsId, ContractsType} = ?CONTRACTS,
     {ok, {Contracts, _, _, _}} = lasp:declare(ContractsId, ContractsType),
 
     %% Generate Rovio's advertisements.
     {ok, {RovioAds, _, _, _}} = lasp:declare(?SET_TYPE),
-    RovioAdList = create_ads_and_contracts(RovioAds, Contracts),
+    RovioAdList = create_ads_and_contracts(RovioAds, Contracts, Actor),
 
     %% Generate Riot's advertisements.
     {ok, {RiotAds, _, _, _}} = lasp:declare(?SET_TYPE),
-    RiotAdList = create_ads_and_contracts(RiotAds, Contracts),
+    RiotAdList = create_ads_and_contracts(RiotAds, Contracts, Actor),
 
     %% Gather ads.
     AdList = RovioAdList ++ RiotAdList,

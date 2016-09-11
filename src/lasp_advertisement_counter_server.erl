@@ -69,6 +69,7 @@ init([]) ->
 
     %% Delay for graph connectedness.
     wait_for_connectedness(),
+    lasp_logger:extended("TBR Will create ads."),
 
     %% Build DAG.
     {ok, AdList} = build_dag(),

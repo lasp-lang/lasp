@@ -93,6 +93,10 @@ handle_cast(Msg, State) ->
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(log, #state{actor=Actor,
                         impressions=Impressions}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX log INFO message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     %% Get current value of the list of advertisements.
     {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
 
@@ -106,6 +110,10 @@ handle_info(log, #state{actor=Actor,
 handle_info(view, #state{actor=Actor,
                          impressions=Impressions0,
                          triggers=Triggers0}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX view INFO message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     %% Get current value of the list of advertisements.
     {ok, Ads0} = lasp:query(?ADS_WITH_CONTRACTS),
 
@@ -168,6 +176,10 @@ handle_info(view, #state{actor=Actor,
     {noreply, State#state{impressions=Impressions1, triggers=Triggers1}};
 
 handle_info(check_simulation_end, #state{actor=Actor}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX check_simulation_end INFO message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     %% A simulation ends for clients when all clients have
     %% observed all ads disabled (first component of the map in
     %% the simulation status instance is true for all clients)

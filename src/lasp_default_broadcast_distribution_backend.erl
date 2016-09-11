@@ -511,6 +511,10 @@ init([]) ->
 
 %% Reset all Lasp application state.
 handle_call(reset, _From, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX reset CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     %% Terminate all Lasp processes.
     _ = lasp_process_sup:terminate(),
 
@@ -523,6 +527,10 @@ handle_call(reset, _From, #state{store=Store}=State) ->
 %% broadcast the value to the remote nodes.
 handle_call({declare, Id, Type}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX declare/2 CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     Result = ?CORE:declare(Id, Type, ?CLOCK_INIT(Actor), Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
@@ -531,6 +539,10 @@ handle_call({declare, Id, Type}, _From,
 %% have local metadata.
 handle_call({declare, Id, IncomingMetadata, Type}, _From,
             #state{store=Store, counter=Counter}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX declare/3 CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     Metadata0 = case get(Id, Store) of
         {ok, {_, _, Metadata, _}} ->
             Metadata;
@@ -544,6 +556,10 @@ handle_call({declare, Id, IncomingMetadata, Type}, _From,
 %% metadata and result in the broadcast operation.
 handle_call({declare_dynamic, Id, Type}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX declare_dynamic CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT(Actor), Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
@@ -551,12 +567,20 @@ handle_call({declare_dynamic, Id, Type}, _From,
 %% stream can result in observable nondeterminism.
 %%
 handle_call({stream, Id, Function}, _From, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX stream CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     {ok, _Pid} = ?CORE:stream(Id, Function, Store),
     {reply, ok, State};
 
 %% Local query operation.
 %% Return the value of a value in the datastore to the user.
 handle_call({query, Id}, _From, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX query CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     {ok, Value} = ?CORE:query(Id, Store),
     {reply, {ok, Value}, State};
 
@@ -564,6 +588,10 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX bind/2 CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_INCR(Actor), Store]),
@@ -577,6 +605,10 @@ handle_call({bind, Id, Value}, _From,
 %% this could change if the other module is later refactored.
 handle_call({bind, Id, Metadata0, Value}, _From,
             #state{store=Store, counter=Counter}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX bind/3 CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_MERG, Store]),
@@ -584,6 +616,10 @@ handle_call({bind, Id, Metadata0, Value}, _From,
 
 %% Bind two variables together.
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX bind_to CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?WRITE, ?READ),
     {reply, ok, State};
 
@@ -595,6 +631,10 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 %%
 handle_call({update, Id, Operation, CRDTActor}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX update CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
                            ?CLOCK_INIT(Actor), Store),
     {ok, Result} = declare_if_not_found(Result0, Id, State, ?CORE, update,
@@ -605,16 +645,28 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
 handle_call({thread, Module, Function, Args},
             _From,
             #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX thread CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     ok = ?CORE:thread(Module, Function, Args, Store),
     {reply, ok, State};
 
 %% Block, enforcing lazy evaluation of the provided function.
 handle_call({wait_needed, Id, Threshold}, From, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX wait_needed CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     ReplyFun = fun(ReadThreshold) -> {reply, {ok, ReadThreshold}, State} end,
     ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
 
 %% Attempt to read a value.
 handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX read CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     ReplyFun = fun({_Id, Type, Metadata, Value}) ->
                     {reply, {ok, {_Id, Type, Metadata, Value}}, State};
                   ({error, Error}) ->
@@ -626,6 +678,10 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
 
 %% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX filter CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?WRITE, ?READ),
     {reply, ok, State};
 
@@ -633,6 +689,10 @@ handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
 handle_call({product, Left, Right, Product},
             _From,
             #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX product CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?WRITE,
                                ?READ, ?READ),
     {reply, ok, State};
@@ -641,23 +701,39 @@ handle_call({product, Left, Right, Product},
 handle_call({intersection, Left, Right, Intersection},
             _From,
             #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX intersection CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     {ok, _Pid} = ?CORE:intersection(Left, Right, Intersection, Store,
                                     ?WRITE, ?READ, ?READ),
     {reply, ok, State};
 
 %% Spawn a process to compute the union.
 handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX union CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?WRITE, ?READ,
                              ?READ),
     {reply, ok, State};
 
 %% Spawn a process to perform a map.
 handle_call({map, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX map CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?WRITE, ?READ),
     {reply, ok, State};
 
 %% Spawn a process to perform a fold.
 handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX fold CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     {ok, _Pid} = ?CORE:fold(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, ok, State};
 
@@ -667,6 +743,10 @@ handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
 %% given we've shown we already have some connection to retrieve data
 %% for that node.  If not, return the the value and repair the tree.
 handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX graft CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     Result = case get(Id, Store) of
         {ok, {Id, Type, Metadata, Value}} ->
             OurClock = orddict:fetch(clock, Metadata),
@@ -684,6 +764,10 @@ handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
 %% Given a message identifer, return stale if we've seen an object with
 %% a vector clock that's greater than the provided one.
 handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX is_stale CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     Result = case get(Id, Store) of
         {ok, {_, _, Metadata, _}} ->
             OurClock = orddict:fetch(clock, Metadata),
@@ -696,6 +780,10 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
 
 %% Naive anti-entropy mechanism; pairwise state shipping.
 handle_call({exchange, Peer}, _From, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX exchange CALL message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
@@ -718,6 +806,10 @@ handle_call(Msg, _From, State) ->
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
 handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX delta_exchange CAST message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     lasp_logger:extended("Exchange starting for ~p", [Peer]),
 
     {ok, AdsDisabledAndLogs} = ?CORE:query(?SIM_STATUS_ID, Store),
@@ -777,6 +869,10 @@ handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=St
 
 handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
             #state{store=Store, actor=Actor}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX aae_send CAST message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     ?CORE:receive_value(Store, {aae_send,
                                 From,
                                {Id, Type, _Metadata, Value},
@@ -793,6 +889,10 @@ handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
 
 handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
             #state{store=Store, actor=Actor}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX delta_send CAST message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     ?CORE:receive_delta(Store, {delta_send,
                                 From,
                                {Id, Type, _Metadata, Deltas},
@@ -809,6 +909,10 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
     {noreply, State};
 
 handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX delta_ack CAST message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     ?CORE:receive_delta(Store, {delta_ack, Id, From, Counter}),
     {noreply, State};
 
@@ -820,6 +924,10 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(plumtree_memory_report, State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX plumtree_memory_report INFO message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     %% Log
     plumtree_memory_report(),
 
@@ -829,6 +937,10 @@ handle_info(plumtree_memory_report, State) ->
     {noreply, State};
 
 handle_info(memory_utilization_report, State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX memory_utilization_report INFO message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     %% Log
     memory_utilization_report(),
 
@@ -838,6 +950,10 @@ handle_info(memory_utilization_report, State) ->
     {noreply, State};
 
 handle_info(aae_sync, #state{store=Store} = State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX aae_sync INFO message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     lasp_logger:extended("Beginning AAE synchronization."),
 
     %% Get the active set from the membership protocol.
@@ -856,6 +972,10 @@ handle_info(aae_sync, #state{store=Store} = State) ->
 
     {noreply, State};
 handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX delta_sync INFO message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     lasp_logger:extended("Beginning delta synchronization."),
 
     %% Get the active set from the membership protocol.
@@ -879,6 +999,10 @@ handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
 
     {noreply, State#state{sync_counter=SyncCounter+1}};
 handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX delta_gc INFO message processed; messages remaining: ~p",
+               [MessageQueueLen]),
+
     MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
     Function =
         fun({Id, #dv{delta_map=DeltaMap0, delta_ack_map=AckMap0,

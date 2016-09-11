@@ -117,7 +117,7 @@ init([]) ->
             schedule_artifact_upload(),
 
             %% All nodes should attempt to refresh the membership.
-            schedule_membership_refresh(),
+            schedule_membership_refresh()
     end,
     {ok, #state{is_connected=false,
                 was_connected=false,
@@ -187,7 +187,7 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     %% Attempt to connect nodes that are not connected.
     AttemptedNodes = maybe_connect(ToConnectNodes, SeenNodes),
 
-    shedule_membership_refresh(),
+    schedule_membership_refresh(),
 
     {noreply, State#state{attempted_nodes=AttemptedNodes}};
 handle_info(?ARTIFACT_MESSAGE, State) ->
@@ -207,7 +207,7 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
             lager:info("Could not upload artifact: ~p", [Error])
     end,
 
-    shedule_artifact_upload(),
+    schedule_artifact_upload(),
 
     {noreply, State};
 handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
@@ -443,20 +443,20 @@ servers_from_marathon() ->
     end.
 
 %% @private
-shedule_artifact_upload() ->
+schedule_build_graph() ->
+    %% Add random jitter.
+    Jitter = rand_compat:uniform(?BUILD_GRAPH_INTERVAL),
+    timer:send_after(?BUILD_GRAPH_INTERVAL + Jitter, ?BUILD_GRAPH_MESSAGE).
+
+%% @private
+schedule_artifact_upload() ->
     %% Add random jitter.
     Jitter = rand_compat:uniform(?ARTIFACT_INTERVAL),
-    timer:send_after(?ARTIFACT_INTERVAL + Interval, ?ARTIFACT_MESSAGE),
+    timer:send_after(?ARTIFACT_INTERVAL + Jitter, ?ARTIFACT_MESSAGE).
 
 %% @private
 schedule_membership_refresh() ->
     %% Add random jitter.
     Jitter = rand_compat:uniform(?REFRESH_INTERVAL),
-    timer:send_after(?REFRESH_INTERVAL + Interval, ?REFRESH_MESSAGE),
-
-%% @private
-schedule_build_graph() ->
-    %% Add random jitter.
-    Jitter = rand_compat:uniform(?BUILD_INTERVAL),
-    timer:send_after(?BUILD_INTERVAL + Interval, ?BUILD_MESSAGE),
+    timer:send_after(?REFRESH_INTERVAL + Jitter, ?REFRESH_MESSAGE).
 

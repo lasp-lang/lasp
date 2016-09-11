@@ -718,6 +718,9 @@ handle_call(Msg, _From, State) ->
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
 handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) ->
+    {ok, AdsDisabledAndLogs} = lasp:query(?SIM_STATUS_ID),
+    lasp_logger:extended("TBR current status structure ~n~n~p~n", [AdsDisabledAndLogs]),
+
     lasp_logger:extended("Exchange starting for ~p", [Peer]),
 
     Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,

@@ -68,6 +68,7 @@ init([]) ->
     schedule_logging(),
 
     %% Delay for graph connectedness.
+    lasp_logger:extended("TBR Waiting for connectedness."),
     wait_for_connectedness(),
     lasp_logger:extended("TBR Will create ads."),
 

@@ -71,7 +71,7 @@ do
 
       echo "Running $EVAL_ID with $CLIENT_NUMBER clients and a partition probability of $PARTITION_PROBABILITY"
 
-      wait_for_completion
+      wait_for_completion $TIMESTAMP
     done
   done
 done

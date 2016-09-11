@@ -2,6 +2,8 @@
 
 source helpers.sh
 
+TIMESTAMP_FILE=.LAST_TIMESTAMP
+
 ENV_VARS=(
   DCOS
   TOKEN
@@ -35,16 +37,23 @@ done
 
 echo ">>> Beginning deployment!"
 
-echo ">>> Removing lasp-server from Marathon"
-curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-server > /dev/null
-sleep 2
+if [ -e "$TIMESTAMP_FILE" ]; then
+  # Last timestamp used to deploy an experiment
+  LAST_TIMESTAMP=$(cat $TIMESTAMP_FILE)
 
-echo ">>> Removing lasp-client from Marathon"
-curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client > /dev/null
-sleep 2
+  echo ">>> Removing lasp-server-$LAST_TIMESTAMP from Marathon"
+  curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-server-$LAST_TIMESTAMP > /dev/null
+  sleep 2
 
-echo ">>> Waiting for Mesos to kill all tasks."
-wait_for_completion
+  echo ">>> Removing lasp-client-$LAST_TIMESTAMP from Marathon"
+  curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client-$LAST_TIMESTAMP > /dev/null
+  sleep 2
+
+  echo ">>> Waiting for Mesos to kill all tasks."
+  wait_for_completion $LAST_TIMESTAMP
+else
+  echo ">>> No apps to be removed from Marathon"
+fi
 
 echo ">>> Configuring Lasp"
 cd /tmp
@@ -62,7 +71,7 @@ cat <<EOF > lasp-server.json
   "acceptedResourceRoles": [
     "slave_public"
   ],
-  "id": "lasp-server",
+  "id": "lasp-server-$EVAL_TIMESTAMP",
   "dependencies": [],
   "constraints": [["hostname", "UNIQUE", ""]],
   "cpus": $SERVER_CPU,
@@ -121,7 +130,7 @@ cat <<EOF > lasp-server.json
 }
 EOF
 
-echo ">>> Adding lasp-server to Marathon"
+echo ">>> Adding lasp-server-$EVAL_TIMESTAMP to Marathon"
 curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-server.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
 sleep 10
 
@@ -130,7 +139,7 @@ cat <<EOF > lasp-client.json
   "acceptedResourceRoles": [
     "slave_public"
   ],
-  "id": "lasp-client",
+  "id": "lasp-client-$EVAL_TIMESTAMP",
   "dependencies": [],
   "cpus": $CLIENT_CPU,
   "mem": $CLIENT_MEMORY,
@@ -184,6 +193,8 @@ cat <<EOF > lasp-client.json
 }
 EOF
 
-echo ">>> Adding lasp-client to Marathon"
+echo ">>> Adding lasp-client-$EVAL_TIMESTAMP to Marathon"
 curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-client.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
 sleep 10
+
+echo $EVAL_TIMESTAMP > $TIMESTAMP_FILE

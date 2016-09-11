@@ -64,7 +64,7 @@ do
 
       echo "Running $EVAL_ID with $CLIENT_NUMBER clients"
 
-      wait_for_completion
+      wait_for_completion $TIMESTAMP
     done
   done
 done

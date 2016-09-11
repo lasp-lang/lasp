@@ -424,8 +424,10 @@ bucket_name() ->
 %% @private
 clients_from_marathon() ->
     DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
+    EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
+    ClientApp = "lasp-client-" ++ integer_to_list(EvalTimestamp),
 
-    case get_request(generate_task_url("lasp-client"), DecodeFun) of
+    case get_request(generate_task_url(ClientApp), DecodeFun) of
         {ok, Clients} ->
             generate_nodes(Clients);
         ClientError ->
@@ -436,8 +438,10 @@ clients_from_marathon() ->
 %% @private
 servers_from_marathon() ->
     DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
+    EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
+    ServerApp = "lasp-server-" ++ integer_to_list(EvalTimestamp),
 
-    case get_request(generate_task_url("lasp-server"), DecodeFun) of
+    case get_request(generate_task_url(ServerApp), DecodeFun) of
         {ok, Servers} ->
             generate_nodes(Servers);
         ServerError ->

@@ -302,17 +302,23 @@ compute_overcounting(AdList) ->
 %% @private
 stop_simulation() ->
     DCOS = os:getenv("DCOS", "false"),
-    Token = os:getenv("TOKEN", "undefined"),
 
     case list_to_atom(DCOS) of
         false ->
             ok;
         _ ->
+            Token = os:getenv("TOKEN", "undefined"),
+            EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
+            RunningApps = [
+                "lasp-client-" ++ integer_to_list(EvalTimestamp),
+                "lasp-server-" ++ integer_to_list(EvalTimestamp)
+            ],
+
             lists:foreach(
                 fun(AppName) ->
                     delete_marathon_app(DCOS, Token, AppName)
                 end,
-                ["lasp-client", "lasp-server"]
+                RunningApps
             )
     end.
 

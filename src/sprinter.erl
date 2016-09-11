@@ -226,7 +226,9 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
 
     %% Get all running nodes, because we need the list of *everything*
     %% to analyze the graph for connectedness.
-    Nodes = sets:union(clients_from_marathon(), servers_from_marathon()),
+    ClientsFromMarathon = clients_from_marathon(),
+    ServersFromMarathon = servers_from_marathon(),
+    Nodes = sets:union(ClientsFromMarathon, ServersFromMarathon),
 
     %% Build the graph.
     Graph = digraph:new(),
@@ -281,7 +283,8 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
                            end,
                            Result
                  end,
-    Connected = sets:fold(ConnectedFun, true, Nodes),
+    Connected = sets:fold(ConnectedFun, true, Nodes)
+        andalso sets:size(ClientsFromMarathon) == lasp_config:get(client_number, 3),
 
     IsConnected = case Connected of
         true ->

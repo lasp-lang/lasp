@@ -4,7 +4,7 @@ MAINTAINER Vitor Enes Duarte <vitorenesduarte@gmail.com>
 
 RUN cd /tmp && \
     apt-get update && \
-    apt-get -y install wget curl build-essential make gcc ruby-dev git expect gnuplot && \
+    apt-get -y install wget curl build-essential make gcc ruby-dev git expect gnuplot python && \
     wget http://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb && \
     dpkg -i erlang-solutions_1.0_all.deb && \
     apt-get update && \

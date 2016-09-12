@@ -190,6 +190,11 @@ configure_defaults() ->
     lager:info("Setting extended logging: ~p", [ExtendedLogging]),
     lasp_config:set(extended_logging, ExtendedLogging),
 
+    MailboxLoggingDefault = list_to_atom(os:getenv("MAILBOX_LOGGING", "false")),
+    MailboxLogging = application:get_env(?APP, mailbox_logging, MailboxLoggingDefault),
+    lager:info("Setting mailbox logging: ~p", [MailboxLogging]),
+    lasp_config:set(mailbox_logging, MailboxLogging),
+
     ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),
     Mode = application:get_env(?APP, mode, ModeDefault),
     lager:info("Setting operation mode: ~p", [Mode]),

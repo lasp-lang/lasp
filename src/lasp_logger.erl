@@ -22,13 +22,26 @@
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -export([extended/1,
-         extended/2]).
+         extended/2,
+         mailbox/1,
+         mailbox/2]).
 
 extended(Message) ->
     extended(Message, []).
 
 extended(Message, Args) ->
     case lasp_config:get(extended_logging, false) of
+        true ->
+            lager:info(Message, Args);
+        _ ->
+            ok
+    end.
+
+mailbox(Message) ->
+    mailbox(Message, []).
+
+mailbox(Message, Args) ->
+    case lasp_config:get(mailbox_logging, false) of
         true ->
             lager:info(Message, Args);
         _ ->

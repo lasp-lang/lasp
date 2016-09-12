@@ -103,9 +103,7 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(log, #state{}=State) ->
-    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
-    lager:info("MAILBOX log INFO message processed; messages remaining: ~p",
-               [MessageQueueLen]),
+    log_message_queue_size("log"),
 
     %% Print number of enabled ads.
     {ok, Ads} = lasp:query(?ADS),
@@ -118,9 +116,7 @@ handle_info(log, #state{}=State) ->
     {noreply, State};
 
 handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
-    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
-    lager:info("MAILBOX check_simulation_end INFO message processed; messages remaining: ~p",
-               [MessageQueueLen]),
+    log_message_queue_size("check_simulation_end"),
 
     %% A simulation ends for the server when all clients have
     %% observed that all clients observed all ads disabled and
@@ -357,3 +353,9 @@ wait_for_connectedness() ->
                     wait_for_connectedness()
             end
     end.
+
+%% @private
+log_message_queue_size(Method) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lasp_logger:mailbox("MAILBOX " ++ Method ++ " message processed; messages remaining: ~p", [MessageQueueLen]).
+

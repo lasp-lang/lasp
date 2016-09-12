@@ -34,7 +34,7 @@
   0},
  {<<"partisan">>,
   {git,"https://github.com/lasp-lang/partisan",
-       {ref,"2ee2dd902e32d4329c682d8facf95ed2322bf239"}},
+       {ref,"2f2f7866d994252c408a96581cdbd217eb905c97"}},
   0},
  {<<"plumtree">>,
   {git,"https://github.com/lasp-lang/plumtree",

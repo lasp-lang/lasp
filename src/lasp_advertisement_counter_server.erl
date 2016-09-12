@@ -68,10 +68,8 @@ init([]) ->
     schedule_logging(),
 
     %% Delay for graph connectedness.
-    lasp_logger:extended("TBR Waiting for connectedness."),
     wait_for_connectedness(),
     lasp_instrumentation:experiment_started(),
-    lasp_logger:extended("TBR Will create ads."),
 
     %% Build DAG.
     {ok, AdList} = build_dag(Actor),
@@ -146,13 +144,10 @@ handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
         true ->
             lager:info("All nodes have pushed their logs"),
             log_overcounting_and_convergence(AdList),
-            lasp_logger:extended("TBR Overcounting and convergence logged"),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(),
-            lasp_logger:extended("TBR Logs pushed"),
             lasp_config:set(simulation_end, true),
-            stop_simulation(),
-            lasp_logger:extended("TBR simulation stopped");
+            stop_simulation();
         false ->
             schedule_check_simulation_end()
     end,

@@ -766,28 +766,6 @@ handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=St
 
     lasp_logger:extended("Exchange starting for ~p", [Peer]),
 
-    {ok, AdsDisabledAndLogs} = ?CORE:query(?SIM_STATUS_ID, Store),
-    {DisabledCount, LogsCount} = lists:foldl(
-        fun({_Node, {Disabled, Logs}}, {DisabledCount0, LogsCount0}) ->
-            DisabledCount1 = case Disabled of
-                true ->
-                    DisabledCount0 + 1;
-                false ->
-                    DisabledCount0
-            end,
-            LogsCount1 = case Logs of
-                true ->
-                    LogsCount0 + 1;
-                false ->
-                    LogsCount0
-            end,
-            {DisabledCount1, LogsCount1}
-        end,
-        {0, 0},
-        AdsDisabledAndLogs
-    ),
-    lasp_logger:extended("TBR STATUS: ~p disabled | ~p logs pushed", [DisabledCount, LogsCount]),
-
     Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
                             delta_counter=Counter, delta_map=DeltaMap,
                             delta_ack_map=AckMap}},

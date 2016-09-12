@@ -341,7 +341,7 @@ delete_marathon_app(DCOS, Token, AppName) ->
 
 %% @private
 wait_for_connectedness() ->
-    case os:getenv("DCOS", "false") of
+    ok = case os:getenv("DCOS", "false") of
         "false" ->
             ok;
         _ ->
@@ -352,7 +352,9 @@ wait_for_connectedness() ->
                     timer:sleep(100),
                     wait_for_connectedness()
             end
-    end.
+    end,
+
+    lasp_instrumentation:experiment_started().
 
 %% @private
 log_message_queue_size(Method) ->

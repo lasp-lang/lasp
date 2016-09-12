@@ -276,7 +276,7 @@ configure_defaults() ->
                                       aae_interval,
                                       AAEIntervalDefault),
     lasp_config:set(aae_interval, AAEInterval),
-    application:set_env(plumtree, broadcast_exchange_timer, 5000),
+    application:set_env(plumtree, broadcast_exchange_timer, AAEInterval),
 
     %% Delta interval.
     DeltaIntervalDefault = list_to_integer(os:getenv("DELTA_INTERVAL", "10000")),

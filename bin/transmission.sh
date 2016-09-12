@@ -67,4 +67,6 @@ do
 
     wait_for_completion $TIMESTAMP
   done
+
+  echo "Evaluation $i of $EVAL_NUMBER completed!"
 done

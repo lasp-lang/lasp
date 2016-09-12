@@ -70,6 +70,7 @@ init([]) ->
     %% Delay for graph connectedness.
     lasp_logger:extended("TBR Waiting for connectedness."),
     wait_for_connectedness(),
+    lasp_instrumentation:experiment_started(),
     lasp_logger:extended("TBR Will create ads."),
 
     %% Build DAG.
@@ -341,7 +342,7 @@ delete_marathon_app(DCOS, Token, AppName) ->
 
 %% @private
 wait_for_connectedness() ->
-    ok = case os:getenv("DCOS", "false") of
+    case os:getenv("DCOS", "false") of
         "false" ->
             ok;
         _ ->
@@ -352,9 +353,7 @@ wait_for_connectedness() ->
                     timer:sleep(100),
                     wait_for_connectedness()
             end
-    end,
-
-    lasp_instrumentation:experiment_started().
+    end.
 
 %% @private
 log_message_queue_size(Method) ->

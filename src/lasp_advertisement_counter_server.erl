@@ -331,10 +331,15 @@ delete_marathon_app(DCOS, Token, AppName) ->
 
 %% @private
 wait_for_connectedness() ->
-    case sprinter:was_connected() of
-        true ->
+    case os:getenv("DCOS", "false") of
+        "false" ->
             ok;
-        false ->
-            timer:sleep(100),
-            wait_for_connectedness()
+        _ ->
+            case sprinter:was_connected() of
+                {ok, true} ->
+                    ok;
+                {ok, false} ->
+                    timer:sleep(100),
+                    wait_for_connectedness()
+            end
     end.

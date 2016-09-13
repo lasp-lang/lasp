@@ -77,7 +77,6 @@
 %% State record.
 -record(state, {store :: store(),
                 actor :: binary(),
-                sync_counter :: non_neg_integer(),
                 counter :: non_neg_integer(),
                 gc_counter :: non_neg_integer()}).
 
@@ -501,7 +500,6 @@ init([]) ->
 
     {ok, #state{actor=Actor,
                 counter=Counter,
-                sync_counter=0,
                 store=Store,
                 gc_counter=GCCounter}}.
 
@@ -891,7 +889,7 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     schedule_aae_synchronization(),
 
     {noreply, State};
-handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
+handle_info(delta_sync, #state{}=State) ->
     log_message_queue_size("delta_sync"),
 
     lasp_logger:extended("Beginning delta synchronization."),
@@ -915,7 +913,7 @@ handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
     %% Schedule next synchronization.
     schedule_delta_synchronization(),
 
-    {noreply, State#state{sync_counter=SyncCounter+1}};
+    {noreply, State#state{}};
 handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
     log_message_queue_size("delta_gc"),
 

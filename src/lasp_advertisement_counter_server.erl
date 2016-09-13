@@ -249,12 +249,14 @@ trigger(#ad{counter=CounterId} = Ad, Actor) ->
     %% Blocking threshold read for max advertisement impressions.
     MaxImpressions = lasp_config:get(max_impressions,
                                      ?MAX_IMPRESSIONS_DEFAULT),
-    {ok, _Value} = lasp:read(CounterId, {value, MaxImpressions}),
 
-    lager:info("Threshold for ~p reached; disabling!", [Ad]),
+    EnforceFun = fun() ->
+            lager:info("Threshold for ~p reached; disabling!", [Ad]),
 
-    %% Remove the advertisement.
-    {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor),
+            %% Remove the advertisement.
+            {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor)
+    end,
+    lasp:invariant(CounterId, {value, MaxImpressions}, EnforceFun),
 
     ok.
 

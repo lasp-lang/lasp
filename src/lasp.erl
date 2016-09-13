@@ -47,7 +47,16 @@
          wait_needed/2,
          thread/3]).
 
+-export([invariant/3]).
+
 %% Public Helpers
+
+%% @doc Invariant enforcing function; once a particular threhsold for an
+%%      object is met, then invoke the enforce function.
+%%
+invariant(Id, Threshold, EnforceFun) ->
+    {ok, _Value} = lasp:read(Id, Threshold),
+    EnforceFun().
 
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.

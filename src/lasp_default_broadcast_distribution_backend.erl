@@ -1239,7 +1239,7 @@ memory_utilization_report() ->
 
 %% @private
 send(Msg, Peer) ->
-    log_transmission(extract_type_and_payload(Msg), 1),
+    log_transmission(extract_log_type_and_payload(Msg), 1),
     PeerServiceManager = lasp_config:get(peer_service_manager,
                                          partisan_peer_service),
     case PeerServiceManager:forward_message(Peer, ?MODULE, Msg) of
@@ -1251,10 +1251,12 @@ send(Msg, Peer) ->
     end.
 
 %% @private
-extract_type_and_payload({Type, _From, Payload}) ->
-    {Type, Payload};
-extract_type_and_payload({Type, _From, Payload, _Count}) ->
-    {Type, Payload}.
+extract_log_type_and_payload({aae_send, _Node, {_Id, _Type, _Metadata, State}}) ->
+    {aae_send, State};
+extract_log_type_and_payload({delta_send, _Node, {_Id, _Type, _Metadata, Deltas}, Counter}) ->
+    {delta_send, {Deltas, Counter}};
+extract_log_type_and_payload({delta_ack, _Node, _Id, Counter}) ->
+    {delta_ack, Counter}.
 
 %% @private
 init_aae_sync(Peer, Store) ->

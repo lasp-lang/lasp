@@ -328,6 +328,6 @@ timestamp() ->
 
 %% @private
 get_transmission_type(aae_send) -> aae_send;
-get_transmission_type(broadcast) -> aae_send;
+get_transmission_type(broadcast) -> broadcast;
 get_transmission_type(delta_send) -> delta_send;
 get_transmission_type(delta_ack) -> delta_send.

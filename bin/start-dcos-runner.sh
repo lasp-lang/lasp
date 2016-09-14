@@ -7,6 +7,7 @@ ENV_VARS=(
   ELB_HOST
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
+  CLIENT_NUMBER
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -56,6 +57,7 @@ cat <<EOF > dcos-runner.json
     "ELB_HOST": "$ELB_HOST",
     "AWS_ACCESS_KEY_ID": "$AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY"
+    "CLIENT_NUMBER": "$CLIENT_NUMBER"
   },
   "healthChecks": []
 }

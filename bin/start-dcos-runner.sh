@@ -32,7 +32,7 @@ cat <<EOF > dcos-runner.json
   "acceptedResourceRoles": [
     "slave_public"
   ],
-  "id": "dcos-runner",
+  "id": "dcos-runner-$CLIENT_NUMBER",
   "dependencies": [],
   "constraints": [],
   "cpus": $CPU,
@@ -56,14 +56,14 @@ cat <<EOF > dcos-runner.json
     "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
     "ELB_HOST": "$ELB_HOST",
     "AWS_ACCESS_KEY_ID": "$AWS_ACCESS_KEY_ID",
-    "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY"
+    "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY",
     "CLIENT_NUMBER": "$CLIENT_NUMBER"
   },
   "healthChecks": []
 }
 EOF
 
-echo ">>> Adding dcos-runner to Marathon"
+echo ">>> Adding dcos-runner-$CLIENT_NUMBER to Marathon"
 curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @dcos-runner.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
 sleep 10
 

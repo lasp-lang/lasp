@@ -46,7 +46,7 @@ EVALUATIONS["code_peer_to_peer_overcounting"]="partisan_hyparview_peer_service_m
 
 for i in $(seq 1 $EVAL_NUMBER)
 do
-  echo "Running evaluation $i of $EVAL_NUMBER"
+  echo "[$(date +%T)] Running evaluation $i of $EVAL_NUMBER"
 
   for POW in $(seq $MIN_POW $MAX_POW)
   do
@@ -63,16 +63,16 @@ do
 
 
       if [ "$PEER_SERVICE" == "partisan_client_server_peer_service_manager" ] && [ "$CLIENT_NUMBER" -gt "128" ]; then
-        echo "Client-Server topology with $CLIENT_NUMBER clients is not supported"
+        echo "[$(date +%T)] Client-Server topology with $CLIENT_NUMBER clients is not supported"
       else
         PEER_SERVICE=$PEER_SERVICE MODE=$MODE BROADCAST=$BROADCAST SIMULATION=$SIMULATION EVAL_ID=$REAL_EVAL_ID EVAL_TIMESTAMP=$TIMESTAMP CLIENT_NUMBER=$CLIENT_NUMBER HEAVY_CLIENTS=$HEAVY_CLIENTS PARTITION_PROBABILITY=$PARTITION_PROBABILITY AAE_INTERVAL=$AAE_INTERVAL DELTA_INTERVAL=$DELTA_INTERVAL INSTRUMENTATION=$INSTRUMENTATION LOGS=$LOGS AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY EXTENDED_LOGGING=$EXTENDED_LOGGING MAILBOX_LOGGING=$MAILBOX_LOGGING ./dcos-deploy.sh
 
-        echo "Running $EVAL_ID with $CLIENT_NUMBER clients"
+        echo "[$(date +%T)] Running $EVAL_ID with $CLIENT_NUMBER clients"
 
         wait_for_completion $TIMESTAMP
       fi
     done
   done
 
-  echo "Evaluation $i of $EVAL_NUMBER completed!"
+  echo "[$(date +%T)] Evaluation $i of $EVAL_NUMBER completed!"
 done

@@ -54,7 +54,7 @@ EVALUATIONS["code_peer_to_peer_partition_overcounting"]="partisan_hyparview_peer
 
 for i in $(seq 1 $EVAL_NUMBER)
 do
-  echo "Running evaluation $i of $EVAL_NUMBER"
+  echo "[$(date +%T)] Running evaluation $i of $EVAL_NUMBER"
 
   for PARTITION_PROBABILITY in $PARTITIONS
   do
@@ -70,11 +70,11 @@ do
       PEER_SERVICE=$PEER_SERVICE MODE=$MODE BROADCAST=$BROADCAST SIMULATION=$SIMULATION EVAL_ID=$REAL_EVAL_ID EVAL_TIMESTAMP=$TIMESTAMP CLIENT_NUMBER=$CLIENT_NUMBER HEAVY_CLIENTS=$HEAVY_CLIENTS PARTITION_PROBABILITY=$PARTITION_PROBABILITY AAE_INTERVAL=$AAE_INTERVAL DELTA_INTERVAL=$DELTA_INTERVAL INSTRUMENTATION=$INSTRUMENTATION LOGS=$LOGS AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY EXTENDED_LOGGING=$EXTENDED_LOGGING MAILBOX_LOGGING=$MAILBOX_LOGGING ./dcos-deploy.sh
 
 
-      echo "Running $EVAL_ID with $CLIENT_NUMBER clients and a partition probability of $PARTITION_PROBABILITY"
+      echo "[$(date +%T)] Running $EVAL_ID with $CLIENT_NUMBER clients and a partition probability of $PARTITION_PROBABILITY"
 
       wait_for_completion $TIMESTAMP
     done
   done
 
-  echo "Evaluation $i of $EVAL_NUMBER completed!"
+  echo "[$(date +%T)] Evaluation $i of $EVAL_NUMBER completed!"
 done

@@ -8,6 +8,7 @@ ENV_VARS=(
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
   CLIENT_NUMBER
+  PARTITION_PROBABILITY
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -32,7 +33,7 @@ cat <<EOF > dcos-runner.json
   "acceptedResourceRoles": [
     "slave_public"
   ],
-  "id": "dcos-runner-$CLIENT_NUMBER",
+  "id": "dcos-runner-$CLIENT_NUMBER-$PARTITION_PROBABILITY",
   "dependencies": [],
   "constraints": [],
   "cpus": $CPU,
@@ -63,7 +64,7 @@ cat <<EOF > dcos-runner.json
 }
 EOF
 
-echo ">>> Adding dcos-runner-$CLIENT_NUMBER to Marathon"
+echo ">>> Adding dcos-runner-$CLIENT_NUMBER-$PARTITION_PROBABILITY to Marathon"
 curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @dcos-runner.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
 sleep 10
 

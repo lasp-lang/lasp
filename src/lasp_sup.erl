@@ -329,9 +329,9 @@ advertisement_counter_child_specs() ->
     lager:info("AdClientEnabled: ~p", [AdClientEnabled]),
 
     %% Give each client at least 100 impressions.
-    ClientNumberDefault = list_to_integer(os:getenv("CLIENT_NUMBER", "3")),
-    ClientNumber = lasp_config:get(client_number, ClientNumberDefault),
-    lasp_config:set(max_impressions, 10 * ClientNumber),
+    %ClientNumberDefault = list_to_integer(os:getenv("CLIENT_NUMBER", "3")),
+    %ClientNumber = lasp_config:get(client_number, ClientNumberDefault),
+    %lasp_config:set(max_impressions, 10 * ClientNumber),
 
     ClientSpecs = case AdClientEnabled of
         true ->

@@ -134,4 +134,4 @@
 -record(ad, {id, name, image, counter}).
 -record(contract, {id}).
 
--define(MAX_IMPRESSIONS_DEFAULT, 25).
+-define(MAX_IMPRESSIONS_DEFAULT, 100).

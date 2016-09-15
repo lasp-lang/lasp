@@ -207,7 +207,11 @@ start(_Case, _Config, Options) ->
                         %% Configure client number.
                         ClientNumber = proplists:get_value(client_number, Options),
                         ok = rpc:call(Node, lasp_config, set,
-                                      [client_number, ClientNumber])
+                                      [client_number, ClientNumber]),
+
+                        MaxImpressions = 10 * ClientNumber,
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [max_impressions, MaxImpressions])
                    end,
     lists:map(ConfigureFun, Nodes),
 

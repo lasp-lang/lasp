@@ -123,7 +123,7 @@
 -define(STATUS_INTERVAL, 10000).
 -define(EVAL_NUMBER, 1).
 -define(LOG_INTERVAL, 10000).
--define(ADS_NUMBER, 5).
+-define(ADS_NUMBER, 10).
 
 -define(DEFAULT_DISTRIBUTION_BACKEND, lasp_default_broadcast_distribution_backend).
 
@@ -134,4 +134,4 @@
 -record(ad, {id, name, image, counter}).
 -record(contract, {id}).
 
--define(MAX_IMPRESSIONS_DEFAULT, 50).
+-define(MAX_IMPRESSIONS_DEFAULT, 25).

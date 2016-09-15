@@ -58,6 +58,10 @@ start_link() ->
 init([]) ->
     lager:info("Advertisement counter server initialized."),
 
+    %% Delay for graph connectedness.
+    wait_for_connectedness(),
+    lasp_instrumentation:experiment_started(),
+
     %% Track whether simulation has ended or not.
     lasp_config:set(simulation_end, false),
 
@@ -66,10 +70,6 @@ init([]) ->
 
     %% Schedule logging.
     schedule_logging(),
-
-    %% Delay for graph connectedness.
-    wait_for_connectedness(),
-    lasp_instrumentation:experiment_started(),
 
     %% Build DAG.
     {ok, AdList} = build_dag(Actor),

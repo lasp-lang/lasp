@@ -361,5 +361,5 @@ wait_for_connectedness() ->
 %% @private
 log_message_queue_size(Method) ->
     {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
-    lasp_logger:mailbox("MAILBOX " ++ Method ++ " message processed; messages remaining: ~p", [MessageQueueLen]).
+    lager:info("MAILBOX " ++ Method ++ " message processed; messages remaining: ~p", [MessageQueueLen]).
 

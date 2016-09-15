@@ -9,6 +9,7 @@ ENV_VARS=(
   AWS_SECRET_ACCESS_KEY
   CLIENT_NUMBER
   PARTITION_PROBABILITY
+  ID
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -33,7 +34,7 @@ cat <<EOF > dcos-runner.json
   "acceptedResourceRoles": [
     "slave_public"
   ],
-  "id": "dcos-runner-$CLIENT_NUMBER-$PARTITION_PROBABILITY",
+  "id": "$ID-dcos-runner-$CLIENT_NUMBER-$PARTITION_PROBABILITY",
   "dependencies": [],
   "constraints": [],
   "cpus": $CPU,

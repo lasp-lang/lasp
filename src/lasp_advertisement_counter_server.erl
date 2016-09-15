@@ -144,10 +144,14 @@ handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
         true ->
             lager:info("All nodes have pushed their logs"),
             log_overcounting_and_convergence(AdList),
+            lager:info("TBR log_overcounting_and_convergence"),
             lasp_instrumentation:stop(),
+            lager:info("TBR lasp_instrumentation:stop()"),
             lasp_support:push_logs(),
+            lager:info("TBR lasp_support:push_logs"),
             lasp_config:set(simulation_end, true),
-            stop_simulation();
+            stop_simulation(),
+            lager:info("TBR stop_simulation()");
         false ->
             schedule_check_simulation_end()
     end,
@@ -328,10 +332,12 @@ stop_simulation() ->
 
 %% @private
 delete_marathon_app(DCOS, Token, AppName) ->
+    lager:info("TBR will delete ~p", [AppName]),
     Headers = [{"Authorization", "token=" ++ Token}],
     Url = DCOS ++ "/marathon/v2/apps/" ++ AppName,
     case httpc:request(delete, {Url, Headers}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, _Body}} ->
+            lager:info("TBR ~p deleted", [AppName]),
             ok;
         Other ->
             lager:info("Delete app ~p request failed: ~p", [AppName, Other])

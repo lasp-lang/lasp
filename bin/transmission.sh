@@ -45,7 +45,7 @@ EVALUATIONS["peer_to_peer_state_based_with_aae"]="partisan_hyparview_peer_servic
 ##EVALUATIONS["peer_to_peer_state_based_with_aae_and_tree"]="partisan_hyparview_peer_service_manager state_based true false"
 
 ## peer_to_peer_delta_based_with_aae_test
-#EVALUATIONS["peer_to_peer_delta_based_with_aae"]="partisan_hyparview_peer_service_manager delta_based false false"
+EVALUATIONS["peer_to_peer_delta_based_with_aae"]="partisan_hyparview_peer_service_manager delta_based false false"
 
 ## code_peer_to_peer_delta_based_with_aae
 EVALUATIONS["code_peer_to_peer_delta_based_with_aae"]="partisan_hyparview_peer_service_manager delta_based false true"

@@ -416,29 +416,25 @@ bucket_name() ->
 
 %% @private
 clients_from_marathon() ->
-    DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     ClientApp = "lasp-client-" ++ integer_to_list(EvalTimestamp),
-
-    case get_request(generate_task_url(ClientApp), DecodeFun) of
-        {ok, Clients} ->
-            generate_nodes(Clients);
-        ClientError ->
-            _ = lager:info("Invalid Marathon response: ~p", [ClientError]),
-            sets:new()
-    end.
+    app_tasks_from_marathon(ClientApp).
 
 %% @private
 servers_from_marathon() ->
-    DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     ServerApp = "lasp-server-" ++ integer_to_list(EvalTimestamp),
+    app_tasks_from_marathon(ServerApp).
 
-    case get_request(generate_task_url(ServerApp), DecodeFun) of
-        {ok, Servers} ->
-            generate_nodes(Servers);
-        ServerError ->
-            _ = lager:info("Invalid Marathon response: ~p", [ServerError]),
+%% @private
+app_tasks_from_marathon(App) ->
+    DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
+
+    case get_request(generate_task_url(App), DecodeFun) of
+        {ok, Tasks} ->
+            generate_nodes(Tasks);
+        Error ->
+            _ = lager:info("Invalid Marathon response: ~p", [Error]),
             sets:new()
     end.
 

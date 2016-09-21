@@ -23,8 +23,8 @@ done
 
 EVAL_NUMBER=1
 SIMULATION=ad_counter
-AAE_INTERVAL=20000
-DELTA_INTERVAL=20000
+AAE_INTERVAL=5000
+DELTA_INTERVAL=5000
 INSTRUMENTATION=true
 LOGS="s3"
 EXTENDED_LOGGING=true
@@ -36,7 +36,7 @@ declare -A EVALUATIONS
 EVALUATIONS["client_server_state_based_with_aae"]="partisan_client_server_peer_service_manager state_based false false"
 
 ## client_server_delta_based_with_aae_test
-EVALUATIONS["client_server_delta_based_with_aae"]="partisan_client_server_peer_service_manager delta_based false false"
+##EVALUATIONS["client_server_delta_based_with_aae"]="partisan_client_server_peer_service_manager delta_based false false"
 
 ## code_client_server_delta_based_with_aae_test
 #EVALUATIONS["code_client_server_delta_based_with_aae"]="partisan_client_server_peer_service_manager delta_based false true"
@@ -48,7 +48,7 @@ EVALUATIONS["peer_to_peer_state_based_with_aae"]="partisan_hyparview_peer_servic
 ##EVALUATIONS["peer_to_peer_state_based_with_aae_and_tree"]="partisan_hyparview_peer_service_manager state_based true false"
 
 ## peer_to_peer_delta_based_with_aae_test
-EVALUATIONS["peer_to_peer_delta_based_with_aae"]="partisan_hyparview_peer_service_manager delta_based false false"
+##EVALUATIONS["peer_to_peer_delta_based_with_aae"]="partisan_hyparview_peer_service_manager delta_based false false"
 
 ## code_peer_to_peer_delta_based_with_aae
 #EVALUATIONS["code_peer_to_peer_delta_based_with_aae"]="partisan_hyparview_peer_service_manager delta_based false true"

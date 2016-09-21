@@ -412,7 +412,7 @@ prefix(File) ->
 
 %% @private
 bucket_name() ->
-    "lasp-marathon-peer-refresh-service-metadata".
+    "lasp-sprinter-metadata".
 
 %% @private
 clients_from_marathon() ->

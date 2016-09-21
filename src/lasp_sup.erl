@@ -328,10 +328,22 @@ advertisement_counter_child_specs() ->
     lasp_config:set(ad_counter_simulation_client, AdClientEnabled),
     lager:info("AdClientEnabled: ~p", [AdClientEnabled]),
 
-    %% Give each client at least 100 impressions.
-    %ClientNumberDefault = list_to_integer(os:getenv("CLIENT_NUMBER", "3")),
-    %ClientNumber = lasp_config:get(client_number, ClientNumberDefault),
-    %lasp_config:set(max_impressions, 10 * ClientNumber),
+    %% - ADS_NUMBER is the number of ads per type
+    %% - We have two types: Rovio ads and Riot ads
+    %% - If we set ADS_NUMBER as 1, the total number of ads will be 2.
+    %%   TOTAL_ADS_NUMBER = ADS_NUMBER * 2
+    %% - We want an enough number of ads to keep the system running
+    %%   1 hour with 2 clients
+    %% - One client takes 0.5s + Jitter to do a random impression.
+    %%   (0.75s on average)
+    %% - One client, in 1 hour, will do on average
+    %%   3600 / 0.75 = 4800 impressions
+    %% - We should have 4800 * 2 = 9600 total impressions to keep the
+    %%   system running 1 hour with 2 clients
+    %% - The max number of impressions per ad should be
+    %%   9600 / TOTAL_ADS_NUMBER = 4800 / ADS_NUMBER
+    %%
+    lasp_config:set(max_impressions, 4800 / ?ADS_NUMBER),
 
     ClientSpecs = case AdClientEnabled of
         true ->

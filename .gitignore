@@ -38,3 +38,4 @@ priv/evaluation
 priv/lager
 src/lasp_sql_lexer.erl
 src/lasp_sql_parser.erl
+bin/a

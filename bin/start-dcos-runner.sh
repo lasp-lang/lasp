@@ -24,10 +24,10 @@ echo ">>> Configuring Runner"
 cd /tmp
 
 # Memory of VM.
-MEMORY=1024.0
+MEMORY=512.0
 
 # CPU of VM.
-CPU=1
+CPU=0.5
 
 cat <<EOF > dcos-runner.json
 {

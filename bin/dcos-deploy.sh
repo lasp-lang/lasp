@@ -60,11 +60,11 @@ echo ">>> Configuring Lasp"
 cd /tmp
 
 # Memory of each VM.
-SERVER_MEMORY=8192.0
+SERVER_MEMORY=2048.0
 CLIENT_MEMORY=1024.0
 
 # CPU of each VM.
-SERVER_CPU=4
+SERVER_CPU=2
 CLIENT_CPU=0.5
 
 cat <<EOF > lasp-server.json

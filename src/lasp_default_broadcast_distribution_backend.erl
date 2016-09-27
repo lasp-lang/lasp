@@ -810,14 +810,18 @@ handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
                                {Id, Type, _Metadata, Value},
                                ?CLOCK_INCR(Actor),
                                ?CLOCK_INIT(Actor)}),
-    %% In client-server, the server only reacts to client messages
-    %%case lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager andalso
-    %%     partisan_config:get(tag, undefined) == server of
-    %%    true ->
-    %%        init_aae_sync(From, Store);
-    %%    _ ->
-    %%        ok
-    %%end,
+
+    %% Send back just the updated state for the object received.
+    case i_am_server_and_should_react() of
+        true ->
+            ObjectFilterFun = fun(Id1) ->
+                                      Id =:= Id1
+                              end,
+            init_aae_sync(From, ObjectFilterFun, Store);
+        false ->
+            ok
+    end,
+
     {noreply, State};
 
 handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
@@ -829,15 +833,21 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
                                {Id, Type, _Metadata, Deltas},
                                ?CLOCK_INCR(Actor),
                                ?CLOCK_INIT(Actor)}),
+
+    %% Acknowledge message.
     send({delta_ack, node(), Id, Counter}, From),
-    %% In client-server, the server only reacts to client messages
-    %%case lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager andalso
-    %%     partisan_config:get(tag, undefined) == server of
-    %%    true ->
-    %%        init_delta_sync(From);
-    %%    _ ->
-    %%        ok
-    %%end,
+
+    %% Send back just the updated state for the object received.
+    case i_am_server_and_should_react() of
+        true ->
+            ObjectFilterFun = fun(Id1) ->
+                                      Id =:= Id1
+                              end,
+            init_delta_sync(From, ObjectFilterFun);
+        false ->
+            ok
+    end,
+
     {noreply, State};
 
 handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
@@ -1170,17 +1180,7 @@ schedule_aae_synchronization() ->
                     false;
                 false ->
                     not lasp_config:get(broadcast, false)
-                    %case lasp_config:get(broadcast, false) of
-                    %    false ->
-                    %        case lasp_config:get(peer_service_manager, partisan_peer_service) of
-                    %            partisan_client_server_peer_service_manager ->
-                    %                partisan_config:get(tag, client) == client;
-                    %            _ ->
-                    %                true
-                    %        end;
-                    %    true ->
-                    %        false
-                    %end
+                    orelse not i_am_server_and_should_react()
             end
     end,
 
@@ -1198,13 +1198,7 @@ schedule_aae_synchronization() ->
 schedule_delta_synchronization() ->
     ShouldDeltaSync = case lasp_config:get(mode, state_based) of
         delta_based ->
-            true;
-            %case lasp_config:get(peer_service_manager, partisan_peer_service) of
-            %    partisan_client_server_peer_service_manager ->
-            %        partisan_config:get(tag, client) == client;
-            %    _ ->
-            %        true
-            %end;
+            not i_am_server_and_should_react();
         state_based ->
             false
     end,
@@ -1281,6 +1275,11 @@ extract_log_type_and_payload({delta_ack, _Node, _Id, Counter}) ->
 
 %% @private
 init_aae_sync(Peer, Store) ->
+    ObjectFilterFun = fun(_) -> true end,
+    init_aae_sync(Peer, ObjectFilterFun, Store).
+
+%% @private
+init_aae_sync(Peer, ObjectFilterFun, Store) ->
     lasp_logger:extended("Initializing AAE synchronization with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
@@ -1288,8 +1287,13 @@ init_aae_sync(Peer, Store) ->
                             %% Ignore: this is a dynamic variable.
                             Acc0;
                         _ ->
-                            send({aae_send, node(), {Id, Type, Metadata, Value}}, Peer),
-                            [{ok, {Id, Type, Metadata, Value}}|Acc0]
+                            case ObjectFilterFun(Id) of
+                                true ->
+                                    send({aae_send, node(), {Id, Type, Metadata, Value}}, Peer),
+                                    [{ok, {Id, Type, Metadata, Value}}|Acc0];
+                                false ->
+                                    Acc0
+                            end
                     end
                end,
     %% TODO: Should this be parallel?
@@ -1369,3 +1373,24 @@ log_message_queue_size(Method) ->
 %% @private
 without_me(Members) ->
     Members -- [node()].
+
+%% @private
+i_am_server_and_should_react() ->
+    PeerServiceManager = lasp_config:get(peer_service_manager, partisan_peer_service),
+    case PeerServiceManager of
+        partisan_client_server_peer_service_manager ->
+            case partisan_config:get(tag, undefined) of
+                server ->
+                    case lasp_config:get(reactive_server, false) of
+                        true ->
+                            %% I'm the server in the reactive client-server mode.
+                            true;
+                        _ ->
+                            false
+                    end;
+                _ ->
+                    false
+            end;
+        _ ->
+            false
+    end.

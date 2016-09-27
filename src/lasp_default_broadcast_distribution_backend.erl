@@ -1180,17 +1180,7 @@ schedule_aae_synchronization() ->
                     false;
                 false ->
                     not lasp_config:get(broadcast, false)
-                    %case lasp_config:get(broadcast, false) of
-                    %    false ->
-                    %        case lasp_config:get(peer_service_manager, partisan_peer_service) of
-                    %            partisan_client_server_peer_service_manager ->
-                    %                partisan_config:get(tag, client) == client;
-                    %            _ ->
-                    %                true
-                    %        end;
-                    %    true ->
-                    %        false
-                    %end
+                    orelse not should_react()
             end
     end,
 
@@ -1208,13 +1198,7 @@ schedule_aae_synchronization() ->
 schedule_delta_synchronization() ->
     ShouldDeltaSync = case lasp_config:get(mode, state_based) of
         delta_based ->
-            true;
-            %case lasp_config:get(peer_service_manager, partisan_peer_service) of
-            %    partisan_client_server_peer_service_manager ->
-            %        partisan_config:get(tag, client) == client;
-            %    _ ->
-            %        true
-            %end;
+            not should_react();
         state_based ->
             false
     end,

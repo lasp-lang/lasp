@@ -29,6 +29,7 @@
          transmission/3,
          memory/1,
          overcounting/1,
+         experiment_started/0,
          convergence/0,
          stop/0,
          log_files/0]).
@@ -78,6 +79,10 @@ overcounting(Value) ->
 -spec convergence() -> ok | error().
 convergence() ->
     gen_server:call(?MODULE, convergence, infinity).
+
+-spec experiment_started() -> ok | error().
+experiment_started() ->
+    gen_server:call(?MODULE, experiment_started, infinity).
 
 -spec stop() -> ok | error().
 stop() ->
@@ -150,6 +155,10 @@ handle_call(convergence, _From, #state{}=State) ->
     record_convergence(),
     {reply, ok, State};
 
+handle_call(experiment_started, _From, #state{}=State) ->
+    record_experiment_started(),
+    {reply, ok, State};
+
 handle_call(stop, _From, #state{tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
     _ = lager:info("Instrumentation timer disabled!"),
@@ -193,7 +202,8 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 termsize(Term) ->
-    erts_debug:flat_size(Term) * erlang:system_info(wordsize).
+    byte_size(term_to_binary(Term)).
+    %%erts_debug:flat_size(Term) * erlang:system_info(wordsize).
 
 %% @private
 start_transmission_timer() ->
@@ -279,6 +289,13 @@ record_convergence() ->
     append_to_file(Filename, Line).
 
 %% @private
+record_experiment_started() ->
+    Filename = main_log(),
+    Timestamp = timestamp(),
+    Line = get_line(experiment_started, Timestamp, 0),
+    append_to_file(Filename, Line).
+
+%% @private
 record_overcounting(Value) ->
     lager:info("Overcounting ~p%", [Value]),
     Filename = overcounting_log(),
@@ -312,6 +329,6 @@ timestamp() ->
 
 %% @private
 get_transmission_type(aae_send) -> aae_send;
-get_transmission_type(broadcast) -> aae_send;
+get_transmission_type(broadcast) -> broadcast;
 get_transmission_type(delta_send) -> delta_send;
 get_transmission_type(delta_ack) -> delta_send.

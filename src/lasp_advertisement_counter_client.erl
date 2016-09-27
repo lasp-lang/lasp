@@ -58,7 +58,7 @@ init([]) ->
     lager:info("Advertisement counter client initialized."),
 
     %% Generate actor identifier.
-    Actor = self(),
+    Actor = node(),
 
     %% Schedule advertisement counter impression.
     schedule_impression(),
@@ -91,11 +91,14 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(log, #state{impressions=Impressions}=State) ->
+handle_info(log, #state{actor=Actor,
+                        impressions=Impressions}=State) ->
+    log_message_queue_size("log"),
+
     %% Get current value of the list of advertisements.
     {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
 
-    lager:info("Impressions: ~p, current ad size: ~p, node: ~p", [Impressions, sets:size(Ads), node()]),
+    lager:info("Impressions: ~p, current ad size: ~p, node: ~p", [Impressions, sets:size(Ads), Actor]),
 
     %% Schedule advertisement counter impression.
     schedule_logging(),
@@ -105,6 +108,8 @@ handle_info(log, #state{impressions=Impressions}=State) ->
 handle_info(view, #state{actor=Actor,
                          impressions=Impressions0,
                          triggers=Triggers0}=State) ->
+    log_message_queue_size("view"),
+
     %% Get current value of the list of advertisements.
     {ok, Ads0} = lasp:query(?ADS_WITH_CONTRACTS),
 
@@ -154,7 +159,7 @@ handle_info(view, #state{actor=Actor,
     %% - Else, keep doing impressions
     case sets:size(Ads) == 0 andalso not lasp_type:is_bottom(AdsType, AdsValue) of
         true ->
-            lager:info("All ads are disabled. Node: ~p", [node()]),
+            lager:info("All ads are disabled. Node: ~p", [Actor]),
 
             %% Update Simulation Status Instance
             lasp:update(?SIM_STATUS_ID, {apply, Actor, {fst, true}}, Actor),
@@ -167,6 +172,8 @@ handle_info(view, #state{actor=Actor,
     {noreply, State#state{impressions=Impressions1, triggers=Triggers1}};
 
 handle_info(check_simulation_end, #state{actor=Actor}=State) ->
+    log_message_queue_size("check_simulation_end"),
+
     %% A simulation ends for clients when all clients have
     %% observed all ads disabled (first component of the map in
     %% the simulation status instance is true for all clients)
@@ -181,7 +188,7 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
 
     case length(NodesWithAdsDisabled) == client_number() of
         true ->
-            lager:info("All nodes observed ads disabled. Node ~p", [node()]),
+            lager:info("All nodes observed ads disabled. Node ~p", [Actor]),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(),
             lasp:update(?SIM_STATUS_ID, {apply, Actor, {snd, true}}, Actor);
@@ -266,3 +273,9 @@ trigger(#ad{counter=CounterId} = Ad, Actor) ->
     {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor),
 
     ok.
+
+%% @private
+log_message_queue_size(Method) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lasp_logger:mailbox("MAILBOX " ++ Method ++ " message processed; messages remaining: ~p", [MessageQueueLen]).
+

@@ -42,16 +42,13 @@
 
 -include("lasp.hrl").
 
--define(REFRESH_INTERVAL, 2000).
+-define(REFRESH_INTERVAL, 20000).
 -define(REFRESH_MESSAGE,  refresh).
 
--define(NODES_INTERVAL, 20000).
--define(NODES_MESSAGE,  nodes).
-
--define(BUILD_GRAPH_INTERVAL, 120000).
+-define(BUILD_GRAPH_INTERVAL, 20000).
 -define(BUILD_GRAPH_MESSAGE,  build_graph).
 
--define(ARTIFACT_INTERVAL, 1000).
+-define(ARTIFACT_INTERVAL, 20000).
 -define(ARTIFACT_MESSAGE,  artifact).
 
 %% State record.
@@ -107,23 +104,20 @@ init([]) ->
                     ok
             end,
 
-            %% Stall messages; Plumtree has a race on startup, again.
-            timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
-
             %% Only construct the graph and attempt to repair the graph
             %% from the designated server node.
             case partisan_config:get(tag, client) of
                 server ->
-                    timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE);
+                    schedule_build_graph();
                 client ->
                     ok
             end,
 
             %% All nodes should upload artifacts.
-            timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
+            schedule_artifact_upload(),
 
             %% All nodes should attempt to refresh the membership.
-            timer:send_after(?REFRESH_INTERVAL, ?REFRESH_MESSAGE)
+            schedule_membership_refresh()
     end,
     {ok, #state{is_connected=false,
                 was_connected=false,
@@ -193,15 +187,9 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     %% Attempt to connect nodes that are not connected.
     AttemptedNodes = maybe_connect(ToConnectNodes, SeenNodes),
 
-    %% Add random jitter.
-    Jitter = rand_compat:uniform(?REFRESH_INTERVAL),
-    timer:send_after(?REFRESH_INTERVAL + Jitter, ?REFRESH_MESSAGE),
+    schedule_membership_refresh(),
 
     {noreply, State#state{attempted_nodes=AttemptedNodes}};
-handle_info(?NODES_MESSAGE, State) ->
-    %% Do nothing right now.
-    timer:send_after(?NODES_INTERVAL, ?NODES_MESSAGE),
-    {noreply, State};
 handle_info(?ARTIFACT_MESSAGE, State) ->
     %% Get bucket name.
     BucketName = bucket_name(),
@@ -219,14 +207,17 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
             lager:info("Could not upload artifact: ~p", [Error])
     end,
 
-    timer:send_after(?ARTIFACT_INTERVAL, ?ARTIFACT_MESSAGE),
+    schedule_artifact_upload(),
+
     {noreply, State};
 handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
     _ = lager:info("Beginning graph analysis."),
 
     %% Get all running nodes, because we need the list of *everything*
     %% to analyze the graph for connectedness.
-    Nodes = sets:union(clients_from_marathon(), servers_from_marathon()),
+    ClientsFromMarathon = clients_from_marathon(),
+    ServersFromMarathon = servers_from_marathon(),
+    Nodes = sets:union(ClientsFromMarathon, ServersFromMarathon),
 
     %% Build the graph.
     Graph = digraph:new(),
@@ -281,7 +272,8 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
                            end,
                            Result
                  end,
-    Connected = sets:fold(ConnectedFun, true, Nodes),
+    Connected = sets:fold(ConnectedFun, true, Nodes)
+        andalso sets:size(ClientsFromMarathon) == lasp_config:get(client_number, 3),
 
     IsConnected = case Connected of
         true ->
@@ -301,7 +293,8 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
             lager:info("~p isolated nodes: ~p", [Length, Orphaned])
     end,
 
-    timer:send_after(?BUILD_GRAPH_INTERVAL, ?BUILD_GRAPH_MESSAGE),
+    schedule_build_graph(),
+
     {noreply, State#state{is_connected=IsConnected,
                           was_connected=WasConnected,
                           graph=Graph}};
@@ -419,28 +412,47 @@ prefix(File) ->
 
 %% @private
 bucket_name() ->
-    "lasp-marathon-peer-refresh-service-metadata".
+    "lasp-sprinter-metadata".
 
 %% @private
 clients_from_marathon() ->
+    EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
+    ClientApp = "lasp-client-" ++ integer_to_list(EvalTimestamp),
+    app_tasks_from_marathon(ClientApp).
+
+%% @private
+servers_from_marathon() ->
+    EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
+    ServerApp = "lasp-server-" ++ integer_to_list(EvalTimestamp),
+    app_tasks_from_marathon(ServerApp).
+
+%% @private
+app_tasks_from_marathon(App) ->
     DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
 
-    case get_request(generate_task_url("lasp-client"), DecodeFun) of
-        {ok, Clients} ->
-            generate_nodes(Clients);
-        ClientError ->
-            _ = lager:info("Invalid Marathon response: ~p", [ClientError]),
+    case get_request(generate_task_url(App), DecodeFun) of
+        {ok, Tasks} ->
+            generate_nodes(Tasks);
+        Error ->
+            _ = lager:info("Invalid Marathon response: ~p", [Error]),
             sets:new()
     end.
 
 %% @private
-servers_from_marathon() ->
-    DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
+schedule_build_graph() ->
+    %% Add random jitter.
+    Jitter = rand_compat:uniform(?BUILD_GRAPH_INTERVAL),
+    timer:send_after(?BUILD_GRAPH_INTERVAL + Jitter, ?BUILD_GRAPH_MESSAGE).
 
-    case get_request(generate_task_url("lasp-server"), DecodeFun) of
-        {ok, Servers} ->
-            generate_nodes(Servers);
-        ServerError ->
-            _ = lager:info("Invalid Marathon response: ~p", [ServerError]),
-            sets:new()
-    end.
+%% @private
+schedule_artifact_upload() ->
+    %% Add random jitter.
+    Jitter = rand_compat:uniform(?ARTIFACT_INTERVAL),
+    timer:send_after(?ARTIFACT_INTERVAL + Jitter, ?ARTIFACT_MESSAGE).
+
+%% @private
+schedule_membership_refresh() ->
+    %% Add random jitter.
+    Jitter = rand_compat:uniform(?REFRESH_INTERVAL),
+    timer:send_after(?REFRESH_INTERVAL + Jitter, ?REFRESH_MESSAGE).
+

@@ -58,20 +58,21 @@ start_link() ->
 init([]) ->
     lager:info("Advertisement counter server initialized."),
 
+    %% Delay for graph connectedness.
+    wait_for_connectedness(),
+    lasp_instrumentation:experiment_started(),
+
     %% Track whether simulation has ended or not.
     lasp_config:set(simulation_end, false),
 
     %% Generate actor identifier.
-    Actor = self(),
+    Actor = node(),
 
     %% Schedule logging.
     schedule_logging(),
 
-    %% Delay for graph connectedness.
-    wait_for_connectedness(),
-
     %% Build DAG.
-    {ok, AdList} = build_dag(),
+    {ok, AdList} = build_dag(Actor),
 
     %% Initialize triggers.
     launch_triggers(AdList, Actor),
@@ -101,6 +102,8 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(log, #state{}=State) ->
+    log_message_queue_size("log"),
+
     %% Print number of enabled ads.
     {ok, Ads} = lasp:query(?ADS),
 
@@ -112,6 +115,8 @@ handle_info(log, #state{}=State) ->
     {noreply, State};
 
 handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
+    log_message_queue_size("check_simulation_end"),
+
     %% A simulation ends for the server when all clients have
     %% observed that all clients observed all ads disabled and
     %% pushed their logs (second component of the map in
@@ -139,13 +144,10 @@ handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
         true ->
             lager:info("All nodes have pushed their logs"),
             log_overcounting_and_convergence(AdList),
-            lasp_logger:extended("TBR Overcounting and convergence logged"),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(),
-            lasp_logger:extended("TBR Logs pushed"),
             lasp_config:set(simulation_end, true),
-            stop_simulation(),
-            lasp_logger:extended("TBR simulation stopped");
+            stop_simulation();
         false ->
             schedule_check_simulation_end()
     end,
@@ -171,7 +173,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-create_ads_and_contracts(Ads, Contracts) ->
+create_ads_and_contracts(Ads, Contracts, Actor) ->
     AdIds = lists:map(fun(_) ->
                               {ok, Unique} = lasp_unique:unique(),
                               Unique
@@ -179,7 +181,7 @@ create_ads_and_contracts(Ads, Contracts) ->
     lists:map(fun(Id) ->
                 {ok, _} = lasp:update(Contracts,
                                       {add, #contract{id=Id}},
-                                      node())
+                                      Actor)
                 end, AdIds),
     lists:map(fun(Id) ->
                 %% Generate a G-Counter.
@@ -188,25 +190,25 @@ create_ads_and_contracts(Ads, Contracts) ->
                 Ad = #ad{id=Id, name=Id, counter=CounterId},
 
                 %% Add it to the advertisement set.
-                {ok, _} = lasp:update(Ads, {add, Ad}, node()),
+                {ok, _} = lasp:update(Ads, {add, Ad}, Actor),
 
                 Ad
 
                 end, AdIds).
 
 %% @private
-build_dag() ->
+build_dag(Actor) ->
     %% For each identifier, generate a contract.
     {ContractsId, ContractsType} = ?CONTRACTS,
     {ok, {Contracts, _, _, _}} = lasp:declare(ContractsId, ContractsType),
 
     %% Generate Rovio's advertisements.
     {ok, {RovioAds, _, _, _}} = lasp:declare(?SET_TYPE),
-    RovioAdList = create_ads_and_contracts(RovioAds, Contracts),
+    RovioAdList = create_ads_and_contracts(RovioAds, Contracts, Actor),
 
     %% Generate Riot's advertisements.
     {ok, {RiotAds, _, _, _}} = lasp:declare(?SET_TYPE),
-    RiotAdList = create_ads_and_contracts(RiotAds, Contracts),
+    RiotAdList = create_ads_and_contracts(RiotAds, Contracts, Actor),
 
     %% Gather ads.
     AdList = RovioAdList ++ RiotAdList,
@@ -249,12 +251,14 @@ trigger(#ad{counter=CounterId} = Ad, Actor) ->
     %% Blocking threshold read for max advertisement impressions.
     MaxImpressions = lasp_config:get(max_impressions,
                                      ?MAX_IMPRESSIONS_DEFAULT),
-    {ok, _Value} = lasp:read(CounterId, {value, MaxImpressions}),
 
-    lager:info("Threshold for ~p reached; disabling!", [Ad]),
+    EnforceFun = fun() ->
+            lager:info("Threshold for ~p reached; disabling!", [Ad]),
 
-    %% Remove the advertisement.
-    {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor),
+            %% Remove the advertisement.
+            {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor)
+    end,
+    lasp:invariant(CounterId, {value, MaxImpressions}, EnforceFun),
 
     ok.
 
@@ -302,17 +306,23 @@ compute_overcounting(AdList) ->
 %% @private
 stop_simulation() ->
     DCOS = os:getenv("DCOS", "false"),
-    Token = os:getenv("TOKEN", "undefined"),
 
     case list_to_atom(DCOS) of
         false ->
             ok;
         _ ->
+            Token = os:getenv("TOKEN", "undefined"),
+            EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
+            RunningApps = [
+                "lasp-client-" ++ integer_to_list(EvalTimestamp),
+                "lasp-server-" ++ integer_to_list(EvalTimestamp)
+            ],
+
             lists:foreach(
                 fun(AppName) ->
                     delete_marathon_app(DCOS, Token, AppName)
                 end,
-                ["lasp-client", "lasp-server"]
+                RunningApps
             )
     end.
 
@@ -341,3 +351,9 @@ wait_for_connectedness() ->
                     wait_for_connectedness()
             end
     end.
+
+%% @private
+log_message_queue_size(Method) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lager:info("MAILBOX " ++ Method ++ " message processed; messages remaining: ~p", [MessageQueueLen]).
+

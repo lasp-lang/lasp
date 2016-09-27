@@ -190,11 +190,6 @@ start(_Case, _Config, Options) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [simulation, Simulation]),
 
-                        %% Configure evaluation identifier.
-                        EvalIdentifier = proplists:get_value(evaluation_identifier, Options),
-                        ok = rpc:call(Node, lasp_config, set,
-                                      [evaluation_identifier, EvalIdentifier]),
-
                         %% Configure evaluation timestamp.
                         EvalTimestamp = proplists:get_value(evaluation_timestamp, Options),
                         ok = rpc:call(Node, lasp_config, set,
@@ -207,7 +202,20 @@ start(_Case, _Config, Options) ->
                         %% Configure client number.
                         ClientNumber = proplists:get_value(client_number, Options),
                         ok = rpc:call(Node, lasp_config, set,
-                                      [client_number, ClientNumber])
+                                      [client_number, ClientNumber]),
+
+                        %% Configure evaluation identifier.
+                        EvalIdentifier = proplists:get_value(evaluation_identifier, Options),
+                        RealEvalIdentifier = atom_to_list(EvalIdentifier)
+                                          ++ "_" ++ integer_to_list(ClientNumber)
+                                          ++ "_" ++ integer_to_list(PartitionProbability),
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [evaluation_identifier, list_to_atom(RealEvalIdentifier)]),
+
+                        %% Configure max impression number
+                        MaxImpressions = 10,
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [max_impressions, MaxImpressions])
                    end,
     lists:map(ConfigureFun, Nodes),
 

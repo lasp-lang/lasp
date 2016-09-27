@@ -77,7 +77,6 @@
 %% State record.
 -record(state, {store :: store(),
                 actor :: binary(),
-                sync_counter :: non_neg_integer(),
                 counter :: non_neg_integer(),
                 gc_counter :: non_neg_integer()}).
 
@@ -501,7 +500,6 @@ init([]) ->
 
     {ok, #state{actor=Actor,
                 counter=Counter,
-                sync_counter=0,
                 store=Store,
                 gc_counter=GCCounter}}.
 
@@ -511,6 +509,8 @@ init([]) ->
 
 %% Reset all Lasp application state.
 handle_call(reset, _From, #state{store=Store}=State) ->
+    log_message_queue_size("reset"),
+
     %% Terminate all Lasp processes.
     _ = lasp_process_sup:terminate(),
 
@@ -523,6 +523,8 @@ handle_call(reset, _From, #state{store=Store}=State) ->
 %% broadcast the value to the remote nodes.
 handle_call({declare, Id, Type}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    log_message_queue_size("declare/2"),
+
     Result = ?CORE:declare(Id, Type, ?CLOCK_INIT(Actor), Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
@@ -531,6 +533,8 @@ handle_call({declare, Id, Type}, _From,
 %% have local metadata.
 handle_call({declare, Id, IncomingMetadata, Type}, _From,
             #state{store=Store, counter=Counter}=State) ->
+    log_message_queue_size("declare/3"),
+
     Metadata0 = case get(Id, Store) of
         {ok, {_, _, Metadata, _}} ->
             Metadata;
@@ -544,6 +548,8 @@ handle_call({declare, Id, IncomingMetadata, Type}, _From,
 %% metadata and result in the broadcast operation.
 handle_call({declare_dynamic, Id, Type}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    log_message_queue_size("declare_dynamic"),
+
     Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT(Actor), Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
 
@@ -551,12 +557,16 @@ handle_call({declare_dynamic, Id, Type}, _From,
 %% stream can result in observable nondeterminism.
 %%
 handle_call({stream, Id, Function}, _From, #state{store=Store}=State) ->
+    log_message_queue_size("stream"),
+
     {ok, _Pid} = ?CORE:stream(Id, Function, Store),
     {reply, ok, State};
 
 %% Local query operation.
 %% Return the value of a value in the datastore to the user.
 handle_call({query, Id}, _From, #state{store=Store}=State) ->
+    log_message_queue_size("query"),
+
     {ok, Value} = ?CORE:query(Id, Store),
     {reply, {ok, Value}, State};
 
@@ -564,6 +574,8 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    log_message_queue_size("bind/2"),
+
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_INCR(Actor), Store]),
@@ -577,6 +589,8 @@ handle_call({bind, Id, Value}, _From,
 %% this could change if the other module is later refactored.
 handle_call({bind, Id, Metadata0, Value}, _From,
             #state{store=Store, counter=Counter}=State) ->
+    log_message_queue_size("bind/3"),
+
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_MERG, Store]),
@@ -584,6 +598,8 @@ handle_call({bind, Id, Metadata0, Value}, _From,
 
 %% Bind two variables together.
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
+    log_message_queue_size("bind_to"),
+
     {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?WRITE, ?READ),
     {reply, ok, State};
 
@@ -595,6 +611,8 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 %%
 handle_call({update, Id, Operation, CRDTActor}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
+    log_message_queue_size("update"),
+
     Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
                            ?CLOCK_INIT(Actor), Store),
     {ok, Result} = declare_if_not_found(Result0, Id, State, ?CORE, update,
@@ -605,16 +623,22 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
 handle_call({thread, Module, Function, Args},
             _From,
             #state{store=Store}=State) ->
+    log_message_queue_size("thread"),
+
     ok = ?CORE:thread(Module, Function, Args, Store),
     {reply, ok, State};
 
 %% Block, enforcing lazy evaluation of the provided function.
 handle_call({wait_needed, Id, Threshold}, From, #state{store=Store}=State) ->
+    log_message_queue_size("wait_needed"),
+
     ReplyFun = fun(ReadThreshold) -> {reply, {ok, ReadThreshold}, State} end,
     ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
 
 %% Attempt to read a value.
 handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
+    log_message_queue_size("read"),
+
     ReplyFun = fun({_Id, Type, Metadata, Value}) ->
                     {reply, {ok, {_Id, Type, Metadata, Value}}, State};
                   ({error, Error}) ->
@@ -626,6 +650,8 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
 
 %% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    log_message_queue_size("filter"),
+
     {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?WRITE, ?READ),
     {reply, ok, State};
 
@@ -633,6 +659,8 @@ handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
 handle_call({product, Left, Right, Product},
             _From,
             #state{store=Store}=State) ->
+    log_message_queue_size("product"),
+
     {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?WRITE,
                                ?READ, ?READ),
     {reply, ok, State};
@@ -641,23 +669,31 @@ handle_call({product, Left, Right, Product},
 handle_call({intersection, Left, Right, Intersection},
             _From,
             #state{store=Store}=State) ->
+    log_message_queue_size("intersection"),
+
     {ok, _Pid} = ?CORE:intersection(Left, Right, Intersection, Store,
                                     ?WRITE, ?READ, ?READ),
     {reply, ok, State};
 
 %% Spawn a process to compute the union.
 handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
+    log_message_queue_size("union"),
+
     {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?WRITE, ?READ,
                              ?READ),
     {reply, ok, State};
 
 %% Spawn a process to perform a map.
 handle_call({map, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    log_message_queue_size("map"),
+
     {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?WRITE, ?READ),
     {reply, ok, State};
 
 %% Spawn a process to perform a fold.
 handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    log_message_queue_size("fold"),
+
     {ok, _Pid} = ?CORE:fold(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, ok, State};
 
@@ -667,6 +703,8 @@ handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
 %% given we've shown we already have some connection to retrieve data
 %% for that node.  If not, return the the value and repair the tree.
 handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
+    log_message_queue_size("graft"),
+
     Result = case get(Id, Store) of
         {ok, {Id, Type, Metadata, Value}} ->
             OurClock = orddict:fetch(clock, Metadata),
@@ -684,6 +722,8 @@ handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
 %% Given a message identifer, return stale if we've seen an object with
 %% a vector clock that's greater than the provided one.
 handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
+    log_message_queue_size("is_stale"),
+
     Result = case get(Id, Store) of
         {ok, {_, _, Metadata, _}} ->
             OurClock = orddict:fetch(clock, Metadata),
@@ -696,6 +736,8 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
 
 %% Naive anti-entropy mechanism; pairwise state shipping.
 handle_call({exchange, Peer}, _From, #state{store=Store}=State) ->
+    log_message_queue_size("exchange"),
+
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
@@ -718,6 +760,8 @@ handle_call(Msg, _From, State) ->
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
 handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) ->
+    log_message_queue_size("delta_exchange"),
+
     lasp_logger:extended("Exchange starting for ~p", [Peer]),
 
     Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
@@ -755,38 +799,46 @@ handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=St
 
 handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
             #state{store=Store, actor=Actor}=State) ->
+    log_message_queue_size("aae_send"),
+
     ?CORE:receive_value(Store, {aae_send,
                                 From,
                                {Id, Type, _Metadata, Value},
                                ?CLOCK_INCR(Actor),
                                ?CLOCK_INIT(Actor)}),
-    case lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager andalso
-         partisan_config:get(tag, undefined) == server of
-        true ->
-            init_aae_sync(From, Store);
-        _ ->
-            ok
-    end,
+    %% In client-server, the server only reacts to client messages
+    %%case lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager andalso
+    %%     partisan_config:get(tag, undefined) == server of
+    %%    true ->
+    %%        init_aae_sync(From, Store);
+    %%    _ ->
+    %%        ok
+    %%end,
     {noreply, State};
 
 handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
             #state{store=Store, actor=Actor}=State) ->
+    log_message_queue_size("delta_send"),
+
     ?CORE:receive_delta(Store, {delta_send,
                                 From,
                                {Id, Type, _Metadata, Deltas},
                                ?CLOCK_INCR(Actor),
                                ?CLOCK_INIT(Actor)}),
     send({delta_ack, node(), Id, Counter}, From),
-    case lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager andalso
-         partisan_config:get(tag, undefined) == server of
-        true ->
-            init_delta_sync(From);
-        _ ->
-            ok
-    end,
+    %% In client-server, the server only reacts to client messages
+    %%case lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager andalso
+    %%     partisan_config:get(tag, undefined) == server of
+    %%    true ->
+    %%        init_delta_sync(From);
+    %%    _ ->
+    %%        ok
+    %%end,
     {noreply, State};
 
 handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
+    log_message_queue_size("delta_ack"),
+
     ?CORE:receive_delta(Store, {delta_ack, Id, From, Counter}),
     {noreply, State};
 
@@ -798,6 +850,8 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(plumtree_memory_report, State) ->
+    log_message_queue_size("plumtree_memory_report"),
+
     %% Log
     plumtree_memory_report(),
 
@@ -807,6 +861,8 @@ handle_info(plumtree_memory_report, State) ->
     {noreply, State};
 
 handle_info(memory_utilization_report, State) ->
+    log_message_queue_size("memory_utilization_report"),
+
     %% Log
     memory_utilization_report(),
 
@@ -816,6 +872,8 @@ handle_info(memory_utilization_report, State) ->
     {noreply, State};
 
 handle_info(aae_sync, #state{store=Store} = State) ->
+    log_message_queue_size("aae_sync"),
+
     lasp_logger:extended("Beginning AAE synchronization."),
 
     %% Get the active set from the membership protocol.
@@ -833,7 +891,9 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     schedule_aae_synchronization(),
 
     {noreply, State};
-handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
+handle_info(delta_sync, #state{}=State) ->
+    log_message_queue_size("delta_sync"),
+
     lasp_logger:extended("Beginning delta synchronization."),
 
     %% Get the active set from the membership protocol.
@@ -855,8 +915,10 @@ handle_info(delta_sync, #state{sync_counter=SyncCounter}=State) ->
     %% Schedule next synchronization.
     schedule_delta_synchronization(),
 
-    {noreply, State#state{sync_counter=SyncCounter+1}};
+    {noreply, State#state{}};
 handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
+    log_message_queue_size("delta_gc"),
+
     MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
     Function =
         fun({Id, #dv{delta_map=DeltaMap0, delta_ack_map=AckMap0,
@@ -1090,17 +1152,18 @@ schedule_aae_synchronization() ->
                 true ->
                     false;
                 false ->
-                    case lasp_config:get(broadcast, false) of
-                        false ->
-                            case lasp_config:get(peer_service_manager, partisan_peer_service) of
-                                partisan_client_server_peer_service_manager ->
-                                    partisan_config:get(tag, client) == client;
-                                _ ->
-                                    true
-                            end;
-                        true ->
-                            false
-                    end
+                    not lasp_config:get(broadcast, false)
+                    %case lasp_config:get(broadcast, false) of
+                    %    false ->
+                    %        case lasp_config:get(peer_service_manager, partisan_peer_service) of
+                    %            partisan_client_server_peer_service_manager ->
+                    %                partisan_config:get(tag, client) == client;
+                    %            _ ->
+                    %                true
+                    %        end;
+                    %    true ->
+                    %        false
+                    %end
             end
     end,
 
@@ -1118,12 +1181,13 @@ schedule_aae_synchronization() ->
 schedule_delta_synchronization() ->
     ShouldDeltaSync = case lasp_config:get(mode, state_based) of
         delta_based ->
-            case lasp_config:get(peer_service_manager, partisan_peer_service) of
-                partisan_client_server_peer_service_manager ->
-                    partisan_config:get(tag, client) == client;
-                _ ->
-                    true
-            end;
+            true;
+            %case lasp_config:get(peer_service_manager, partisan_peer_service) of
+            %    partisan_client_server_peer_service_manager ->
+            %        partisan_config:get(tag, client) == client;
+            %    _ ->
+            %        true
+            %end;
         state_based ->
             false
     end,
@@ -1179,7 +1243,7 @@ memory_utilization_report() ->
 
 %% @private
 send(Msg, Peer) ->
-    log_transmission(extract_type_and_payload(Msg), 1),
+    log_transmission(extract_log_type_and_payload(Msg), 1),
     PeerServiceManager = lasp_config:get(peer_service_manager,
                                          partisan_peer_service),
     case PeerServiceManager:forward_message(Peer, ?MODULE, Msg) of
@@ -1191,10 +1255,12 @@ send(Msg, Peer) ->
     end.
 
 %% @private
-extract_type_and_payload({Type, _From, Payload}) ->
-    {Type, Payload};
-extract_type_and_payload({Type, _From, Payload, _Count}) ->
-    {Type, Payload}.
+extract_log_type_and_payload({aae_send, _Node, {_Id, _Type, _Metadata, State}}) ->
+    {aae_send, State};
+extract_log_type_and_payload({delta_send, _Node, {_Id, _Type, _Metadata, Deltas}, Counter}) ->
+    {delta_send, {Deltas, Counter}};
+extract_log_type_and_payload({delta_ack, _Node, _Id, Counter}) ->
+    {delta_ack, Counter}.
 
 %% @private
 init_aae_sync(Peer, Store) ->
@@ -1277,3 +1343,8 @@ compute_exchange(Peers) ->
 %% @private
 buffer_broadcast(Payload) ->
     lasp_broadcast_buffer:buffer(Payload).
+
+%% @private
+log_message_queue_size(Method) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lasp_logger:mailbox("MAILBOX " ++ Method ++ " message processed; messages remaining: ~p", [MessageQueueLen]).

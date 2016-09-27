@@ -759,7 +759,8 @@ handle_call(Msg, _From, State) ->
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
-handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) ->
+handle_cast({delta_exchange, Peer, ObjectFilterFun},
+            #state{store=Store, gc_counter=GCCounter}=State) ->
     log_message_queue_size("delta_exchange"),
 
     lasp_logger:extended("Exchange starting for ~p", [Peer]),
@@ -768,28 +769,31 @@ handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=St
                             delta_counter=Counter, delta_map=DeltaMap,
                             delta_ack_map=AckMap}},
                    Acc0) ->
-                       Ack = case orddict:find(Peer, AckMap) of
-                                 {ok, {Ack0, _GCed}} ->
-                                     Ack0;
-                                 error ->
-                                     0
-                             end,
-                       Min = case orddict:fetch_keys(DeltaMap) of
-                           [] ->
-                               0;
-                           Keys ->
-                               lists:min(Keys)
-                       end,
-
-                       Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
+                       case ObjectFilterFun(Id) of
                            true ->
-                               Value;
+                               Ack = case orddict:find(Peer, AckMap) of
+                                         {ok, {Ack0, _GCed}} ->
+                                             Ack0;
+                                         error ->
+                                             0
+                                     end,
+                               Min = case orddict:fetch_keys(DeltaMap) of
+                                   [] ->
+                                       0;
+                                   Keys ->
+                                       lists:min(Keys)
+                               end,
+                                Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
+                                   true ->
+                                       Value;
+                                   false ->
+                                       collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
+                                end,
+                                send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
+                                [{ok, Id}|Acc0];
                            false ->
-                               collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
-                       end,
-
-                       send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
-                       [{ok, Id}|Acc0]
+                               Acc0
+                       end
                end,
     %% TODO: Should this be parallel?
     {ok, Result} = do(fold, [Store, Function, []]),
@@ -905,12 +909,20 @@ handle_info(delta_sync, #state{}=State) ->
                [PeerServiceManager, Members]),
 
     %% Remove ourself and compute exchange peers.
-    Peers = compute_exchange(Members -- [node()]),
+    Peers = compute_exchange(without_me(Members)),
 
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
     lists:foreach(fun(Peer) -> init_delta_sync(Peer) end, Peers),
+
+    %% Synchronize convergence structure.
+    ObjectFilterFun = fun(Id) ->
+                              Id =:= ?SIM_STATUS_STRUCTURE
+                      end,
+    lists:foreach(fun(Peer) ->
+                          init_delta_sync(Peer, ObjectFilterFun) end,
+                  without_me(Members)),
 
     %% Schedule next synchronization.
     schedule_delta_synchronization(),
@@ -1282,7 +1294,10 @@ init_aae_sync(Peer, Store) ->
 
 %% @private
 init_delta_sync(Peer) ->
-    gen_server:cast(?MODULE, {delta_exchange, Peer}).
+    init_delta_sync(Peer, fun(_) -> true end).
+
+init_delta_sync(Peer, ObjectFilterFun) ->
+    gen_server:cast(?MODULE, {delta_exchange, Peer, ObjectFilterFun}).
 
 %% @private
 membership() ->
@@ -1348,3 +1363,7 @@ buffer_broadcast(Payload) ->
 log_message_queue_size(Method) ->
     {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
     lasp_logger:mailbox("MAILBOX " ++ Method ++ " message processed; messages remaining: ~p", [MessageQueueLen]).
+
+%% @private
+without_me(Members) ->
+    Members -- [node()].

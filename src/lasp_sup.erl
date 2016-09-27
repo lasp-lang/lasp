@@ -247,6 +247,12 @@ configure_defaults() ->
                                        HeavyClientsDefault),
     lasp_config:set(heavy_clients, HeavyClients),
 
+    ReactiveServerDefault = list_to_atom(os:getenv("REACTIVE_SERVER", "false")),
+    ReactiveServer = application:get_env(?APP,
+                                       reactive_server,
+                                       ReactiveServerDefault),
+    lasp_config:set(reactive_server, ReactiveServer),
+
     PartitionProbabilityDefault = list_to_integer(os:getenv("PARTITION_PROBABILITY", "0")),
     PartitionProbability = application:get_env(?APP,
                                                partition_probability,

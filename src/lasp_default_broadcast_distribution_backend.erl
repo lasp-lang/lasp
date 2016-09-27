@@ -759,7 +759,8 @@ handle_call(Msg, _From, State) ->
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
-handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=State) ->
+handle_cast({delta_exchange, Peer, ObjectFilterFun},
+            #state{store=Store, gc_counter=GCCounter}=State) ->
     log_message_queue_size("delta_exchange"),
 
     lasp_logger:extended("Exchange starting for ~p", [Peer]),
@@ -768,28 +769,31 @@ handle_cast({delta_exchange, Peer}, #state{store=Store, gc_counter=GCCounter}=St
                             delta_counter=Counter, delta_map=DeltaMap,
                             delta_ack_map=AckMap}},
                    Acc0) ->
-                       Ack = case orddict:find(Peer, AckMap) of
-                                 {ok, {Ack0, _GCed}} ->
-                                     Ack0;
-                                 error ->
-                                     0
-                             end,
-                       Min = case orddict:fetch_keys(DeltaMap) of
-                           [] ->
-                               0;
-                           Keys ->
-                               lists:min(Keys)
-                       end,
-
-                       Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
+                       case ObjectFilterFun(Id) of
                            true ->
-                               Value;
+                               Ack = case orddict:find(Peer, AckMap) of
+                                         {ok, {Ack0, _GCed}} ->
+                                             Ack0;
+                                         error ->
+                                             0
+                                     end,
+                               Min = case orddict:fetch_keys(DeltaMap) of
+                                   [] ->
+                                       0;
+                                   Keys ->
+                                       lists:min(Keys)
+                               end,
+                               Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
+                                   true ->
+                                       Value;
+                                   false ->
+                                       collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
+                               end,
+                               send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
+                               [{ok, Id}|Acc0];
                            false ->
-                               collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
-                       end,
-
-                       send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
-                       [{ok, Id}|Acc0]
+                               Acc0
+                       end
                end,
     %% TODO: Should this be parallel?
     {ok, Result} = do(fold, [Store, Function, []]),
@@ -806,14 +810,18 @@ handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
                                {Id, Type, _Metadata, Value},
                                ?CLOCK_INCR(Actor),
                                ?CLOCK_INIT(Actor)}),
-    %% In client-server, the server only reacts to client messages
-    %%case lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager andalso
-    %%     partisan_config:get(tag, undefined) == server of
-    %%    true ->
-    %%        init_aae_sync(From, Store);
-    %%    _ ->
-    %%        ok
-    %%end,
+
+    %% Send back just the updated state for the object received.
+    case i_am_server_and_should_react() of
+        true ->
+            ObjectFilterFun = fun(Id1) ->
+                                      Id =:= Id1
+                              end,
+            init_aae_sync(From, ObjectFilterFun, Store);
+        false ->
+            ok
+    end,
+
     {noreply, State};
 
 handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
@@ -825,15 +833,21 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
                                {Id, Type, _Metadata, Deltas},
                                ?CLOCK_INCR(Actor),
                                ?CLOCK_INIT(Actor)}),
+
+    %% Acknowledge message.
     send({delta_ack, node(), Id, Counter}, From),
-    %% In client-server, the server only reacts to client messages
-    %%case lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager andalso
-    %%     partisan_config:get(tag, undefined) == server of
-    %%    true ->
-    %%        init_delta_sync(From);
-    %%    _ ->
-    %%        ok
-    %%end,
+
+    %% Send back just the updated state for the object received.
+    case i_am_server_and_should_react() of
+        true ->
+            ObjectFilterFun = fun(Id1) ->
+                                      Id =:= Id1
+                              end,
+            init_delta_sync(From, ObjectFilterFun);
+        false ->
+            ok
+    end,
+
     {noreply, State};
 
 handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
@@ -905,12 +919,25 @@ handle_info(delta_sync, #state{}=State) ->
                [PeerServiceManager, Members]),
 
     %% Remove ourself and compute exchange peers.
-    Peers = compute_exchange(Members -- [node()]),
+    Peers = compute_exchange(without_me(Members)),
 
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
-    lists:foreach(fun(Peer) -> init_delta_sync(Peer) end, Peers),
+    WithoutConvergenceFun = fun(Id) ->
+                              Id =/= ?SIM_STATUS_STRUCTURE
+                      end,
+    lists:foreach(fun(Peer) ->
+                          init_delta_sync(Peer, WithoutConvergenceFun) end,
+                  Peers),
+
+    %% Synchronize convergence structure.
+    WithConvergenceFun = fun(Id) ->
+                              Id =:= ?SIM_STATUS_STRUCTURE
+                      end,
+    lists:foreach(fun(Peer) ->
+                          init_delta_sync(Peer, WithConvergenceFun) end,
+                  without_me(Members)),
 
     %% Schedule next synchronization.
     schedule_delta_synchronization(),
@@ -1153,17 +1180,7 @@ schedule_aae_synchronization() ->
                     false;
                 false ->
                     not lasp_config:get(broadcast, false)
-                    %case lasp_config:get(broadcast, false) of
-                    %    false ->
-                    %        case lasp_config:get(peer_service_manager, partisan_peer_service) of
-                    %            partisan_client_server_peer_service_manager ->
-                    %                partisan_config:get(tag, client) == client;
-                    %            _ ->
-                    %                true
-                    %        end;
-                    %    true ->
-                    %        false
-                    %end
+                    orelse not i_am_server_and_should_react()
             end
     end,
 
@@ -1181,13 +1198,7 @@ schedule_aae_synchronization() ->
 schedule_delta_synchronization() ->
     ShouldDeltaSync = case lasp_config:get(mode, state_based) of
         delta_based ->
-            true;
-            %case lasp_config:get(peer_service_manager, partisan_peer_service) of
-            %    partisan_client_server_peer_service_manager ->
-            %        partisan_config:get(tag, client) == client;
-            %    _ ->
-            %        true
-            %end;
+            not i_am_server_and_should_react();
         state_based ->
             false
     end,
@@ -1264,6 +1275,11 @@ extract_log_type_and_payload({delta_ack, _Node, _Id, Counter}) ->
 
 %% @private
 init_aae_sync(Peer, Store) ->
+    ObjectFilterFun = fun(_) -> true end,
+    init_aae_sync(Peer, ObjectFilterFun, Store).
+
+%% @private
+init_aae_sync(Peer, ObjectFilterFun, Store) ->
     lasp_logger:extended("Initializing AAE synchronization with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
@@ -1271,8 +1287,13 @@ init_aae_sync(Peer, Store) ->
                             %% Ignore: this is a dynamic variable.
                             Acc0;
                         _ ->
-                            send({aae_send, node(), {Id, Type, Metadata, Value}}, Peer),
-                            [{ok, {Id, Type, Metadata, Value}}|Acc0]
+                            case ObjectFilterFun(Id) of
+                                true ->
+                                    send({aae_send, node(), {Id, Type, Metadata, Value}}, Peer),
+                                    [{ok, {Id, Type, Metadata, Value}}|Acc0];
+                                false ->
+                                    Acc0
+                            end
                     end
                end,
     %% TODO: Should this be parallel?
@@ -1281,8 +1302,8 @@ init_aae_sync(Peer, Store) ->
     ok.
 
 %% @private
-init_delta_sync(Peer) ->
-    gen_server:cast(?MODULE, {delta_exchange, Peer}).
+init_delta_sync(Peer, ObjectFilterFun) ->
+    gen_server:cast(?MODULE, {delta_exchange, Peer, ObjectFilterFun}).
 
 %% @private
 membership() ->
@@ -1348,3 +1369,28 @@ buffer_broadcast(Payload) ->
 log_message_queue_size(Method) ->
     {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
     lasp_logger:mailbox("MAILBOX " ++ Method ++ " message processed; messages remaining: ~p", [MessageQueueLen]).
+
+%% @private
+without_me(Members) ->
+    Members -- [node()].
+
+%% @private
+i_am_server_and_should_react() ->
+    PeerServiceManager = lasp_config:get(peer_service_manager, partisan_peer_service),
+    case PeerServiceManager of
+        partisan_client_server_peer_service_manager ->
+            case partisan_config:get(tag, undefined) of
+                server ->
+                    case lasp_config:get(reactive_server, false) of
+                        true ->
+                            %% I'm the server in the reactive client-server mode.
+                            true;
+                        _ ->
+                            false
+                    end;
+                _ ->
+                    false
+            end;
+        _ ->
+            false
+    end.

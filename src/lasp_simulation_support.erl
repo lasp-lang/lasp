@@ -172,6 +172,10 @@ start(_Case, _Config, Options) ->
                         HeavyClient = proplists:get_value(heavy_client, Options, false),
                         ok = rpc:call(Node, lasp_config, set, [heavy_client, HeavyClient]),
 
+                        %% Configure reactive server.
+                        ReactiveServer = proplists:get_value(reactive_server, Options, false),
+                        ok = rpc:call(Node, lasp_config, set, [reactive_server, ReactiveServer]),
+
                         %% Configure partitions.
                         PartitionProbability = proplists:get_value(partition_probability, Options, 0),
                         ok = rpc:call(Node, lasp_config, set, [partition_probability, PartitionProbability]),

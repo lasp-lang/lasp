@@ -343,7 +343,11 @@ advertisement_counter_child_specs() ->
     %% - The max number of impressions per ad should be
     %%   9600 / TOTAL_ADS_NUMBER = 4800 / ADS_NUMBER
     %%
-    lasp_config:set(max_impressions, 4800 / ?ADS_NUMBER),
+    ImpressionNumberDefault = 4800 / ?ADS_NUMBER,
+    ImpressionNumber = application:get_env(?APP,
+                                           max_impressions,
+                                           ImpressionNumberDefault),
+    lasp_config:set(max_impressions, 4800 / ImpressionNumber),
 
     ClientSpecs = case AdClientEnabled of
         true ->

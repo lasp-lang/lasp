@@ -347,7 +347,7 @@ advertisement_counter_child_specs() ->
     ImpressionNumber = application:get_env(?APP,
                                            max_impressions,
                                            ImpressionNumberDefault),
-    lasp_config:set(max_impressions, 4800 / ImpressionNumber),
+    lasp_config:set(max_impressions, ImpressionNumber),
 
     ClientSpecs = case AdClientEnabled of
         true ->

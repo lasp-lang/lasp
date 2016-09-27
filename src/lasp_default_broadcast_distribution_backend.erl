@@ -914,14 +914,19 @@ handle_info(delta_sync, #state{}=State) ->
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
-    lists:foreach(fun(Peer) -> init_delta_sync(Peer) end, Peers),
+    WithoutConvergenceFun = fun(Id) ->
+                              Id =/= ?SIM_STATUS_STRUCTURE
+                      end,
+    lists:foreach(fun(Peer) ->
+                          init_delta_sync(Peer, WithoutConvergenceFun) end,
+                  Peers),
 
     %% Synchronize convergence structure.
-    ObjectFilterFun = fun(Id) ->
+    WithConvergenceFun = fun(Id) ->
                               Id =:= ?SIM_STATUS_STRUCTURE
                       end,
     lists:foreach(fun(Peer) ->
-                          init_delta_sync(Peer, ObjectFilterFun) end,
+                          init_delta_sync(Peer, WithConvergenceFun) end,
                   without_me(Members)),
 
     %% Schedule next synchronization.
@@ -1293,9 +1298,6 @@ init_aae_sync(Peer, Store) ->
     ok.
 
 %% @private
-init_delta_sync(Peer) ->
-    init_delta_sync(Peer, fun(_) -> true end).
-
 init_delta_sync(Peer, ObjectFilterFun) ->
     gen_server:cast(?MODULE, {delta_exchange, Peer, ObjectFilterFun}).
 

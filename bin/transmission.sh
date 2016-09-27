@@ -32,28 +32,9 @@ MAILBOX_LOGGING=false
 
 declare -A EVALUATIONS
 
-## client_server_state_based_with_aae_test
-EVALUATIONS["client_server_state_based_with_aae"]="partisan_client_server_peer_service_manager state_based false false"
-EVALUATIONS["code_client_server_state_based_with_aae"]="partisan_client_server_peer_service_manager state_based false true"
-
-## client_server_delta_based_with_aae_test
-##EVALUATIONS["client_server_delta_based_with_aae"]="partisan_client_server_peer_service_manager delta_based false false"
-
-## code_client_server_delta_based_with_aae_test
-#EVALUATIONS["code_client_server_delta_based_with_aae"]="partisan_client_server_peer_service_manager delta_based false true"
-
-## peer_to_peer_state_based_with_aae_test
-EVALUATIONS["peer_to_peer_state_based_with_aae"]="partisan_hyparview_peer_service_manager state_based false false"
-EVALUATIONS["code_peer_to_peer_state_based_with_aae"]="partisan_hyparview_peer_service_manager state_based false true"
-
-## peer_to_peer_state_based_with_aae_and_tree_test
-##EVALUATIONS["peer_to_peer_state_based_with_aae_and_tree"]="partisan_hyparview_peer_service_manager state_based true false"
-
-## peer_to_peer_delta_based_with_aae_test
-##EVALUATIONS["peer_to_peer_delta_based_with_aae"]="partisan_hyparview_peer_service_manager delta_based false false"
-
-## code_peer_to_peer_delta_based_with_aae
-#EVALUATIONS["code_peer_to_peer_delta_based_with_aae"]="partisan_hyparview_peer_service_manager delta_based false true"
+EVALUATIONS["client_server_state_based_with_aae"]="partisan_client_server_peer_service_manager state_based false false false"
+EVALUATIONS["reactive_client_server_state_based_with_aae"]="partisan_client_server_peer_service_manager state_based false false true"
+EVALUATIONS["peer_to_peer_state_based_with_aae"]="partisan_hyparview_peer_service_manager state_based false false true"
 
 for i in $(seq 1 $EVAL_NUMBER)
 do
@@ -67,13 +48,14 @@ do
     MODE=${CONFIG[1]}
     BROADCAST=${CONFIG[2]}
     HEAVY_CLIENTS=${CONFIG[3]}
+    REACTIVE_SERVER=${CONFIG[4]}
     TIMESTAMP=$(date +%s)
     REAL_EVAL_ID=$EVAL_ID"_"$CLIENT_NUMBER"_"$PARTITION_PROBABILITY
 
     if [ "$PEER_SERVICE" == "partisan_client_server_peer_service_manager" ] && [ "$CLIENT_NUMBER" -gt "128" ]; then
       echo "[$(date +%T)] Client-Server topology with $CLIENT_NUMBER clients is not supported"
     else
-      PEER_SERVICE=$PEER_SERVICE MODE=$MODE BROADCAST=$BROADCAST SIMULATION=$SIMULATION EVAL_ID=$REAL_EVAL_ID EVAL_TIMESTAMP=$TIMESTAMP CLIENT_NUMBER=$CLIENT_NUMBER HEAVY_CLIENTS=$HEAVY_CLIENTS PARTITION_PROBABILITY=$PARTITION_PROBABILITY AAE_INTERVAL=$AAE_INTERVAL DELTA_INTERVAL=$DELTA_INTERVAL INSTRUMENTATION=$INSTRUMENTATION LOGS=$LOGS AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY EXTENDED_LOGGING=$EXTENDED_LOGGING MAILBOX_LOGGING=$MAILBOX_LOGGING ./dcos-deploy.sh
+      PEER_SERVICE=$PEER_SERVICE MODE=$MODE BROADCAST=$BROADCAST SIMULATION=$SIMULATION EVAL_ID=$REAL_EVAL_ID EVAL_TIMESTAMP=$TIMESTAMP CLIENT_NUMBER=$CLIENT_NUMBER HEAVY_CLIENTS=$HEAVY_CLIENTS REACTIVE_SERVER=$REACTIVE_SERVER PARTITION_PROBABILITY=$PARTITION_PROBABILITY AAE_INTERVAL=$AAE_INTERVAL DELTA_INTERVAL=$DELTA_INTERVAL INSTRUMENTATION=$INSTRUMENTATION LOGS=$LOGS AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY EXTENDED_LOGGING=$EXTENDED_LOGGING MAILBOX_LOGGING=$MAILBOX_LOGGING ./dcos-deploy.sh
 
       echo "[$(date +%T)] Running $EVAL_ID with $CLIENT_NUMBER clients; $PARTITION_PROBABILITY % partitions; with configuration $STR"
 

@@ -812,7 +812,7 @@ handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
                                ?CLOCK_INIT(Actor)}),
 
     %% Send back just the updated state for the object received.
-    case should_react() of
+    case i_am_server_and_should_react() of
         true ->
             ObjectFilterFun = fun(Id1) ->
                                       Id =:= Id1
@@ -838,7 +838,7 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
     send({delta_ack, node(), Id, Counter}, From),
 
     %% Send back just the updated state for the object received.
-    case should_react() of
+    case i_am_server_and_should_react() of
         true ->
             ObjectFilterFun = fun(Id1) ->
                                       Id =:= Id1
@@ -1180,7 +1180,7 @@ schedule_aae_synchronization() ->
                     false;
                 false ->
                     not lasp_config:get(broadcast, false)
-                    orelse not should_react()
+                    orelse not i_am_server_and_should_react()
             end
     end,
 
@@ -1198,7 +1198,7 @@ schedule_aae_synchronization() ->
 schedule_delta_synchronization() ->
     ShouldDeltaSync = case lasp_config:get(mode, state_based) of
         delta_based ->
-            not should_react();
+            not i_am_server_and_should_react();
         state_based ->
             false
     end,
@@ -1375,7 +1375,7 @@ without_me(Members) ->
     Members -- [node()].
 
 %% @private
-should_react() ->
+i_am_server_and_should_react() ->
     PeerServiceManager = lasp_config:get(peer_service_manager, partisan_peer_service),
     case PeerServiceManager of
         partisan_client_server_peer_service_manager ->

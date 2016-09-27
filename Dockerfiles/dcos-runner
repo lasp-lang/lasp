@@ -11,6 +11,6 @@ RUN cd /tmp && \
     apt-get -y install erlang
 
 CMD cd /opt && \
-    git clone https://github.com/lasp-lang/lasp.git -b multiple_dcos && \
+    git clone https://github.com/lasp-lang/lasp.git -b unstable && \
     cd lasp/bin && \
     DCOS=$DCOS TOKEN=$TOKEN EVALUATION_PASSPHRASE=$EVALUATION_PASSPHRASE ELB_HOST=$ELB_HOST AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY ./transmission.sh

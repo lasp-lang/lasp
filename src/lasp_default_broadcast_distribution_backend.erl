@@ -783,14 +783,14 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
                                    Keys ->
                                        lists:min(Keys)
                                end,
-                                Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
+                               Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
                                    true ->
                                        Value;
                                    false ->
                                        collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
-                                end,
-                                send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
-                                [{ok, Id}|Acc0];
+                               end,
+                               send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
+                               [{ok, Id}|Acc0];
                            false ->
                                Acc0
                        end

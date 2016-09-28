@@ -101,6 +101,7 @@
 -define(MAX_PLAYERS_DEFAULT, 5).
 -define(GAMES_NUMBER, 1).
 -define(ENROLLABLE_GAMES, {<<"enrollable_games">>, ?SET_TYPE}).
+-define(ENROLLMENT_INTERVAL, 500).
 
 -define(BOOLEAN_TYPE, boolean).
 -define(COUNTER_TYPE, gcounter).

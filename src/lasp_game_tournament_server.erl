@@ -253,10 +253,9 @@ compute_overcounting(GameList) ->
     OvercountingSum = lists:foldl(
         fun(GameId, Acc) ->
             {ok, Value} = lasp:query(GameId),
-            MaxPlayers = lasp_config:get(max_players,
-                                         ?MAX_PLAYERS_DEFAULT),
-            %% Length, because we cant cardinality.
-            Overcounting = length(Value) - MaxPlayers,
+            MaxPlayers = lasp_config:get(max_players, ?MAX_PLAYERS_DEFAULT),
+            %% Size, because we count cardinality.
+            Overcounting = sets:size(Value) - MaxPlayers,
             OvercountingPercentage = (Overcounting * 100) / MaxPlayers,
             Acc + OvercountingPercentage
         end,

@@ -217,7 +217,7 @@ start(_Case, _Config, Options) ->
                                       [evaluation_identifier, list_to_atom(RealEvalIdentifier)]),
 
                         %% Configure impression velocity.
-                        ImpressionVelocity = 10,
+                        ImpressionVelocity = 16,
                         ok = rpc:call(Node, lasp_config, set,
                                       [impression_velocity, ImpressionVelocity])
                    end,

@@ -232,7 +232,7 @@ start(_Case, _Config, Options) ->
                         %% Configure max impression number.
                         MaxImpressions = 10,
                         ok = rpc:call(Node, lasp_config, set,
-                                      [max_impressions, MaxImpressions])
+                                      [max_impressions, MaxImpressions]),
 
                         %% Configure impression velocity.
                         ImpressionVelocity = 4800,

@@ -218,8 +218,6 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 schedule_impression() ->
-    %% Add random jitter.
-    Jitter = rand_compat:uniform(?IMPRESSION_INTERVAL),
     timer:send_after(?IMPRESSION_INTERVAL + Jitter, view).
 
 %% @private

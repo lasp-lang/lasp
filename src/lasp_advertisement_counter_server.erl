@@ -219,7 +219,7 @@ build_dag(Actor) ->
     %% ok = lasp:union(RovioAds, RiotAds, ?ADS),
 
     %% Generate adverstisements.
-    AdList = create_ads_and_contracts(AdsId, ContractsId, Actor),
+    AdList = create_ads_and_contracts(?ADS, ?CONTRACTS, Actor),
 
     %% Compute the Cartesian product of both ads and contracts.
     {AdsContractsId, AdsContractsType} = ?ADS_CONTRACTS,

@@ -38,7 +38,7 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {actor, adlist}).
+-record(state, {actor, ad_list}).
 
 %%%===================================================================
 %%% API
@@ -84,7 +84,7 @@ init([]) ->
     %% Schedule check simulation end
     schedule_check_simulation_end(),
 
-    {ok, #state{actor=Actor, adlist=AdList}}.
+    {ok, #state{actor=Actor, ad_list=AdList}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -114,7 +114,7 @@ handle_info(log, #state{}=State) ->
 
     {noreply, State};
 
-handle_info(check_simulation_end, #state{adlist=AdList}=State) ->
+handle_info(check_simulation_end, #state{ad_list=AdList}=State) ->
     log_message_queue_size("check_simulation_end"),
 
     %% A simulation ends for the server when all clients have

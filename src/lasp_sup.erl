@@ -337,14 +337,17 @@ advertisement_counter_child_specs() ->
     lasp_config:set(ad_counter_simulation_client, AdClientEnabled),
     lager:info("AdClientEnabled: ~p", [AdClientEnabled]),
 
+    ImpressionNumberDefault = 4800,
+    ImpressionNumber = application:get_env(?APP,
+                                           max_impressions,
+                                           ImpressionNumberDefault),
+    lasp_config:set(max_impressions, ImpressionNumber),
+
     ImpressionVelocityDefault = list_to_integer(os:getenv("IMPRESSION_VELOCITY", "1")),
     ImpressionVelocity = application:get_env(?APP,
                                              impression_velocity,
                                              ImpressionVelocityDefault),
     lasp_config:set(impression_velocity, ImpressionVelocity),
-
-    %% 16 keeps the system running 1h, with 16 clients, and `ImpressionVelocity = 1'
-    lasp_config:set(max_impressions, 16),
 
     ClientSpecs = case AdClientEnabled of
         true ->

@@ -94,12 +94,12 @@ handle_cast(Msg, State) ->
 handle_info(log, #state{actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("log"),
 
-    %% Get current value of the list of advertisements.
+    %% Get current value of the list of enrollments.
     {ok, GameList} = lasp:query(?ENROLLABLE_GAMES),
 
     lager:info("Game list: ~p, node: ~p", [GameList, Actor]),
 
-    %% Schedule advertisement counter impression.
+    %% Schedule logging.
     schedule_logging(),
 
     {noreply, State};
@@ -108,7 +108,7 @@ handle_info(view, #state{actor=Actor,
                          triggers=Triggers0}=State) ->
     lasp_marathon_simulations:log_message_queue_size("view"),
 
-    %% Get current value of the list of advertisements.
+    %% Get current value of the list of enrollments.
     {ok, GameList0} = lasp:query(?ENROLLABLE_GAMES),
 
     %% Make sure we have games...
@@ -122,8 +122,8 @@ handle_info(view, #state{actor=Actor,
 
             GameId = lists:nth(Random, sets:to_list(GameList0)),
 
-            %% Spawn a process to disable the advertisement if it goes
-            %% above the maximum number of impressions.
+            %% Spawn a process to disable the game if it goes
+            %% above the maximum number of enrollments.
             %%
             Triggers = case lasp_config:get(heavy_client, false) of
                 true ->
@@ -250,7 +250,7 @@ trigger(GameId, Actor) ->
     EnforceFun = fun() ->
             lager:info("Threshold for ~p reached; disabling!", [GameId]),
 
-            %% Remove the advertisement.
+            %% Remove the game.
             {ok, _} = lasp:update(?ENROLLABLE_GAMES, {rmv, GameId}, Actor)
     end,
     lasp:invariant(GameId, {cardinality, MaxPlayers}, EnforceFun),

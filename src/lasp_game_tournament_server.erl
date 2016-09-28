@@ -109,7 +109,7 @@ handle_info(log, #state{}=State) ->
 
     lager:info("Game list: ~p", [sets:size(Games)]),
 
-    %% Schedule advertisement counter impression.
+    %% Schedule logging.
     schedule_logging(),
 
     {noreply, State};
@@ -221,7 +221,7 @@ trigger(GameId, Actor) ->
     EnforceFun = fun() ->
             lager:info("Threshold for ~p reached; disabling!", [GameId]),
 
-            %% Remove the advertisement.
+            %% Remove the game.
             {ok, _} = lasp:update(?ENROLLABLE_GAMES, {rmv, GameId}, Actor)
     end,
     lasp:invariant(GameId, {cardinality, MaxPlayers}, EnforceFun),

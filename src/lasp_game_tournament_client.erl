@@ -154,7 +154,7 @@ handle_info(view, #state{actor=Actor,
     %%   and all games are enrolled.
     %%   If `not lasp_type:is_bottom(GamesType, GamesValue)' then the experiment
     %%   has started. With both, it means the experiement has ended
-    %% - Else, keep doing impressions
+    %% - Else, keep doing enrollments
     case sets:size(GameList) == 0 andalso not lasp_type:is_bottom(GamesType, GamesValue) of
         true ->
             lager:info("All games are fully enrolled. Node: ~p", [Actor]),

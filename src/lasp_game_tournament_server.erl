@@ -237,10 +237,10 @@ schedule_check_simulation_end() ->
     timer:send_after(?STATUS_INTERVAL, check_simulation_end).
 
 %% @private
-log_overcounting_and_convergence(AdList) ->
+log_overcounting_and_convergence(GameList) ->
     case lasp_config:get(instrumentation, false) of
         true ->
-            Overcounting = compute_overcounting(AdList),
+            Overcounting = compute_overcounting(GameList),
             lasp_instrumentation:overcounting(Overcounting),
             lasp_instrumentation:convergence();
 

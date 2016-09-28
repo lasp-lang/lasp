@@ -11,7 +11,7 @@ RUN cd /tmp && \
     apt-get -y install erlang
 
 CMD cd /opt && \
-    git clone https://github.com/lasp-lang/lasp.git -b unstable && \
+    git clone https://github.com/lasp-lang/lasp.git -b $LASP_BRANCH && \
     cd lasp && \
     make stage && \
     /opt/lasp/_build/default/rel/lasp/bin/env

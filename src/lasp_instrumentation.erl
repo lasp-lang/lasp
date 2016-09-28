@@ -18,16 +18,21 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_transmission_instrumentation).
+-module(lasp_instrumentation).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).
 
 %% API
 -export([start_link/0,
-         log/3,
+         transmission/2,
+         transmission/3,
+         memory/1,
+         overcounting/1,
+         experiment_started/0,
          convergence/0,
-         stop/0]).
+         stop/0,
+         log_files/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -42,10 +47,9 @@
 %% State record.
 -record(state, {tref,
                 size_per_type=orddict:new(),
-                status=init,
-                filename}).
+                status=init}).
 
--define(INTERVAL, 1000). %% 1 second.
+-define(TRANSMISSION_INTERVAL, 1000). %% 1 second.
 
 %%%===================================================================
 %%% API
@@ -56,17 +60,51 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec log(term(), term(), pos_integer()) -> ok | error().
-log(Type, Payload, PeerCount) ->
-    gen_server:call(?MODULE, {log, Type, Payload, PeerCount}, infinity).
+-spec transmission(term(), term()) -> ok | error().
+transmission(Type, Payload) ->
+    gen_server:call(?MODULE, {transmission, Type, Payload, 1}, infinity).
+
+-spec transmission(term(), term(), pos_integer()) -> ok | error().
+transmission(Type, Payload, PeerCount) ->
+    gen_server:call(?MODULE, {transmission, Type, Payload, PeerCount}, infinity).
+
+-spec memory(pos_integer()) -> ok | error().
+memory(Size) ->
+    gen_server:call(?MODULE, {memory, Size}, infinity).
+
+-spec overcounting(pos_integer()) -> ok | error().
+overcounting(Value) ->
+    gen_server:call(?MODULE, {overcounting, Value}, infinity).
 
 -spec convergence() -> ok | error().
 convergence() ->
     gen_server:call(?MODULE, convergence, infinity).
 
+-spec experiment_started() -> ok | error().
+experiment_started() ->
+    gen_server:call(?MODULE, experiment_started, infinity).
+
 -spec stop() -> ok | error().
 stop() ->
     gen_server:call(?MODULE, stop, infinity).
+
+-spec log_files() -> [{string(), string()}].
+log_files() ->
+    SimulationId = simulation_id(),
+
+    MainLog = main_log(),
+    MainLogS3 = SimulationId ++ "/" ++ main_log_suffix(),
+
+    OtherLogs = case partisan_config:get(tag, undefined) of
+        server ->
+            OvercountingLog = overcounting_log(),
+            OvercountingLogS3 = SimulationId ++ "/" ++ overcounting_log_suffix(),
+            [{OvercountingLog, OvercountingLogS3}];
+        _ ->
+            []
+    end,
+
+    [{MainLog, MainLogS3} | OtherLogs].
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -75,41 +113,54 @@ stop() ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([]) ->
-    Filename = create_dir(),
+    LogDir = log_dir(),
+    filelib:ensure_dir(LogDir),
+
+    Filename = main_log(),
     Line = io_lib:format("Type,Seconds,MegaBytes\n", []),
     write_to_file(Filename, Line),
 
-    {ok, TRef} = start_timer(),
+    {ok, TRef} = start_transmission_timer(),
 
     _ = lager:info("Instrumentation timer enabled!"),
 
-    {ok, #state{tref=TRef, filename=Filename, status=running,
+    {ok, #state{tref=TRef, status=running,
                 size_per_type=orddict:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({log, Type, Payload, PeerCount}, _From, #state{size_per_type=Map0}=State) ->
-    LogType = get_log_type(Type),
+handle_call({transmission, Type, Payload, PeerCount}, _From, #state{size_per_type=Map0}=State) ->
+    TransmissionType = get_transmission_type(Type),
     Size = termsize(Payload) * PeerCount,
-    Current = case orddict:find(LogType, Map0) of
+    Current = case orddict:find(TransmissionType, Map0) of
         {ok, Value} ->
             Value;
         error ->
             0
     end,
-    Map = orddict:store(LogType, Current + Size, Map0),
+    Map = orddict:store(TransmissionType, Current + Size, Map0),
     {reply, ok, State#state{size_per_type=Map}};
 
-handle_call(convergence, _From, #state{filename=Filename}=State) ->
-    record_convergence(Filename),
+handle_call({memory, Size}, _From, #state{}=State) ->
+    record_memory(Size),
     {reply, ok, State};
 
-handle_call(stop, _From, #state{size_per_type=Map,
-                                filename=Filename, tref=TRef}=State) ->
+handle_call({overcounting, Value}, _From, #state{}=State) ->
+    record_overcounting(Value),
+    {reply, ok, State};
+
+handle_call(convergence, _From, #state{}=State) ->
+    record_convergence(),
+    {reply, ok, State};
+
+handle_call(experiment_started, _From, #state{}=State) ->
+    record_experiment_started(),
+    {reply, ok, State};
+
+handle_call(stop, _From, #state{tref=TRef}=State) ->
     {ok, cancel} = timer:cancel(TRef),
-    record(Map, Filename),
     _ = lager:info("Instrumentation timer disabled!"),
     {reply, ok, State#state{tref=undefined}};
 
@@ -126,10 +177,9 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(record, #state{filename=Filename, size_per_type=Map,
-                           status=running}=State) ->
-    {ok, TRef} = start_timer(),
-    record(Map, Filename),
+handle_info(transmission, #state{size_per_type=Map, status=running}=State) ->
+    {ok, TRef} = start_transmission_timer(),
+    record_transmission(Map),
     {noreply, State#state{tref=TRef}};
 
 handle_info(Msg, State) ->
@@ -152,35 +202,58 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 termsize(Term) ->
-    erts_debug:flat_size(Term) * erlang:system_info(wordsize).
+    byte_size(term_to_binary(Term)).
+    %%erts_debug:flat_size(Term) * erlang:system_info(wordsize).
 
 %% @private
-start_timer() ->
-    timer:send_after(?INTERVAL, record).
+start_transmission_timer() ->
+    timer:send_after(?TRANSMISSION_INTERVAL, transmission).
 
 %% @private
-eval_dir() ->
+root_eval_dir() ->
     code:priv_dir(?APP) ++ "/evaluation".
 
 %% @private
-log_dir() ->
-    eval_dir() ++ "/logs".
+root_log_dir() ->
+    root_eval_dir() ++ "/logs".
 
 %% @private
-create_dir() ->
-    EvalIdentifier = case lasp_config:get(evaluation_identifier, undefined) of
-        undefined ->
-            "undefined";
-        {Simulation, Id} ->
-            atom_to_list(Simulation) ++ "/" ++ atom_to_list(Id)
+log_dir() ->
+    root_log_dir() ++ "/" ++ simulation_id() ++ "/".
+
+%% @private
+simulation_id() ->
+    Simulation = lasp_config:get(simulation, undefined),
+    LocalOrDCOS = case os:getenv("DCOS", "false") of
+        "false" ->
+            "local";
+        _ ->
+            "dcos"
     end,
+    EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
-    Filename = io_lib:format("~s.csv", [node()]),
-    Path = log_dir() ++ "/"
-        ++ EvalIdentifier ++ "/"
-        ++ integer_to_list(EvalTimestamp) ++ "/",
-    filelib:ensure_dir(Path),
-    Path ++ Filename.
+
+    Id = atom_to_list(Simulation) ++ "/"
+      ++ LocalOrDCOS ++ "/"
+      ++ atom_to_list(EvalIdentifier) ++ "/"
+      ++ integer_to_list(EvalTimestamp),
+    Id.
+
+%% @private
+main_log() ->
+    log_dir() ++ main_log_suffix().
+
+%% @private
+main_log_suffix() ->
+    atom_to_list(node()) ++ ".csv".
+
+%% @private
+overcounting_log() ->
+    log_dir() ++ overcounting_log_suffix().
+
+%% @private
+overcounting_log_suffix() ->
+    "overcounting".
 
 %% @private
 megasize(Size) ->
@@ -189,7 +262,8 @@ megasize(Size) ->
     MegaSize.
 
 %% @private
-record(Map, Filename) ->
+record_transmission(Map) ->
+    Filename = main_log(),
     Timestamp = timestamp(),
     Lines = orddict:fold(
         fun(Type, Size, Acc) ->
@@ -201,10 +275,32 @@ record(Map, Filename) ->
     append_to_file(Filename, Lines).
 
 %% @private
-record_convergence(Filename) ->
+record_memory(Size) ->
+    Filename = main_log(),
+    Timestamp = timestamp(),
+    Line = get_line(memory, Timestamp, Size),
+    append_to_file(Filename, Line).
+
+%% @private
+record_convergence() ->
+    Filename = main_log(),
     Timestamp = timestamp(),
     Line = get_line(convergence, Timestamp, 0),
     append_to_file(Filename, Line).
+
+%% @private
+record_experiment_started() ->
+    Filename = main_log(),
+    Timestamp = timestamp(),
+    Line = get_line(experiment_started, Timestamp, 0),
+    append_to_file(Filename, Line).
+
+%% @private
+record_overcounting(Value) ->
+    lager:info("Overcounting ~p%", [Value]),
+    Filename = overcounting_log(),
+    Line = io_lib:format("~w", [Value]),
+    write_to_file(Filename, Line).
 
 %% @private
 get_line(Type, Timestamp, Size) ->
@@ -232,7 +328,7 @@ timestamp() ->
     Mega * 1000000 + Sec.
 
 %% @private
-get_log_type(aae_send) -> aae_send;
-get_log_type(broadcast) -> aae_send;
-get_log_type(delta_send) -> delta_send;
-get_log_type(delta_ack) -> delta_send.
+get_transmission_type(aae_send) -> aae_send;
+get_transmission_type(broadcast) -> broadcast;
+get_transmission_type(delta_send) -> delta_send;
+get_transmission_type(delta_ack) -> delta_send.

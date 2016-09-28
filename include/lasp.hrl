@@ -119,13 +119,11 @@
 
 %% Simulation helpers.
 -define(AAE_INTERVAL, 10000).
--define(IMPRESSION_INTERVAL, 500).
--define(STATUS_INTERVAL, 1000).
+-define(IMPRESSION_INTERVAL, 3600 * 1000). %% 1 Hour
+-define(STATUS_INTERVAL, 10000).
 -define(EVAL_NUMBER, 1).
--define(MAX_IMPRESSIONS, 50).
 -define(LOG_INTERVAL, 10000).
--define(VOTING_INTERVAL, 1000).
--define(ADS_NUMBER, 5).
+-define(ADS_NUMBER, 1).
 
 -define(DEFAULT_DISTRIBUTION_BACKEND, lasp_default_broadcast_distribution_backend).
 
@@ -135,3 +133,5 @@
 
 -record(ad, {id, name, image, counter}).
 -record(contract, {id}).
+
+-define(MAX_IMPRESSIONS_DEFAULT, 10).

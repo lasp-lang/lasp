@@ -58,7 +58,7 @@ init([]) ->
     lager:info("Advertisement counter client initialized."),
 
     %% Generate actor identifier.
-    Actor = self(),
+    Actor = node(),
 
     %% Schedule advertisement counter impression.
     schedule_impression(),
@@ -91,11 +91,14 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(log, #state{impressions=Impressions}=State) ->
+handle_info(log, #state{actor=Actor,
+                        impressions=Impressions}=State) ->
+    log_message_queue_size("log"),
+
     %% Get current value of the list of advertisements.
     {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
 
-    lager:info("Impressions: ~p, current ad size: ~p", [Impressions, sets:size(Ads)]),
+    lager:info("Impressions: ~p, current ad size: ~p, node: ~p", [Impressions, sets:size(Ads), Actor]),
 
     %% Schedule advertisement counter impression.
     schedule_logging(),
@@ -105,11 +108,13 @@ handle_info(log, #state{impressions=Impressions}=State) ->
 handle_info(view, #state{actor=Actor,
                          impressions=Impressions0,
                          triggers=Triggers0}=State) ->
+    log_message_queue_size("view"),
+
     %% Get current value of the list of advertisements.
-    {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
+    {ok, Ads0} = lasp:query(?ADS_WITH_CONTRACTS),
 
     %% Make sure we have ads...
-    {Impressions1, Triggers1} = case sets:size(Ads) of
+    {Impressions1, Triggers1} = case sets:size(Ads0) of
         0 ->
             %% Do nothing.
             {Impressions0, Triggers0};
@@ -118,7 +123,7 @@ handle_info(view, #state{actor=Actor,
             Random = lasp_support:puniform(Size),
 
             {#ad{counter=Counter} = Ad, _Contract} =
-                lists:nth(Random, sets:to_list(Ads)),
+                lists:nth(Random, sets:to_list(Ads0)),
 
             %% Spawn a process to disable the advertisement if it goes
             %% above the maximum number of impressions.
@@ -143,18 +148,21 @@ handle_info(view, #state{actor=Actor,
             {Impressions0 + 1, Triggers}
     end,
 
-    %% - If I did nothing (`Impressions0 == Impressions1`),
-    %% and the `Impressions1 > 0` (meaning I did something before)
-    %% then all ads are disabled and simulation has ended
-    %%      (If we don't check for `Impressions1 > 0` it might mean that
-    %%      the experiment hasn't started yet)
+    {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
+    {ok, {_AdsId, AdsType, _AdsMetadata, AdsValue}} = lasp:read(?ADS_WITH_CONTRACTS, undefined),
+
+    %% - If there are no ads (`sets:size(Ads) == 0')
+    %%   it might mean the experiment hasn't started or it has started
+    %%   and all ads are disabled.
+    %%   If `not lasp_type:is_bottom(AdsType, AdsValue)' then the experiment
+    %%   has started. With both, it means the experiement has ended
     %% - Else, keep doing impressions
-    case Impressions0 == Impressions1 andalso Impressions1 > 0 of
+    case sets:size(Ads) == 0 andalso not lasp_type:is_bottom(AdsType, AdsValue) of
         true ->
-            lager:info("All ads are disabled. Node: ~p", [node()]),
+            lager:info("All ads are disabled. Node: ~p", [Actor]),
 
             %% Update Simulation Status Instance
-            lasp:update(?SIM_STATUS_ID, {Actor, {fst, true}}, Actor),
+            lasp:update(?SIM_STATUS_ID, {apply, Actor, {fst, true}}, Actor),
             log_convergence(),
             schedule_check_simulation_end();
         false ->
@@ -164,6 +172,8 @@ handle_info(view, #state{actor=Actor,
     {noreply, State#state{impressions=Impressions1, triggers=Triggers1}};
 
 handle_info(check_simulation_end, #state{actor=Actor}=State) ->
+    log_message_queue_size("check_simulation_end"),
+
     %% A simulation ends for clients when all clients have
     %% observed all ads disabled (first component of the map in
     %% the simulation status instance is true for all clients)
@@ -178,9 +188,10 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
 
     case length(NodesWithAdsDisabled) == client_number() of
         true ->
-            lager:info("All nodes observed ads disabled. Node ~p", [node()]),
-            lasp:update(?SIM_STATUS_ID, {Actor, {snd, true}}, Actor),
-            lasp_support:push_logs();
+            lager:info("All nodes observed ads disabled. Node ~p", [Actor]),
+            lasp_instrumentation:stop(),
+            lasp_support:push_logs(),
+            lasp:update(?SIM_STATUS_ID, {apply, Actor, {snd, true}}, Actor);
         false ->
             schedule_check_simulation_end()
     end,
@@ -207,17 +218,16 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 schedule_impression() ->
-    %% Add random jitter.
-    Jitter = rand_compat:uniform(?IMPRESSION_INTERVAL),
-    erlang:send_after(?IMPRESSION_INTERVAL + Jitter, self(), view).
+    ImpressionVelocity = lasp_config:get(impression_velocity, 1),
+    timer:send_after(?IMPRESSION_INTERVAL / ImpressionVelocity, view).
 
 %% @private
 schedule_logging() ->
-    erlang:send_after(?LOG_INTERVAL, self(), log).
+    timer:send_after(?LOG_INTERVAL, log).
 
 %% @private
 schedule_check_simulation_end() ->
-    erlang:send_after(?STATUS_INTERVAL, self(), check_simulation_end).
+    timer:send_after(?STATUS_INTERVAL, check_simulation_end).
 
 %% @private
 client_number() ->
@@ -227,7 +237,7 @@ client_number() ->
 log_convergence() ->
     case lasp_config:get(instrumentation, false) of
         true ->
-            lasp_transmission_instrumentation:convergence();
+            lasp_instrumentation:convergence();
         false ->
             ok
     end.
@@ -252,12 +262,21 @@ build_dag() ->
 %% @private
 trigger(#ad{counter=CounterId} = Ad, Actor) ->
     %% Blocking threshold read for max advertisement impressions.
-    {ok, Value} = lasp:read(CounterId, {value, ?MAX_IMPRESSIONS}),
+    MaxImpressions = lasp_config:get(max_impressions,
+                                     ?MAX_IMPRESSIONS_DEFAULT),
 
-    lager:info("Threshold for ~p reached; disabling!", [Ad]),
-    lager:info("Counter: ~p", [Value]),
+    EnforceFun = fun() ->
+            lager:info("Threshold for ~p reached; disabling!", [Ad]),
 
-    %% Remove the advertisement.
-    {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor),
+            %% Remove the advertisement.
+            {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor)
+    end,
+
+    lasp:invariant(CounterId, {value, MaxImpressions}, EnforceFun),
 
     ok.
+
+%% @private
+log_message_queue_size(Method) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lasp_logger:mailbox("MAILBOX " ++ Method ++ " message processed; messages remaining: ~p", [MessageQueueLen]).

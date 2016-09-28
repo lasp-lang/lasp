@@ -1,55 +1,90 @@
 #!/bin/bash
 
-if [ -z "$DCOS" ]; then
-  echo ">>> DCOS is not configured; please export DCOS."
-  exit 1
-fi
+source helpers.sh
 
-if [ -z "$MODE" ]; then
-  echo ">>> MODE is not configured; please export MODE."
-  exit 1
-fi
+TIMESTAMP_FILE=/tmp/.LAST_TIMESTAMP
 
-if [ -z "$BROADCAST" ]; then
-  echo ">>> BROADCAST is not configured; please export BROADCAST."
-  exit 1
-fi
+ENV_VARS=(
+  LASP_BRANCH
+  DCOS
+  TOKEN
+  EVALUATION_PASSPHRASE
+  ELB_HOST
+  PEER_SERVICE
+  MODE
+  BROADCAST
+  SIMULATION
+  EVAL_ID
+  EVAL_TIMESTAMP
+  CLIENT_NUMBER
+  HEAVY_CLIENTS
+  REACTIVE_SERVER
+  PARTITION_PROBABILITY
+  IMPRESSION_VELOCITY
+  AAE_INTERVAL
+  DELTA_INTERVAL
+  INSTRUMENTATION
+  LOGS
+  EXTENDED_LOGGING
+  MAILBOX_LOGGING
+  AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY
+)
 
-if [ -z "$TOKEN" ]; then
-  echo ">>> TOKEN is not configured; please export TOKEN."
-  exit 1
-fi
-
-if [ -z "$ELB_HOST" ]; then
-  echo ">>> ELB_HOST is not configured; please export ELB_HOST."
-  exit 1
-fi
-
-if [ -z "$EVALUATION_PASSPHRASE" ]; then
-  echo ">>> EVALUATION_PASSPHRASE is not configured; please export EVALUATION_PASSPHRASE."
-  exit 1
-fi
+for ENV_VAR in "${ENV_VARS[@]}"
+do
+  if [ -z "${!ENV_VAR}" ]; then
+    echo ">>> ${ENV_VAR} is not configured; please export it."
+    exit 1
+  fi
+done
 
 echo ">>> Beginning deployment!"
 
+if [ -e "$TIMESTAMP_FILE" ]; then
+  # Last timestamp used to deploy an experiment
+  LAST_TIMESTAMP=$(cat $TIMESTAMP_FILE)
+
+  echo ">>> Removing lasp-server-$LAST_TIMESTAMP from Marathon"
+  curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-server-$LAST_TIMESTAMP > /dev/null
+  sleep 2
+
+  echo ">>> Removing lasp-client-$LAST_TIMESTAMP from Marathon"
+  curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client-$LAST_TIMESTAMP > /dev/null
+  sleep 2
+
+  echo ">>> Waiting for Mesos to kill all tasks."
+  wait_for_completion $LAST_TIMESTAMP
+else
+  echo ">>> No apps to be removed from Marathon"
+fi
+
 echo ">>> Configuring Lasp"
 cd /tmp
+
+# Memory of each VM.
+SERVER_MEMORY=4096.0
+CLIENT_MEMORY=1024.0
+
+# CPU of each VM.
+SERVER_CPU=2
+CLIENT_CPU=0.5
 
 cat <<EOF > lasp-server.json
 {
   "acceptedResourceRoles": [
     "slave_public"
   ],
-  "id": "lasp-server",
+  "id": "lasp-server-$EVAL_TIMESTAMP",
   "dependencies": [],
   "constraints": [["hostname", "UNIQUE", ""]],
-  "cpus": 1.0,
-  "mem": 2048.0,
+  "cpus": $SERVER_CPU,
+  "mem": $SERVER_MEMORY,
   "instances": 1,
   "container": {
     "type": "DOCKER",
     "docker": {
-      "image": "cmeiklejohn/lasp-dev",
+      "image": "vitorenesduarte/lasp-dev",
       "network": "HOST",
       "forcePullImage": true,
       "parameters": [
@@ -59,13 +94,30 @@ cat <<EOF > lasp-server.json
   },
   "ports": [0, 0],
   "env": {
+    "LASP_BRANCH": "$LASP_BRANCH",
     "AD_COUNTER_SIM_SERVER": "true",
-    "AD_COUNTER_SIM_CLIENT": "true",
+    "DCOS": "$DCOS",
+    "TOKEN": "$TOKEN",
+    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
+    "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",
     "BROADCAST": "$BROADCAST",
-    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
-    "DCOS": "$DCOS",
-    "TOKEN": "$TOKEN"
+    "SIMULATION": "$SIMULATION",
+    "EVAL_ID": "$EVAL_ID",
+    "EVAL_TIMESTAMP": "$EVAL_TIMESTAMP",
+    "CLIENT_NUMBER": "$CLIENT_NUMBER",
+    "HEAVY_CLIENTS": "$HEAVY_CLIENTS",
+    "REACTIVE_SERVER": "$REACTIVE_SERVER",
+    "PARTITION_PROBABILITY": "$PARTITION_PROBABILITY",
+    "IMPRESSION_VELOCITY": "$IMPRESSION_VELOCITY",
+    "AAE_INTERVAL": "$AAE_INTERVAL",
+    "DELTA_INTERVAL": "$DELTA_INTERVAL",
+    "INSTRUMENTATION": "$INSTRUMENTATION",
+    "LOGS": "$LOGS",
+    "EXTENDED_LOGGING": "$EXTENDED_LOGGING",
+    "MAILBOX_LOGGING": "$MAILBOX_LOGGING",
+    "AWS_ACCESS_KEY_ID": "$AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY"
   },
   "labels": {
       "HAPROXY_GROUP":"external",
@@ -86,13 +138,8 @@ cat <<EOF > lasp-server.json
 }
 EOF
 
-echo ">>> Removing lasp-server from Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-server
-sleep 2
-
-echo ">>> Adding lasp-server to Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-server.json $DCOS/service/marathon/v2/apps
-echo
+echo ">>> Adding lasp-server-$EVAL_TIMESTAMP to Marathon"
+curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-server.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
 sleep 10
 
 cat <<EOF > lasp-client.json
@@ -100,11 +147,11 @@ cat <<EOF > lasp-client.json
   "acceptedResourceRoles": [
     "slave_public"
   ],
-  "id": "lasp-client",
+  "id": "lasp-client-$EVAL_TIMESTAMP",
   "dependencies": [],
-  "cpus": 1.0,
-  "mem": 2048.0,
-  "instances": 5,
+  "cpus": $CLIENT_CPU,
+  "mem": $CLIENT_MEMORY,
+  "instances": $CLIENT_NUMBER,
   "container": {
     "type": "DOCKER",
     "docker": {
@@ -118,12 +165,30 @@ cat <<EOF > lasp-client.json
   },
   "ports": [0, 0],
   "env": {
+    "LASP_BRANCH": "$LASP_BRANCH",
     "AD_COUNTER_SIM_CLIENT": "true",
+    "DCOS": "$DCOS",
+    "TOKEN": "$TOKEN",
+    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
+    "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",
     "BROADCAST": "$BROADCAST",
-    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
-    "DCOS": "$DCOS",
-    "TOKEN": "$TOKEN"
+    "SIMULATION": "$SIMULATION",
+    "EVAL_ID": "$EVAL_ID",
+    "EVAL_TIMESTAMP": "$EVAL_TIMESTAMP",
+    "CLIENT_NUMBER": "$CLIENT_NUMBER",
+    "HEAVY_CLIENTS": "$HEAVY_CLIENTS",
+    "REACTIVE_SERVER": "$REACTIVE_SERVER",
+    "PARTITION_PROBABILITY": "$PARTITION_PROBABILITY",
+    "IMPRESSION_VELOCITY": "$IMPRESSION_VELOCITY",
+    "AAE_INTERVAL": "$AAE_INTERVAL",
+    "DELTA_INTERVAL": "$DELTA_INTERVAL",
+    "INSTRUMENTATION": "$INSTRUMENTATION",
+    "LOGS": "$LOGS",
+    "EXTENDED_LOGGING": "$EXTENDED_LOGGING",
+    "MAILBOX_LOGGING": "$MAILBOX_LOGGING",
+    "AWS_ACCESS_KEY_ID": "$AWS_ACCESS_KEY_ID",
+    "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY"
   },
   "healthChecks": [
     {
@@ -140,11 +205,8 @@ cat <<EOF > lasp-client.json
 }
 EOF
 
-echo ">>> Removing lasp-client from Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client
-sleep 2
-
-echo ">>> Adding lasp-client to Marathon"
-curl -k -v -v -v -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-client.json $DCOS/service/marathon/v2/apps
-echo
+echo ">>> Adding lasp-client-$EVAL_TIMESTAMP to Marathon"
+curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-client.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
 sleep 10
+
+echo $EVAL_TIMESTAMP > $TIMESTAMP_FILE

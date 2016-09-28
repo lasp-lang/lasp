@@ -1,10 +1,10 @@
 FROM ubuntu:xenial
 
-MAINTAINER Christopher Meiklejohn <christopher.meiklejohn@gmail.com>
+MAINTAINER Vitor Enes Duarte <vitorenesduarte@gmail.com>
 
 RUN cd /tmp && \
     apt-get update && \
-    apt-get -y install wget build-essential make gcc ruby-dev git expect gnuplot && \
+    apt-get -y install wget curl build-essential make gcc ruby-dev git expect gnuplot python && \
     wget http://packages.erlang-solutions.com/erlang-solutions_1.0_all.deb && \
     dpkg -i erlang-solutions_1.0_all.deb && \
     apt-get update && \
@@ -12,6 +12,5 @@ RUN cd /tmp && \
 
 CMD cd /opt && \
     git clone https://github.com/lasp-lang/lasp.git -b $LASP_BRANCH && \
-    cd lasp && \
-    make stage && \
-    /opt/lasp/_build/default/rel/lasp/bin/env
+    cd lasp/bin && \
+    ./transmission.sh

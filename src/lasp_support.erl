@@ -366,11 +366,68 @@ start_slave(Name, NodeConfig, _Case) ->
 
 push_logs() ->
     DCOS = os:getenv("DCOS", "false"),
-    ShouldPush = list_to_atom(DCOS),
+    LOGS = os:getenv("LOGS", "git"),
 
-    case ShouldPush of
-        true ->
-            _Result = os:cmd("cd " ++ code:priv_dir(?APP) ++ " ; ./push_logs.sh");
-        false ->
-            ok
+    case DCOS of
+        "false" ->
+            ok;
+        _ ->
+            lager:info("Will push logs"),
+            case LOGS of
+                "s3" ->
+                    %% Configure erlcloud.
+                    S3Host = "s3.amazonaws.com",
+                    AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
+                    SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
+                    erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
+
+                    BucketName = "lasp-instrumentation-logs",
+                    %% Create S3 bucket.
+                    try
+                        lager:info("Creating bucket: ~p", [BucketName]),
+                        ok = erlcloud_s3:create_bucket(BucketName)
+                    catch
+                        _:{aws_error, Error} ->
+                        lager:info("Bucket creation failed: ~p", [Error]),
+                        ok
+                    end,
+
+                    %% Store logs on S3.
+                    lists:foreach(
+                        fun({FilePath, S3Id}) ->
+                            Lines = read_file(FilePath),
+                            Logs = lists:foldl(
+                                fun(Line, Acc) ->
+                                    Acc ++ Line
+                                end,
+                                "",
+                                Lines
+                            ),
+                            erlcloud_s3:put_object(BucketName, S3Id, list_to_binary(Logs))
+                        end,
+                        lasp_instrumentation:log_files()
+                    );
+                "git" ->
+                    %% push to git
+                    Result = os:cmd("cd /opt/lasp && ./priv/evaluate-mesos-push.sh"),
+                    lager:info("Logs pushed. Output ~p", [Result])
+            end
+    end.
+
+%% @private
+read_file(FilePath) ->
+    {ok, FileDescriptor} = file:open(FilePath, [read]),
+    Lines = read_lines(FilePath, FileDescriptor),
+    Lines.
+
+%% @private
+read_lines(FilePath, FileDescriptor) ->
+    case io:get_line(FileDescriptor, '') of
+        eof ->
+            [];
+        {error, Error} ->
+            lager:warning("Error while reading line from file ~p. Error: ~p", [FilePath, Error]),
+            [];
+        Line ->
+            [Line | read_lines(FilePath, FileDescriptor)]
     end.

@@ -62,11 +62,11 @@ end_per_testcase(Case, _Config) ->
 all() ->
     [
      client_server_state_based_with_aae_test,
-     client_server_state_based_with_aae_and_tree_test,
      client_server_delta_based_with_aae_test,
-     client_server_state_based_ps_with_aae_test,
-     client_server_state_based_ps_with_aae_and_tree_test,
-     client_server_delta_based_ps_with_aae_test
+     reactive_client_server_state_based_with_aae_test,
+     reactive_client_server_delta_based_with_aae_test
+     %%client_server_state_based_ps_with_aae_test,
+     %%client_server_delta_based_ps_with_aae_test
     ].
 
 %% ===================================================================
@@ -91,23 +91,6 @@ client_server_state_based_with_aae_test(Config) ->
          {evaluation_identifier, client_server_state_based_with_aae}]),
     ok.
 
-client_server_state_based_with_aae_and_tree_test(Config) ->
-    case os:getenv("OMIT_HIGH_ULIMIT", "false") of
-        "false" ->
-            lasp_simulation_support:run(client_server_ad_counter_state_based_with_aae_and_tree_test,
-                Config,
-                [{mode, state_based},
-                 {simulation, ad_counter},
-                 {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
-                 {set, orset},
-                 {broadcast, true},
-                 {evaluation_identifier, client_server_state_based_with_aae_and_tree}]),
-            ok;
-        _ ->
-            %% Omit.
-            ok
-    end.
-
 client_server_delta_based_with_aae_test(Config) ->
     lasp_simulation_support:run(client_server_ad_counter_delta_based_with_aae_test,
         Config,
@@ -117,6 +100,30 @@ client_server_delta_based_with_aae_test(Config) ->
          {set, orset},
          {broadcast, false},
          {evaluation_identifier, client_server_delta_based_with_aae}]),
+    ok.
+
+reactive_client_server_state_based_with_aae_test(Config) ->
+    lasp_simulation_support:run(reactive_client_server_ad_counter_state_based_with_aae_test,
+        Config,
+        [{mode, state_based},
+         {simulation, ad_counter},
+         {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
+         {set, orset},
+         {broadcast, false},
+         {reactive_server, true},
+         {evaluation_identifier, reactive_client_server_state_based_with_aae}]),
+    ok.
+
+reactive_client_server_delta_based_with_aae_test(Config) ->
+    lasp_simulation_support:run(reactive_client_server_ad_counter_delta_based_with_aae_test,
+        Config,
+        [{mode, delta_based},
+         {simulation, ad_counter},
+         {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
+         {set, orset},
+         {broadcast, false},
+         {reactive_server, true},
+         {evaluation_identifier, reactive_client_server_delta_based_with_aae}]),
     ok.
 
 client_server_state_based_ps_with_aae_test(Config) ->
@@ -129,23 +136,6 @@ client_server_state_based_ps_with_aae_test(Config) ->
          {broadcast, false},
          {evaluation_identifier, client_server_state_based_ps_with_aae}]),
     ok.
-
-client_server_state_based_ps_with_aae_and_tree_test(Config) ->
-    case os:getenv("OMIT_HIGH_ULIMIT", "false") of
-        "false" ->
-            lasp_simulation_support:run(client_server_ad_counter_state_based_ps_with_aae_and_tree_test,
-                Config,
-                [{mode, state_based},
-                 {simulation, ad_counter},
-                 {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
-                 {set, awset_ps},
-                 {broadcast, true},
-                 {evaluation_identifier, client_server_state_based_ps_with_aae_and_tree}]),
-            ok;
-        _ ->
-            %% Omit.
-            ok
-    end.
 
 client_server_delta_based_ps_with_aae_test(Config) ->
     lasp_simulation_support:run(client_server_ad_counter_delta_based_ps_with_aae_test,

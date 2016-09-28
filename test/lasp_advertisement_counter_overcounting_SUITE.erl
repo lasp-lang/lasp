@@ -89,7 +89,6 @@ client_server_overcounting_test(Config) ->
                  {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
                  {set, orset},
                  {broadcast, false},
-                 {instrumentation, false},
                  {heavy_client, false},
                  {evaluation_identifier, EvaluationIdentifier}]
             )
@@ -111,7 +110,6 @@ peer_to_peer_overcounting_test(Config) ->
                  {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
                  {set, orset},
                  {broadcast, false},
-                 {instrumentation, false},
                  {heavy_client, false},
                  {evaluation_identifier, EvaluationIdentifier}]
             )
@@ -133,7 +131,6 @@ code_peer_to_peer_overcounting_test(Config) ->
                  {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
                  {set, orset},
                  {broadcast, false},
-                 {instrumentation, false},
                  {heavy_client, true},
                  {evaluation_identifier, EvaluationIdentifier}]
             )

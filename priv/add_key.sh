@@ -2,5 +2,7 @@
 
 spawn ssh-add "/tmp/evaluation"
 expect "Enter passphrase for /tmp/evaluation:"
-send "$env(EVALUATION_PASSPHRASE)\n";
-interact
+send_user "$env(EVALUATION_PASSPHRASE)\r\n";
+send "$env(EVALUATION_PASSPHRASE)\r\n";
+expect eof
+exit

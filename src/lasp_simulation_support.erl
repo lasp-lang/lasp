@@ -130,15 +130,23 @@ start(_Case, _Config, Options) ->
                      end,
     lists:map(LoaderFun, Nodes),
 
+    SimulationsSyncInterval = 5000,
+
     %% Configure Lasp settings.
     ConfigureFun = fun(Node) ->
+                        %% Configure extended logging.
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [extended_logging, true]),
+
                         %% Configure timers.
                         ok = rpc:call(Node, lasp_config, set,
-                                      [aae_interval, ?AAE_INTERVAL]),
+                                      [aae_interval, SimulationsSyncInterval]),
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [delta_interval, SimulationsSyncInterval]),
 
                         %% Configure plumtree AAE interval to be the same.
                         ok = rpc:call(Node, application, set_env,
-                                      [plumtree, broadcast_exchange_timer, ?AAE_INTERVAL]),
+                                      [plumtree, broadcast_exchange_timer, SimulationsSyncInterval]),
 
                         %% Configure who should be the server and who's
                         %% the client.
@@ -164,6 +172,10 @@ start(_Case, _Config, Options) ->
                         HeavyClient = proplists:get_value(heavy_client, Options, false),
                         ok = rpc:call(Node, lasp_config, set, [heavy_client, HeavyClient]),
 
+                        %% Configure reactive server.
+                        ReactiveServer = proplists:get_value(reactive_server, Options, false),
+                        ok = rpc:call(Node, lasp_config, set, [reactive_server, ReactiveServer]),
+
                         %% Configure partitions.
                         PartitionProbability = proplists:get_value(partition_probability, Options, 0),
                         ok = rpc:call(Node, lasp_config, set, [partition_probability, PartitionProbability]),
@@ -177,11 +189,10 @@ start(_Case, _Config, Options) ->
                         Set = proplists:get_value(set, Options),
                         ok = rpc:call(Node, lasp_config, set, [set, Set]),
 
-                        %% Configure evaluation identifier.
+                        %% Configure simulation.
                         Simulation = proplists:get_value(simulation, Options),
-                        EvalIdentifier = proplists:get_value(evaluation_identifier, Options),
                         ok = rpc:call(Node, lasp_config, set,
-                                      [evaluation_identifier, {Simulation, EvalIdentifier}]),
+                                      [simulation, Simulation]),
 
                         %% Configure evaluation timestamp.
                         EvalTimestamp = proplists:get_value(evaluation_timestamp, Options),
@@ -189,14 +200,26 @@ start(_Case, _Config, Options) ->
                                       [evaluation_timestamp, EvalTimestamp]),
 
                         %% Configure instrumentation.
-                        Instrumentation = proplists:get_value(instrumentation, Options, true),
                         ok = rpc:call(Node, lasp_config, set,
-                                      [instrumentation, Instrumentation]),
+                                      [instrumentation, true]),
 
                         %% Configure client number.
                         ClientNumber = proplists:get_value(client_number, Options),
                         ok = rpc:call(Node, lasp_config, set,
-                                      [client_number, ClientNumber])
+                                      [client_number, ClientNumber]),
+
+                        %% Configure evaluation identifier.
+                        EvalIdentifier = proplists:get_value(evaluation_identifier, Options),
+                        RealEvalIdentifier = atom_to_list(EvalIdentifier)
+                                          ++ "_" ++ integer_to_list(ClientNumber)
+                                          ++ "_" ++ integer_to_list(PartitionProbability),
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [evaluation_identifier, list_to_atom(RealEvalIdentifier)]),
+
+                        %% Configure impression velocity.
+                        ImpressionVelocity = 256,
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [impression_velocity, ImpressionVelocity])
                    end,
     lists:map(ConfigureFun, Nodes),
 

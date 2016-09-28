@@ -56,4 +56,4 @@ echo "IP: ${IP}"
 echo "HOSTNAME: ${HOSTNAME}"
 
 RELNAME="`dirname \"$0\"`"/lasp
-exec ${RELNAME} foreground "$@"
+exec ${RELNAME} console "$@"

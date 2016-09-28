@@ -57,8 +57,15 @@ init(_Args) ->
                [lasp_unique]},
 
     %% Before initializing the partisan backend, be sure to configure it
-    %% to use the proper ports.
-    %%
+    %% to use the proper ip and ports.
+    case os:getenv("IP", "false") of
+        "false" ->
+            ok;
+        IP ->
+            {ok, IPAddress} = inet_parse:address(IP),
+            partisan_config:set(peer_ip, IPAddress),
+            ok
+    end,
     case os:getenv("PEER_PORT", "false") of
         "false" ->
             partisan_config:set(peer_port, random_port()),
@@ -69,13 +76,11 @@ init(_Args) ->
     end,
 
     %% Configure the peer service.
-    case partisan_config:get(partisan_peer_service_manager, false) of
-        false ->
-            partisan_config:set(partisan_peer_service_manager,
-                                partisan_client_server_peer_service_manager);
-        _ ->
-            ok
-    end,
+    PeerServiceDefault = list_to_atom(os:getenv("PEER_SERVICE", "partisan_client_server_peer_service_manager")),
+    PeerService = application:get_env(?APP,
+                                      partisan_peer_service_manager,
+                                      PeerServiceDefault),
+    lasp_config:set(partisan_peer_service_manager, PeerService),
 
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},
@@ -90,18 +95,24 @@ init(_Args) ->
                 {plumtree_sup, start_link, []},
                  permanent, infinity, supervisor, [plumtree_sup]},
 
-    MarathonPeerRefresh = {lasp_marathon_peer_refresh_service,
-                           {lasp_marathon_peer_refresh_service, start_link, []},
-                            permanent, 5000, worker,
-                            [lasp_marathon_peer_refresh_service]},
+    Sprinter = {sprinter,
+                {sprinter, start_link, []},
+                 permanent, 5000, worker,
+                 [sprinter]},
+
+    BroadcastBuffer = {lasp_broadcast_buffer,
+                       {lasp_broadcast_buffer, start_link, []},
+                        permanent, 5000, worker,
+                        [lasp_broadcast_buffer]},
 
     WebSpecs = web_specs(),
 
     BaseSpecs0 = [Unique,
+                  BroadcastBuffer,
                   Partisan,
                   DistributionBackend,
                   Plumtree,
-                  MarathonPeerRefresh,
+                  Sprinter,
                   Process] ++ WebSpecs,
 
     DagEnabled = application:get_env(?APP, dag_enabled, false),
@@ -111,6 +122,10 @@ init(_Args) ->
         false -> BaseSpecs0
     end,
 
+    %% Configure Plumtree logging.
+    TransLogMFA = {lasp_instrumentation, transmission, [broadcast]},
+    partisan_config:set(transmission_logging_mfa, TransLogMFA),
+
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
     InstrEnabled = application:get_env(?APP, instrumentation, InstrDefault),
     lasp_config:set(instrumentation, InstrEnabled),
@@ -118,12 +133,12 @@ init(_Args) ->
     Children0 = case InstrEnabled of
         true ->
             lager:info("Instrumentation is enabled!"),
-            Transmission = {lasp_transmission_instrumentation,
-                            {lasp_transmission_instrumentation, start_link, []},
-                             permanent, 5000, worker,
-                             [lasp_transmission_instrumentation]},
+            Instrumentation = {lasp_instrumentation,
+                               {lasp_instrumentation, start_link, []},
+                               permanent, 5000, worker,
+                               [lasp_instrumentation]},
 
-            BaseSpecs ++ [Transmission];
+            BaseSpecs ++ [Instrumentation];
         false ->
             BaseSpecs
     end,
@@ -165,6 +180,21 @@ web_specs() ->
 
 %% @private
 configure_defaults() ->
+    TutorialDefault = list_to_atom(os:getenv("TUTORIAL", "false")),
+    Tutorial = application:get_env(?APP, tutorial, TutorialDefault),
+    lager:info("Setting tutorial: ~p", [Tutorial]),
+    lasp_config:set(tutorial, Tutorial),
+
+    ExtendedLoggingDefault = list_to_atom(os:getenv("EXTENDED_LOGGING", "false")),
+    ExtendedLogging = application:get_env(?APP, extended_logging, ExtendedLoggingDefault),
+    lager:info("Setting extended logging: ~p", [ExtendedLogging]),
+    lasp_config:set(extended_logging, ExtendedLogging),
+
+    MailboxLoggingDefault = list_to_atom(os:getenv("MAILBOX_LOGGING", "false")),
+    MailboxLogging = application:get_env(?APP, mailbox_logging, MailboxLoggingDefault),
+    lager:info("Setting mailbox logging: ~p", [MailboxLogging]),
+    lasp_config:set(mailbox_logging, MailboxLogging),
+
     ModeDefault = list_to_atom(os:getenv("MODE", "state_based")),
     Mode = application:get_env(?APP, mode, ModeDefault),
     lager:info("Setting operation mode: ~p", [Mode]),
@@ -187,23 +217,47 @@ configure_defaults() ->
                                            BroadcastDefault),
     lasp_config:set(broadcast, BroadcastEnabled),
 
+    SimulationDefault = list_to_atom(os:getenv("SIMULATION", "undefined")),
+    Simulation = application:get_env(?APP,
+                                       simulation,
+                                       SimulationDefault),
+    lasp_config:set(simulation, Simulation),
+
     EvaluationIdDefault = list_to_atom(os:getenv("EVAL_ID", "undefined")),
-    EvaluationIdEnabled = application:get_env(?APP,
-                                              evaluation_identifier,
-                                              EvaluationIdDefault),
-    lasp_config:set(evaluation_identifier, EvaluationIdEnabled),
+    EvaluationId = application:get_env(?APP,
+                                       evaluation_identifier,
+                                       EvaluationIdDefault),
+    lasp_config:set(evaluation_identifier, EvaluationId),
 
     EvaluationTimestampDefault = list_to_integer(os:getenv("EVAL_TIMESTAMP", "0")),
-    EvaluationTimestampEnabled = application:get_env(?APP,
-                                                  evaluation_timestamp,
-                                                  EvaluationTimestampDefault),
-    lasp_config:set(evaluation_timstamp, EvaluationTimestampEnabled),
+    EvaluationTimestamp = application:get_env(?APP,
+                                              evaluation_timestamp,
+                                              EvaluationTimestampDefault),
+    lasp_config:set(evaluation_timestamp, EvaluationTimestamp),
 
     ClientNumberDefault = list_to_integer(os:getenv("CLIENT_NUMBER", "3")),
     ClientNumber = application:get_env(?APP,
                                        client_number,
                                        ClientNumberDefault),
     lasp_config:set(client_number, ClientNumber),
+
+    HeavyClientsDefault = list_to_atom(os:getenv("HEAVY_CLIENTS", "false")),
+    HeavyClients = application:get_env(?APP,
+                                       heavy_clients,
+                                       HeavyClientsDefault),
+    lasp_config:set(heavy_clients, HeavyClients),
+
+    ReactiveServerDefault = list_to_atom(os:getenv("REACTIVE_SERVER", "false")),
+    ReactiveServer = application:get_env(?APP,
+                                       reactive_server,
+                                       ReactiveServerDefault),
+    lasp_config:set(reactive_server, ReactiveServer),
+
+    PartitionProbabilityDefault = list_to_integer(os:getenv("PARTITION_PROBABILITY", "0")),
+    PartitionProbability = application:get_env(?APP,
+                                               partition_probability,
+                                               PartitionProbabilityDefault),
+    lasp_config:set(partition_probability, PartitionProbability),
 
     %% Peer service.
     PeerService = application:get_env(plumtree,
@@ -221,6 +275,21 @@ configure_defaults() ->
             application:set_env(plumtree, exchange_selection,
                                 normal)
     end,
+
+    %% AAE interval.
+    AAEIntervalDefault = list_to_integer(os:getenv("AAE_INTERVAL", "10000")),
+    AAEInterval = application:get_env(?APP,
+                                      aae_interval,
+                                      AAEIntervalDefault),
+    lasp_config:set(aae_interval, AAEInterval),
+    application:set_env(plumtree, broadcast_exchange_timer, AAEInterval),
+
+    %% Delta interval.
+    DeltaIntervalDefault = list_to_integer(os:getenv("DELTA_INTERVAL", "10000")),
+    DeltaInterval = application:get_env(?APP,
+                                        delta_interval,
+                                        DeltaIntervalDefault),
+    lasp_config:set(delta_interval, DeltaInterval),
 
     %% Backend configurations.
     StorageBackend = application:get_env(
@@ -265,6 +334,15 @@ advertisement_counter_child_specs() ->
     lasp_config:set(ad_counter_simulation_client, AdClientEnabled),
     lager:info("AdClientEnabled: ~p", [AdClientEnabled]),
 
+    ImpressionVelocityDefault = list_to_integer(os:getenv("IMPRESSION_VELOCITY", "1")),
+    ImpressionVelocity = application:get_env(?APP,
+                                             impression_velocity,
+                                             ImpressionVelocityDefault),
+    lasp_config:set(impression_velocity, ImpressionVelocity),
+
+    %% 16 keeps the system running 1h, with 16 clients, and `ImpressionVelocity = 1'
+    lasp_config:set(max_impressions, 16),
+
     ClientSpecs = case AdClientEnabled of
         true ->
             %% Start one advertisement counter client process per node.
@@ -275,9 +353,6 @@ advertisement_counter_child_specs() ->
 
             %% Configure proper partisan tag.
             partisan_config:set(tag, client),
-
-            %% Configure reserved slots.
-            partisan_config:set(reservations, [server]),
 
             [AdCounterClient];
         false ->

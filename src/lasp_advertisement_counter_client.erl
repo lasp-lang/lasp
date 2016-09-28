@@ -151,7 +151,7 @@ handle_info(view, #state{actor=Actor,
     {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
     {ok, {_AdsId, AdsType, _AdsMetadata, AdsValue}} = lasp:read(?ADS_WITH_CONTRACTS, undefined),
 
-    %% - If there are no ads (`sets:size(Ads) == 0') 
+    %% - If there are no ads (`sets:size(Ads) == 0')
     %%   it might mean the experiment hasn't started or it has started
     %%   and all ads are disabled.
     %%   If `not lasp_type:is_bottom(AdsType, AdsValue)' then the experiment
@@ -264,12 +264,15 @@ trigger(#ad{counter=CounterId} = Ad, Actor) ->
     %% Blocking threshold read for max advertisement impressions.
     MaxImpressions = lasp_config:get(max_impressions,
                                      ?MAX_IMPRESSIONS_DEFAULT),
-    {ok, _Value} = lasp:read(CounterId, {value, MaxImpressions}),
 
-    lager:info("Threshold for ~p reached; disabling!", [Ad]),
+    EnforceFun = fun() ->
+            lager:info("Threshold for ~p reached; disabling!", [Ad]),
 
-    %% Remove the advertisement.
-    {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor),
+            %% Remove the advertisement.
+            {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor)
+    end,
+
+    lasp:invariant(CounterId, {value, MaxImpressions}, EnforceFun),
 
     ok.
 
@@ -277,4 +280,3 @@ trigger(#ad{counter=CounterId} = Ad, Actor) ->
 log_message_queue_size(Method) ->
     {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
     lasp_logger:mailbox("MAILBOX " ++ Method ++ " message processed; messages remaining: ~p", [MessageQueueLen]).
-

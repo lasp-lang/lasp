@@ -220,7 +220,7 @@ exchange(Peer) ->
             Pid = spawn_link(fun() -> ok end),
             {ok, Pid};
         state_based ->
-            case lasp_config:get(broadcast, false) of
+            case broadcast_tree_mode() of
                 true ->
                     %% Plumtree AAE.
                     gen_server:call(?MODULE, {exchange, Peer}, infinity);
@@ -812,7 +812,7 @@ handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
                                ?CLOCK_INIT(Actor)}),
 
     %% Send back just the updated state for the object received.
-    case i_am_server_and_should_react() of
+    case client_server_mode() andalso i_am_server() andalso reactive_server() of
         true ->
             ObjectFilterFun = fun(Id1) ->
                                       Id =:= Id1
@@ -838,7 +838,7 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
     send({delta_ack, node(), Id, Counter}, From),
 
     %% Send back just the updated state for the object received.
-    case i_am_server_and_should_react() of
+    case client_server_mode() andalso i_am_server() andalso reactive_server() of
         true ->
             ObjectFilterFun = fun(Id1) ->
                                       Id =:= Id1
@@ -1049,7 +1049,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 broadcast({Id, Type, Metadata, Value}) ->
-    case lasp_config:get(broadcast, false) of
+    case broadcast_tree_mode() of
         true ->
             Clock = orddict:fetch(clock, Metadata),
             Broadcast = #broadcast{id=Id,
@@ -1171,18 +1171,18 @@ log_transmission({Type, Payload}, PeerCount) ->
 
 %% @private
 schedule_aae_synchronization() ->
-    ShouldAAESync = case lasp_config:get(mode, state_based) of
-        delta_based ->
-            false;
-        state_based ->
-            case lasp_config:get(tutorial, false) of
-                true ->
-                    false;
-                false ->
-                    not lasp_config:get(broadcast, false)
-                    orelse not i_am_server_and_should_react()
-            end
-    end,
+    ShouldAAESync = state_based_mode()
+            andalso (not tutorial_mode())
+            andalso (not broadcast_tree_mode())
+            andalso (
+              peer_to_peer_mode()
+              orelse
+              (
+               client_server_mode()
+               andalso
+               not (i_am_server() andalso reactive_server())
+              )
+            ),
 
     case ShouldAAESync of
         true ->
@@ -1196,13 +1196,17 @@ schedule_aae_synchronization() ->
 
 %% @private
 schedule_delta_synchronization() ->
-    ShouldDeltaSync = case lasp_config:get(mode, state_based) of
-        delta_based ->
-            not i_am_server_and_should_react();
-        state_based ->
-            false
-    end,
-
+    ShouldDeltaSync = delta_based_mode()
+            andalso (
+              peer_to_peer_mode()
+              orelse
+              (
+               client_server_mode()
+               andalso
+               not (i_am_server() andalso reactive_server())
+              )
+            ),
+ 
     case ShouldDeltaSync of
         true ->
             Interval = lasp_config:get(delta_interval, 10000),
@@ -1215,10 +1219,10 @@ schedule_delta_synchronization() ->
 
 %% @private
 schedule_delta_garbage_collection() ->
-    case lasp_config:get(mode, state_based) of
-        delta_based ->
+    case delta_based_mode() of
+        true ->
             timer:send_after(?DELTA_GC_INTERVAL, delta_gc);
-        state_based ->
+        false ->
             ok
     end.
 %% @private
@@ -1375,22 +1379,33 @@ without_me(Members) ->
     Members -- [node()].
 
 %% @private
-i_am_server_and_should_react() ->
-    PeerServiceManager = lasp_config:get(peer_service_manager, partisan_peer_service),
-    case PeerServiceManager of
-        partisan_client_server_peer_service_manager ->
-            case partisan_config:get(tag, undefined) of
-                server ->
-                    case lasp_config:get(reactive_server, false) of
-                        true ->
-                            %% I'm the server in the reactive client-server mode.
-                            true;
-                        _ ->
-                            false
-                    end;
-                _ ->
-                    false
-            end;
-        _ ->
-            false
-    end.
+state_based_mode() ->
+    lasp_config:get(mode, state_based) == state_based.
+
+%% @private
+delta_based_mode() ->
+    lasp_config:get(mode, state_based) == delta_based.
+
+%% @private
+broadcast_tree_mode() ->
+    lasp_config:get(broadcast, false).
+
+%% @private
+tutorial_mode() ->
+    lasp_config:get(tutorial, false).
+
+%% @private
+client_server_mode() ->
+    lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager.
+
+%% @private
+peer_to_peer_mode() ->
+    lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_hyparview_peer_service_manager.
+
+%% @private
+i_am_server() ->
+    partisan_config:get(tag, undefined) == server.
+
+%% @private
+reactive_server() ->
+    lasp_config:get(reactive_server, false).

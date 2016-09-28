@@ -218,7 +218,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 schedule_impression() ->
-    timer:send_after(?IMPRESSION_INTERVAL + Jitter, view).
+    timer:send_after(?IMPRESSION_INTERVAL, view).
 
 %% @private
 schedule_logging() ->

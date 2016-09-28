@@ -119,7 +119,7 @@
 
 %% Simulation helpers.
 -define(AAE_INTERVAL, 10000).
--define(IMPRESSION_INTERVAL, 500).
+-define(IMPRESSION_INTERVAL, 3600 * 1000). %% 1 Hour
 -define(STATUS_INTERVAL, 10000).
 -define(EVAL_NUMBER, 1).
 -define(LOG_INTERVAL, 10000).

@@ -200,23 +200,26 @@ create_ads_and_contracts(Ads, Contracts, Actor) ->
 build_dag(Actor) ->
     %% For each identifier, generate a contract.
     {ContractsId, ContractsType} = ?CONTRACTS,
-    {ok, {Contracts, _, _, _}} = lasp:declare(ContractsId, ContractsType),
+    {ok, _} = lasp:declare(ContractsId, ContractsType),
 
     %% Generate Rovio's advertisements.
-    {ok, {RovioAds, _, _, _}} = lasp:declare(?SET_TYPE),
-    RovioAdList = create_ads_and_contracts(RovioAds, Contracts, Actor),
+    %% {ok, {RovioAds, _, _, _}} = lasp:declare(?SET_TYPE),
+    %% RovioAdList = create_ads_and_contracts(RovioAds, Contracts, Actor),
 
     %% Generate Riot's advertisements.
-    {ok, {RiotAds, _, _, _}} = lasp:declare(?SET_TYPE),
-    RiotAdList = create_ads_and_contracts(RiotAds, Contracts, Actor),
+    %% {ok, {RiotAds, _, _, _}} = lasp:declare(?SET_TYPE),
+    %% RiotAdList = create_ads_and_contracts(RiotAds, Contracts, Actor),
 
     %% Gather ads.
-    AdList = RovioAdList ++ RiotAdList,
+    %% AdList = RovioAdList ++ RiotAdList,
 
     %% Union ads.
     {AdsId, AdsType} = ?ADS,
     {ok, _} = lasp:declare(AdsId, AdsType),
-    ok = lasp:union(RovioAds, RiotAds, ?ADS),
+    %% ok = lasp:union(RovioAds, RiotAds, ?ADS),
+
+    %% Generate adverstisements.
+    AdList = create_ads_and_contracts(AdsId, ContractsId, Actor),
 
     %% Compute the Cartesian product of both ads and contracts.
     {AdsContractsId, AdsContractsType} = ?ADS_CONTRACTS,

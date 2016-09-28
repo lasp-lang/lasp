@@ -97,9 +97,15 @@
 -define(CONTRACTS, {<<"contracts">>, ?SET_TYPE}).
 -define(ADS_CONTRACTS, {<<"ads_contracts">>, ?SET_TYPE}).
 -define(ADS_WITH_CONTRACTS, {<<"ads_with_contracts">>, ?SET_TYPE}).
+
+-define(MAX_PLAYERS_DEFAULT, 5).
+-define(GAMES_NUMBER, 1).
+-define(ENROLLABLE_GAMES, {<<"enrollable_games">>, ?SET_TYPE}).
+
 -define(BOOLEAN_TYPE, boolean).
 -define(COUNTER_TYPE, gcounter).
 -define(GMAP_TYPE, gmap).
+-define(GSET_TYPE, gset).
 -define(SET_TYPE, lasp_config:get(set, orset)).
 -define(PAIR_TYPE, pair).
 

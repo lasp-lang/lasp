@@ -311,30 +311,7 @@ stop_simulation() ->
         false ->
             ok;
         _ ->
-            Token = os:getenv("TOKEN", "undefined"),
-            EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
-            RunningApps = [
-                "lasp-client-" ++ integer_to_list(EvalTimestamp),
-                "lasp-server-" ++ integer_to_list(EvalTimestamp)
-            ],
-
-            lists:foreach(
-                fun(AppName) ->
-                    delete_marathon_app(DCOS, Token, AppName)
-                end,
-                RunningApps
-            )
-    end.
-
-%% @private
-delete_marathon_app(DCOS, Token, AppName) ->
-    Headers = [{"Authorization", "token=" ++ Token}],
-    Url = DCOS ++ "/marathon/v2/apps/" ++ AppName,
-    case httpc:request(delete, {Url, Headers}, [], [{body_format, binary}]) of
-        {ok, {{_, 200, _}, _, _Body}} ->
-            ok;
-        Other ->
-            lager:info("Delete app ~p request failed: ~p", [AppName, Other])
+            lasp_marathon_simulations:stop()
     end.
 
 %% @private

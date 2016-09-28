@@ -21,7 +21,8 @@
 -module(lasp_marathon_simulations).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
--export([stop/0]).
+-export([stop/0,
+         log_message_queue_size/1]).
 
 stop() ->
     DCOS = os:getenv("DCOS", "false"),
@@ -48,3 +49,7 @@ delete_marathon_app(DCOS, Token, AppName) ->
         Other ->
             lager:info("Delete app ~p request failed: ~p", [AppName, Other])
     end.
+
+log_message_queue_size(Method) ->
+    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
+    lasp_logger:mailbox("MAILBOX " ++ Method ++ " message processed; messages remaining: ~p", [MessageQueueLen]).

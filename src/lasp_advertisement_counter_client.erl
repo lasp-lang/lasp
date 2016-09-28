@@ -93,7 +93,7 @@ handle_cast(Msg, State) ->
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(log, #state{actor=Actor,
                         impressions=Impressions}=State) ->
-    log_message_queue_size("log"),
+    lasp_marathon_simulations:log_message_queue_size("log"),
 
     %% Get current value of the list of advertisements.
     {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
@@ -108,7 +108,7 @@ handle_info(log, #state{actor=Actor,
 handle_info(view, #state{actor=Actor,
                          impressions=Impressions0,
                          triggers=Triggers0}=State) ->
-    log_message_queue_size("view"),
+    lasp_marathon_simulations:log_message_queue_size("view"),
 
     %% Get current value of the list of advertisements.
     {ok, Ads0} = lasp:query(?ADS_WITH_CONTRACTS),
@@ -172,7 +172,7 @@ handle_info(view, #state{actor=Actor,
     {noreply, State#state{impressions=Impressions1, triggers=Triggers1}};
 
 handle_info(check_simulation_end, #state{actor=Actor}=State) ->
-    log_message_queue_size("check_simulation_end"),
+    lasp_marathon_simulations:log_message_queue_size("check_simulation_end"),
 
     %% A simulation ends for clients when all clients have
     %% observed all ads disabled (first component of the map in
@@ -276,8 +276,3 @@ trigger(#ad{counter=CounterId} = Ad, Actor) ->
     lasp:invariant(CounterId, {value, MaxImpressions}, EnforceFun),
 
     ok.
-
-%% @private
-log_message_queue_size(Method) ->
-    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
-    lasp_logger:mailbox("MAILBOX " ++ Method ++ " message processed; messages remaining: ~p", [MessageQueueLen]).

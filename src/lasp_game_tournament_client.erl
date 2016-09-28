@@ -18,8 +18,8 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_advertisement_counter_client).
--author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
+-module(lasp_game_tournament_client).
+-author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).
 
@@ -37,7 +37,7 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {actor, impressions, triggers}).
+-record(state, {actor, triggers}).
 
 %%%===================================================================
 %%% API
@@ -55,13 +55,13 @@ start_link() ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([]) ->
-    lager:info("Advertisement counter client initialized."),
+    lager:info("Game tournament client initialized."),
 
     %% Generate actor identifier.
     Actor = node(),
 
-    %% Schedule advertisement counter impression.
-    schedule_impression(),
+    %% Schedule game enrollment.
+    schedule_enrollment(),
 
     %% Build DAG.
     case lasp_config:get(heavy_client, false) of
@@ -74,7 +74,7 @@ init([]) ->
     %% Schedule logging.
     schedule_logging(),
 
-    {ok, #state{actor=Actor, impressions=0, triggers=dict:new()}}.
+    {ok, #state{actor=Actor, triggers=dict:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -91,104 +91,102 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(log, #state{actor=Actor,
-                        impressions=Impressions}=State) ->
+handle_info(log, #state{actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("log"),
 
-    %% Get current value of the list of advertisements.
-    {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
+    %% Get current value of the list of enrollments.
+    {ok, GameList} = lasp:query(?ENROLLABLE_GAMES),
 
-    lager:info("Impressions: ~p, current ad size: ~p, node: ~p", [Impressions, sets:size(Ads), Actor]),
+    lager:info("Game list: ~p, node: ~p", [GameList, Actor]),
 
-    %% Schedule advertisement counter impression.
+    %% Schedule logging.
     schedule_logging(),
 
     {noreply, State};
 
 handle_info(view, #state{actor=Actor,
-                         impressions=Impressions0,
                          triggers=Triggers0}=State) ->
     lasp_marathon_simulations:log_message_queue_size("view"),
 
-    %% Get current value of the list of advertisements.
-    {ok, Ads0} = lasp:query(?ADS_WITH_CONTRACTS),
+    %% Get current value of the list of enrollments.
+    {ok, GameList0} = lasp:query(?ENROLLABLE_GAMES),
 
-    %% Make sure we have ads...
-    {Impressions1, Triggers1} = case sets:size(Ads0) of
+    %% Make sure we have games...
+    Triggers1 = case sets:size(GameList0) of
         0 ->
             %% Do nothing.
-            {Impressions0, Triggers0};
+            Triggers0;
         Size ->
             %% Select random.
             Random = lasp_support:puniform(Size),
 
-            {#ad{counter=Counter} = Ad, _Contract} =
-                lists:nth(Random, sets:to_list(Ads0)),
+            GameId = lists:nth(Random, sets:to_list(GameList0)),
 
-            %% Spawn a process to disable the advertisement if it goes
-            %% above the maximum number of impressions.
+            %% Spawn a process to disable the game if it goes
+            %% above the maximum number of enrollments.
             %%
             Triggers = case lasp_config:get(heavy_client, false) of
                 true ->
-                    case dict:find(Ad, Triggers0) of
+                    case dict:find(GameId, Triggers0) of
                         {ok, _Pid} ->
                             Triggers0;
                         error ->
-                            Pid = spawn_link(fun() -> trigger(Ad, Actor) end),
-                            dict:store(Ad, Pid, Triggers0)
+                            Pid = spawn_link(fun() -> trigger(GameId, Actor) end),
+                            dict:store(GameId, Pid, Triggers0)
                     end;
                 false ->
                     Triggers0
             end,
 
-            %% Increment counter.
-            {ok, _} = lasp:update(Counter, increment, Actor),
+            %% Enroll random player identifier into the game.
+            PlayerId = lasp_support:puniform(1000),
+            {ok, _} = lasp:update(GameId, {add, PlayerId}, Actor),
 
-            %% Increment impressions.
-            {Impressions0 + 1, Triggers}
+            %% Update triggers.
+            Triggers
     end,
 
-    {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
-    {ok, {_AdsId, AdsType, _AdsMetadata, AdsValue}} = lasp:read(?ADS_WITH_CONTRACTS, undefined),
+    {ok, GameList} = lasp:query(?ENROLLABLE_GAMES),
+    {ok, {_GamesId, GamesType, _GamesMetadata, GamesValue}} = lasp:read(?ENROLLABLE_GAMES, undefined),
 
-    %% - If there are no ads (`sets:size(Ads) == 0')
+    %% - If there are no games (`sets:size(GameList) == 0')
     %%   it might mean the experiment hasn't started or it has started
-    %%   and all ads are disabled.
-    %%   If `not lasp_type:is_bottom(AdsType, AdsValue)' then the experiment
+    %%   and all games are enrolled.
+    %%   If `not lasp_type:is_bottom(GamesType, GamesValue)' then the experiment
     %%   has started. With both, it means the experiement has ended
-    %% - Else, keep doing impressions
-    case sets:size(Ads) == 0 andalso not lasp_type:is_bottom(AdsType, AdsValue) of
+    %% - Else, keep doing enrollments
+    case sets:size(GameList) == 0 andalso not lasp_type:is_bottom(GamesType, GamesValue) of
         true ->
-            lager:info("All ads are disabled. Node: ~p", [Actor]),
+            lager:info("All games are fully enrolled. Node: ~p", [Actor]),
 
             %% Update Simulation Status Instance
             lasp:update(?SIM_STATUS_ID, {apply, Actor, {fst, true}}, Actor),
             log_convergence(),
             schedule_check_simulation_end();
         false ->
-            schedule_impression()
+            schedule_enrollment()
     end,
 
-    {noreply, State#state{impressions=Impressions1, triggers=Triggers1}};
+    {noreply, State#state{triggers=Triggers1}};
 
 handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("check_simulation_end"),
 
     %% A simulation ends for clients when all clients have
-    %% observed all ads disabled (first component of the map in
+    %% observed all games enrolled (first component of the map in
     %% the simulation status instance is true for all clients)
-    {ok, AdsDisabledAndLogs} = lasp:query(?SIM_STATUS_ID),
+    {ok, GamesEnrolledAndLogs} = lasp:query(?SIM_STATUS_ID),
 
-    NodesWithAdsDisabled = lists:filter(
-        fun({_Node, {AdsDisabled, _LogsPushed}}) ->
-            AdsDisabled
+    NodesWithGamesEnrolled = lists:filter(
+        fun({_Node, {GamesEnrolled, _LogsPushed}}) ->
+            GamesEnrolled
         end,
-        AdsDisabledAndLogs
+        GamesEnrolledAndLogs
     ),
 
-    case length(NodesWithAdsDisabled) == client_number() of
+    case length(NodesWithGamesEnrolled) == lasp_config:get(client_number, 3) of
         true ->
-            lager:info("All nodes observed ads disabled. Node ~p", [Actor]),
+            lager:info("All nodes observed games enrolled. Node ~p", [Actor]),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(),
             lasp:update(?SIM_STATUS_ID, {apply, Actor, {snd, true}}, Actor);
@@ -217,9 +215,10 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-schedule_impression() ->
-    ImpressionVelocity = lasp_config:get(impression_velocity, 1),
-    timer:send_after(round(?IMPRESSION_INTERVAL / ImpressionVelocity), view).
+schedule_enrollment() ->
+    %% Add random jitter.
+    Jitter = rand_compat:uniform(?ENROLLMENT_INTERVAL),
+    timer:send_after(?ENROLLMENT_INTERVAL + Jitter, view).
 
 %% @private
 schedule_logging() ->
@@ -228,10 +227,6 @@ schedule_logging() ->
 %% @private
 schedule_check_simulation_end() ->
     timer:send_after(?STATUS_INTERVAL, check_simulation_end).
-
-%% @private
-client_number() ->
-    lasp_config:get(client_number, 3).
 
 %% @private
 log_convergence() ->
@@ -244,34 +239,20 @@ log_convergence() ->
 
 %% @private
 build_dag() ->
-    %% Compute the Cartesian product of both ads and contracts.
-    {AdsContractsId, AdsContractsType} = ?ADS_CONTRACTS,
-    {ok, _} = lasp:declare(AdsContractsId, AdsContractsType),
-    ok = lasp:product(?ADS, ?CONTRACTS, ?ADS_CONTRACTS),
-
-    %% Filter items by join on item it.
-    {AdsWithContractsId, AdsWithContractsType} = ?ADS_WITH_CONTRACTS,
-    {ok, _} = lasp:declare(AdsWithContractsId, AdsWithContractsType),
-    FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
-        Id1 =:= Id2
-    end,
-    ok = lasp:filter(?ADS_CONTRACTS, FilterFun, ?ADS_WITH_CONTRACTS),
-
+    %% Nothing to do.
     ok.
 
 %% @private
-trigger(#ad{counter=CounterId} = Ad, Actor) ->
-    %% Blocking threshold read for max advertisement impressions.
-    MaxImpressions = lasp_config:get(max_impressions,
-                                     ?MAX_IMPRESSIONS_DEFAULT),
+trigger(GameId, Actor) ->
+    %% Blocking threshold read for max players.
+    MaxPlayers = lasp_config:get(max_players, ?MAX_PLAYERS_DEFAULT),
 
     EnforceFun = fun() ->
-            lager:info("Threshold for ~p reached; disabling!", [Ad]),
+            lager:info("Threshold for ~p reached; disabling!", [GameId]),
 
-            %% Remove the advertisement.
-            {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor)
+            %% Remove the game.
+            {ok, _} = lasp:update(?ENROLLABLE_GAMES, {rmv, GameId}, Actor)
     end,
-
-    lasp:invariant(CounterId, {value, MaxImpressions}, EnforceFun),
+    lasp:invariant(GameId, {cardinality, MaxPlayers}, EnforceFun),
 
     ok.

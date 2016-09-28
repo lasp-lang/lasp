@@ -18,8 +18,8 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_advertisement_counter_server).
--author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
+-module(lasp_game_tournament_server).
+-author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).
 
@@ -38,7 +38,7 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {actor, ad_list}).
+-record(state, {actor, game_list}).
 
 %%%===================================================================
 %%% API
@@ -56,7 +56,7 @@ start_link() ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([]) ->
-    lager:info("Advertisement counter server initialized."),
+    lager:info("Game tournament server initialized."),
 
     %% Delay for graph connectedness.
     wait_for_connectedness(),
@@ -72,10 +72,10 @@ init([]) ->
     schedule_logging(),
 
     %% Build DAG.
-    {ok, AdList} = build_dag(Actor),
+    {ok, GameList} = build_dag(Actor),
 
     %% Initialize triggers.
-    launch_triggers(AdList, Actor),
+    launch_triggers(GameList, Actor),
 
     %% Create instance for simulation status tracking
     {Id, Type} = ?SIM_STATUS_ID,
@@ -84,7 +84,7 @@ init([]) ->
     %% Schedule check simulation end
     schedule_check_simulation_end(),
 
-    {ok, #state{actor=Actor, ad_list=AdList}}.
+    {ok, #state{actor=Actor, game_list=GameList}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -104,46 +104,46 @@ handle_cast(Msg, State) ->
 handle_info(log, #state{}=State) ->
     lasp_marathon_simulations:log_message_queue_size("log"),
 
-    %% Print number of enabled ads.
-    {ok, Ads} = lasp:query(?ADS),
+    %% Print number of games.
+    {ok, Games} = lasp:query(?ENROLLABLE_GAMES),
 
-    lager:info("Enabled advertisements: ~p", [sets:size(Ads)]),
+    lager:info("Game list: ~p", [sets:size(Games)]),
 
-    %% Schedule advertisement counter impression.
+    %% Schedule logging.
     schedule_logging(),
 
     {noreply, State};
 
-handle_info(check_simulation_end, #state{ad_list=AdList}=State) ->
+handle_info(check_simulation_end, #state{game_list=GameList}=State) ->
     lasp_marathon_simulations:log_message_queue_size("check_simulation_end"),
 
     %% A simulation ends for the server when all clients have
-    %% observed that all clients observed all ads disabled and
+    %% observed that all clients observed all games enrolled and
     %% pushed their logs (second component of the map in
     %% the simulation status instance is true for all clients)
-    {ok, AdsDisabledAndLogs} = lasp:query(?SIM_STATUS_ID),
+    {ok, GamesEnrolledAndLogs} = lasp:query(?SIM_STATUS_ID),
 
     NodesWithLogsPushed = lists:filter(
-        fun({_Node, {_AdsDisabled, LogsPushed}}) ->
+        fun({_Node, {_GamesEnrolled, LogsPushed}}) ->
             LogsPushed
         end,
-        AdsDisabledAndLogs
+        GamesEnrolledAndLogs
     ),
 
-    NodesWithAdsDisabled = lists:filter(
-        fun({_Node, {AdsDisabled, _LogsPushed}}) ->
-            AdsDisabled
+    NodesWithGamesEnrolled = lists:filter(
+        fun({_Node, {GamesEnrolled, _LogsPushed}}) ->
+            GamesEnrolled
         end,
-        AdsDisabledAndLogs
+        GamesEnrolledAndLogs
     ),
 
-    lager:info("Checking for simulation end: ~p nodes with ads disabled and ~p nodes with logs pushed.",
-               [length(NodesWithAdsDisabled), length(NodesWithLogsPushed)]),
+    lager:info("Checking for simulation end: ~p nodes with enrolled games and ~p nodes with logs pushed.",
+               [length(NodesWithGamesEnrolled), length(NodesWithLogsPushed)]),
 
-    case length(NodesWithLogsPushed) == client_number() of
+    case length(NodesWithLogsPushed) == lasp_config:get(client_number, 3) of
         true ->
             lager:info("All nodes have pushed their logs"),
-            log_overcounting_and_convergence(AdList),
+            log_overcounting_and_convergence(GameList),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(),
             lasp_config:set(simulation_end, true),
@@ -173,95 +173,58 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-create_ads_and_contracts(Ads, Contracts, Actor) ->
-    AdIds = lists:map(fun(_) ->
-                              {ok, Unique} = lasp_unique:unique(),
-                              Unique
-                      end, lists:seq(1, ?ADS_NUMBER)),
-    lists:map(fun(Id) ->
-                {ok, _} = lasp:update(Contracts,
-                                      {add, #contract{id=Id}},
-                                      Actor)
-                end, AdIds),
-    lists:map(fun(Id) ->
-                %% Generate a G-Counter.
-                {ok, {CounterId, _, _, _}} = lasp:declare(?COUNTER_TYPE),
-
-                Ad = #ad{id=Id, name=Id, counter=CounterId},
-
-                %% Add it to the advertisement set.
-                {ok, _} = lasp:update(Ads, {add, Ad}, Actor),
-
-                Ad
-
-                end, AdIds).
-
-%% @private
 build_dag(Actor) ->
-    %% For each identifier, generate a contract.
-    {ContractsId, ContractsType} = ?CONTRACTS,
-    {ok, _} = lasp:declare(ContractsId, ContractsType),
+    %% Create a bunch of unique identifiers for games.
+    GameIds = lists:map(fun(_) ->
+                                {ok, Unique} = lasp_unique:unique(),
+                                Unique
+                        end, lists:seq(1, ?GAMES_NUMBER)),
 
-    %% Generate Rovio's advertisements.
-    %% {ok, {RovioAds, _, _, _}} = lasp:declare(?SET_TYPE),
-    %% RovioAdList = create_ads_and_contracts(RovioAds, Contracts, Actor),
+    %% Create each game, and then add each of the games to the set of
+    %% enrollable games.
+    GameList = lists:map(fun(Id) ->
+                    %% Generate identifier.
+                    GameId = {Id, ?GSET_TYPE},
 
-    %% Generate Riot's advertisements.
-    %% {ok, {RiotAds, _, _, _}} = lasp:declare(?SET_TYPE),
-    %% RiotAdList = create_ads_and_contracts(RiotAds, Contracts, Actor),
+                    %% Generate game.
+                    {ok, {GameId, _, _, _}} = lasp:declare(GameId, ?GSET_TYPE),
 
-    %% Gather ads.
-    %% AdList = RovioAdList ++ RiotAdList,
+                    %% Add game.
+                    {ok, _} = lasp:update(?ENROLLABLE_GAMES,
+                                          {add, GameId},
+                                          Actor),
 
-    %% Union ads.
-    {AdsId, AdsType} = ?ADS,
-    {ok, _} = lasp:declare(AdsId, AdsType),
-    %% ok = lasp:union(RovioAds, RiotAds, ?ADS),
+                    GameId
 
-    %% Generate adverstisements.
-    AdList = create_ads_and_contracts(?ADS, ?CONTRACTS, Actor),
+                    end, GameIds),
 
-    %% Compute the Cartesian product of both ads and contracts.
-    {AdsContractsId, AdsContractsType} = ?ADS_CONTRACTS,
-    {ok, _} = lasp:declare(AdsContractsId, AdsContractsType),
-    ok = lasp:product(?ADS, ?CONTRACTS, ?ADS_CONTRACTS),
-
-    %% Filter items by join on item it.
-    {AdsWithContractsId, AdsWithContractsType} = ?ADS_WITH_CONTRACTS,
-    {ok, _} = lasp:declare(AdsWithContractsId, AdsWithContractsType),
-    FilterFun = fun({#ad{id=Id1}, #contract{id=Id2}}) ->
-        Id1 =:= Id2
-    end,
-    ok = lasp:filter(?ADS_CONTRACTS, FilterFun, ?ADS_WITH_CONTRACTS),
-
-    {ok, AdList}.
+    {ok, GameList}.
 
 %% @private
-launch_triggers(AdList, Actor) ->
+launch_triggers(GameList, Actor) ->
     lists:map(
-        fun(Ad) ->
+        fun(GameId) ->
             spawn_link(
                 fun() ->
-                    trigger(Ad, Actor)
+                    trigger(GameId, Actor)
                 end
             )
         end,
-        AdList
+        GameList
     ).
 
 %% @private
-trigger(#ad{counter=CounterId} = Ad, Actor) ->
-    %% Blocking threshold read for max advertisement impressions.
-    MaxImpressions = lasp_config:get(max_impressions,
-                                     ?MAX_IMPRESSIONS_DEFAULT),
+trigger(GameId, Actor) ->
+    %% Blocking threshold read for max players.
+    MaxPlayers = lasp_config:get(max_players, ?MAX_PLAYERS_DEFAULT),
 
     EnforceFun = fun() ->
-            lager:info("Threshold for ~p reached; disabling!", [Ad]),
+            lager:info("Threshold for ~p reached; disabling!", [GameId]),
 
-            %% Remove the advertisement.
-            {ok, _} = lasp:update(?ADS, {rmv, Ad}, Actor)
+            %% Remove the game.
+            {ok, _} = lasp:update(?ENROLLABLE_GAMES, {rmv, GameId}, Actor)
     end,
-    lasp:invariant(CounterId, {value, MaxImpressions}, EnforceFun),
+    lasp:invariant(GameId, {cardinality, MaxPlayers}, EnforceFun),
 
     ok.
 
@@ -274,14 +237,10 @@ schedule_check_simulation_end() ->
     timer:send_after(?STATUS_INTERVAL, check_simulation_end).
 
 %% @private
-client_number() ->
-    lasp_config:get(client_number, 3).
-
-%% @private
-log_overcounting_and_convergence(AdList) ->
+log_overcounting_and_convergence(GameList) ->
     case lasp_config:get(instrumentation, false) of
         true ->
-            Overcounting = compute_overcounting(AdList),
+            Overcounting = compute_overcounting(GameList),
             lasp_instrumentation:overcounting(Overcounting),
             lasp_instrumentation:convergence();
 
@@ -290,21 +249,23 @@ log_overcounting_and_convergence(AdList) ->
     end.
 
 %% @private
-compute_overcounting(AdList) ->
+compute_overcounting(GameList) ->
     OvercountingSum = lists:foldl(
-        fun(#ad{counter=CounterId} = _Ad, Acc) ->
-            {ok, Value} = lasp:query(CounterId),
-            MaxImpressions = lasp_config:get(max_impressions,
-                                             ?MAX_IMPRESSIONS_DEFAULT),
-            Overcounting = Value - MaxImpressions,
-            OvercountingPercentage = (Overcounting * 100) / MaxImpressions,
+        fun(GameId, Acc) ->
+            {ok, Value} = lasp:query(GameId),
+            MaxPlayers = lasp_config:get(max_players, ?MAX_PLAYERS_DEFAULT),
+            %% Size, because we count cardinality.
+            Overcounting = sets:size(Value) - MaxPlayers,
+            lager:info("Game ~p had ~p enrolled out of ~p",
+                       [GameId, sets:size(Value), MaxPlayers]),
+            OvercountingPercentage = (Overcounting * 100) / MaxPlayers,
             Acc + OvercountingPercentage
         end,
         0,
-        AdList
+        GameList
     ),
 
-    OvercountingSum / length(AdList).
+    OvercountingSum / length(GameList).
 
 %% @private
 stop_simulation() ->

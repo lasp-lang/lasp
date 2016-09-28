@@ -150,13 +150,26 @@ start(_Case, _Config, Options) ->
 
                         %% Configure who should be the server and who's
                         %% the client.
-                        case Node of
-                            Server ->
-                                ok = rpc:call(Node, lasp_config, set,
-                                              [ad_counter_simulation_server, true]);
-                            _ ->
-                                ok = rpc:call(Node, lasp_config, set,
-                                              [ad_counter_simulation_client, true])
+                        Simulation = proplists:get_value(simulation, Options, undefined),
+                        case Simulation of
+                            ad_counter ->
+                                case Node of
+                                    Server ->
+                                        ok = rpc:call(Node, lasp_config, set,
+                                                      [ad_counter_simulation_server, true]);
+                                    _ ->
+                                        ok = rpc:call(Node, lasp_config, set,
+                                                      [ad_counter_simulation_client, true])
+                                end;
+                            game_tournament ->
+                                case Node of
+                                    Server ->
+                                        ok = rpc:call(Node, lasp_config, set,
+                                                      [tournament_simulation_server, true]);
+                                    _ ->
+                                        ok = rpc:call(Node, lasp_config, set,
+                                                      [tournament_simulation_client, true])
+                                end
                         end,
 
                         %% Configure the peer service.

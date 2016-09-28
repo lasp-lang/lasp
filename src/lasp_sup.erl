@@ -146,7 +146,10 @@ init(_Args) ->
     %% Setup the advertisement counter example, if necessary.
     AdSpecs = advertisement_counter_child_specs(),
 
-    Children = Children0 ++ AdSpecs,
+    %% Setup the game tournament example, if necessary.
+    TournamentSpecs = game_tournament_child_specs(),
+
+    Children = Children0 ++ AdSpecs ++ TournamentSpecs,
 
     %% Configure defaults.
     configure_defaults(),
@@ -402,3 +405,54 @@ random_port() ->
     {ok, {_, Port}} = inet:sockname(Socket),
     ok = gen_tcp:close(Socket),
     Port.
+
+%% @private
+game_tournament_child_specs() ->
+    %% Figure out who is acting as the client.
+    TournClientDefault = list_to_atom(os:getenv("TOURNAMENT_SIM_CLIENT", "false")),
+    TournClientEnabled = application:get_env(?APP,
+                                          tournament_simulation_client,
+                                          TournClientDefault),
+    lasp_config:set(tournament_simulation_client, TournClientEnabled),
+    lager:info("TournClientEnabled: ~p", [TournClientEnabled]),
+
+    ClientSpecs = case TournClientEnabled of
+        true ->
+            TournCounterClient = {lasp_game_tournament_client,
+                                  {lasp_game_tournament_client, start_link, []},
+                                   permanent, 5000, worker,
+                                   [lasp_game_tournament_client]},
+
+            %% Configure proper partisan tag.
+            partisan_config:set(tag, client),
+
+            [TournCounterClient];
+        false ->
+            []
+    end,
+
+    %% Figure out who is acting as the server.
+    TournServerDefault = list_to_atom(os:getenv("TOURNAMENT_SIM_SERVER", "false")),
+    TournServerEnabled = application:get_env(?APP,
+                                             tournament_simulation_server,
+                                             TournServerDefault),
+    lasp_config:set(tournament_simulation_server, TournServerEnabled),
+    lager:info("TournServerEnabled: ~p", [TournServerEnabled]),
+
+    ServerSpecs = case TournServerEnabled of
+        true ->
+            TournServer = {lasp_game_tournament_server,
+                           {lasp_game_tournament_server, start_link, []},
+                            permanent, 5000, worker,
+                            [lasp_game_tournament_server]},
+
+            %% Configure proper partisan tag.
+            partisan_config:set(tag, server),
+
+            [TournServer];
+        false ->
+            []
+    end,
+
+    ClientSpecs ++ ServerSpecs.
+

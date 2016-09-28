@@ -137,7 +137,7 @@ handle_info(check_simulation_end, #state{game_list=GameList}=State) ->
         GamesEnrolledAndLogs
     ),
 
-    lager:info("Checking for simulation end: ~p nodes with ads disabled and ~p nodes with logs pushed.",
+    lager:info("Checking for simulation end: ~p nodes with enrolledgames and ~p nodes with logs pushed.",
                [length(NodesWithGamesEnrolled), length(NodesWithLogsPushed)]),
 
     case length(NodesWithLogsPushed) == lasp_config:get(client_number, 3) of

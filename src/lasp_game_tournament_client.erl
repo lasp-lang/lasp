@@ -111,7 +111,7 @@ handle_info(view, #state{actor=Actor,
     %% Get current value of the list of advertisements.
     {ok, GameList0} = lasp:query(?ENROLLABLE_GAMES),
 
-    %% Make sure we have ads...
+    %% Make sure we have games...
     Triggers1 = case sets:size(GameList0) of
         0 ->
             %% Do nothing.
@@ -173,7 +173,7 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("check_simulation_end"),
 
     %% A simulation ends for clients when all clients have
-    %% observed all ads disabled (first component of the map in
+    %% observed all games enrolled (first component of the map in
     %% the simulation status instance is true for all clients)
     {ok, GamesEnrolledAndLogs} = lasp:query(?SIM_STATUS_ID),
 
@@ -186,7 +186,7 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
 
     case length(NodesWithGamesEnrolled) == lasp_config:get(client_number, 3) of
         true ->
-            lager:info("All nodes observed ads disabled. Node ~p", [Actor]),
+            lager:info("All nodes observed games enrolled. Node ~p", [Actor]),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(),
             lasp:update(?SIM_STATUS_ID, {apply, Actor, {snd, true}}, Actor);

@@ -5,6 +5,7 @@ source helpers.sh
 TIMESTAMP_FILE=/tmp/.LAST_TIMESTAMP
 
 ENV_VARS=(
+  LASP_BRANCH
   DCOS
   TOKEN
   EVALUATION_PASSPHRASE
@@ -83,7 +84,7 @@ cat <<EOF > lasp-server.json
   "container": {
     "type": "DOCKER",
     "docker": {
-      "image": "cmeiklejohn/lasp-dev",
+      "image": "vitorenesduarte/lasp-dev",
       "network": "HOST",
       "forcePullImage": true,
       "parameters": [
@@ -93,6 +94,7 @@ cat <<EOF > lasp-server.json
   },
   "ports": [0, 0],
   "env": {
+    "LASP_BRANCH": "$LASP_BRANCH",
     "AD_COUNTER_SIM_SERVER": "true",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN",
@@ -163,6 +165,7 @@ cat <<EOF > lasp-client.json
   },
   "ports": [0, 0],
   "env": {
+    "LASP_BRANCH": "$LASP_BRANCH",
     "AD_COUNTER_SIM_CLIENT": "true",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN",

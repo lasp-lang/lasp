@@ -1191,9 +1191,14 @@ schedule_aae_synchronization() ->
     case ShouldAAESync of
         true ->
             Interval = lasp_config:get(aae_interval, 10000),
-            %% Add random jitter.
-            Jitter = rand_compat:uniform(Interval),
-            timer:send_after(Interval + Jitter, aae_sync);
+            case lasp_config:get(jitter, false) of
+                true ->
+                    %% Add random jitter.
+                    Jitter = rand_compat:uniform(Interval),
+                    timer:send_after(Interval + Jitter, aae_sync);
+                false ->
+                    timer:send_after(Interval, aae_sync)
+            end;
         false ->
             ok
     end.
@@ -1210,13 +1215,18 @@ schedule_delta_synchronization() ->
                not (i_am_server() andalso reactive_server())
               )
             ),
- 
+
     case ShouldDeltaSync of
         true ->
             Interval = lasp_config:get(delta_interval, 10000),
-            %% Add random jitter.
-            Jitter = rand_compat:uniform(Interval),
-            timer:send_after(Interval + Jitter, delta_sync);
+            case lasp_config:get(jitter, false) of
+                true ->
+                    %% Add random jitter.
+                    Jitter = rand_compat:uniform(Interval),
+                    timer:send_after(Interval + Jitter, delta_sync);
+                false ->
+                    timer:send_after(Interval, delta_sync)
+            end;
         false ->
             ok
     end.

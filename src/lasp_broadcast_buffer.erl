@@ -143,9 +143,14 @@ schedule_broadcast() ->
     case lasp_config:get(broadcast, false) of
         true ->
             Interval = lasp_config:get(aae_interval, 10000),
-            %% Add random jitter.
-            Jitter = rand_compat:uniform(Interval),
-            timer:send_after(Interval + Jitter, perform_broadcast);
+            case lasp_config:get(jitter, false) of
+                true ->
+                    %% Add random jitter.
+                    Jitter = rand_compat:uniform(Interval),
+                    timer:send_after(Interval + Jitter, perform_broadcast);
+                false ->
+                    timer:send_after(Interval, perform_broadcast)
+            end;
         false ->
             ok
     end.

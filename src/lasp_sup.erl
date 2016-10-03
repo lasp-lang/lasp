@@ -167,8 +167,12 @@ web_specs() ->
     %%
     case os:getenv("WEB_PORT", "false") of
         "false" ->
-            lasp_config:set(web_port, random_port()),
-            ok;
+            case lasp_config:get(web_port, undefined) of
+                undefined ->
+                    lasp_config:set(web_port, random_port());
+                _ ->
+                    ok
+            end;
         WebPort ->
             lasp_config:set(web_port, list_to_integer(WebPort)),
             ok

@@ -80,7 +80,7 @@ init(_Args) ->
     PeerService = application:get_env(?APP,
                                       partisan_peer_service_manager,
                                       PeerServiceDefault),
-    lasp_config:set(partisan_peer_service_manager, PeerService),
+    partisan_config:set(partisan_peer_service_manager, PeerService),
 
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},

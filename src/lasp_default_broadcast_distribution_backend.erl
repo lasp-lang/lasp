@@ -915,8 +915,7 @@ handle_info(delta_sync, #state{}=State) ->
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
 
-    PeerServiceManager = lasp_config:get(peer_service_manager,
-                                         partisan_peer_service),
+    PeerServiceManager = lasp_config:peer_service_manager(),
     lager:info("Manager is: ~p, Members are: ~p",
                [PeerServiceManager, Members]),
 
@@ -1273,8 +1272,7 @@ memory_utilization_report() ->
 %% @private
 send(Msg, Peer) ->
     log_transmission(extract_log_type_and_payload(Msg), 1),
-    PeerServiceManager = lasp_config:get(peer_service_manager,
-                                         partisan_peer_service),
+    PeerServiceManager = lasp_config:peer_service_manager(),
     case PeerServiceManager:forward_message(Peer, ?MODULE, Msg) of
         ok ->
             ok;
@@ -1337,8 +1335,7 @@ shuffle(L) ->
 
 %% @private
 compute_exchange(Peers) ->
-    PeerServiceManager = lasp_config:get(peer_service_manager,
-                                         partisan_peer_service),
+    PeerServiceManager = lasp_config:peer_service_manager(),
 
     Probability = lasp_config:get(partition_probability, 0),
     lager:info("Probability of partition: ~p", [Probability]),
@@ -1405,11 +1402,11 @@ tutorial_mode() ->
 
 %% @private
 client_server_mode() ->
-    lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager.
+    lasp_config:peer_service_manager() == partisan_client_server_peer_service_manager.
 
 %% @private
 peer_to_peer_mode() ->
-    lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_hyparview_peer_service_manager.
+    lasp_config:peer_service_manager() == partisan_hyparview_peer_service_manager.
 
 %% @private
 i_am_server() ->

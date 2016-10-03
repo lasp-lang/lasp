@@ -154,8 +154,7 @@ handle_cast(Msg, State) ->
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     Tag = partisan_config:get(tag, client),
-    PeerServiceManager = lasp_config:get(peer_service_manager,
-                                         partisan_peer_service),
+    PeerServiceManager = lasp_config:peer_service_manager(),
 
     %% Get list of nodes to connect to: this specialized logic isn't
     %% required when the node count is small, but is required with a

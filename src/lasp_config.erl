@@ -26,6 +26,7 @@
 -export([dispatch/0,
          set/2,
          get/2,
+         peer_service_manager/0,
          web_config/0]).
 
 get(Key, Default) ->
@@ -60,3 +61,8 @@ web_config() ->
     Node = node(),
     lager:info("Node ~p enabling web configuration: ~p", [Node, Config]),
     Config.
+
+%% @private
+peer_service_manager() ->
+    partisan_config:get(partisan_peer_service_manager,
+                        partisan_default_peer_service_manager).

@@ -1025,7 +1025,7 @@ increment_counter(Counter) ->
 %%      map, which means, it will always send the full state to the
 %%      clients.
 store_delta(Origin, Counter, Delta, DeltaMap0) ->
-    case lasp_config:get(peer_service_manager, partisan_peer_service) == partisan_client_server_peer_service_manager andalso
+    case lasp_config:peer_service_manager() == partisan_client_server_peer_service_manager andalso
          partisan_config:get(tag, undefined) == server of
         true ->
             DeltaMap0;

@@ -895,8 +895,8 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
 
-    %% Remove ourself.
-    Peers = Members -- [node()],
+    %% Remove ourself and compute exchange peers.
+    Peers = compute_exchange(without_me(Members)),
 
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 

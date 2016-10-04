@@ -77,7 +77,7 @@ init(_Args) ->
 
     %% Configure the peer service.
     PeerServiceDefault = list_to_atom(os:getenv("PEER_SERVICE", "partisan_client_server_peer_service_manager")),
-    PeerService = application:get_env(?APP,
+    PeerService = application:get_env(partisan,
                                       partisan_peer_service_manager,
                                       PeerServiceDefault),
     partisan_config:set(partisan_peer_service_manager, PeerService),

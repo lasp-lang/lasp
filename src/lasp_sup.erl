@@ -76,11 +76,21 @@ init(_Args) ->
     end,
 
     %% Configure the peer service.
-    PeerServiceDefault = list_to_atom(os:getenv("PEER_SERVICE", "partisan_client_server_peer_service_manager")),
-    PeerService = application:get_env(?APP,
-                                      partisan_peer_service_manager,
-                                      PeerServiceDefault),
-    partisan_config:set(partisan_peer_service_manager, PeerService),
+    %%
+    %% Only take the environment variable if it hasn't been defined by
+    %% the test runner.
+    %%
+    case partisan_config:get(partisan_peer_service_manager, undefined) of
+        undefined ->
+            PeerServiceDefault = list_to_atom(os:getenv("PEER_SERVICE", "partisan_client_server_peer_service_manager")),
+            PeerService = application:get_env(?APP,
+                                              partisan_peer_service_manager,
+                                              PeerServiceDefault),
+            partisan_config:set(partisan_peer_service_manager, PeerService),
+            ok;
+        _ ->
+            ok
+    end,
 
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},

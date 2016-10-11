@@ -100,9 +100,6 @@ publish:
 shell:
 	${REBAR} shell --apps lasp
 
-dcos:
-	bin/dcos-deploy.sh
-
 ##
 ## Evaluation related targets
 ##
@@ -124,14 +121,6 @@ part-div:
 	pkill -9 beam.smp; \
 		clear; \
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_partition_overcounting_SUITE
-
-evaluate-local: SHELL:=/bin/bash
-evaluate-local:
-	priv/evaluate-local.sh
-
-evaluate-docker: SHELL:=/bin/bash
-evaluate-docker:
-	priv/evaluate-docker.sh
 
 logs:
 	tail -F priv/lager/*/log/*.log

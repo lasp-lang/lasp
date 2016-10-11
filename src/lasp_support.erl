@@ -366,7 +366,7 @@ start_slave(Name, NodeConfig, _Case) ->
 
 push_logs() ->
     DCOS = os:getenv("DCOS", "false"),
-    LOGS = os:getenv("LOGS", "git"),
+    LOGS = os:getenv("LOGS", "s3"),
 
     case DCOS of
         "false" ->
@@ -406,11 +406,7 @@ push_logs() ->
                             erlcloud_s3:put_object(BucketName, S3Id, list_to_binary(Logs))
                         end,
                         lasp_instrumentation:log_files()
-                    );
-                "git" ->
-                    %% push to git
-                    Result = os:cmd("cd /opt/lasp && ./priv/evaluate-mesos-push.sh"),
-                    lager:info("Logs pushed. Output ~p", [Result])
+                    )
             end
     end.
 

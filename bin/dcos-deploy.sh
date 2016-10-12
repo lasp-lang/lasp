@@ -8,7 +8,6 @@ ENV_VARS=(
   LASP_BRANCH
   DCOS
   TOKEN
-  EVALUATION_PASSPHRASE
   ELB_HOST
   PEER_SERVICE
   MODE
@@ -98,7 +97,6 @@ cat <<EOF > lasp-server.json
     "AD_COUNTER_SIM_SERVER": "true",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN",
-    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
     "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",
     "BROADCAST": "$BROADCAST",
@@ -169,7 +167,6 @@ cat <<EOF > lasp-client.json
     "AD_COUNTER_SIM_CLIENT": "true",
     "DCOS": "$DCOS",
     "TOKEN": "$TOKEN",
-    "EVALUATION_PASSPHRASE": "$EVALUATION_PASSPHRASE",
     "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",
     "BROADCAST": "$BROADCAST",

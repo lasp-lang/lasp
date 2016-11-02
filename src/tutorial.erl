@@ -59,7 +59,7 @@ query(Id, Type) ->
     %% Ensure the object is declared.
     {ok, Value} = lasp:query(Identifier),
 
-    Value.
+    sets:to_list(Value).
 
 mutate(Id, Type, Operation) ->
     %% Convert actor to binary representation.

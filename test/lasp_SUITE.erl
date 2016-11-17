@@ -114,7 +114,7 @@ all() ->
 -define(ID, <<"myidentifier">>).
 
 contracted_latency_test(_Config) ->
-    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
+    case lasp_config:get(dag_enabled, true) of
         true ->
             Res = latency_test_case(5, contraction, no_read, ?LATENCY_ITERATIONS),
             write_csv(path_contraction, contraction, Res, ?TRIM);
@@ -123,7 +123,7 @@ contracted_latency_test(_Config) ->
     end.
 
 uncontracted_latency_test(_Config) ->
-    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
+    case lasp_config:get(dag_enabled, true) of
         true ->
             Res = latency_test_case(5, no_contraction, no_read, ?LATENCY_ITERATIONS),
             write_csv(path_contraction, no_contraction, Res, ?TRIM);
@@ -132,7 +132,7 @@ uncontracted_latency_test(_Config) ->
     end.
 
 latency_with_reads_test(_Config) ->
-    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
+    case lasp_config:get(dag_enabled, true) of
         true ->
             Res = latency_test_case(5, contraction, random_reads, ?LATENCY_ITERATIONS),
             write_csv(path_contraction, contraction_with_reads, Res, ?TRIM);
@@ -266,7 +266,7 @@ latency_run_case(Iterations, Acc, RandomReadsConfig,
 
 
 sql_simple_contracted_latency_test(_Config) ->
-    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
+    case lasp_config:get(dag_enabled, true) of
         true ->
             %% Topology.
             Initial = lasp_sql_materialized_view:create_empty_table(initial),
@@ -288,7 +288,7 @@ sql_simple_contracted_latency_test(_Config) ->
     end.
 
 sql_simple_uncontracted_latency_test(_Config) ->
-    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
+    case lasp_config:get(dag_enabled, true) orelse omit_high_ulimit() of
         true ->
             %% Topology.
             Initial = lasp_sql_materialized_view:create_empty_table(initial),
@@ -310,7 +310,7 @@ sql_simple_uncontracted_latency_test(_Config) ->
     end.
 
 sql_join_contracted_latency_test(_Config) ->
-    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
+    case lasp_config:get(dag_enabled, true) of
         true ->
             %% Topology.
             Initial = lasp_sql_materialized_view:create_empty_table(initial),
@@ -327,7 +327,7 @@ sql_join_contracted_latency_test(_Config) ->
     end.
 
 sql_join_uncontracted_latency_test(_Config) ->
-    case lasp_config:get(dag_enabled, true) orelse os:getenv("OMIT_HIGH_ULIMIT", false) of
+    case lasp_config:get(dag_enabled, true) of
         true ->
             %% Topology.
             Initial = lasp_sql_materialized_view:create_empty_table(initial),

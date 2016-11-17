@@ -93,7 +93,7 @@ peer_to_peer_state_based_with_aae_test(Config) ->
 
 peer_to_peer_state_based_with_aae_and_tree_test(Config) ->
     case os:getenv("OMIT_HIGH_ULIMIT", "false") of
-        "false" ->
+        "true" ->
             lasp_simulation_support:run(peer_to_peer_ad_counter_state_based_with_aae_and_tree_test,
                 Config,
                 [{mode, state_based},

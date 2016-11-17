@@ -1286,12 +1286,25 @@ send(Msg, Peer) ->
     end.
 
 %% @private
-extract_log_type_and_payload({aae_send, _Node, {_Id, _Type, _Metadata, State}}) ->
-    [{aae_send, State}];
-extract_log_type_and_payload({delta_send, _Node, {_Id, _Type, _Metadata, Deltas}, Counter}) ->
-    [{delta_send, Deltas}, {delta_send_protocol, Counter}];
-extract_log_type_and_payload({delta_ack, _Node, _Id, Counter}) ->
-    [{delta_send_protocol, Counter}].
+%% state_based messages:
+extract_log_type_and_payload({aae_send, _Node, {Id, _Type, _Metadata, State}}) ->
+    [{aae_send, State}, {aae_send_protocol, Id}];
+%% delta_based messages:
+extract_log_type_and_payload({delta_send, Node, {Id, _Type, _Metadata, Deltas}, Counter}) ->
+    [{delta_send, Deltas}, {delta_send_protocol, {Id, Node, Counter}}];
+extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
+    [{delta_send_protocol, {Id, Node, Counter}}];
+%% plumtree messages:
+extract_log_type_and_payload({prune, Root, From}) ->
+    [{broadcast_protocol, {Root, From}}];
+extract_log_type_and_payload({ignored_i_have, MessageId, _Mod, Round, Root, From}) ->
+    [{broadcast_protocol, {MessageId, Round, Root, From}}];
+extract_log_type_and_payload({graft, MessageId, _Mod, Round, Root, From}) ->
+    [{broadcast_protocol, {MessageId, Round, Root, From}}];
+extract_log_type_and_payload({broadcast, MessageId, {Id, _Type, _Metadata, State}, _Mod, Round, Root, From}) ->
+    [{broadcast, State}, {broadcast_protocol, {Id, MessageId, Round, Root, From}}];
+extract_log_type_and_payload({i_have, MessageId, _Mod, Round, Root, From}) ->
+    [{broadcast_protocol, {MessageId, Round, Root, From}}].
 
 %% @private
 init_aae_sync(Peer, Store) ->

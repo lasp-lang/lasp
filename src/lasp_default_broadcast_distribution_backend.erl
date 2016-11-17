@@ -72,6 +72,9 @@
 %% broadcast interface
 -export([broadcast/1]).
 
+%% transmission callbacks
+-export([extract_log_type_and_payload/1]).
+
 -include("lasp.hrl").
 
 %% State record.
@@ -1153,11 +1156,16 @@ do(Function, Args) ->
 -endif.
 
 %% @private
-log_transmission({Type, Payload}, PeerCount) ->
+log_transmission(ToLog, PeerCount) ->
     try
         case lasp_config:get(instrumentation, false) of
             true ->
-                ok = lasp_instrumentation:transmission(Type, Payload, PeerCount),
+                lists:foreach(
+                    fun({Type, Payload}) ->
+                        ok = lasp_instrumentation:transmission(Type, Payload, PeerCount)
+                    end,
+                    ToLog
+                ),
                 ok;
             false ->
                 ok
@@ -1279,11 +1287,11 @@ send(Msg, Peer) ->
 
 %% @private
 extract_log_type_and_payload({aae_send, _Node, {_Id, _Type, _Metadata, State}}) ->
-    {aae_send, State};
+    [{aae_send, State}];
 extract_log_type_and_payload({delta_send, _Node, {_Id, _Type, _Metadata, Deltas}, Counter}) ->
-    {delta_send, {Deltas, Counter}};
+    [{delta_send, Deltas}, {delta_send_protocol, Counter}];
 extract_log_type_and_payload({delta_ack, _Node, _Id, Counter}) ->
-    {delta_ack, Counter}.
+    [{delta_send_protocol, Counter}].
 
 %% @private
 init_aae_sync(Peer, Store) ->

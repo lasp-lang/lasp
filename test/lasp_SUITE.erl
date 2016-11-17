@@ -288,7 +288,7 @@ sql_simple_contracted_latency_test(_Config) ->
     end.
 
 sql_simple_uncontracted_latency_test(_Config) ->
-    case lasp_config:get(dag_enabled, true) orelse omit_high_ulimit() of
+    case lasp_config:get(dag_enabled, true) of
         true ->
             %% Topology.
             Initial = lasp_sql_materialized_view:create_empty_table(initial),

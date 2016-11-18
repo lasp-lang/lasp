@@ -123,7 +123,7 @@ init(_Args) ->
     end,
 
     %% Configure Plumtree logging.
-    TransLogMFA = {lasp_instrumentation, transmission, [broadcast]},
+    TransLogMFA = {lasp_instrumentation, transmission, []},
     partisan_config:set(transmission_logging_mfa, TransLogMFA),
 
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),

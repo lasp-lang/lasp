@@ -230,14 +230,9 @@ start(_Case, _Config, Options) ->
                                       [evaluation_identifier, list_to_atom(RealEvalIdentifier)]),
 
                         %% Configure max impression number.
-                        MaxImpressions = 10,
+                        MaxImpressions = 30,
                         ok = rpc:call(Node, lasp_config, set,
-                                      [max_impressions, MaxImpressions]),
-
-                        %% Configure impression velocity.
-                        ImpressionVelocity = 4800,
-                        ok = rpc:call(Node, lasp_config, set,
-                                      [impression_velocity, ImpressionVelocity])
+                                      [max_impressions, MaxImpressions])
                    end,
     lists:map(ConfigureFun, Nodes),
 

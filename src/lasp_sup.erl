@@ -43,6 +43,9 @@ start_link() ->
 %% ===================================================================
 
 init(_Args) ->
+    %% Configure defaults.
+    configure_defaults(),
+
     DepDag = {lasp_dependence_dag,
               {lasp_dependence_dag, start_link, []},
                permanent, 5000, worker, [lasp_dependence_dag]},
@@ -150,9 +153,6 @@ init(_Args) ->
     TournamentSpecs = game_tournament_child_specs(),
 
     Children = Children0 ++ AdSpecs ++ TournamentSpecs,
-
-    %% Configure defaults.
-    configure_defaults(),
 
     {ok, {{one_for_one, 5, 10}, Children}}.
 
@@ -334,17 +334,19 @@ advertisement_counter_child_specs() ->
     lasp_config:set(ad_counter_simulation_client, AdClientEnabled),
     lager:info("AdClientEnabled: ~p", [AdClientEnabled]),
 
-    ImpressionNumberDefault = 4800,
+    %% Since IMPRESSION_INTERVAL=10s
+    %% each node, per minute, does 6 impressions.
+    %% We want the experiments to run for 30 minutes.
+    %% Each node, per 30 minutes, does 6*30=180 impressions.
+    %% To have enough impressions for all nodes we need
+    %% 180 * client_number impressions
+
+    ClientNumber = application:get_env(?APP, client_number),
+    ImpressionNumberDefault = 180 * ClientNumber,
     ImpressionNumber = application:get_env(?APP,
                                            max_impressions,
                                            ImpressionNumberDefault),
     lasp_config:set(max_impressions, ImpressionNumber),
-
-    ImpressionVelocityDefault = list_to_integer(os:getenv("IMPRESSION_VELOCITY", "1")),
-    ImpressionVelocity = application:get_env(?APP,
-                                             impression_velocity,
-                                             ImpressionVelocityDefault),
-    lasp_config:set(impression_velocity, ImpressionVelocity),
 
     ClientSpecs = case AdClientEnabled of
         true ->

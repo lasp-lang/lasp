@@ -6,7 +6,7 @@ aws cloudformation create-stack \
   --template-body https://s3-us-west-2.amazonaws.com/downloads.dcos.io/dcos/stable/commit/e64024af95b62c632c90b9063ed06296fcf38ea5/cloudformation/multi-master.cloudformation.json \
   --capabilities CAPABILITY_IAM \
   --parameters ParameterKey=KeyName,ParameterValue=dcos \
-               ParameterKey=PublicSlaveInstanceCount,ParameterValue=1 \
+               ParameterKey=PublicSlaveInstanceCount,ParameterValue=25 \
                ParameterKey=OAuthEnabled,ParameterValue=false \
                ParameterKey=SlaveInstanceCount,ParameterValue=0
 

@@ -236,10 +236,10 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
                                    Membership = binary_to_term(Body),
                                    case Membership of
                                        [N] ->
-                                           populate_graph(N, [], Graph),
+                                           populate_graph(Peer, [], Graph),
                                            [Peer|OrphanedNodes];
                                        _ ->
-                                           populate_graph(N, Membership, Graph),
+                                           populate_graph(Peer, Membership, Graph),
                                            OrphanedNodes
                                    end
                            end

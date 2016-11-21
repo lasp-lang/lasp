@@ -149,7 +149,7 @@ cat <<EOF > lasp-client.json
   "container": {
     "type": "DOCKER",
     "docker": {
-      "image": "cmeiklejohn/lasp-dev",
+      "image": "vitorenesduarte/lasp-dev",
       "network": "HOST",
       "forcePullImage": true,
       "parameters": [

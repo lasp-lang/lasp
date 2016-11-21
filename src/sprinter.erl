@@ -250,14 +250,19 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
                                OrphanedNodes
                        end
                end,
+
     Orphaned = lists:foldl(GraphFun, [], Nodes),
-
     [FirstNode|_] = Nodes,
-    {SymmetricViews, VisitedNodes} = breath_first(FirstNode, Graph, ordsets:new()),
 
-    Connected = SymmetricViews
-        andalso ordsets:from_list(Nodes) == VisitedNodes
-        andalso sets:size(ClientsFromMarathon) == lasp_config:get(client_number, 3),
+    {SymmetricViews, VisitedNodes} = breath_first(FirstNode, Graph, ordsets:new()),
+    AllNodesVisited = ordsets:from_list(Nodes) == VisitedNodes,
+    AllClientsConnected = sets:size(ClientsFromMarathon) == lasp_config:get(client_number, 3),
+
+    Connected = SymmetricViews andalso AllNodesVisited andalso AllClientsConnected,
+    lager:info("SymmetricView ~p", [SymmetricViews]),
+    lager:info("Visited all nodes ~p", [AllNodesVisited]),
+    lager:info("All clients connected ~p", [AllClientsConnected]),
+
 
     case Connected of
         true ->

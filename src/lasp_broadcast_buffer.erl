@@ -98,7 +98,6 @@ handle_cast(Msg, State) ->
 
 %% @private
 handle_info(perform_broadcast, #state{buffer=Buffer0}=State) ->
-    Size = dict:size(Buffer0),
     Backend = lasp_config:get(distribution_backend,
                               ?DEFAULT_DISTRIBUTION_BACKEND),
 

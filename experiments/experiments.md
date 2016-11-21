@@ -9,6 +9,7 @@
    - Pick one of your keys in __KeyName__
    - __PublicSlaveInstanceCount__: 25
    - __SlaveInstanceCount__: 0
+   - __OAuthEnabled: false
 
 4. In __Options__ just click __Next__
 
@@ -21,16 +22,21 @@ Once the cluster is created, go to the __CloudFormation__ page in your AWS conso
 - __ExhibitorS3Bucket__
 - __PublicSlaveDnsAddress__: _$ELB_HOST_
 
-# Installing DCOS CLI
+# Installing DCOS CLI and authenticating (if not yet installed.)
 
 - Open _$DCOS_ in the browser
 - Login
 - Click in the bottom left corner and then in __Install CLI__
-
-# Authenticate to your DCOS cluster
+- Authenticate to your DCOS cluster
 
 ```bash
 $ dcos auth login
+```
+
+# Configuring DCOS CLI (if already installed)
+
+```bash
+$ dcos config dcos config set core.dcos_url http://$DCOS
 ```
 
 # Installing Marathon-lb

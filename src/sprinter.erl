@@ -216,7 +216,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
     %% to analyze the graph for connectedness.
     ClientsFromMarathon = clients_from_marathon(),
     ServersFromMarathon = servers_from_marathon(),
-    Nodes = sets:union(ClientsFromMarathon, ServersFromMarathon),
+    Nodes = sets:to_list(sets:union(ClientsFromMarathon, ServersFromMarathon)),
 
     %% Build the graph.
     Graph = digraph:new(),
@@ -250,9 +250,9 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
                                OrphanedNodes
                        end
                end,
-    Orphaned = sets:fold(GraphFun, [], Nodes),
+    Orphaned = lists:foldl(GraphFun, [], Nodes),
 
-    [FirstNode|_] = sets:to_list(Nodes),
+    [FirstNode|_] = Nodes,
     {SymmetricViews, VisitedNodes} = breath_first(FirstNode, Graph, ordsets:new()),
 
     Connected = SymmetricViews

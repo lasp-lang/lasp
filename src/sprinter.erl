@@ -236,11 +236,11 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
                                    Membership = binary_to_term(Body),
                                    lager:info("MEMBERSHIP ~p", [Membership]),
                                    case Membership of
-                                       [Peer] ->
-                                           populate_graph(Peer, [], Graph),
+                                       [N] ->
+                                           populate_graph(N, [], Graph),
                                            [Peer|OrphanedNodes];
                                        _ ->
-                                           populate_graph(Peer, Membership, Graph),
+                                           populate_graph(N, Membership, Graph),
                                            OrphanedNodes
                                    end
                            end
@@ -253,19 +253,16 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
                end,
 
     Orphaned = lists:foldl(GraphFun, [], Nodes),
-    [FirstNode|_] = Nodes,
+    [{FirstName, _, _}|_] = Nodes,
 
-    {SymmetricViews, VisitedNodes} = breath_first(FirstNode, Graph, ordsets:new()),
-    AllNodesVisited = ordsets:from_list(Nodes) == VisitedNodes,
-    AllClientsConnected = sets:size(ClientsFromMarathon) == lasp_config:get(client_number, 3),
+    {SymmetricViews, VisitedNames} = breath_first(FirstName, Graph, ordsets:new()),
+    AllNodesVisited = length(Nodes) == length(VisitedNames),
 
-    Connected = SymmetricViews andalso AllNodesVisited andalso AllClientsConnected,
+    Connected = SymmetricViews andalso AllNodesVisited,
     lager:info("SymmetricView ~p", [SymmetricViews]),
-    lager:info("Visited nodes ~p", [VisitedNodes]),
+    lager:info("Visited nodes ~p", [VisitedNames]),
     lager:info("Nodes ~p", [Nodes]),
     lager:info("Visited all nodes ~p", [AllNodesVisited]),
-    lager:info("All clients connected ~p", [AllClientsConnected]),
-
 
     case Connected of
         true ->

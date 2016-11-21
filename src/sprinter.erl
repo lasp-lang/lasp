@@ -338,8 +338,16 @@ maybe_connect(Nodes, SeenNodes) ->
     %% If this is the first time you've seen the node, attempt to
     %% connect; only attempt to connect once, because node might be
     %% migrated to a passive view of the membership.
-    %%
-    ToConnect = sets:subtract(Nodes, SeenNodes),
+    %% If the node is isolated always try to connect.
+    {ok, Membership} = lasp_peer_service:members(),
+    Isolated = length(Membership) == 0,
+
+    ToConnect = case Isolated of
+        true ->
+            Nodes;
+        false ->
+            sets:subtract(Nodes, SeenNodes)
+    end,
 
     %% Attempt connection to any new nodes.
     sets:fold(fun(Node, Acc) -> [connect(Node) | Acc] end, [], ToConnect),

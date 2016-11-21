@@ -110,8 +110,6 @@ handle_info(view, #state{actor=Actor,
                          triggers=Triggers0}=State) ->
     lasp_marathon_simulations:log_message_queue_size("view"),
 
-    lager:info("Will do an impression, node: ~p", [Actor]),
-
     %% Get current value of the list of advertisements.
     {ok, Ads0} = lasp:query(?ADS_WITH_CONTRACTS),
 

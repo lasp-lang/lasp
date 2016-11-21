@@ -340,10 +340,8 @@ advertisement_counter_child_specs() ->
     %% Each node, per 30 minutes, does 6*30=180 impressions.
     %% To have enough impressions for all nodes we need
     %% 180 * client_number impressions
-
-    %%{ok, ClientNumber} = application:get_env(?APP, client_number),
-    %%ImpressionNumberDefault = 180 * ClientNumber,
-    ImpressionNumberDefault = 10,
+    {ok, ClientNumber} = application:get_env(?APP, client_number),
+    ImpressionNumberDefault = 180 * ClientNumber,
     ImpressionNumber = application:get_env(?APP,
                                            max_impressions,
                                            ImpressionNumberDefault),

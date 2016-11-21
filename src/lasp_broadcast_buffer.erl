@@ -99,8 +99,6 @@ handle_cast(Msg, State) ->
 %% @private
 handle_info(perform_broadcast, #state{buffer=Buffer0}=State) ->
     Size = dict:size(Buffer0),
-    lasp_logger:extended("Flushing broadcast buffer with ~p messages.", [Size]),
-
     Backend = lasp_config:get(distribution_backend,
                               ?DEFAULT_DISTRIBUTION_BACKEND),
 
@@ -115,8 +113,6 @@ handle_info(perform_broadcast, #state{buffer=Buffer0}=State) ->
 
     %% Reschedule broadcast.
     schedule_broadcast(),
-
-    lasp_logger:extended("Flushing broadcast buffer complete."),
 
     {noreply, State#state{buffer=Buffer}};
 

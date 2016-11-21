@@ -234,7 +234,6 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
                                    OrphanedNodes;
                                _ ->
                                    Membership = binary_to_term(Body),
-                                   lager:info("MEMBERSHIP ~p", [Membership]),
                                    case Membership of
                                        [N] ->
                                            populate_graph(N, [], Graph),
@@ -259,10 +258,6 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
     AllNodesVisited = length(Nodes) == length(VisitedNames),
 
     Connected = SymmetricViews andalso AllNodesVisited,
-    lager:info("SymmetricView ~p", [SymmetricViews]),
-    lager:info("Visited nodes ~p", [VisitedNames]),
-    lager:info("Nodes ~p", [Nodes]),
-    lager:info("Visited all nodes ~p", [AllNodesVisited]),
 
     case Connected of
         true ->
@@ -405,9 +400,6 @@ breath_first(Root, Graph, Visited0) ->
     %% If not, stop traversal
     In = ordsets:from_list(digraph:in_neighbours(Graph, Root)),
     Out = ordsets:from_list(digraph:out_neighbours(Graph, Root)),
-    lager:info("Visited0 ~p, root ~p", [Visited0, Root]),
-    lager:info("In ~p, root ~p", [In, Root]),
-    lager:info("Out ~p, root ~p", [Out, Root]),
 
     Visited1 = ordsets:union(Visited0, [Root]),
 
@@ -422,9 +414,6 @@ breath_first(Root, Graph, Visited0) ->
                 ordsets:subtract(Out, Visited1)
             ),
             
-            lager:info("SymmetricViews ~p, root ~p", [SymmetricViews, Root]),
-            lager:info("VisitedNodes ~p, root ~p", [VisitedNodes, Root]),
-
             {SymmetricViews, ordsets:union(VisitedNodes, Out)};
         false ->
             {false, ordsets:new()}

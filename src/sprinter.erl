@@ -408,8 +408,8 @@ breath_first(Root, Graph, Visited0) ->
     In = ordsets:from_list(digraph:in_neighbours(Graph, Root)),
     Out = ordsets:from_list(digraph:out_neighbours(Graph, Root)),
     lager:info("Visited0 ~p, root ~p", [Visited0, Root]),
-    lager:info("In ~p, root ~p", [In, Root]]),
-    lager:info("Out ~p, root ~p", [Out, Root]]),
+    lager:info("In ~p, root ~p", [In, Root]),
+    lager:info("Out ~p, root ~p", [Out, Root]),
 
     Visited1 = ordsets:union(Visited0, [Root]),
 

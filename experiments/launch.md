@@ -20,3 +20,6 @@ $ aws configure set default.region us-west-2
 $ cd bin/
 $ ./launch-instances.sh
 ```
+
+If you didn't have DCOS CLI installed, the script above did not configure it properly.
+See [how to do it](manual-launch.md#installing-dcos-cli-if-not-yet-installed).

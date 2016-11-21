@@ -252,7 +252,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
                end,
     Orphaned = sets:fold(GraphFun, [], Nodes),
 
-    [FirstNode|_] = Nodes,
+    [FirstNode|_] = sets:to_list(Nodes),
     {SymmetricViews, VisitedNodes} = breath_first(FirstNode, Graph, ordsets:new()),
 
     Connected = SymmetricViews

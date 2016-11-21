@@ -339,8 +339,9 @@ maybe_connect(Nodes, SeenNodes) ->
     %% connect; only attempt to connect once, because node might be
     %% migrated to a passive view of the membership.
     %% If the node is isolated always try to connect.
-    {ok, Membership} = lasp_peer_service:members(),
-    Isolated = length(Membership) == 0,
+    {ok, Membership0} = lasp_peer_service:members(),
+    Membership1 = Membership0 -- [node()],
+    Isolated = length(Membership1) == 0,
 
     ToConnect = case Isolated of
         true ->

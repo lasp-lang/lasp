@@ -1,5 +1,7 @@
 ## Starting the experiments
 
+This assumes that you have the AWS CLI configured. See [how to configure it](./launch.md).
+
 ```bash
 $ cd bin/
 $ ID=1 \

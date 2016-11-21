@@ -1,5 +1,3 @@
-## Launching the cluster
-
 ## Configuring AWS CLI
 
 Add the following to your __.bashrc__
@@ -16,8 +14,9 @@ $ aws configure set aws_secret_access_key $AWS_SECRET_ACCESS_KEY
 $ aws configure set default.region us-west-2
 ```
 
+## Launching the cluster
+
 ```bash
 $ cd bin/
 $ ./launch-instances.sh
 ```
-

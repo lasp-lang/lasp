@@ -260,6 +260,8 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
 
     Connected = SymmetricViews andalso AllNodesVisited andalso AllClientsConnected,
     lager:info("SymmetricView ~p", [SymmetricViews]),
+    lager:info("Visited nodes ~p", [VisitedNodes]),
+    lager:info("Nodes ~p", [Nodes]),
     lager:info("Visited all nodes ~p", [AllNodesVisited]),
     lager:info("All clients connected ~p", [AllClientsConnected]),
 

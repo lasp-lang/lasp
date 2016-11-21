@@ -26,7 +26,6 @@
 
 stop() ->
     DCOS = os:getenv("DCOS", "false"),
-    Token = os:getenv("TOKEN", "undefined"),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     RunningApps = [
         "lasp-client-" ++ integer_to_list(EvalTimestamp),
@@ -35,13 +34,13 @@ stop() ->
 
     lists:foreach(
         fun(AppName) ->
-            delete_marathon_app(DCOS, Token, AppName)
+            delete_marathon_app(DCOS, AppName)
         end,
         RunningApps).
 
 %% @private
-delete_marathon_app(DCOS, Token, AppName) ->
-    Headers = [{"Authorization", "token=" ++ Token}],
+delete_marathon_app(DCOS, AppName) ->
+    Headers = [],
     Url = DCOS ++ "/marathon/v2/apps/" ++ AppName,
     case httpc:request(delete, {Url, Headers}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, _Body}} ->

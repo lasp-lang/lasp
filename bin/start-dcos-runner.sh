@@ -1,7 +1,6 @@
 #!/bin/bash
 
 DCOS=$(dcos config show core.dcos_url)
-TOKEN=$(dcos config show core.dcos_acs_token)
 
 ENV_VARS=(
   ID
@@ -56,7 +55,6 @@ cat <<EOF > dcos-runner.json
   "env": {
     "LASP_BRANCH": "$LASP_BRANCH",
     "DCOS": "$DCOS",
-    "TOKEN": "$TOKEN",
     "ELB_HOST": "$ELB_HOST",
     "AWS_ACCESS_KEY_ID": "$AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY",
@@ -68,6 +66,6 @@ cat <<EOF > dcos-runner.json
 EOF
 
 echo ">>> Adding $ID-dcos-runner-$CLIENT_NUMBER-$PARTITION_PROBABILITY to Marathon"
-curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @dcos-runner.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
+curl -s -k -H 'Content-type: application/json' -X POST -d @dcos-runner.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
 sleep 10
 

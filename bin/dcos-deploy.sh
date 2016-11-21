@@ -7,7 +7,6 @@ TIMESTAMP_FILE=/tmp/.LAST_TIMESTAMP
 ENV_VARS=(
   LASP_BRANCH
   DCOS
-  TOKEN
   ELB_HOST
   PEER_SERVICE
   MODE
@@ -44,11 +43,11 @@ if [ -e "$TIMESTAMP_FILE" ]; then
   LAST_TIMESTAMP=$(cat $TIMESTAMP_FILE)
 
   echo ">>> Removing lasp-server-$LAST_TIMESTAMP from Marathon"
-  curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-server-$LAST_TIMESTAMP > /dev/null
+  curl -s -k -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-server-$LAST_TIMESTAMP > /dev/null
   sleep 2
 
   echo ">>> Removing lasp-client-$LAST_TIMESTAMP from Marathon"
-  curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client-$LAST_TIMESTAMP > /dev/null
+  curl -s -k -H 'Content-type: application/json' -X DELETE $DCOS/service/marathon/v2/apps/lasp-client-$LAST_TIMESTAMP > /dev/null
   sleep 2
 
   echo ">>> Waiting for Mesos to kill all tasks."
@@ -95,7 +94,6 @@ cat <<EOF > lasp-server.json
     "LASP_BRANCH": "$LASP_BRANCH",
     "AD_COUNTER_SIM_SERVER": "true",
     "DCOS": "$DCOS",
-    "TOKEN": "$TOKEN",
     "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",
     "BROADCAST": "$BROADCAST",
@@ -135,7 +133,7 @@ cat <<EOF > lasp-server.json
 EOF
 
 echo ">>> Adding lasp-server-$EVAL_TIMESTAMP to Marathon"
-curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-server.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
+curl -s -k -H 'Content-type: application/json' -X POST -d @lasp-server.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
 sleep 10
 
 cat <<EOF > lasp-client.json
@@ -164,7 +162,6 @@ cat <<EOF > lasp-client.json
     "LASP_BRANCH": "$LASP_BRANCH",
     "AD_COUNTER_SIM_CLIENT": "true",
     "DCOS": "$DCOS",
-    "TOKEN": "$TOKEN",
     "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",
     "BROADCAST": "$BROADCAST",
@@ -200,7 +197,7 @@ cat <<EOF > lasp-client.json
 EOF
 
 echo ">>> Adding lasp-client-$EVAL_TIMESTAMP to Marathon"
-curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @lasp-client.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
+curl -s -k -H 'Content-type: application/json' -X POST -d @lasp-client.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
 sleep 10
 
 echo $EVAL_TIMESTAMP > $TIMESTAMP_FILE

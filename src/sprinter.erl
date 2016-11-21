@@ -376,8 +376,7 @@ headers() ->
         "false" ->
             [];
         _ ->
-            Token = os:getenv("TOKEN", "undefined"),
-            [{"Authorization", "token=" ++ Token}]
+            []
     end.
 
 %% @private

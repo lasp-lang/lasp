@@ -2,7 +2,7 @@
 
 This assumes:
 - AWS CLI ([how to configure it](./launch.md#configuring-aws-cli))
-- DCOS CLI ([how to configure it])(./manual-launch.md#configuring-dcos-cli-if-already-installed))
+- DCOS CLI ([how to configure it](./manual-launch.md#configuring-dcos-cli-if-already-installed))
 
 ```bash
 $ cd bin/

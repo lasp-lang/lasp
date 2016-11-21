@@ -234,8 +234,9 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
                                    OrphanedNodes;
                                _ ->
                                    Membership = binary_to_term(Body),
+                                   lager:info("MEMBERSHIP ~p", [Membership]),
                                    case Membership of
-                                       [N] ->
+                                       [Peer] ->
                                            populate_graph(Peer, [], Graph),
                                            [Peer|OrphanedNodes];
                                        _ ->

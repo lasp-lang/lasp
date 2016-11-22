@@ -259,24 +259,12 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
 
     Connected = SymmetricViews andalso AllNodesVisited,
 
-    case SymmetricViews of
-        false ->
-            lager:info("SymmetricViews ~p", [SymmetricViews]);
-        true ->
-            ok
-    end,
-
-    case AllNodesVisited of
-        false ->
-            lager:info("Visited ~p from ~p: ~p", [length(VisitedNames), ServerName, VisitedNames]);
-        true ->
-            ok
-    end,
-
     case Connected of
         true ->
             lager:info("Graph is connected!");
         false ->
+            lager:info("SymmetricViews ~p", [SymmetricViews]),
+            lager:info("Visited ~p from ~p: ~p", [length(VisitedNames), ServerName, VisitedNames]),
             lager:info("Graph is not connected!")
     end,
 

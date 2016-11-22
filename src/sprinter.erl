@@ -404,9 +404,6 @@ breath_first(Root, Graph, Visited0) ->
     In = ordsets:from_list(digraph:in_neighbours(Graph, Root)),
     Out = ordsets:from_list(digraph:out_neighbours(Graph, Root)),
 
-    lager:info("In ~p, root ~p", [In, Root]),
-    lager:info("Out ~p, root ~p", [Out, Root]),
-
     Visited1 = ordsets:union(Visited0, [Root]),
 
     case In == Out of
@@ -419,10 +416,9 @@ breath_first(Root, Graph, Visited0) ->
                 {true, Visited1},
                 ordsets:subtract(Out, Visited1)
             ),
-            lager:info("SymmetricViews ~p, root ~p", [SymmetricViews, Root]),
-            lager:info("VisitedNodes ~p, root ~p", [VisitedNodes, Root]),
             {SymmetricViews, ordsets:union(VisitedNodes, Out)};
         false ->
+            lager:info("Non symmetric views for node ~p. In ~p; Out ~p", [Root, In, Out]),
             {false, ordsets:new()}
     end.
 

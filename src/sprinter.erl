@@ -216,7 +216,8 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
     %% to analyze the graph for connectedness.
     ClientsFromMarathon = clients_from_marathon(),
     ServersFromMarathon = servers_from_marathon(),
-    Nodes = sets:to_list(sets:union(ClientsFromMarathon, ServersFromMarathon)),
+    Nodes = sets:union(ClientsFromMarathon, ServersFromMarathon),
+    [{ServerName, _, _}|_] = sets:to_list(ServersFromMarathon),
 
     %% Build the graph.
     Graph = digraph:new(),
@@ -251,13 +252,26 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
                        end
                end,
 
-    Orphaned = lists:foldl(GraphFun, [], Nodes),
-    [{FirstName, _, _}|_] = Nodes,
+    Orphaned = sets:fold(GraphFun, [], Nodes),
 
-    {SymmetricViews, VisitedNames} = breath_first(FirstName, Graph, ordsets:new()),
-    AllNodesVisited = length(Nodes) == length(VisitedNames),
+    {SymmetricViews, VisitedNames} = breath_first(ServerName, Graph, ordsets:new()),
+    AllNodesVisited = sets:size(Nodes) == length(VisitedNames),
 
     Connected = SymmetricViews andalso AllNodesVisited,
+
+    case SymmetricViews of
+        false ->
+            lager:info("SymmetricViews ~p", [SymmetricViews]);
+        true ->
+            ok
+    end,
+
+    case AllNodesVisited of
+        false ->
+            lager:info("Visited ~p from ~p: ~p", [length(VisitedNames), ServerName, VisitedNames]);
+        true ->
+            ok
+    end,
 
     case Connected of
         true ->

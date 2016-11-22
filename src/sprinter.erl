@@ -217,7 +217,6 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
     ClientsFromMarathon = clients_from_marathon(),
     ServersFromMarathon = servers_from_marathon(),
     Nodes = sets:union(ClientsFromMarathon, ServersFromMarathon),
-    [{ServerName, _, _}|_] = sets:to_list(ServersFromMarathon),
 
     %% Build the graph.
     Graph = digraph:new(),
@@ -254,7 +253,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
 
     Orphaned = sets:fold(GraphFun, [], Nodes),
 
-    {SymmetricViews, VisitedNames} = breath_first(ServerName, Graph, ordsets:new()),
+    {SymmetricViews, VisitedNames} = breath_first(node(), Graph, ordsets:new()),
     AllNodesVisited = sets:size(Nodes) == length(VisitedNames),
 
     Connected = SymmetricViews andalso AllNodesVisited,
@@ -264,7 +263,9 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
             lager:info("Graph is connected!");
         false ->
             lager:info("SymmetricViews ~p", [SymmetricViews]),
-            lager:info("Visited ~p from ~p: ~p", [length(VisitedNames), ServerName, VisitedNames]),
+            lager:info("Visited ~p from ~p: ~p", [length(VisitedNames), node(), VisitedNames]),
+            {ok, ServerMembership} = lasp_peer_service:members(),
+            lager:info("Membership (~p) ~p", [length(ServerMembership), ServerMembership]),
             lager:info("Graph is not connected!")
     end,
 
@@ -403,6 +404,9 @@ breath_first(Root, Graph, Visited0) ->
     In = ordsets:from_list(digraph:in_neighbours(Graph, Root)),
     Out = ordsets:from_list(digraph:out_neighbours(Graph, Root)),
 
+    lager:info("In ~p, root ~p", [In, Root]),
+    lager:info("Out ~p, root ~p", [Out, Root]),
+
     Visited1 = ordsets:union(Visited0, [Root]),
 
     case In == Out of
@@ -415,6 +419,8 @@ breath_first(Root, Graph, Visited0) ->
                 {true, Visited1},
                 ordsets:subtract(Out, Visited1)
             ),
+            lager:info("SymmetricViews ~p, root ~p", [SymmetricViews, Root]),
+            lager:info("VisitedNodes ~p, root ~p", [VisitedNodes, Root]),
             {SymmetricViews, ordsets:union(VisitedNodes, Out)};
         false ->
             {false, ordsets:new()}

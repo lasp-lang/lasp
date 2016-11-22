@@ -413,7 +413,6 @@ breath_first(Root, Graph, Visited0) ->
                 {true, Visited1},
                 ordsets:subtract(Out, Visited1)
             ),
-            
             {SymmetricViews, ordsets:union(VisitedNodes, Out)};
         false ->
             {false, ordsets:new()}

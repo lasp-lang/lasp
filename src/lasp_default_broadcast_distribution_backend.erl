@@ -799,7 +799,7 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
                        end
                end,
     %% TODO: Should this be parallel?
-    {ok, Result} = do(fold, [Store, Function, []]),
+    {ok, _Result} = do(fold, [Store, Function, []]),
     %lasp_logger:extended("Finished exchange peer: ~p; sent ~p objects", [Peer, length(Result)]),
 
     {noreply, State#state{gc_counter=increment_counter(GCCounter)}};
@@ -916,7 +916,7 @@ handle_info(delta_sync, #state{}=State) ->
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
 
-    PeerServiceManager = lasp_config:peer_service_manager(),
+    %PeerServiceManager = lasp_config:peer_service_manager(),
     %lager:info("Manager is: ~p, Members are: ~p",
     %           [PeerServiceManager, Members]),
 
@@ -1330,7 +1330,7 @@ init_aae_sync(Peer, ObjectFilterFun, Store) ->
                     end
                end,
     %% TODO: Should this be parallel?
-    {ok, Result} = do(fold, [Store, Function, []]),
+    {ok, _Result} = do(fold, [Store, Function, []]),
     %lasp_logger:extended("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]),
     ok.
 

@@ -1,11 +1,11 @@
 #!/bin/bash
 
 DCOS=$(dcos config show core.dcos_url)
+ELB_HOST=$(./elb-host.sh)
 
 ENV_VARS=(
   ID
   LASP_BRANCH
-  ELB_HOST
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
   CLIENT_NUMBER

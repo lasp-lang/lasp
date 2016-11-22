@@ -15,19 +15,10 @@ aws cloudformation wait stack-create-complete --stack-name dcos
 
 DCOS_URL=$(aws cloudformation describe-stacks --stack-name dcos --query 'Stacks[0].Outputs[0].OutputValue' | sed -e s/\"//g)
 
-ELB_HOST=$(aws cloudformation describe-stacks --stack-name dcos --query 'Stacks[0].Outputs[2].OutputValue' | sed -e s/\"//g)
-
 echo "Configuring DCOS url."
 dcos config set core.dcos_url "http://${DCOS_URL}"
 
 echo "Installing marathon-lb."
 yes | dcos package install marathon-lb
 
-echo "Starting run."
-ID=1 \
-LASP_BRANCH=dcos_again \
-ELB_HOST=$ELB_HOST \
-AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-CLIENT_NUMBER=32 \
-PARTITION_PROBABILITY=0 bin/start-dcos-runner.sh
+google-chrome ${DCOS_URL}

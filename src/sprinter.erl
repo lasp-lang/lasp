@@ -216,7 +216,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
     %% to analyze the graph for connectedness.
     ClientsFromMarathon = clients_from_marathon(),
     ServersFromMarathon = servers_from_marathon(),
-    Nodes = sets:union(ClientsFromMarathon, ServersFromMarathon),
+    Nodes = sets:to_list(sets:union(ClientsFromMarathon, ServersFromMarathon)),
 
     %% Build the graph.
     Graph = digraph:new(),
@@ -250,40 +250,23 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
                                OrphanedNodes
                        end
                end,
-    Orphaned = sets:fold(GraphFun, [], Nodes),
 
-    %% Verify connectedness.
-    ConnectedFun = fun({Name, _, _}, Result0) ->
-                           {Ns, Result} = sets:fold(fun({N, _, _}, {Disconnected, Result1}) ->
-                                           Path = digraph:get_short_path(Graph, Name, N),
-                                           case Path of
-                                               false ->
-                                                   {[N|Disconnected], Result1 andalso false};
-                                               _ ->
-                                                   {Disconnected, Result1 andalso true}
-                                           end
-                                      end, {[], Result0}, Nodes),
-                           case Ns of
-                               [] ->
-                                   ok;
-                               _ ->
-                                lager:info("Node ~p can not find shortest path to: ~p", [Name, Ns])
-                           end,
-                           Result
-                 end,
-    Connected = sets:fold(ConnectedFun, true, Nodes)
-        andalso sets:size(ClientsFromMarathon) == lasp_config:get(client_number, 3),
+    Orphaned = lists:foldl(GraphFun, [], Nodes),
+    [{FirstName, _, _}|_] = Nodes,
 
-    IsConnected = case Connected of
+    {SymmetricViews, VisitedNames} = breath_first(FirstName, Graph, ordsets:new()),
+    AllNodesVisited = length(Nodes) == length(VisitedNames),
+
+    Connected = SymmetricViews andalso AllNodesVisited,
+
+    case Connected of
         true ->
-            lager:info("Graph is connected!"),
-            true;
+            lager:info("Graph is connected!");
         false ->
-            lager:info("Graph is not connected!"),
-            false
+            lager:info("Graph is not connected!")
     end,
 
-    WasConnected = IsConnected orelse WasConnected0,
+    WasConnected = Connected orelse WasConnected0,
 
     case length(Orphaned) of
         0 ->
@@ -294,7 +277,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
 
     schedule_build_graph(),
 
-    {noreply, State#state{is_connected=IsConnected,
+    {noreply, State#state{is_connected=Connected,
                           was_connected=WasConnected,
                           graph=Graph}};
 
@@ -338,8 +321,17 @@ maybe_connect(Nodes, SeenNodes) ->
     %% If this is the first time you've seen the node, attempt to
     %% connect; only attempt to connect once, because node might be
     %% migrated to a passive view of the membership.
-    %%
-    ToConnect = sets:subtract(Nodes, SeenNodes),
+    %% If the node is isolated always try to connect.
+    {ok, Membership0} = lasp_peer_service:members(),
+    Membership1 = Membership0 -- [node()],
+    Isolated = length(Membership1) == 0,
+
+    ToConnect = case Isolated of
+        true ->
+            Nodes;
+        false ->
+            sets:subtract(Nodes, SeenNodes)
+    end,
 
     %% Attempt connection to any new nodes.
     sets:fold(fun(Node, Acc) -> [connect(Node) | Acc] end, [], ToConnect),
@@ -402,6 +394,29 @@ populate_graph(Name, Membership, Graph) ->
                         %% Add edge to graph.
                         digraph:add_edge(Graph, Name, N)
                 end, Graph, Membership).
+
+breath_first(Root, Graph, Visited0) ->
+    %% Check if every link is bidirectional
+    %% If not, stop traversal
+    In = ordsets:from_list(digraph:in_neighbours(Graph, Root)),
+    Out = ordsets:from_list(digraph:out_neighbours(Graph, Root)),
+
+    Visited1 = ordsets:union(Visited0, [Root]),
+
+    case In == Out of
+        true ->
+            {SymmetricViews, VisitedNodes} = ordsets:fold(
+                fun(Peer, {SymmetricViews0, VisitedNodes0}) ->
+                    {SymmetricViews1, VisitedNodes1} = breath_first(Peer, Graph, VisitedNodes0),
+                    {SymmetricViews0 andalso SymmetricViews1, ordsets:union(VisitedNodes0, VisitedNodes1)}
+                end,
+                {true, Visited1},
+                ordsets:subtract(Out, Visited1)
+            ),
+            {SymmetricViews, ordsets:union(VisitedNodes, Out)};
+        false ->
+            {false, ordsets:new()}
+    end.
 
 %% @private
 prefix(File) ->

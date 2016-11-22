@@ -60,6 +60,8 @@ do
       echo "[$(date +%T)] Running $EVAL_ID with $CLIENT_NUMBER clients; $PARTITION_PROBABILITY % partitions; with configuration $STR"
 
       wait_for_completion $TIMESTAMP
+      # Marathon may reply that no app is running but the resources may still be unavailable
+      sleep 60
     fi
   done
 

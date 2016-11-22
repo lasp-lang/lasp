@@ -14,7 +14,7 @@ Cluster up-time:
 - 40 m3.xlarge
   - from __2016-11-21 22:06:48__ to __2016-11-22 00:06:27__ (02:00)
 
-- 70 m3.xlarge
+- 75 m3.xlarge
   - from __2016-11-22 11:10:38__ to
 
 Total up-time:

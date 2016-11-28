@@ -61,7 +61,8 @@ do
 
       wait_for_completion $TIMESTAMP
       # Marathon may reply that no app is running but the resources may still be unavailable
-      sleep 60
+      # Wait 10 minutes
+      sleep 600
     fi
   done
 

@@ -5,11 +5,11 @@
 2. In __Select Template__ just click __Next__
 
 3. In __Specify Details__:
-   - Choose a __Stack name__
+   - __Stack name__: dcos
    - Pick one of your keys in __KeyName__
+   - __OAuthEnabled__: false
    - __PublicSlaveInstanceCount__: 25
    - __SlaveInstanceCount__: 0
-   - __OAuthEnabled__: false
 
 4. In __Options__ just click __Next__
 

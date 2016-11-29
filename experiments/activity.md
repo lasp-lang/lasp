@@ -19,6 +19,7 @@ Cluster up-time:
 
 - 40 m3.2xlarge
   - from __2016-11-28 09:09:09__ to __2016-11-28 22:23:21__ (13h14)
+  - from __2016-11-29 10:53:41__ to
 
 Total up-time:
 - 10 m3.xlarge: 01h11

@@ -222,6 +222,7 @@ configure_defaults() ->
     BroadcastEnabled = application:get_env(?APP,
                                            broadcast,
                                            BroadcastDefault),
+    lager:info("Setting broadcast: ~p", [BroadcastEnabled]),
     lasp_config:set(broadcast, BroadcastEnabled),
 
     SimulationDefault = list_to_atom(os:getenv("SIMULATION", "undefined")),

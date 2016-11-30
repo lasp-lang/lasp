@@ -1,7 +1,8 @@
-[{<<"eini">>,{pkg,<<"eini">>,<<"1.2.1">>},1},
+{"1.1.0",
+[{<<"eini">>,{pkg,<<"eini">>,<<"1.2.4">>},1},
  {<<"erlcloud">>,
   {git,"https://github.com/erlcloud/erlcloud.git",
-       {ref,"be805cf4916c709c50797a687b94cf0b539f8025"}},
+       {ref,"9f366edb9f1339cd71a5ef61d6de45c456ca9002"}},
   0},
  {<<"gb_trees_ext">>,
   {git,"https://github.com/lasp-lang/gb_trees_ext.git",
@@ -67,4 +68,9 @@
  {<<"webmachine">>,
   {git,"https://github.com/webmachine/webmachine.git",
        {ref,"b4758b51c05e8f4e8898a70b7a14514a8c150ffa"}},
-  0}].
+  0}]}.
+[
+{pkg_hash,[
+ {<<"eini">>, <<"ABD64A0533398A6D714D21219BB85F2D41FDB42665AC4080939B7BFA8E55F386">>},
+ {<<"lhttpc">>, <<"61760AFEC1DDB98E47972BE93B13FBFF487A63D65B91A02C41122A0ADF83DA38">>}]}
+].

@@ -766,7 +766,7 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
             #state{store=Store, gc_counter=GCCounter}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_exchange"),
 
-    %lasp_logger:extended("Exchange starting for ~p", [Peer]),
+    lasp_logger:extended("Exchange starting for ~p", [Peer]),
 
     Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
                             delta_counter=Counter, delta_map=DeltaMap,
@@ -799,8 +799,7 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
                        end
                end,
     %% TODO: Should this be parallel?
-    {ok, _Result} = do(fold, [Store, Function, []]),
-    %lasp_logger:extended("Finished exchange peer: ~p; sent ~p objects", [Peer, length(Result)]),
+    {ok, _} = do(fold, [Store, Function, []]),
 
     {noreply, State#state{gc_counter=increment_counter(GCCounter)}};
 
@@ -891,7 +890,7 @@ handle_info(memory_utilization_report, State) ->
 handle_info(aae_sync, #state{store=Store} = State) ->
     lasp_marathon_simulations:log_message_queue_size("aae_sync"),
 
-    %lasp_logger:extended("Beginning AAE synchronization."),
+    lasp_logger:extended("Beginning AAE synchronization."),
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
@@ -899,7 +898,7 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     %% Remove ourself and compute exchange peers.
     Peers = compute_exchange(without_me(Members)),
 
-    %lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
+    lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
     lists:foreach(fun(Peer) -> init_aae_sync(Peer, Store) end, Peers),
@@ -911,19 +910,15 @@ handle_info(aae_sync, #state{store=Store} = State) ->
 handle_info(delta_sync, #state{}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_sync"),
 
-    %lasp_logger:extended("Beginning delta synchronization."),
+    lasp_logger:extended("Beginning delta synchronization."),
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
 
-    %PeerServiceManager = lasp_config:peer_service_manager(),
-    %lager:info("Manager is: ~p, Members are: ~p",
-    %           [PeerServiceManager, Members]),
-
     %% Remove ourself and compute exchange peers.
     Peers = compute_exchange(without_me(Members)),
 
-    %lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
+    lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
     WithoutConvergenceFun = fun(Id) ->
@@ -1313,7 +1308,7 @@ init_aae_sync(Peer, Store) ->
 
 %% @private
 init_aae_sync(Peer, ObjectFilterFun, Store) ->
-    %lasp_logger:extended("Initializing AAE synchronization with peer: ~p", [Peer]),
+    lasp_logger:extended("Initializing AAE synchronization with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
@@ -1330,8 +1325,7 @@ init_aae_sync(Peer, ObjectFilterFun, Store) ->
                     end
                end,
     %% TODO: Should this be parallel?
-    {ok, _Result} = do(fold, [Store, Function, []]),
-    %lasp_logger:extended("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]),
+    {ok, _} = do(fold, [Store, Function, []]),
     ok.
 
 %% @private
@@ -1355,7 +1349,7 @@ compute_exchange(Peers) ->
     PeerServiceManager = lasp_config:peer_service_manager(),
 
     Probability = lasp_config:get(partition_probability, 0),
-    %lasp_logger:extended("Probability of partition: ~p", [Probability]),
+    lasp_logger:extended("Probability of partition: ~p", [Probability]),
     Percent = lasp_support:puniform(100),
 
     case Percent =< Probability of

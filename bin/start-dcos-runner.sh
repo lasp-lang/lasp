@@ -4,7 +4,6 @@ DCOS=$(dcos config show core.dcos_url)
 ELB_HOST=$(./elb-host.sh)
 
 ENV_VARS=(
-  ID
   LASP_BRANCH
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
@@ -34,7 +33,7 @@ cat <<EOF > dcos-runner.json
   "acceptedResourceRoles": [
     "slave_public"
   ],
-  "id": "$ID-dcos-runner-$CLIENT_NUMBER-$PARTITION_PROBABILITY",
+  "id": "dcos-runner-$CLIENT_NUMBER-$PARTITION_PROBABILITY",
   "dependencies": [],
   "constraints": [],
   "cpus": $CPU,

@@ -49,7 +49,8 @@ do
     BROADCAST=${CONFIG[2]}
     HEAVY_CLIENTS=${CONFIG[3]}
     REACTIVE_SERVER=${CONFIG[4]}
-    TIMESTAMP=$(date +%s)
+    # unix timestamp + nanoseconds
+    TIMESTAMP=$(date +%s)$(date +%N)
     REAL_EVAL_ID=$EVAL_ID"_"$CLIENT_NUMBER"_"$PARTITION_PROBABILITY
 
     if [ "$PEER_SERVICE" == "partisan_client_server_peer_service_manager" ] && [ "$CLIENT_NUMBER" -gt "128" ]; then

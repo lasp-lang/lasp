@@ -1265,7 +1265,10 @@ plumtree_memory_report() ->
 
 %% @private
 memory_utilization_report() ->
-    TotalBytes = orddict:fetch(total, erlang:memory()),
+    TotalBytes = erlang:memory(total),
+    TotalKBytes = TotalBytes / 1024,
+    TotalMBytes = TotalKBytes / 1024,
+    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, TotalMBytes]),
     lasp_instrumentation:memory(TotalBytes).
 
 %% @private

@@ -1268,7 +1268,7 @@ memory_utilization_report() ->
     TotalBytes = erlang:memory(total),
     TotalKBytes = TotalBytes / 1024,
     TotalMBytes = TotalKBytes / 1024,
-    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, TotalMBytes]),
+    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]),
     lasp_instrumentation:memory(TotalBytes).
 
 %% @private

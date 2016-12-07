@@ -72,7 +72,7 @@ transmission(Type, Payload, PeerCount) ->
 memory(Size) ->
     gen_server:call(?MODULE, {memory, Size}, infinity).
 
--spec overcounting(pos_integer()) -> ok | error().
+-spec overcounting(number()) -> ok | error().
 overcounting(Value) ->
     gen_server:call(?MODULE, {overcounting, Value}, infinity).
 

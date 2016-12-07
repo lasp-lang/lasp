@@ -944,6 +944,7 @@ handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_gc"),
 
     MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
+
     Function =
         fun({Id, #dv{delta_map=DeltaMap0, delta_ack_map=AckMap0,
                      delta_counter=Counter}=_Object},
@@ -996,9 +997,12 @@ handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
                         end
                 end
         end,
-    GCCounter = case GCCounter0 == MaxGCCounter of
+
+    %% Advance the GCounter each time the garbage collection routine is
+    %% triggered.
+    UpdatedGCCounter = case GCCounter0 =:= MaxGCCounter of
         false ->
-            GCCounter0;
+            GCCounter0 + 1;
         true ->
             spawn(
                 fun() ->
@@ -1023,7 +1027,7 @@ handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
     %% Schedule next GC and reset counter.
     schedule_delta_garbage_collection(),
 
-    {noreply, State#state{gc_counter=GCCounter}};
+    {noreply, State#state{gc_counter=UpdatedGCCounter}};
 
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),

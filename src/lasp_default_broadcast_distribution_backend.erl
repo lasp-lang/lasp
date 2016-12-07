@@ -1000,27 +1000,26 @@ handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
 
     %% Advance the GCounter each time the garbage collection routine is
     %% triggered.
-    UpdatedGCCounter = case GCCounter0 =:= MaxGCCounter of
+    ShouldGC = GCCounter0 =:= MaxGCCounter,
+
+    UpdatedGCCounter = case ShouldGC of
         false ->
             GCCounter0 + 1;
         true ->
-            spawn(
-                fun() ->
-                        {ok, Results} = do(fold, [Store, Function, []]),
-                        lists:foreach(
-                          fun({ok, Id, DeltaMap, RemovedAckMap}) ->
-                                  case do(get, [Store, Id]) of
-                                      {ok, Object} ->
-                                          _ = do(put,
-                                                 [Store, Id,
-                                                  Object#dv{delta_map=DeltaMap,
-                                                            delta_ack_map=RemovedAckMap}]),
-                                          ok;
-                                      _ ->
-                                          ok
-                                  end
-                          end, Results)
-                end),
+            {ok, Results} = do(fold, [Store, Function, []]),
+            lists:foreach(
+              fun({ok, Id, DeltaMap, RemovedAckMap}) ->
+                      case do(get, [Store, Id]) of
+                          {ok, Object} ->
+                              _ = do(put,
+                                     [Store, Id,
+                                      Object#dv{delta_map=DeltaMap,
+                                                delta_ack_map=RemovedAckMap}]),
+                              ok;
+                          _ ->
+                              ok
+                      end
+            end, Results),
             0
     end,
 

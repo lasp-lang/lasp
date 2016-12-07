@@ -943,60 +943,70 @@ handle_info(delta_sync, #state{}=State) ->
 handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_gc"),
 
-    MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
+    MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter,
+                                   ?MAX_GC_COUNTER),
 
-    Function =
-        fun({Id, #dv{delta_map=DeltaMap0, delta_ack_map=AckMap0,
-                     delta_counter=Counter}=_Object},
-            Acc0) ->
-                case orddict:is_empty(DeltaMap0) of
+    %% Generate garbage collection function.
+    Function = fun({Id,
+                    #dv{delta_map=DeltaMap0,
+                        delta_ack_map=AckMap0,
+                        delta_counter=Counter}}, Acc0) ->
+        case orddict:is_empty(DeltaMap0) of
+            true ->
+                %% If the delta map is empty, then we don't need to do
+                %% anything to perform garbage collection.
+                Acc0;
+            false ->
+                %% Remove disconnected or slow node() entries;
+                %% where disconnected or slow: seen the previous GC & no change.
+                PruneFun = fun(_Node, {Ack, GCed}) ->
+                                (GCed == false) orelse (Ack == Counter)
+                           end,
+                PrunedAckMap = orddict:filter(PruneFun, AckMap0),
+
+                case orddict:to_list(PrunedAckMap) =:= orddict:to_list(AckMap0) of
                     true ->
+                        %% If the pruned map is equal to the unpruned map,
+                        %% do nothing.
                         Acc0;
                     false ->
-                        %% Remove disconnected or slow node() entries from the AckMap.
-                        %% disconnected or slow: seen the previous GC & no change
-                        RemovedAckMap0 =
-                            orddict:filter(fun(_Node, {Ack, GCed}) ->
-                                                   (GCed == false) orelse (Ack == Counter)
-                                           end, AckMap0),
-                        case orddict:size(RemovedAckMap0) of
-                            0 ->
-                                Acc0;
-                            _ ->
-                                %% Mark remained entries as seen this GC.
-                                RemovedAckMap =
-                                    orddict:fold(
-                                      fun(Node, {Ack, _GCed}, RemovedAckMap1) ->
-                                              orddict:store(Node, {Ack, true},
-                                                            RemovedAckMap1)
-                                      end, orddict:new(), RemovedAckMap0),
-                                %% Collect garbage deltas.
-                                MinAck =
-                                    lists:min([Ack || {_Node, {Ack, _GCed}} <- RemovedAckMap]),
-                                %% size() should be bigger than 0.
-                                MinAck1 =
-                                    case orddict:size(DeltaMap0) of
-                                        1 ->
-                                            MinAck;
-                                        _ ->
-                                            Counters = orddict:fetch_keys(DeltaMap0),
-                                            NotCollectable =
-                                                (MinAck > lists:nth(1, Counters)) andalso
-                                                    (MinAck < lists:nth(2, Counters)),
-                                            case NotCollectable of
-                                                true ->
-                                                    lists:nth(1, Counters);
-                                                false ->
-                                                    MinAck
-                                            end
+                        %% Mark survivors as garbage collected.
+                        FinalPrunedFun = fun(Node, {Ack, _GCed}, Acc) ->
+                                                orddict:store(Node, {Ack, true}, Acc)
+                                         end,
+                        FinalPrunedAckMap = orddict:fold(FinalPrunedFun,
+                                                         orddict:new(),
+                                                         PrunedAckMap),
+
+                        %% Determine the minimal acknowledgement number we
+                        %% need.
+                        MinAck = lists:min([Ack || {_Node, {Ack, _GCed}} <-
+                                           FinalPrunedAckMap]),
+
+                        %% Filter the delta map to remove any unnecessary
+                        %% deltas.
+                        FilterFun = fun(Counter0, _Delta) ->
+                                            Counter0 >= MinAck
                                     end,
-                                DeltaMap = orddict:filter(fun(Counter0, _Delta) ->
-                                                                  Counter0 >= MinAck1
-                                                          end, DeltaMap0),
-                                [{ok, Id, DeltaMap, RemovedAckMap}|Acc0]
-                        end
+                        DeltaMap = orddict:filter(FilterFun, DeltaMap0),
+
+                        %% Generate object mutator.
+                        Mutator = fun(#dv{type=Type,
+                                          metadata=Metadata,
+                                          value=Value}=Object) ->
+                            {Object#dv{delta_map=DeltaMap,
+                                       delta_ack_map=FinalPrunedAckMap},
+                             {ok, {Id, Type, Metadata, Value}}}
+                        end,
+
+                        %% Update the object's ack map and delta map.
+                        Result = do(update, [Store, Id, Mutator]),
+
+                        %% Mark the object as updated.
+                        [Result|Acc0]
                 end
-        end,
+        end
+   end,
 
     %% Advance the GCounter each time the garbage collection routine is
     %% triggered.
@@ -1007,19 +1017,8 @@ handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
             GCCounter0 + 1;
         true ->
             {ok, Results} = do(fold, [Store, Function, []]),
-            lists:foreach(
-              fun({ok, Id, DeltaMap, RemovedAckMap}) ->
-                      case do(get, [Store, Id]) of
-                          {ok, Object} ->
-                              _ = do(put,
-                                     [Store, Id,
-                                      Object#dv{delta_map=DeltaMap,
-                                                delta_ack_map=RemovedAckMap}]),
-                              ok;
-                          _ ->
-                              ok
-                      end
-            end, Results),
+            lager:info("Garbage collection complete for objects: ~p",
+                       [Results]),
             0
     end,
 

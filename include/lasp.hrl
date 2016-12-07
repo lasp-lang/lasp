@@ -26,8 +26,7 @@
              metadata :: metadata(),
              delta_counter :: non_neg_integer(),
              delta_map :: orddict:orddict(),
-             delta_ack_map :: orddict:orddict(),
-             delta_eager_map = [] :: list(crdt())}).
+             delta_ack_map :: orddict:orddict()}).
 
 -type variable() :: #dv{}.
 

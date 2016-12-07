@@ -971,13 +971,25 @@ receive_delta(Store, {delta_send, Origin, {Id, Type, Metadata, Deltas},
 %%
 receive_delta(Store, {delta_ack, Id, From, Counter}) ->
     Mutator = fun(#dv{delta_ack_map=AckMap0}=Object) ->
-        OldAck = case orddict:find(From, AckMap0) of
-            {ok, {Ack0, _GCed}} ->
-                Ack0;
+        {CurrentAck, CurrentGCCounter} = case orddict:find(From, AckMap0) of
+            {ok, Value} ->
+                Value;
             error ->
-                0
+                {0, 0}
         end,
-        AckMap = orddict:store(From, {max(OldAck, Counter), false}, AckMap0),
+
+        ToStore = case CurrentAck < Counter of
+            true ->
+                %% If this is an ack from a newer write
+                %% I should store the received value
+                %% and reset the GC counter.
+                {Counter, 0};
+            false ->
+                %% Otherwise, keep it as it was
+                {CurrentAck, CurrentGCCounter}
+        end,
+
+        AckMap = orddict:store(From, ToStore, AckMap0),
         {Object#dv{delta_ack_map=AckMap}, ok}
     end,
 

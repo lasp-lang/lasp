@@ -79,8 +79,7 @@
 
 %% State record.
 -record(state, {store :: store(),
-                actor :: binary(),
-                gc_counter :: non_neg_integer()}).
+                actor :: binary()}).
 
 %% Broadcast record.
 -record(broadcast, {id :: id(),
@@ -482,7 +481,6 @@ init([]) ->
 
     {ok, Actor} = lasp_unique:unique(),
 
-    GCCounter = 0,
     Identifier = node(),
 
     {ok, Store} = case ?CORE:start(Identifier) of
@@ -500,8 +498,7 @@ init([]) ->
     schedule_memory_utilization_report(),
 
     {ok, #state{actor=Actor,
-                store=Store,
-                gc_counter=GCCounter}}.
+                store=Store}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -760,7 +757,7 @@ handle_call(Msg, _From, State) ->
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
 handle_cast({delta_exchange, Peer, ObjectFilterFun},
-            #state{store=Store, gc_counter=GCCounter}=State) ->
+            #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_exchange"),
 
     lasp_logger:extended("Exchange starting for ~p", [Peer]),
@@ -772,17 +769,14 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
                        case ObjectFilterFun(Id) of
                            true ->
                                Ack = case orddict:find(Peer, AckMap) of
-                                         {ok, {Ack0, _GCed}} ->
+                                         {ok, {Ack0, _GCCounter}} ->
                                              Ack0;
                                          error ->
                                              0
                                      end,
-                               Min = case orddict:fetch_keys(DeltaMap) of
-                                   [] ->
-                                       0;
-                                   Keys ->
-                                       lists:min(Keys)
-                               end,
+
+                               Min = lists_min(orddict:fetch_keys(DeltaMap)),
+
                                Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
                                    true ->
                                        Value;
@@ -798,7 +792,7 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
     %% TODO: Should this be parallel?
     {ok, _} = do(fold, [Store, Function, []]),
 
-    {noreply, State#state{gc_counter=increment_counter(GCCounter)}};
+    {noreply, State};
 
 handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
             #state{store=Store, actor=Actor}=State) ->
@@ -937,92 +931,52 @@ handle_info(delta_sync, #state{}=State) ->
     schedule_delta_synchronization(),
 
     {noreply, State#state{}};
-handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
+handle_info(delta_gc, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_gc"),
 
     MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter,
                                    ?MAX_GC_COUNTER),
 
     %% Generate garbage collection function.
-    Function = fun({Id,
-                    #dv{delta_map=DeltaMap0,
-                        delta_ack_map=AckMap0,
-                        delta_counter=Counter}}, Acc0) ->
-        case orddict:is_empty(DeltaMap0) of
-            true ->
-                %% If the delta map is empty, then we don't need to do
-                %% anything to perform garbage collection.
-                Acc0;
-            false ->
-                %% Remove disconnected or slow node() entries;
-                %% where disconnected or slow: seen the previous GC & no change.
-                PruneFun = fun(_Node, {Ack, GCed}) ->
-                                (GCed == false) orelse (Ack == Counter)
-                           end,
-                PrunedAckMap = orddict:filter(PruneFun, AckMap0),
+    Mutator = fun({Id, #dv{delta_map=DeltaMap0,
+                           delta_ack_map=AckMap0}=Object}) ->
 
-                case orddict:to_list(PrunedAckMap) =:= orddict:to_list(AckMap0) of
-                    true ->
-                        %% If the pruned map is equal to the unpruned map,
-                        %% do nothing.
-                        Acc0;
-                    false ->
-                        %% Mark survivors as garbage collected.
-                        FinalPrunedFun = fun(Node, {Ack, _GCed}, Acc) ->
-                                                orddict:store(Node, {Ack, true}, Acc)
-                                         end,
-                        FinalPrunedAckMap = orddict:fold(FinalPrunedFun,
-                                                         orddict:new(),
-                                                         PrunedAckMap),
+        %% In every GC attempt, increment GCCounter for each node.
+        %% This value is reseted to 0 when a new ack is received.
+        %% If `MaxGCCounter' garbage-collections happened
+        %% without receiving a new ack, prune that node from
+        %% the ack map.
+        UpdateFun = fun(_Node, {Ack, GCCounter}) ->
+            {Ack, GCCounter + 1}
+        end,
 
-                        %% Determine the minimal acknowledgement number we
-                        %% need.
-                        MinAck = lists:min([Ack || {_Node, {Ack, _GCed}} <-
-                                           FinalPrunedAckMap]),
+        PruneFun = fun(_Node, {_Ack, GCCounter}) ->
+            GCCounter == MaxGCCounter
+        end,
 
-                        %% Filter the delta map to remove any unnecessary
-                        %% deltas.
-                        FilterFun = fun(Counter0, _Delta) ->
-                                            Counter0 >= MinAck
-                                    end,
-                        DeltaMap = orddict:filter(FilterFun, DeltaMap0),
+        AckMap1 = orddict:map(UpdateFun, AckMap0),
+        PrunedAckMap = orddict:filter(PruneFun, AckMap1),
 
-                        %% Generate object mutator.
-                        Mutator = fun(#dv{type=Type,
-                                          metadata=Metadata,
-                                          value=Value}=Object) ->
-                            {Object#dv{delta_map=DeltaMap,
-                                       delta_ack_map=FinalPrunedAckMap},
-                             {ok, {Id, Type, Metadata, Value}}}
-                        end,
+        %% Determine the min ack present in the ack map
+        MinAck = lists_min([Ack || {_Node, {Ack, _GCCounter}} <- PrunedAckMap]),
 
-                        %% Update the object's ack map and delta map.
-                        Result = do(update, [Store, Id, Mutator]),
+        %% Remove unnecessary deltas from the delta map
+        DeltaMapGCFun = fun(Counter, {_Origin, _Delta}) ->
+            Counter >= MinAck
+        end,
 
-                        %% Mark the object as updated.
-                        [Result|Acc0]
-                end
-        end
-   end,
+        DeltaMapGC = orddict:filter(DeltaMapGCFun, DeltaMap0),
 
-    %% Advance the GCounter each time the garbage collection routine is
-    %% triggered.
-    ShouldGC = GCCounter0 =:= MaxGCCounter,
-
-    UpdatedGCCounter = case ShouldGC of
-        false ->
-            GCCounter0 + 1;
-        true ->
-            {ok, Results} = do(fold, [Store, Function, []]),
-            lager:info("Garbage collection complete for objects: ~p",
-                       [Results]),
-            0
+        {Object#dv{delta_map=DeltaMapGC, delta_ack_map=PrunedAckMap}, Id}
     end,
+
+    {ok, Results} = do(update_all, [Store, Mutator]),
+    lager:info("Garbage collection complete for objects: ~p", [Results]),
 
     %% Schedule next GC and reset counter.
     schedule_delta_garbage_collection(),
 
-    {noreply, State#state{gc_counter=UpdatedGCCounter}};
+    {noreply, State};
 
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -1091,38 +1045,22 @@ get(Id, Store) ->
     ?CORE:read(Id, Threshold, Store, self(), ReplyFun, BlockingFun).
 
 %% @private
-increment_counter(Counter) ->
-    Counter + 1.
-
-%% @private
-collect_deltas(Destination, Type, DeltaMap, Min0, Max) ->
-    Counters = orddict:fetch_keys(DeltaMap),
-    Min1 = case lists:member(Min0, Counters) of
-               true ->
-                   Min0;
-               false ->
-                   lists:min(Counters)
-           end,
-    SmallDeltaMap = orddict:filter(fun(Counter, _Delta) ->
-                                           (Counter >= Min1) andalso (Counter < Max)
-                                   end, DeltaMap),
-    Deltas = orddict:fold(fun(_Counter, {Origin, Delta}, Deltas0) ->
-                                  case Origin of
-                                      Destination ->
-                                        Deltas0;
-                                      _ ->
-                                        lasp_type:merge(Type, Deltas0, Delta)
-                                  end
-                          end, lasp_type:new_delta(Type), SmallDeltaMap),
-
-    %% @todo should we remove this once we know everything is working fine?
-    case lasp_type:is_delta(Type, Deltas) of
-        false ->
-            % lager:info("Folded delta group is not a delta");
-            ok;
-        true ->
-            ok
-    end,
+collect_deltas(Peer, Type, DeltaMap, PeerLastAck, DeltaCounter) ->
+    SmallDeltaMap = orddict:filter(
+        fun(Counter, {Origin, _Delta}) ->
+            (Counter >= PeerLastAck) andalso
+            (Counter < DeltaCounter) andalso
+            Origin /= Peer
+        end,
+        DeltaMap
+    ),
+    Deltas = orddict:fold(
+        fun(_Counter, {_Origin, Delta}, Deltas0) ->
+            lasp_type:merge(Type, Deltas0, Delta)
+        end,
+        lasp_type:new(Type),
+        SmallDeltaMap
+    ),
     Deltas.
 
 %% @private
@@ -1345,6 +1283,10 @@ select_random_sublist(List, K) ->
 %% @reference http://stackoverflow.com/questions/8817171/shuffling-elements-in-a-list-randomly-re-arrange-list-elements/8820501#8820501
 shuffle(L) ->
     [X || {_, X} <- lists:sort([{lasp_support:puniform(65535), N} || N <- L])].
+
+%% @private
+lists_min([]) -> 0;
+lists_min(L) -> lists:min(L).
 
 %% @private
 compute_exchange(Peers) ->

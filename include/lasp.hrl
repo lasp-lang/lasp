@@ -48,9 +48,13 @@
             {error, timeout}
         end).
 
-%% @doc Garbage collection will happen after the certain number
-%%      (MAX_GC_COUNTER) of times of exchanges.
--define(MAX_GC_COUNTER, 7).
+%% @doc A node will be evicted from the Ack Map when the entry of
+%%      that node in the Ack Map remains unchanged for
+%%      (MAX_GC_COUNTER) exchanges.
+%%      If the delta exchange timer is 5 seconds and MAX_GC_COUNTER
+%%      is 20, a node will be evicted from the Ack Map after not
+%%      sending acks for ~2 minutes
+-define(MAX_GC_COUNTER, 20).
 
 %% General types.
 -type file() :: iolist().

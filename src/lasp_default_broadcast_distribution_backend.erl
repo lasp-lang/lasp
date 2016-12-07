@@ -762,35 +762,51 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
 
     lasp_logger:extended("Exchange starting for ~p", [Peer]),
 
-    Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
-                            delta_counter=Counter, delta_map=DeltaMap,
-                            delta_ack_map=AckMap}},
-                   Acc0) ->
-                       case ObjectFilterFun(Id) of
-                           true ->
-                               Ack = case orddict:find(Peer, AckMap) of
-                                         {ok, {Ack0, _GCCounter}} ->
-                                             Ack0;
-                                         error ->
-                                             0
-                                     end,
+    Mutator = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
+                           delta_counter=Counter, delta_map=DeltaMap,
+                           delta_ack_map=AckMap0}=Object}) ->
+        case ObjectFilterFun(Id) of
+            true ->
+                Ack = case orddict:find(Peer, AckMap0) of
+                    {ok, {Ack0, _GCCounter}} ->
+                        Ack0;
+                    error ->
+                        0
+                end,
 
-                               Min = lists_min(orddict:fetch_keys(DeltaMap)),
+                Min = lists_min(orddict:fetch_keys(DeltaMap)),
 
-                               Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
-                                   true ->
-                                       Value;
-                                   false ->
-                                       collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
-                               end,
-                               send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
-                               [{ok, Id}|Acc0];
-                           false ->
-                               Acc0
-                       end
-               end,
+                Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
+                    true ->
+                        Value;
+                    false ->
+                        collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
+                end,
+
+                send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
+
+                %% In every exchange, increment GCCounter for that node.
+                %% This value is reseted to 0 when a new ack is received.
+                AckMap = orddict:map(
+                    fun(Peer0, {Ack0, GCCounter0}) ->
+                        case Peer0 of
+                            Peer ->
+                                {Ack0, GCCounter0 + 1};
+                            _ ->
+                                {Ack0, GCCounter0}
+                        end
+                    end,
+                    AckMap0
+                ),
+
+                {Object#dv{delta_ack_map=AckMap}, Id};
+            false ->
+                {Object, skip}
+        end
+    end,
+
     %% TODO: Should this be parallel?
-    {ok, _} = do(fold, [Store, Function, []]),
+    {ok, _} = do(update_all, [Store, Mutator]),
 
     {noreply, State};
 
@@ -941,21 +957,14 @@ handle_info(delta_gc, #state{store=Store}=State) ->
     Mutator = fun({Id, #dv{delta_map=DeltaMap0,
                            delta_ack_map=AckMap0}=Object}) ->
 
-        %% In every GC attempt, increment GCCounter for each node.
-        %% This value is reseted to 0 when a new ack is received.
-        %% If `MaxGCCounter' garbage-collections happened
+        %% If `MaxGCCounter' exchanges happened
         %% without receiving a new ack, prune that node from
-        %% the ack map.
-        UpdateFun = fun(_Node, {Ack, GCCounter}) ->
-            {Ack, GCCounter + 1}
-        end,
-
+        %% the ack map
         PruneFun = fun(_Node, {_Ack, GCCounter}) ->
             GCCounter == MaxGCCounter
         end,
 
-        AckMap1 = orddict:map(UpdateFun, AckMap0),
-        PrunedAckMap = orddict:filter(PruneFun, AckMap1),
+        PrunedAckMap = orddict:filter(PruneFun, AckMap0),
 
         %% Determine the min ack present in the ack map
         MinAck = lists_min([Ack || {_Node, {Ack, _GCCounter}} <- PrunedAckMap]),

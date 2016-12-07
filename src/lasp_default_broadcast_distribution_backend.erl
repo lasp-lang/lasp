@@ -957,11 +957,10 @@ handle_info(delta_gc, #state{store=Store}=State) ->
     Mutator = fun({Id, #dv{delta_map=DeltaMap0,
                            delta_ack_map=AckMap0}=Object}) ->
 
-        %% If at least `MaxGCCounter' exchanges happened
-        %% without receiving a new ack, prune that node from
-        %% the ack map
+        %% Only keep in the ack map nodes with gc counter
+        %% below `MaxGCCounter'.
         PruneFun = fun(_Node, {_Ack, GCCounter}) ->
-            GCCounter >= MaxGCCounter
+            GCCounter < MaxGCCounter
         end,
 
         PrunedAckMap = orddict:filter(PruneFun, AckMap0),

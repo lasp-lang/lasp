@@ -80,7 +80,6 @@
 %% State record.
 -record(state, {store :: store(),
                 actor :: binary(),
-                counter :: non_neg_integer(),
                 gc_counter :: non_neg_integer()}).
 
 %% Broadcast record.
@@ -483,7 +482,6 @@ init([]) ->
 
     {ok, Actor} = lasp_unique:unique(),
 
-    Counter = 0,
     GCCounter = 0,
     Identifier = node(),
 
@@ -502,7 +500,6 @@ init([]) ->
     schedule_memory_utilization_report(),
 
     {ok, #state{actor=Actor,
-                counter=Counter,
                 store=Store,
                 gc_counter=GCCounter}}.
 
@@ -525,17 +522,17 @@ handle_call(reset, _From, #state{store=Store}=State) ->
 %% Local declare operation, which will need to initialize metadata and
 %% broadcast the value to the remote nodes.
 handle_call({declare, Id, Type}, _From,
-            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+            #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("declare/2"),
 
     Result = ?CORE:declare(Id, Type, ?CLOCK_INIT(Actor), Store),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Incoming bind request, where we do not have information about the
 %% variable yet.  In this case, take the remote metadata, if we don't
 %% have local metadata.
 handle_call({declare, Id, IncomingMetadata, Type}, _From,
-            #state{store=Store, counter=Counter}=State) ->
+            #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("declare/3"),
 
     Metadata0 = case get(Id, Store) of
@@ -545,16 +542,16 @@ handle_call({declare, Id, IncomingMetadata, Type}, _From,
             IncomingMetadata
     end,
     Result = ?CORE:declare(Id, Type, ?CLOCK_MERG, Metadata0, Store),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Issue a local dynamic declare operation, which should initialize
 %% metadata and result in the broadcast operation.
 handle_call({declare_dynamic, Id, Type}, _From,
-            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+            #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("declare_dynamic"),
 
     Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT(Actor), Store),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Stream values out of the Lasp system; using the values from this
 %% stream can result in observable nondeterminism.
@@ -576,13 +573,13 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% Issue a local bind, which should increment the local clock and
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
-            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+            #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("bind/2"),
 
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_INCR(Actor), Store]),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Incoming bind operation; merge incoming clock with the remote clock.
 %%
@@ -591,13 +588,13 @@ handle_call({bind, Id, Value}, _From,
 %% clock to be incremented again and a subsequent broadcast.  However,
 %% this could change if the other module is later refactored.
 handle_call({bind, Id, Metadata0, Value}, _From,
-            #state{store=Store, counter=Counter}=State) ->
+            #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("bind/3"),
 
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_MERG, Store]),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Bind two variables together.
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
@@ -613,14 +610,14 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 %% necessary, where the vclock is serialized *per-node*.
 %%
 handle_call({update, Id, Operation, CRDTActor}, _From,
-            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+            #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("update"),
 
     Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
                            ?CLOCK_INIT(Actor), Store),
     {ok, Result} = declare_if_not_found(Result0, Id, State, ?CORE, update,
                                         [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
-    {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};
+    {reply, {ok, Result}, State};
 
 %% Spawn a function.
 handle_call({thread, Module, Function, Args},

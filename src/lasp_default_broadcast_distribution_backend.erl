@@ -975,6 +975,12 @@ handle_info(delta_gc, #state{store=Store}=State) ->
 
         DeltaMapGC = orddict:filter(DeltaMapGCFun, DeltaMap0),
 
+        lager:info("\n\n\n--------------------GC--------------------"),
+        lager:info("GC stats for ~p", [Id]),
+        lager:info("Delta Map size: before ~p | after ~p", [orddict:size(DeltaMap0), orddict:size(DeltaMapGC)]),
+        lager:info("Ack Map size:   before ~p | after ~p", [orddict:size(AckMap0), orddict:size(PrunedAckMap)]),
+        lager:info("--------------------GC--------------------\n\n\n"),
+
         {Object#dv{delta_map=DeltaMapGC, delta_ack_map=PrunedAckMap}, Id}
     end,
 

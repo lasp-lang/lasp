@@ -783,21 +783,28 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
                         collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
                 end,
 
-                send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
+                AckMap = case lasp_type:is_bottom(Type, Deltas) of
+                    true ->
+                        %% If the delta group is bottom, don't send it
+                        %% Also, don't update the GCCounter for this peer.
+                        AckMap0;
+                    false ->
+                        send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
 
-                %% In every exchange, increment GCCounter for that node.
-                %% This value is reseted to 0 when a new ack is received.
-                AckMap = orddict:map(
-                    fun(Peer0, {Ack0, GCCounter0}) ->
-                        case Peer0 of
-                            Peer ->
-                                {Ack0, GCCounter0 + 1};
-                            _ ->
-                                {Ack0, GCCounter0}
-                        end
-                    end,
-                    AckMap0
-                ),
+                        %% In every exchange, increment GCCounter for that node.
+                        %% This value is reseted to 0 when a new ack is received.
+                        orddict:map(
+                            fun(Peer0, {Ack0, GCCounter0}) ->
+                                case Peer0 of
+                                    Peer ->
+                                        {Ack0, GCCounter0 + 1};
+                                    _ ->
+                                        {Ack0, GCCounter0}
+                                end
+                            end,
+                            AckMap0
+                        )
+                end,
 
                 {Object#dv{delta_ack_map=AckMap}, Id};
             false ->

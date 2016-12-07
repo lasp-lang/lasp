@@ -90,7 +90,7 @@
                     metadata :: metadata(),
                     value :: value()}).
 
--define(DELTA_GC_INTERVAL, 60000).
+-define(DELTA_GC_INTERVAL, 10000).
 -define(PLUMTREE_MEMORY_INTERVAL, 10000).
 -define(MEMORY_UTILIZATION_INTERVAL, 10000).
 

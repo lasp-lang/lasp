@@ -970,16 +970,20 @@ receive_delta(Store, {delta_send, Origin, {Id, Type, Metadata, Deltas},
 %% @doc When the delta ack is arrived with the counter, store it in the ack map.
 %%
 receive_delta(Store, {delta_ack, Id, From, Counter}) ->
-    case do(get, [Store, Id]) of
-        {ok, #dv{delta_ack_map=AckMap0}=Object} ->
-            OldAck = case orddict:find(From, AckMap0) of
-                         {ok, {Ack0, _GCed}} ->
-                             Ack0;
-                         error ->
-                             0
-                     end,
-            AckMap = orddict:store(From, {max(OldAck, Counter), false}, AckMap0),
-            do(put, [Store, Id, Object#dv{delta_ack_map=AckMap}]);
+    Mutator = fun(#dv{delta_ack_map=AckMap0}=Object) ->
+        OldAck = case orddict:find(From, AckMap0) of
+            {ok, {Ack0, _GCed}} ->
+                Ack0;
+            error ->
+                0
+        end,
+        AckMap = orddict:store(From, {max(OldAck, Counter), false}, AckMap0),
+        {Object#dv{delta_ack_map=AckMap}, ok}
+    end,
+
+    case do(update, [Store, Id, Mutator]) of
+        ok ->
+            ok;
         _ ->
             error
     end.

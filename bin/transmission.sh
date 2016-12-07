@@ -35,7 +35,7 @@ declare -A EVALUATIONS
 EVALUATIONS["peer_to_peer_state_based_with_aae_test"]="partisan_hyparview_peer_service_manager state_based false false false"
 #EVALUATIONS["peer_to_peer_state_based_with_aae_and_tree_test"]="partisan_hyparview_peer_service_manager state_based true false false"
 #EVALUATIONS["peer_to_peer_delta_based_with_aae_test"]="partisan_hyparview_peer_service_manager delta_based false false false"
-EVALUATIONS["client_server_state_based_with_aae_test"]="partisan_client_server_peer_service_manager state_based false false false"
+#EVALUATIONS["client_server_state_based_with_aae_test"]="partisan_client_server_peer_service_manager state_based false false false"
 
 for i in $(seq 1 $EVAL_NUMBER)
 do

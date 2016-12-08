@@ -31,14 +31,18 @@ Cluster up-time:
   - from __2016-12-07 18:57:23__ to __2016-12-07 20:52:16__ (01h55)
 
 - 70 m3.2xlarge
-  - from __2016-12-08 12:04:20__
+  - from __2016-12-08 12:04:20__ to __2016-12-08 15:44:47__ (03h40)
+
+- 140 m3.2xlarge
+  - from __2016-12-08 15:47:36__ to
 
 Total up-time:
-- 10 m3.xlarge: 01h11
-- 25 m3.xlarge: 08h03
-- 40 m3.xlarge: 02h00
-- 75 m3.xlarge: 04h01
-- 20 m3.2xlarge: 01h07
-- 35 m3.2xlarge: 07h49
-- 40 m3.2xlarge: 19h55
-- 70 m3.2xlarge: 
+- 10 m3.xlarge:   01h11
+- 25 m3.xlarge:   08h03
+- 40 m3.xlarge:   02h00
+- 75 m3.xlarge:   04h01
+- 20 m3.2xlarge:  01h07
+- 35 m3.2xlarge:  07h49
+- 40 m3.2xlarge:  19h55
+- 70 m3.2xlarge:  03h40
+- 140 m3.2xlarge:

@@ -12,8 +12,8 @@ script:
   - make ct
   - make peer-to-peer-ad-counter-simulation
   - make client-server-ad-counter-simulation
-  - make peer-to-peer-game-tournament-simulation
-  - make client-server-game-tournament-simulation
+#  - make peer-to-peer-game-tournament-simulation
+#  - make client-server-game-tournament-simulation
   - make peer-to-peer-simple-simulation
 notifications:
   email: christopher.meiklejohn@gmail.com

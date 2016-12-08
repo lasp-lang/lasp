@@ -61,7 +61,7 @@ do
     wait_for_completion $TIMESTAMP
     # Marathon may reply that no app is running but the resources may still be unavailable
     # Wait 10 minutes
-    sleep 600
+    # sleep 600
   done
 
   echo "[$(date +%T)] Evaluation $i of $EVAL_NUMBER completed!"

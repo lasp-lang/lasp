@@ -29,7 +29,7 @@ packageclean:
 
 check: test xref dialyzer
 
-test: ct eunit ad-counter-simulations game-tournament-simulations
+test: ct eunit ad-counter-simulations game-tournament-simulations simple-simulations
 
 lint:
 	${REBAR} as lint lint
@@ -42,6 +42,7 @@ ct:
 
 ad-counter-simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation ad-counter-overcounting ad-counter-partition-overcounting
 game-tournament-simulations: client-server-game-tournament-simulation peer-to-peer-game-tournament-simulation
+simple-simulations: peer-to-peer-simple-simulation
 
 peer-to-peer-ad-counter-simulation:
 	${REBAR} as test ct --suite=lasp_peer_to_peer_advertisement_counter_SUITE
@@ -60,6 +61,9 @@ peer-to-peer-game-tournament-simulation:
 
 client-server-game-tournament-simulation:
 	${REBAR} as test ct --suite=lasp_client_server_game_tournament_SUITE
+
+peer-to-peer-simple-simulation:
+	${REBAR} as test ct --suite=lasp_peer_to_peer_simple_SUITE
 
 ##
 ## Release targets

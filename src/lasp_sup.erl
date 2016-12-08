@@ -152,7 +152,10 @@ init(_Args) ->
     %% Setup the game tournament example, if necessary.
     TournamentSpecs = game_tournament_child_specs(),
 
-    Children = Children0 ++ AdSpecs ++ TournamentSpecs,
+    %% Setup the simple example, if necessary.
+    SimpleSpecs = simple_child_specs(),
+
+    Children = Children0 ++ AdSpecs ++ TournamentSpecs ++ SimpleSpecs,
 
     {ok, {{one_for_one, 5, 10}, Children}}.
 
@@ -446,3 +449,63 @@ game_tournament_child_specs() ->
 
     ClientSpecs ++ ServerSpecs.
 
+%% @private
+simple_child_specs() ->
+    %% Figure out who is acting as the client.
+    ClientDefault = list_to_atom(os:getenv("SIMPLE_SIM_CLIENT", "false")),
+    ClientEnabled = application:get_env(?APP,
+                                        simple_simulation_client,
+                                        ClientDefault),
+    lasp_config:set(simple_simulation_client, ClientEnabled),
+    lager:info("SimpleClientEnabled: ~p", [ClientEnabled]),
+
+    %% Since EVENT_INTERVAL=10s
+    %% each node, per minute, does 6 events.
+    %% We want the experiments to run for 30 minutes.
+    %% Each node, per 30 minutes, does 6*30=180 events.
+    EventNumberDefault = 180,
+    EventNumber = application:get_env(?APP,
+                                      max_events,
+                                      EventNumberDefault),
+    lasp_config:set(max_events, EventNumber),
+
+    ClientSpecs = case ClientEnabled of
+        true ->
+            %% Start one simple client process per node.
+            Client = {lasp_simple_client,
+                      {lasp_simple_client, start_link, []},
+                      permanent, 5000, worker,
+                      [lasp_simple_client]},
+
+            %% Configure proper partisan tag.
+            partisan_config:set(tag, client),
+
+            [Client];
+        false ->
+            []
+    end,
+
+    %% Figure out who is acting as the server.
+    ServerDefault = list_to_atom(os:getenv("SIMPLE_SIM_SERVER", "false")),
+    ServerEnabled = application:get_env(?APP,
+                                        simple_simulation_server,
+                                        ServerDefault),
+    lasp_config:set(simple_simulation_server, ServerEnabled),
+    lager:info("SimpleServerEnabled: ~p", [ServerEnabled]),
+
+    ServerSpecs = case ServerEnabled of
+        true ->
+            Server = {lasp_simple_server,
+                      {lasp_simple_server, start_link, []},
+                      permanent, 5000, worker,
+                      [lasp_simple_server]},
+
+            %% Configure proper partisan tag.
+            partisan_config:set(tag, server),
+
+            [Server];
+        false ->
+            []
+    end,
+
+    ClientSpecs ++ ServerSpecs.

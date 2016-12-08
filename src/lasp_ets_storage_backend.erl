@@ -30,7 +30,7 @@
 -export([start/1,
          put/3,
          update/3,
-         update_all/2, %% @todo add this function to behaviour lasp_storage_backend
+         update_all/2,
          get/2,
          reset/1,
          fold/3]).

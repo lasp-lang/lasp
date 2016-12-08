@@ -238,13 +238,15 @@ start(_Case, _Config, Options) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [evaluation_identifier, list_to_atom(RealEvalIdentifier)]),
 
-                        %% Configure max impression and event number.
-                        Max = 30,
+                        %% Configure max impression number.
+                        MaxImpressions = 30,
                         ok = rpc:call(Node, lasp_config, set,
-                                      [max_impressions, Max]),
+                                      [max_impressions, MaxImpressions]),
 
+                        %% Configure max event number
+                        MaxEvents = 10,
                         ok = rpc:call(Node, lasp_config, set,
-                                      [max_events, Max])
+                                      [max_events, MaxEvents])
                    end,
     lists:map(ConfigureFun, Nodes),
 

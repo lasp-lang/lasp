@@ -65,4 +65,4 @@ cat <<EOF > dcos-runner.json
 EOF
 
 echo ">>> Adding dcos-runner-$CLIENT_NUMBER-$PARTITION_PROBABILITY to Marathon"
-curl -k -H 'Content-type: application/json' -X POST -d @dcos-runner.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
+curl -s -k -H 'Content-type: application/json' -X POST -d @dcos-runner.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null

@@ -1060,22 +1060,20 @@ get(Id, Store) ->
 
 %% @private
 collect_deltas(Peer, Type, DeltaMap, PeerLastAck, DeltaCounter) ->
-    SmallDeltaMap = orddict:filter(
-        fun(Counter, {Origin, _Delta}) ->
-            (Counter >= PeerLastAck) andalso
-            (Counter < DeltaCounter) andalso
-            Origin /= Peer
-        end,
-        DeltaMap
-    ),
-    Deltas = orddict:fold(
-        fun(_Counter, {_Origin, Delta}, Deltas0) ->
-            lasp_type:merge(Type, Deltas0, Delta)
+    orddict:fold(
+        fun(Counter, {Origin, Delta}, Deltas) ->
+            case (Counter >= PeerLastAck) andalso 
+                 (Counter < DeltaCounter) andalso
+                 Origin /= Peer of
+                true ->
+                    lasp_type:merge(Type, Deltas, Delta);
+                false ->
+                    Deltas
+            end
         end,
         lasp_type:new(Type),
-        SmallDeltaMap
-    ),
-    Deltas.
+        DeltaMap
+    ).
 
 %% @private
 declare_if_not_found({error, not_found}, {StorageId, TypeId},

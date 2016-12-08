@@ -767,16 +767,16 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
                            delta_ack_map=AckMap0}=Object}) ->
         case ObjectFilterFun(Id) of
             true ->
-                Ack = case orddict:find(Peer, AckMap0) of
+                {UnknownPeer, Ack} = case orddict:find(Peer, AckMap0) of
                     {ok, {Ack0, _GCCounter}} ->
-                        Ack0;
+                        {false, Ack0};
                     error ->
-                        0
+                        {true, 0}
                 end,
 
                 Min = lists_min(orddict:fetch_keys(DeltaMap)),
 
-                Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
+                Deltas = case UnknownPeer orelse Min > Ack of
                     true ->
                         Value;
                     false ->

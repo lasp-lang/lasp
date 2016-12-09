@@ -144,8 +144,9 @@ handle_info(check_simulation_end, #state{ad_list=AdList}=State) ->
         true ->
             lager:info("All nodes have pushed their logs"),
             log_overcounting_and_convergence(AdList),
+            LogFiles = lasp_instrumentation:log_fies(),
             lasp_instrumentation:stop(),
-            lasp_support:push_logs(),
+            lasp_support:push_logs(LogFiles),
             lasp_config:set(simulation_end, true),
             stop_simulation();
         false ->

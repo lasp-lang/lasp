@@ -45,7 +45,7 @@
          heal_cluster/2,
          load_lasp/3,
          start_lasp/2,
-         push_logs/0]).
+         push_logs/1]).
 
 -define(EXCHANGE_TIMER, 120).
 
@@ -364,7 +364,7 @@ start_slave(Name, NodeConfig, _Case) ->
             end
     end.
 
-push_logs() ->
+push_logs(LogFiles) ->
     DCOS = os:getenv("DCOS", "false"),
     LOGS = os:getenv("LOGS", "s3"),
 
@@ -405,7 +405,7 @@ push_logs() ->
                             ),
                             erlcloud_s3:put_object(BucketName, S3Id, list_to_binary(Logs))
                         end,
-                        lasp_instrumentation:log_files()
+                        LogFiles
                     )
             end
     end.

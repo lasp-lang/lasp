@@ -160,7 +160,7 @@ handle_call(experiment_started, _From, #state{}=State) ->
     {reply, ok, State};
 
 handle_call(stop, _From, #state{tref=TRef}=State) ->
-    {ok, cancel} = timer:cancel(TRef),
+    timer:cancel(TRef),
     _ = lager:info("Instrumentation timer disabled!"),
     {reply, ok, State#state{tref=undefined}};
 

@@ -187,7 +187,7 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     case length(NodesWithGamesEnrolled) == lasp_config:get(client_number, 3) of
         true ->
             lager:info("All nodes observed games enrolled. Node ~p", [Actor]),
-            LogFiles = lasp_instrumentation:log_fies(),
+            LogFiles = lasp_instrumentation:log_files(),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(LogFiles),
             lasp:update(?SIM_STATUS_ID, {apply, Actor, {snd, true}}, Actor);

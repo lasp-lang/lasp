@@ -121,7 +121,7 @@ handle_info(check_simulation_end, State) ->
         true ->
             lager:info("All nodes have pushed their logs"),
             log_convergence(),
-            LogFiles = lasp_instrumentation:log_fies(),
+            LogFiles = lasp_instrumentation:log_files(),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(LogFiles),
             lasp_config:set(simulation_end, true),

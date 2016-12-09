@@ -137,7 +137,7 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     case length(NodesWithAllEvents) == client_number() of
         true ->
             lager:info("All nodes did all events. Node ~p", [Actor]),
-            LogFiles = lasp_instrumentation:log_fies(),
+            LogFiles = lasp_instrumentation:log_files(),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(LogFiles),
             lasp:update(?SIM_STATUS_ID, {apply, Actor, {snd, true}}, Actor);

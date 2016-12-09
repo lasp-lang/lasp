@@ -153,7 +153,7 @@ handle_call(reset, _From, #state{ref=Ref}=State) ->
     true = ets:delete_all_objects(Ref),
     {reply, ok, State};
 handle_call(memory, _From, #state{ref=Ref}=State) ->
-    Result = ets:info(Ref, memory) / 8,
+    Result = ets:info(Ref, memory) * 8,
     {reply, Result, State};
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),

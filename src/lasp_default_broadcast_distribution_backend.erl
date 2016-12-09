@@ -1217,8 +1217,8 @@ memory_utilization_report(Store) ->
     Bytes = erlang:memory(total),
     ETSBytes = lasp_ets_storage_backend:memory(Store),
     %lasp_instrumentation:memory(TotalBytes),
-    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [Bytes, to_mb(Bytes)]),
-    lager:info("\nTOTAL ETS MEMORY ~p bytes, ~p megabytes\n", [ETSBytes, to_mb(ETSBytes)]),
+    lager:info("\nTOTAL MEMORY ~p megabytes\n", [to_mb(Bytes)]),
+    lager:info("\nTOTAL ETS MEMORY ~p megabytes\n", [to_mb(ETSBytes)]),
 
     ProcessesInfo = [process_info(PID, [memory, registered_name]) || PID <- processes()],
     Sorted = lists:sublist(
@@ -1236,7 +1236,7 @@ memory_utilization_report(Store) ->
         "",
         Sorted
     ),
-    lager:info("\nPROCESSES INFO\n" ++ Log ++ "\n\n\n").
+    lager:info("\nPROCESSES INFO\n" ++ Log).
 
 to_mb(Bytes) ->
     KBytes = Bytes / 1024,

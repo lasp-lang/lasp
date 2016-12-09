@@ -1224,7 +1224,7 @@ memory_utilization_report(Store) ->
     Sorted = lists:reverse(ordsets:from_list([{to_mb(M), I} || [{memory, M}, {registered_name, I}] <- ProcessesInfo])),
     Log = lists:foldl(
         fun({M, I}, Acc) ->
-            Acc ++ atom_to_list(I) ++ ":" ++ float_to_list(M) ++ "\n"
+            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(M) ++ "\n"
         end,
         "",
         Sorted

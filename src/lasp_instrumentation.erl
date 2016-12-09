@@ -95,7 +95,7 @@ log_files() ->
     MainLog = main_log(),
     MainLogS3 = SimulationId ++ "/" ++ main_log_suffix(),
 
-    OtherLogs = case partisan_config:get(tag, undefined) == server andalso lasp_config:get(simulation, undefined) /= basic of
+    OtherLogs = case partisan_config:get(tag, undefined) == server andalso lasp_config:get(simulation, undefined) /= simple of
         true ->
             OvercountingLog = overcounting_log(),
             OvercountingLogS3 = SimulationId ++ "/" ++ overcounting_log_suffix(),

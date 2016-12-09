@@ -84,27 +84,40 @@ handle_info(event, #state{actor=Actor,
                           events=Events0}=State) ->
     lasp_marathon_simulations:log_message_queue_size("event"),
 
-    Events1 = Events0 + 1,
-    Element = atom_to_list(Actor) ++ "###" ++ integer_to_list(Events1),
-
-    lasp:update(?SIMPLE_BAG, {add, Element}, Actor),
-
     {ok, Value} = lasp:query(?SIMPLE_BAG),
-    lager:info("Events done: ~p, Events seen: ~p. Node: ~p", [Events1, sets:size(Value), Actor]),
+    TotalEvents = sets:size(Value),
 
-    case Events1 == max_events() of
+    LocalEvents = case TotalEvents of
         true ->
-            lager:info("All events done. Node: ~p", [Actor]),
+            %% The server, once it detects connectedness
+            %% it will add one element to the bag
+            %% Until then, clients are not allowed
+            %% to add elements to the bag
+            Events1 = Events0 + 1,
+            Element = atom_to_list(Actor) ++ "###" ++ integer_to_list(Events1),
 
-            %% Update Simulation Status Instance
-            lasp:update(?SIM_STATUS_ID, {apply, Actor, {fst, true}}, Actor),
-            log_convergence(),
-            schedule_check_simulation_end();
+            lasp:update(?SIMPLE_BAG, {add, Element}, Actor),
+
+            lager:info("Events done: ~p, Events seen: ~p. Node: ~p", [Events1, TotalEvents + 1, Actor]),
+
+            case Events1 == max_events() of
+                true ->
+                    lager:info("All events done. Node: ~p", [Actor]),
+
+                    %% Update Simulation Status Instance
+                    lasp:update(?SIM_STATUS_ID, {apply, Actor, {fst, true}}, Actor),
+                    log_convergence(),
+                    schedule_check_simulation_end();
+                false ->
+                    schedule_event()
+            end,
+            Events1;
         false ->
-            schedule_event()
+            schedule_event(),
+            Events0
     end,
 
-    {noreply, State#state{events=Events1}};
+    {noreply, State#state{events=LocalEvents}};
 
 handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("check_simulation_end"),

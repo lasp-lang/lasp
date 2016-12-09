@@ -67,6 +67,15 @@ init([]) ->
     %% Schedule check simulation end
     schedule_check_simulation_end(),
 
+    %% Generate actor identifier.
+    Actor = node(),
+
+    %% Bootstrap the experiment by adding one
+    %% element to the bag; clients don't
+    %% add elements to the bag until
+    %% they observe a non empty bag
+    lasp:update(?SIMPLE_BAG, {add, Actor}, Actor),
+
     {ok, #state{}}.
 
 %% @private

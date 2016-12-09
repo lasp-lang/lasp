@@ -395,6 +395,8 @@ push_logs(LogFiles) ->
                     %% Store logs on S3.
                     lists:foreach(
                         fun({FilePath, S3Id}) ->
+                            lager:info("FILEPATH ~p", [FilePath]),
+                            lager:info("FILEPATH s3id ~p", [S3Id]),
                             Lines = read_file(FilePath),
                             Logs = lists:foldl(
                                 fun(Line, Acc) ->

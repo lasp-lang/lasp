@@ -85,7 +85,7 @@ handle_info(event, #state{actor=Actor,
     lasp_marathon_simulations:log_message_queue_size("event"),
 
     Events1 = Events0 + 1,
-    Element = atom_to_list(Actor) ++ "###" + integer_to_list(Events1),
+    Element = atom_to_list(Actor) ++ "###" ++ integer_to_list(Events1),
 
     lasp:update(?SIMPLE_BAG, {add, Element}, Actor),
 

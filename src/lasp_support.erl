@@ -414,6 +414,7 @@ push_logs(LogFiles) ->
 
 %% @private
 read_file(FilePath) ->
+    lager:info("READ FILE ~p",[FilePath]),
     {ok, FileDescriptor} = file:open(FilePath, [read]),
     Lines = read_lines(FilePath, FileDescriptor),
     Lines.

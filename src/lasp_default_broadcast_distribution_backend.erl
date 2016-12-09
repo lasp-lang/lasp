@@ -1218,7 +1218,18 @@ memory_utilization_report(Store) ->
     ETSBytes = lasp_ets_storage_backend:memory(Store),
     %lasp_instrumentation:memory(TotalBytes),
     lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [Bytes, to_mb(Bytes)]),
-    lager:info("\nTOTAL ETS MEMORY ~p bytes, ~p megabytes\n", [ETSBytes, to_mb(ETSBytes)]).
+    lager:info("\nTOTAL ETS MEMORY ~p bytes, ~p megabytes\n", [ETSBytes, to_mb(ETSBytes)]),
+
+    ProcessesInfo = [process_info(PID, [memory, registered_name]) || PID <- processes()],
+    Sorted = lists:reverse(ordsets:from_list([{to_mb(M), I} || [{memory, M}, {registered_name, I}] <- ProcessesInfo])),
+    Log = lists:foldl(
+        fun({M, I}, Acc) ->
+            Acc ++ atom_to_list(I) ++ ":" ++ float_to_list(M) ++ "\n"
+        end,
+        "",
+        Sorted
+    ),
+    lager:info("\nPROCESSES INFO\n~p\n\n\n", [Log]).
 
 to_mb(Bytes) ->
     KBytes = Bytes / 1024,

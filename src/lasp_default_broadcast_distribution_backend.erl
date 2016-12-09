@@ -1221,7 +1221,14 @@ memory_utilization_report(Store) ->
     lager:info("\nTOTAL ETS MEMORY ~p bytes, ~p megabytes\n", [ETSBytes, to_mb(ETSBytes)]),
 
     ProcessesInfo = [process_info(PID, [memory, registered_name]) || PID <- processes()],
-    Sorted = lists:reverse(ordsets:from_list([{to_mb(M), get_name(I)} || [{memory, M}, {registered_name, I}] <- ProcessesInfo])),
+    Sorted = lists:sublist(
+        lists:reverse(
+            ordsets:from_list(
+                [{to_mb(M), get_name(I)} || [{memory, M}, {registered_name, I}] <- ProcessesInfo]
+            )
+        ),
+        10
+    ),
     Log = lists:foldl(
         fun({M, I}, Acc) ->
             Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(M) ++ "\n"

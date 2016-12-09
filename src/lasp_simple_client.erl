@@ -87,12 +87,12 @@ handle_info(event, #state{actor=Actor,
     {ok, Value} = lasp:query(?SIMPLE_BAG),
     TotalEvents = sets:size(Value),
 
-    LocalEvents = case TotalEvents of
+    LocalEvents = case TotalEvents > 0 of
         true ->
-            %% The server, once it detects connectedness
-            %% it will add one element to the bag
+            %% The server, once it detects connectedness,
+            %% will add one element to the bag.
             %% Until then, clients are not allowed
-            %% to add elements to the bag
+            %% to add elements to the bag.
             Events1 = Events0 + 1,
             Element = atom_to_list(Actor) ++ "###" ++ integer_to_list(Events1),
 

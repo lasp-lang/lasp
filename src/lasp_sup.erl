@@ -463,7 +463,7 @@ simple_child_specs() ->
     %% each node, per minute, does 6 events.
     %% We want the experiments to run for 30 minutes.
     %% Each node, per 30 minutes, does 6*30=180 events.
-    EventNumberDefault = 180,
+    EventNumberDefault = 5,
     EventNumber = application:get_env(?APP,
                                       max_events,
                                       EventNumberDefault),

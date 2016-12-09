@@ -1229,7 +1229,7 @@ memory_utilization_report(Store) ->
         "",
         Sorted
     ),
-    lager:info("\nPROCESSES INFO\n~p\n\n\n", [Log]).
+    lager:info("\nPROCESSES INFO\n" ++ Log ++ "\n\n\n").
 
 to_mb(Bytes) ->
     KBytes = Bytes / 1024,

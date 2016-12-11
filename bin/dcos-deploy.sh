@@ -61,7 +61,7 @@ cd /tmp
 
 # Memory of each VM.
 SERVER_MEMORY=4096.0
-CLIENT_MEMORY=1024.0
+CLIENT_MEMORY=2048.0
 
 # CPU of each VM.
 SERVER_CPU=2

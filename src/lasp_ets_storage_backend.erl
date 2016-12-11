@@ -33,7 +33,8 @@
          update_all/2,
          get/2,
          reset/1,
-         fold/3]).
+         fold/3,
+         memory/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -93,6 +94,9 @@ fold(Ref, Function, Acc) ->
 reset(Ref) ->
     gen_server:call(Ref, reset, infinity).
 
+memory(Ref) ->
+    gen_server:call(Ref, memory, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -148,6 +152,9 @@ handle_call({fold, Function, Acc0}, _From, #state{ref=Ref}=State) ->
 handle_call(reset, _From, #state{ref=Ref}=State) ->
     true = ets:delete_all_objects(Ref),
     {reply, ok, State};
+handle_call(memory, _From, #state{ref=Ref}=State) ->
+    Result = ets:info(Ref, memory) * 8,
+    {reply, Result, State};
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.

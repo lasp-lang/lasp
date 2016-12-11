@@ -61,7 +61,7 @@ cd /tmp
 
 # Memory of each VM.
 SERVER_MEMORY=4096.0
-CLIENT_MEMORY=1024.0
+CLIENT_MEMORY=2048.0
 
 # CPU of each VM.
 SERVER_CPU=2
@@ -92,7 +92,7 @@ cat <<EOF > lasp-server.json
   "ports": [0, 0],
   "env": {
     "LASP_BRANCH": "$LASP_BRANCH",
-    "AD_COUNTER_SIM_SERVER": "true",
+    "SIMPLE_SIM_SERVER": "true",
     "DCOS": "$DCOS",
     "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",
@@ -160,7 +160,7 @@ cat <<EOF > lasp-client.json
   "ports": [0, 0],
   "env": {
     "LASP_BRANCH": "$LASP_BRANCH",
-    "AD_COUNTER_SIM_CLIENT": "true",
+    "SIMPLE_SIM_CLIENT": "true",
     "DCOS": "$DCOS",
     "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",

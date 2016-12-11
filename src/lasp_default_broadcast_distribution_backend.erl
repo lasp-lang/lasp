@@ -883,11 +883,11 @@ handle_info(plumtree_memory_report, State) ->
 
     {noreply, State};
 
-handle_info(memory_utilization_report, State) ->
+handle_info(memory_utilization_report, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("memory_utilization_report"),
 
     %% Log
-    memory_utilization_report(),
+    memory_utilization_report(Store),
 
     %% Schedule report.
     schedule_memory_utilization_report(),
@@ -1213,12 +1213,38 @@ plumtree_memory_report() ->
                [process_info(self(), message_queue_len)]).
 
 %% @private
-memory_utilization_report() ->
-    TotalBytes = erlang:memory(total),
-    TotalKBytes = TotalBytes / 1024,
-    TotalMBytes = TotalKBytes / 1024,
+memory_utilization_report(Store) ->
+    Bytes = erlang:memory(total),
+    ETSBytes = lasp_ets_storage_backend:memory(Store),
     %lasp_instrumentation:memory(TotalBytes),
-    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]).
+    lager:info("\nTOTAL MEMORY ~p megabytes\n", [to_mb(Bytes)]),
+    lager:info("\nTOTAL ETS MEMORY ~p megabytes\n", [to_mb(ETSBytes)]),
+
+    ProcessesInfo = [process_info(PID, [memory, registered_name]) || PID <- processes()],
+    Sorted = lists:sublist(
+        lists:reverse(
+            ordsets:from_list(
+                [{to_mb(M), get_name(I)} || [{memory, M}, {registered_name, I}] <- ProcessesInfo]
+            )
+        ),
+        10
+    ),
+    Log = lists:foldl(
+        fun({M, I}, Acc) ->
+            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(M) ++ "\n"
+        end,
+        "",
+        Sorted
+    ),
+    lager:info("\nPROCESSES INFO\n" ++ Log).
+
+to_mb(Bytes) ->
+    KBytes = Bytes / 1024,
+    MBytes = KBytes / 1024,
+    round(MBytes).
+
+get_name([]) -> undefined;
+get_name(Name) -> Name.
 
 %% @private
 send(Msg, Peer) ->

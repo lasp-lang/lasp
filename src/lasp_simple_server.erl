@@ -18,14 +18,13 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_game_tournament_server).
--author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
+-module(lasp_simple_server).
+-author("Vitor Enes Duarte <vitorenesduarte@gmail.com>").
 
 -behaviour(gen_server).
 
 %% API
--export([start_link/0,
-         trigger/2]).
+-export([start_link/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -38,7 +37,7 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {actor, game_list}).
+-record(state, {}).
 
 %%%===================================================================
 %%% API
@@ -56,7 +55,7 @@ start_link() ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([]) ->
-    lager:info("Game tournament server initialized."),
+    lager:info("Simple server initialized."),
 
     %% Delay for graph connectedness.
     wait_for_connectedness(),
@@ -65,26 +64,19 @@ init([]) ->
     %% Track whether simulation has ended or not.
     lasp_config:set(simulation_end, false),
 
-    %% Generate actor identifier.
-    Actor = node(),
-
-    %% Schedule logging.
-    schedule_logging(),
-
-    %% Build DAG.
-    {ok, GameList} = build_dag(Actor),
-
-    %% Initialize triggers.
-    launch_triggers(GameList, Actor),
-
-    %% Create instance for simulation status tracking
-    {Id, Type} = ?SIM_STATUS_ID,
-    {ok, _} = lasp:declare(Id, Type),
-
     %% Schedule check simulation end
     schedule_check_simulation_end(),
 
-    {ok, #state{actor=Actor, game_list=GameList}}.
+    %% Generate actor identifier.
+    Actor = node(),
+
+    %% Bootstrap the experiment by adding one
+    %% element to the bag; clients don't
+    %% add elements to the bag until
+    %% they observe a non empty bag
+    lasp:update(?SIMPLE_BAG, {add, Actor}, Actor),
+
+    {ok, #state{}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -99,51 +91,36 @@ handle_cast(Msg, State) ->
     lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
-%% @private
--spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(log, #state{}=State) ->
-    lasp_marathon_simulations:log_message_queue_size("log"),
-
-    %% Print number of games.
-    {ok, Games} = lasp:query(?ENROLLABLE_GAMES),
-
-    lager:info("Game list: ~p", [sets:size(Games)]),
-
-    %% Schedule logging.
-    schedule_logging(),
-
-    {noreply, State};
-
-handle_info(check_simulation_end, #state{game_list=GameList}=State) ->
+handle_info(check_simulation_end, State) ->
     lasp_marathon_simulations:log_message_queue_size("check_simulation_end"),
 
     %% A simulation ends for the server when all clients have
-    %% observed that all clients observed all games enrolled and
+    %% observed that all clients did all events and
     %% pushed their logs (second component of the map in
     %% the simulation status instance is true for all clients)
-    {ok, GamesEnrolledAndLogs} = lasp:query(?SIM_STATUS_ID),
+    {ok, AllEventsAndLogs} = lasp:query(?SIM_STATUS_ID),
 
     NodesWithLogsPushed = lists:filter(
-        fun({_Node, {_GamesEnrolled, LogsPushed}}) ->
+        fun({_Node, {_AllEvents, LogsPushed}}) ->
             LogsPushed
         end,
-        GamesEnrolledAndLogs
+        AllEventsAndLogs
     ),
 
-    NodesWithGamesEnrolled = lists:filter(
-        fun({_Node, {GamesEnrolled, _LogsPushed}}) ->
-            GamesEnrolled
+    NodesWithAllEvents = lists:filter(
+        fun({_Node, {AllEvents, _LogsPushed}}) ->
+            AllEvents
         end,
-        GamesEnrolledAndLogs
+        AllEventsAndLogs
     ),
 
-    lager:info("Checking for simulation end: ~p nodes with enrolled games and ~p nodes with logs pushed.",
-               [length(NodesWithGamesEnrolled), length(NodesWithLogsPushed)]),
+    lager:info("Checking for simulation end: ~p nodes with all events and ~p nodes with logs pushed.",
+               [length(NodesWithAllEvents), length(NodesWithLogsPushed)]),
 
-    case length(NodesWithLogsPushed) == lasp_config:get(client_number, 3) of
+    case length(NodesWithLogsPushed) == client_number() of
         true ->
             lager:info("All nodes have pushed their logs"),
-            log_overcounting_and_convergence(GameList),
+            log_convergence(),
             LogFiles = lasp_instrumentation:log_files(),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(LogFiles),
@@ -174,99 +151,21 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-build_dag(Actor) ->
-    %% Create a bunch of unique identifiers for games.
-    GameIds = lists:map(fun(_) ->
-                                {ok, Unique} = lasp_unique:unique(),
-                                Unique
-                        end, lists:seq(1, ?GAMES_NUMBER)),
-
-    %% Create each game, and then add each of the games to the set of
-    %% enrollable games.
-    GameList = lists:map(fun(Id) ->
-                    %% Generate identifier.
-                    GameId = {Id, ?GSET_TYPE},
-
-                    %% Generate game.
-                    {ok, {GameId, _, _, _}} = lasp:declare(GameId, ?GSET_TYPE),
-
-                    %% Add game.
-                    {ok, _} = lasp:update(?ENROLLABLE_GAMES,
-                                          {add, GameId},
-                                          Actor),
-
-                    GameId
-
-                    end, GameIds),
-
-    {ok, GameList}.
-
-%% @private
-launch_triggers(GameList, Actor) ->
-    lists:map(
-        fun(GameId) ->
-            spawn_link(
-                fun() ->
-                    trigger(GameId, Actor)
-                end
-            )
-        end,
-        GameList
-    ).
-
-%% @private
-trigger(GameId, Actor) ->
-    %% Blocking threshold read for max players.
-    MaxPlayers = lasp_config:get(max_players, ?MAX_PLAYERS_DEFAULT),
-
-    EnforceFun = fun() ->
-            lager:info("Threshold for ~p reached; disabling!", [GameId]),
-
-            %% Remove the game.
-            {ok, _} = lasp:update(?ENROLLABLE_GAMES, {rmv, GameId}, Actor)
-    end,
-    lasp:invariant(GameId, {cardinality, MaxPlayers}, EnforceFun),
-
-    ok.
-
-%% @private
-schedule_logging() ->
-    timer:send_after(?LOG_INTERVAL, log).
-
-%% @private
 schedule_check_simulation_end() ->
     timer:send_after(?STATUS_INTERVAL, check_simulation_end).
 
 %% @private
-log_overcounting_and_convergence(GameList) ->
+client_number() ->
+    lasp_config:get(client_number, 3).
+
+%% @private
+log_convergence() ->
     case lasp_config:get(instrumentation, false) of
         true ->
-            Overcounting = compute_overcounting(GameList),
-            lasp_instrumentation:overcounting(Overcounting),
             lasp_instrumentation:convergence();
-
         false ->
             ok
     end.
-
-%% @private
-compute_overcounting(GameList) ->
-    OvercountingSum = lists:foldl(
-        fun(GameId, Acc) ->
-            {ok, Value} = lasp:query(GameId),
-            MaxPlayers = lasp_config:get(max_players, ?MAX_PLAYERS_DEFAULT),
-            %% Size, because we count cardinality.
-            Overcounting = sets:size(Value) - MaxPlayers,
-            lager:info("Game ~p had ~p enrolled out of ~p",
-                       [GameId, sets:size(Value), MaxPlayers]),
-            OvercountingPercentage = (Overcounting * 100) / MaxPlayers,
-            Acc + OvercountingPercentage
-        end,
-        0,
-        GameList
-    ),
-
-    OvercountingSum / length(GameList).
 
 %% @private
 stop_simulation() ->

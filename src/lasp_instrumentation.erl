@@ -95,12 +95,12 @@ log_files() ->
     MainLog = main_log(),
     MainLogS3 = SimulationId ++ "/" ++ main_log_suffix(),
 
-    OtherLogs = case partisan_config:get(tag, undefined) of
-        server ->
+    OtherLogs = case partisan_config:get(tag, undefined) == server andalso lasp_config:get(simulation, undefined) /= simple of
+        true ->
             OvercountingLog = overcounting_log(),
             OvercountingLogS3 = SimulationId ++ "/" ++ overcounting_log_suffix(),
             [{OvercountingLog, OvercountingLogS3}];
-        _ ->
+        false ->
             []
     end,
 
@@ -160,7 +160,7 @@ handle_call(experiment_started, _From, #state{}=State) ->
     {reply, ok, State};
 
 handle_call(stop, _From, #state{tref=TRef}=State) ->
-    {ok, cancel} = timer:cancel(TRef),
+    timer:cancel(TRef),
     _ = lager:info("Instrumentation timer disabled!"),
     {reply, ok, State#state{tref=undefined}};
 

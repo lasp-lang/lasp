@@ -445,7 +445,6 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
     Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
                       waiting_delta_threads=WDT, waiting_threads=WT,
                       delta_counter=Counter0, delta_map=DeltaMap0,
-                      delta_eager_map=DeltaEagerMap0,
                       delta_ack_map=AckMap}=Object) ->
             Metadata = MetadataFun(Metadata0),
             case {Id, Type, Metadata0, Value0} of
@@ -463,20 +462,18 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                             {ok, SW} = reply_to_all(WT, [],
                                                     {ok, {Id, Type, Metadata, Merged}}),
 
-                            {ok, SWD, Counter, DeltaMap, DeltaEagerMap} = case lasp_config:get(mode, state_based) of
+                            {ok, SWD, Counter, DeltaMap} = case lasp_config:get(mode, state_based) of
                                 state_based ->
-                                    {ok, WDT, Counter0, DeltaMap0, DeltaEagerMap0};
+                                    {ok, WDT, Counter0, DeltaMap0};
                                 delta_based ->
                                     {ok, SWD1} = reply_to_all(WDT, [],
                                                               {ok, {Id, Type, Metadata, Value}}),
                                     DeltaMap1 = store_delta(Origin, Counter0, Value, DeltaMap0),
-                                    DeltaEagerMap1 = DeltaEagerMap0 ++ [Value],
-                                    {ok, SWD1, increment_counter(Counter0), DeltaMap1, DeltaEagerMap1}
+                                    {ok, SWD1, increment_counter(Counter0), DeltaMap1}
                             end,
                             NewObject = #dv{type=Type, metadata=Metadata, value=Merged,
                                             waiting_delta_threads=SWD, waiting_threads=SW,
                                             delta_counter=Counter,
-                                            delta_eager_map=DeltaEagerMap,
                                             delta_map=DeltaMap, delta_ack_map=AckMap},
                             %% Return value is a delta state.
                             {NewObject, {ok, {Id, Type, Metadata, Merged}}};
@@ -973,16 +970,32 @@ receive_delta(Store, {delta_send, Origin, {Id, Type, Metadata, Deltas},
 %% @doc When the delta ack is arrived with the counter, store it in the ack map.
 %%
 receive_delta(Store, {delta_ack, Id, From, Counter}) ->
-    case do(get, [Store, Id]) of
-        {ok, #dv{delta_ack_map=AckMap0}=Object} ->
-            OldAck = case orddict:find(From, AckMap0) of
-                         {ok, {Ack0, _GCed}} ->
-                             Ack0;
-                         error ->
-                             0
-                     end,
-            AckMap = orddict:store(From, {max(OldAck, Counter), false}, AckMap0),
-            do(put, [Store, Id, Object#dv{delta_ack_map=AckMap}]);
+    Mutator = fun(#dv{delta_ack_map=AckMap0}=Object) ->
+        {CurrentAck, CurrentGCCounter} = case orddict:find(From, AckMap0) of
+            {ok, Value} ->
+                Value;
+            error ->
+                {0, 0}
+        end,
+
+        ToStore = case CurrentAck < Counter of
+            true ->
+                %% If this is an ack from a newer write
+                %% I should store the received value
+                %% and reset the GC counter.
+                {Counter, 0};
+            false ->
+                %% Otherwise, keep it as it was
+                {CurrentAck, CurrentGCCounter}
+        end,
+
+        AckMap = orddict:store(From, ToStore, AckMap0),
+        {Object#dv{delta_ack_map=AckMap}, ok}
+    end,
+
+    case do(update, [Store, Id, Mutator]) of
+        ok ->
+            ok;
         _ ->
             error
     end.

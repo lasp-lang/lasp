@@ -30,6 +30,7 @@
 -export([start/1,
          put/3,
          update/3,
+         update_all/2,
          get/2,
          reset/1,
          fold/3]).
@@ -70,6 +71,11 @@ put(Ref, Id, Record) ->
                                          {error, atom()}.
 update(Ref, Id, Function) ->
     gen_server:call(Ref, {update, Id, Function}, infinity).
+
+%% @doc Update all objects given a mutation function.
+-spec update_all(ref(), function()) -> {ok, term()}.
+update_all(Ref, Function) ->
+    gen_server:call(Ref, {update_all, Function}, infinity).
 
 %% @doc Retrieve a record from the backend.
 -spec get(ref(), id()) -> {ok, variable()} | {error, not_found} |
@@ -123,6 +129,19 @@ handle_call({update, Id, Function}, _From, #state{ref=Ref}=State) ->
             Error
     end,
     {reply, Result, State};
+handle_call({update_all, Function}, _From, #state{ref=Ref}=State) ->
+    Result = ets:foldl(
+        fun({Id, _}=Value, Acc) ->
+            {NewValue, InnerResult} = Function(Value),
+            case do_put(Ref, Id, NewValue) of
+                ok ->
+                    Acc ++ [InnerResult]
+            end
+        end,
+        [],
+        Ref
+    ),
+    {reply, {ok, Result}, State};
 handle_call({fold, Function, Acc0}, _From, #state{ref=Ref}=State) ->
     Acc1 = ets:foldl(Function, Acc0, Ref),
     {reply, {ok, Acc1}, State};

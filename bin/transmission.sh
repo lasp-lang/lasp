@@ -54,18 +54,14 @@ do
     TIMESTAMP=$(date +%s)$(date +%N)
     REAL_EVAL_ID=$EVAL_ID"_"$CLIENT_NUMBER"_"$PARTITION_PROBABILITY
 
-    if [ "$PEER_SERVICE" == "partisan_client_server_peer_service_manager" ] && [ "$CLIENT_NUMBER" -gt "256" ]; then
-      echo "[$(date +%T)] Client-Server topology with $CLIENT_NUMBER clients is not supported"
-    else
-      PEER_SERVICE=$PEER_SERVICE MODE=$MODE BROADCAST=$BROADCAST SIMULATION=$SIMULATION EVAL_ID=$REAL_EVAL_ID EVAL_TIMESTAMP=$TIMESTAMP HEAVY_CLIENTS=$HEAVY_CLIENTS REACTIVE_SERVER=$REACTIVE_SERVER AAE_INTERVAL=$AAE_INTERVAL DELTA_INTERVAL=$DELTA_INTERVAL INSTRUMENTATION=$INSTRUMENTATION LOGS=$LOGS EXTENDED_LOGGING=$EXTENDED_LOGGING MAILBOX_LOGGING=$MAILBOX_LOGGING ./dcos-deploy.sh
+    PEER_SERVICE=$PEER_SERVICE MODE=$MODE BROADCAST=$BROADCAST SIMULATION=$SIMULATION EVAL_ID=$REAL_EVAL_ID EVAL_TIMESTAMP=$TIMESTAMP HEAVY_CLIENTS=$HEAVY_CLIENTS REACTIVE_SERVER=$REACTIVE_SERVER AAE_INTERVAL=$AAE_INTERVAL DELTA_INTERVAL=$DELTA_INTERVAL INSTRUMENTATION=$INSTRUMENTATION LOGS=$LOGS EXTENDED_LOGGING=$EXTENDED_LOGGING MAILBOX_LOGGING=$MAILBOX_LOGGING ./dcos-deploy.sh
 
-      echo "[$(date +%T)] Running $EVAL_ID with $CLIENT_NUMBER clients; $PARTITION_PROBABILITY % partitions; with configuration $STR"
+    echo "[$(date +%T)] Running $EVAL_ID with $CLIENT_NUMBER clients; $PARTITION_PROBABILITY % partitions; with configuration $STR"
 
-      wait_for_completion $TIMESTAMP
-      # Marathon may reply that no app is running but the resources may still be unavailable
-      # Wait 10 minutes
-      # sleep 600
-    fi
+    wait_for_completion $TIMESTAMP
+    # Marathon may reply that no app is running but the resources may still be unavailable
+    # Wait 10 minutes
+    # sleep 600
   done
 
   echo "[$(date +%T)] Evaluation $i of $EVAL_NUMBER completed!"

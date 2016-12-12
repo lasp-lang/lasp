@@ -79,9 +79,7 @@
 
 %% State record.
 -record(state, {store :: store(),
-                actor :: binary(),
-                counter :: non_neg_integer(),
-                gc_counter :: non_neg_integer()}).
+                actor :: binary()}).
 
 %% Broadcast record.
 -record(broadcast, {id :: id(),
@@ -483,8 +481,6 @@ init([]) ->
 
     {ok, Actor} = lasp_unique:unique(),
 
-    Counter = 0,
-    GCCounter = 0,
     Identifier = node(),
 
     {ok, Store} = case ?CORE:start(Identifier) of
@@ -502,9 +498,7 @@ init([]) ->
     schedule_memory_utilization_report(),
 
     {ok, #state{actor=Actor,
-                counter=Counter,
-                store=Store,
-                gc_counter=GCCounter}}.
+                store=Store}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -525,17 +519,17 @@ handle_call(reset, _From, #state{store=Store}=State) ->
 %% Local declare operation, which will need to initialize metadata and
 %% broadcast the value to the remote nodes.
 handle_call({declare, Id, Type}, _From,
-            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+            #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("declare/2"),
 
     Result = ?CORE:declare(Id, Type, ?CLOCK_INIT(Actor), Store),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Incoming bind request, where we do not have information about the
 %% variable yet.  In this case, take the remote metadata, if we don't
 %% have local metadata.
 handle_call({declare, Id, IncomingMetadata, Type}, _From,
-            #state{store=Store, counter=Counter}=State) ->
+            #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("declare/3"),
 
     Metadata0 = case get(Id, Store) of
@@ -545,16 +539,16 @@ handle_call({declare, Id, IncomingMetadata, Type}, _From,
             IncomingMetadata
     end,
     Result = ?CORE:declare(Id, Type, ?CLOCK_MERG, Metadata0, Store),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Issue a local dynamic declare operation, which should initialize
 %% metadata and result in the broadcast operation.
 handle_call({declare_dynamic, Id, Type}, _From,
-            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+            #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("declare_dynamic"),
 
     Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT(Actor), Store),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Stream values out of the Lasp system; using the values from this
 %% stream can result in observable nondeterminism.
@@ -576,13 +570,13 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% Issue a local bind, which should increment the local clock and
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
-            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+            #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("bind/2"),
 
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_INCR(Actor), Store]),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Incoming bind operation; merge incoming clock with the remote clock.
 %%
@@ -591,13 +585,13 @@ handle_call({bind, Id, Value}, _From,
 %% clock to be incremented again and a subsequent broadcast.  However,
 %% this could change if the other module is later refactored.
 handle_call({bind, Id, Metadata0, Value}, _From,
-            #state{store=Store, counter=Counter}=State) ->
+            #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("bind/3"),
 
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_MERG, Store]),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Bind two variables together.
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
@@ -613,14 +607,14 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 %% necessary, where the vclock is serialized *per-node*.
 %%
 handle_call({update, Id, Operation, CRDTActor}, _From,
-            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+            #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("update"),
 
     Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
                            ?CLOCK_INIT(Actor), Store),
     {ok, Result} = declare_if_not_found(Result0, Id, State, ?CORE, update,
                                         [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
-    {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};
+    {reply, {ok, Result}, State};
 
 %% Spawn a function.
 handle_call({thread, Module, Function, Args},
@@ -763,45 +757,65 @@ handle_call(Msg, _From, State) ->
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
 handle_cast({delta_exchange, Peer, ObjectFilterFun},
-            #state{store=Store, gc_counter=GCCounter}=State) ->
+            #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_exchange"),
 
     lasp_logger:extended("Exchange starting for ~p", [Peer]),
 
-    Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
-                            delta_counter=Counter, delta_map=DeltaMap,
-                            delta_ack_map=AckMap}},
-                   Acc0) ->
-                       case ObjectFilterFun(Id) of
-                           true ->
-                               Ack = case orddict:find(Peer, AckMap) of
-                                         {ok, {Ack0, _GCed}} ->
-                                             Ack0;
-                                         error ->
-                                             0
-                                     end,
-                               Min = case orddict:fetch_keys(DeltaMap) of
-                                   [] ->
-                                       0;
-                                   Keys ->
-                                       lists:min(Keys)
-                               end,
-                               Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
-                                   true ->
-                                       Value;
-                                   false ->
-                                       collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
-                               end,
-                               send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
-                               [{ok, Id}|Acc0];
-                           false ->
-                               Acc0
-                       end
-               end,
-    %% TODO: Should this be parallel?
-    {ok, _} = do(fold, [Store, Function, []]),
+    Mutator = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
+                           delta_counter=Counter, delta_map=DeltaMap,
+                           delta_ack_map=AckMap0}=Object}) ->
+        case ObjectFilterFun(Id) of
+            true ->
+                Ack = case orddict:find(Peer, AckMap0) of
+                    {ok, {Ack0, _GCCounter}} ->
+                        Ack0;
+                    error ->
+                        0
+                end,
 
-    {noreply, State#state{gc_counter=increment_counter(GCCounter)}};
+                Min = lists_min(orddict:fetch_keys(DeltaMap)),
+
+                Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
+                    true ->
+                        Value;
+                    false ->
+                        collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
+                end,
+
+                ClientInReactiveMode = (client_server_mode() andalso i_am_client() andalso reactive_server()),
+
+                AckMap = case Ack < Counter orelse ClientInReactiveMode of
+                    true ->
+                        send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
+
+                        orddict:map(
+                            fun(Peer0, {Ack0, GCCounter0}) ->
+                                case Peer0 of
+                                    Peer ->
+                                        {Ack0, GCCounter0 + 1};
+                                    _ ->
+                                        {Ack0, GCCounter0}
+                                end
+                            end,
+                            AckMap0
+                        );
+                    false ->
+                        AckMap0
+                end,
+
+                {Object#dv{delta_ack_map=AckMap}, Id};
+            false ->
+                {Object, skip}
+        end
+    end,
+
+    %% TODO: Should this be parallel?
+    {ok, _} = do(update_all, [Store, Mutator]),
+
+    lasp_logger:extended("Exchange finished for ~p", [Peer]),
+
+    {noreply, State};
 
 handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
             #state{store=Store, actor=Actor}=State) ->
@@ -940,92 +954,50 @@ handle_info(delta_sync, #state{}=State) ->
     schedule_delta_synchronization(),
 
     {noreply, State#state{}};
-handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
+handle_info(delta_gc, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_gc"),
 
     MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter,
                                    ?MAX_GC_COUNTER),
 
     %% Generate garbage collection function.
-    Function = fun({Id,
-                    #dv{delta_map=DeltaMap0,
-                        delta_ack_map=AckMap0,
-                        delta_counter=Counter}}, Acc0) ->
-        case orddict:is_empty(DeltaMap0) of
-            true ->
-                %% If the delta map is empty, then we don't need to do
-                %% anything to perform garbage collection.
-                Acc0;
-            false ->
-                %% Remove disconnected or slow node() entries;
-                %% where disconnected or slow: seen the previous GC & no change.
-                PruneFun = fun(_Node, {Ack, GCed}) ->
-                                (GCed == false) orelse (Ack == Counter)
-                           end,
-                PrunedAckMap = orddict:filter(PruneFun, AckMap0),
+    Mutator = fun({Id, #dv{delta_map=DeltaMap0,
+                           delta_ack_map=AckMap0}=Object}) ->
 
-                case orddict:to_list(PrunedAckMap) =:= orddict:to_list(AckMap0) of
-                    true ->
-                        %% If the pruned map is equal to the unpruned map,
-                        %% do nothing.
-                        Acc0;
-                    false ->
-                        %% Mark survivors as garbage collected.
-                        FinalPrunedFun = fun(Node, {Ack, _GCed}, Acc) ->
-                                                orddict:store(Node, {Ack, true}, Acc)
-                                         end,
-                        FinalPrunedAckMap = orddict:fold(FinalPrunedFun,
-                                                         orddict:new(),
-                                                         PrunedAckMap),
+        %% Only keep in the ack map nodes with gc counter
+        %% below `MaxGCCounter'.
+        PruneFun = fun(_Node, {_Ack, GCCounter}) ->
+            GCCounter < MaxGCCounter
+        end,
 
-                        %% Determine the minimal acknowledgement number we
-                        %% need.
-                        MinAck = lists:min([Ack || {_Node, {Ack, _GCed}} <-
-                                           FinalPrunedAckMap]),
+        PrunedAckMap = orddict:filter(PruneFun, AckMap0),
 
-                        %% Filter the delta map to remove any unnecessary
-                        %% deltas.
-                        FilterFun = fun(Counter0, _Delta) ->
-                                            Counter0 >= MinAck
-                                    end,
-                        DeltaMap = orddict:filter(FilterFun, DeltaMap0),
+        %% Determine the min ack present in the ack map
+        MinAck = lists_min([Ack || {_Node, {Ack, _GCCounter}} <- PrunedAckMap]),
 
-                        %% Generate object mutator.
-                        Mutator = fun(#dv{type=Type,
-                                          metadata=Metadata,
-                                          value=Value}=Object) ->
-                            {Object#dv{delta_map=DeltaMap,
-                                       delta_ack_map=FinalPrunedAckMap},
-                             {ok, {Id, Type, Metadata, Value}}}
-                        end,
+        %% Remove unnecessary deltas from the delta map
+        DeltaMapGCFun = fun(Counter, {_Origin, _Delta}) ->
+            Counter >= MinAck
+        end,
 
-                        %% Update the object's ack map and delta map.
-                        Result = do(update, [Store, Id, Mutator]),
+        DeltaMapGC = orddict:filter(DeltaMapGCFun, DeltaMap0),
 
-                        %% Mark the object as updated.
-                        [Result|Acc0]
-                end
-        end
-   end,
+        lager:info("\n\n\n--------------------GC--------------------"),
+        lager:info("GC stats for ~p", [Id]),
+        lager:info("Delta Map size: before ~p | after ~p", [orddict:size(DeltaMap0), orddict:size(DeltaMapGC)]),
+        lager:info("Ack Map size:   before ~p | after ~p", [orddict:size(AckMap0), orddict:size(PrunedAckMap)]),
+        lager:info("--------------------GC--------------------\n\n\n"),
 
-    %% Advance the GCounter each time the garbage collection routine is
-    %% triggered.
-    ShouldGC = GCCounter0 =:= MaxGCCounter,
-
-    UpdatedGCCounter = case ShouldGC of
-        false ->
-            GCCounter0 + 1;
-        true ->
-            {ok, Results} = do(fold, [Store, Function, []]),
-            lager:info("Garbage collection complete for objects: ~p",
-                       [Results]),
-            0
+        {Object#dv{delta_map=DeltaMapGC, delta_ack_map=PrunedAckMap}, Id}
     end,
+
+    {ok, Results} = do(update_all, [Store, Mutator]),
+    lager:info("Garbage collection complete for objects: ~p", [Results]),
 
     %% Schedule next GC and reset counter.
     schedule_delta_garbage_collection(),
 
-    {noreply, State#state{gc_counter=UpdatedGCCounter}};
+    {noreply, State};
 
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -1094,39 +1066,21 @@ get(Id, Store) ->
     ?CORE:read(Id, Threshold, Store, self(), ReplyFun, BlockingFun).
 
 %% @private
-increment_counter(Counter) ->
-    Counter + 1.
-
-%% @private
-collect_deltas(Destination, Type, DeltaMap, Min0, Max) ->
-    Counters = orddict:fetch_keys(DeltaMap),
-    Min1 = case lists:member(Min0, Counters) of
-               true ->
-                   Min0;
-               false ->
-                   lists:min(Counters)
-           end,
-    SmallDeltaMap = orddict:filter(fun(Counter, _Delta) ->
-                                           (Counter >= Min1) andalso (Counter < Max)
-                                   end, DeltaMap),
-    Deltas = orddict:fold(fun(_Counter, {Origin, Delta}, Deltas0) ->
-                                  case Origin of
-                                      Destination ->
-                                        Deltas0;
-                                      _ ->
-                                        lasp_type:merge(Type, Deltas0, Delta)
-                                  end
-                          end, lasp_type:new_delta(Type), SmallDeltaMap),
-
-    %% @todo should we remove this once we know everything is working fine?
-    case lasp_type:is_delta(Type, Deltas) of
-        false ->
-            % lager:info("Folded delta group is not a delta");
-            ok;
-        true ->
-            ok
-    end,
-    Deltas.
+collect_deltas(Peer, Type, DeltaMap, PeerLastAck, DeltaCounter) ->
+    orddict:fold(
+        fun(Counter, {Origin, Delta}, Deltas) ->
+            case (Counter >= PeerLastAck) andalso 
+                 (Counter < DeltaCounter) andalso
+                 Origin /= Peer of
+                true ->
+                    lasp_type:merge(Type, Deltas, Delta);
+                false ->
+                    Deltas
+            end
+        end,
+        lasp_type:new(Type),
+        DeltaMap
+    ).
 
 %% @private
 declare_if_not_found({error, not_found}, {StorageId, TypeId},
@@ -1270,8 +1224,8 @@ memory_utilization_report() ->
     TotalBytes = erlang:memory(total),
     TotalKBytes = TotalBytes / 1024,
     TotalMBytes = TotalKBytes / 1024,
-    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]),
-    lasp_instrumentation:memory(TotalBytes).
+    %lasp_instrumentation:memory(TotalBytes),
+    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]).
 
 %% @private
 send(Msg, Peer) ->
@@ -1348,6 +1302,10 @@ select_random_sublist(List, K) ->
 %% @reference http://stackoverflow.com/questions/8817171/shuffling-elements-in-a-list-randomly-re-arrange-list-elements/8820501#8820501
 shuffle(L) ->
     [X || {_, X} <- lists:sort([{lasp_support:puniform(65535), N} || N <- L])].
+
+%% @private
+lists_min([]) -> 0;
+lists_min(L) -> lists:min(L).
 
 %% @private
 compute_exchange(Peers) ->
@@ -1427,6 +1385,10 @@ peer_to_peer_mode() ->
 %% @private
 i_am_server() ->
     partisan_config:get(tag, undefined) == server.
+
+%% @private
+i_am_client() ->
+    partisan_config:get(tag, undefined) == client.
 
 %% @private
 reactive_server() ->

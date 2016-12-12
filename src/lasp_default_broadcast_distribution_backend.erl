@@ -767,35 +767,40 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
                            delta_ack_map=AckMap0}=Object}) ->
         case ObjectFilterFun(Id) of
             true ->
-                {UnknownPeer, Ack} = case orddict:find(Peer, AckMap0) of
+                Ack = case orddict:find(Peer, AckMap0) of
                     {ok, {Ack0, _GCCounter}} ->
-                        {false, Ack0};
+                        Ack0;
                     error ->
-                        {true, 0}
+                        0
                 end,
 
                 Min = lists_min(orddict:fetch_keys(DeltaMap)),
 
-                Deltas = case UnknownPeer orelse Min > Ack of
+                Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
                     true ->
                         Value;
                     false ->
                         collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
                 end,
 
-                send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
+                AckMap = case Ack < Counter of
+                    true ->
+                        send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
 
-                AckMap = orddict:map(
-                    fun(Peer0, {Ack0, GCCounter0}) ->
-                        case Peer0 of
-                            Peer ->
-                                {Ack0, GCCounter0 + 1};
-                            _ ->
-                                {Ack0, GCCounter0}
-                        end
-                    end,
-                    AckMap0
-                ),
+                        orddict:map(
+                            fun(Peer0, {Ack0, GCCounter0}) ->
+                                case Peer0 of
+                                    Peer ->
+                                        {Ack0, GCCounter0 + 1};
+                                    _ ->
+                                        {Ack0, GCCounter0}
+                                end
+                            end,
+                            AckMap0
+                        );
+                    false ->
+                        AckMap0
+                end,
 
                 {Object#dv{delta_ack_map=AckMap}, Id};
             false ->

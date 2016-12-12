@@ -783,7 +783,9 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
                         collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
                 end,
 
-                AckMap = case Ack < Counter of
+                %% 
+                ClientInReactiveMode = (client_server_mode() andalso i_am_client() andalso reactive_server())
+                AckMap = case Ack < Counter orelse ClientInReactiveMode of
                     true ->
                         send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
 
@@ -1383,6 +1385,10 @@ peer_to_peer_mode() ->
 %% @private
 i_am_server() ->
     partisan_config:get(tag, undefined) == server.
+
+%% @private
+i_am_client() ->
+    partisan_config:get(tag, undefined) == client.
 
 %% @private
 reactive_server() ->

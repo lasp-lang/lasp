@@ -783,8 +783,8 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
                         collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
                 end,
 
-                %% 
-                ClientInReactiveMode = (client_server_mode() andalso i_am_client() andalso reactive_server())
+                ClientInReactiveMode = (client_server_mode() andalso i_am_client() andalso reactive_server()),
+
                 AckMap = case Ack < Counter orelse ClientInReactiveMode of
                     true ->
                         send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),

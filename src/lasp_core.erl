@@ -466,9 +466,10 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                                 state_based ->
                                     {ok, WDT, Counter0, DeltaMap0};
                                 delta_based ->
+                                    Delta = lasp_type:delta(Type, state_driven, Value, Value0),
                                     {ok, SWD1} = reply_to_all(WDT, [],
-                                                              {ok, {Id, Type, Metadata, Value}}),
-                                    DeltaMap1 = store_delta(Origin, Counter0, Value, DeltaMap0),
+                                                              {ok, {Id, Type, Metadata, Delta}}),
+                                    DeltaMap1 = store_delta(Origin, Counter0, Delta, DeltaMap0),
                                     {ok, SWD1, increment_counter(Counter0), DeltaMap1}
                             end,
                             NewObject = #dv{type=Type, metadata=Metadata, value=Merged,

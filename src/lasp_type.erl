@@ -35,7 +35,8 @@
          encode/3,
          decode/3,
          query/2,
-         get_type/1]).
+         get_type/1,
+         delta/4]).
 
 types() ->
     [
@@ -171,3 +172,8 @@ merge(Type, Value0, Value) ->
 query(Type, Value) ->
     T = get_type(remove_args(Type)),
     T:query(Value).
+
+%% @doc
+delta(Type, Method, Remote, Local) ->
+    T = get_type(remove_args(Type)),
+    T:delta(Method, Remote, Local).

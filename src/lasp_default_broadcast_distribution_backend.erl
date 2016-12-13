@@ -145,22 +145,12 @@ start_link(Opts) ->
 %% @doc Declare a new dataflow variable of a given type.
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
-    case lasp_config:get(mode, state_based) of
-        delta_based ->
-            gen_server:call(?MODULE, {declare, Id, Type}, infinity);
-        state_based ->
-            gen_server:call(?MODULE, {declare, Id, Type}, infinity)
-    end.
+    gen_server:call(?MODULE, {declare, Id, Type}, infinity).
 
 %% @doc Declare a new dynamic variable of a given type.
 -spec declare_dynamic(id(), type()) -> {ok, var()}.
 declare_dynamic(Id, Type) ->
-    case lasp_config:get(mode, state_based) of
-        delta_based ->
-            gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity);
-        state_based ->
-            gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity)
-    end.
+    gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity).
 
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.
@@ -194,9 +184,6 @@ update(Id, Operation, Actor) ->
                           Value;
                       _ ->
                           case lasp_config:get(mode, state_based) of
-                              delta_based  ->
-                                  %% No broadcasting for the delta.
-                                  Value;
                               state_based ->
                                   Value;
                               pure_op_based ->
@@ -222,9 +209,6 @@ bind(Id, Value0) ->
                           Value;
                       _ ->
                           case lasp_config:get(mode, state_based) of
-                              delta_based ->
-                                  %% No broadcasting for the delta.
-                                  Value;
                               state_based ->
                                   Value;
                               pure_op_based ->

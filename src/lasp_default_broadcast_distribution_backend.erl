@@ -1275,4 +1275,6 @@ plumtree_eager_peers(Root) ->
 
 %% @private
 servers() ->
-    sprinter:servers().
+    {ok, Servers} = sprinter:servers(),
+    lager:info("Servers: ~p", [Servers]),
+    Servers.

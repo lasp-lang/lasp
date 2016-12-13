@@ -108,15 +108,9 @@ init(_Args) ->
                  permanent, 5000, worker,
                  [sprinter]},
 
-    BroadcastBuffer = {lasp_broadcast_buffer,
-                       {lasp_broadcast_buffer, start_link, []},
-                        permanent, 5000, worker,
-                        [lasp_broadcast_buffer]},
-
     WebSpecs = web_specs(),
 
     BaseSpecs0 = [Unique,
-                  BroadcastBuffer,
                   Partisan,
                   PlumtreeBackend,
                   DistributionBackend,

@@ -152,10 +152,7 @@ declare(Id, Type) ->
         delta_based ->
             gen_server:call(?MODULE, {declare, Id, Type}, infinity);
         state_based ->
-            {ok, Variable} = gen_server:call(?MODULE,
-                                             {declare, Id, Type}, infinity),
-            buffer_broadcast(Variable),
-            {ok, Variable}
+            gen_server:call(?MODULE, {declare, Id, Type}, infinity)
     end.
 
 %% @doc Declare a new dynamic variable of a given type.
@@ -165,11 +162,7 @@ declare_dynamic(Id, Type) ->
         delta_based ->
             gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity);
         state_based ->
-            {ok, Variable} = gen_server:call(?MODULE,
-                                             {declare_dynamic, Id, Type},
-                                             infinity),
-            buffer_broadcast(Variable),
-            {ok, Variable}
+            gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity)
     end.
 
 %% @doc Stream values out of the Lasp system; using the values from this
@@ -208,7 +201,6 @@ update(Id, Operation, Actor) ->
                                   %% No broadcasting for the delta.
                                   Value;
                               state_based ->
-                                  buffer_broadcast({Id, Type, Metadata, Value}),
                                   Value;
                               pure_op_based ->
                                   ok %% @todo
@@ -237,7 +229,6 @@ bind(Id, Value0) ->
                                   %% No broadcasting for the delta.
                                   Value;
                               state_based ->
-                                  buffer_broadcast({Id, Type, Metadata, Value}),
                                   Value;
                               pure_op_based ->
                                   ok %% todo
@@ -1291,10 +1282,6 @@ compute_exchange(Peers) ->
         false ->
             Peers
     end.
-
-%% @private
-buffer_broadcast(Payload) ->
-    lasp_broadcast_buffer:buffer(Payload).
 
 %% @private
 without_me(Members) ->

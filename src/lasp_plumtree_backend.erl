@@ -65,7 +65,6 @@ start_link() ->
 start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
 
-
 %%%===================================================================
 %%% plumtree_broadcast_handler callbacks
 %%%===================================================================
@@ -202,8 +201,15 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 schedule_heartbeat() ->
-    Interval = lasp_config:get(heartbeat_interval, 10000),
-    timer:send_after(Interval, heartbeat).
+    Servers = servers(),
+
+    case sets:is_element(node(), Servers) of
+        true ->
+            Interval = lasp_config:get(heartbeat_interval, 10000),
+            timer:send_after(Interval, heartbeat);
+        false ->
+            ok
+    end.
 
 %%%===================================================================
 %%% Transmission functions

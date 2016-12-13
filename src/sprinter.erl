@@ -54,7 +54,7 @@
 -define(ARTIFACT_MESSAGE,  artifact).
 
 %% State record.
--record(state, {is_connected, was_connected, attempted_nodes, graph}).
+-record(state, {is_connected, was_connected, attempted_nodes, graph, servers}).
 
 %%%===================================================================
 %%% API
@@ -134,8 +134,7 @@ init([]) ->
     {reply, term(), #state{}}.
 
 %% @private
-handle_call(servers, _From, State) ->
-    Servers = servers_from_marathon(),
+handle_call(servers, _From, #state{servers=Servers}=State) ->
     {reply, {ok, Servers}, State};
 
 handle_call(was_connected, _From, #state{was_connected=WasConnected}=State) ->
@@ -165,6 +164,8 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     Tag = partisan_config:get(tag, client),
     PeerServiceManager = lasp_config:peer_service_manager(),
 
+    Servers = servers_from_marathon(),
+
     %% Get list of nodes to connect to: this specialized logic isn't
     %% required when the node count is small, but is required with a
     %% larger node count to ensure the network stabilizes correctly
@@ -175,7 +176,7 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
         {client, partisan_client_server_peer_service_manager} ->
             %% If we're a client, and we're in client/server mode, then
             %% always connect with the server.
-            servers_from_marathon();
+            Servers;
         {server, partisan_client_server_peer_service_manager} ->
             %% If we're a server, and we're in client/server mode, then
             %% always initiate connections with clients.
@@ -184,7 +185,7 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
             %% If we're the server, and we're in HyParView, clients will
             %% ask the server to join the overlay and force outbound
             %% conenctions to the clients.
-            servers_from_marathon();
+            Servers;
         {server, partisan_hyparview_peer_service_manager} ->
             %% If we're in HyParView, and we're a client, only ever
             %% do nothing -- force all connection to go through the
@@ -197,7 +198,7 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
 
     schedule_membership_refresh(),
 
-    {noreply, State#state{attempted_nodes=AttemptedNodes}};
+    {noreply, State#state{servers=Servers, attempted_nodes=AttemptedNodes}};
 handle_info(?ARTIFACT_MESSAGE, State) ->
     %% Get bucket name.
     BucketName = bucket_name(),

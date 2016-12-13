@@ -107,7 +107,7 @@
 -define(ENROLLABLE_GAMES, {<<"enrollable_games">>, ?SET_TYPE}).
 -define(ENROLLMENT_INTERVAL, 500).
 
--define(SIMPLE_BAG, {<<"bag">>, ?COUNTER_TYPE}).
+-define(SIMPLE_BAG, {<<"bag">>, ?GSET_TYPE}).
 
 -define(BOOLEAN_TYPE, boolean).
 -define(COUNTER_TYPE, gcounter).

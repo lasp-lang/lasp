@@ -61,9 +61,6 @@
 %% debug callbacks
 -export([local_bind/4]).
 
-%% transmission callbacks
--export([extract_log_type_and_payload/1]).
-
 -include("lasp.hrl").
 
 %% State record.
@@ -1095,48 +1092,7 @@ extract_log_type_and_payload({aae_send, _Node, {Id, _Type, _Metadata, State}}) -
 extract_log_type_and_payload({delta_send, Node, {Id, _Type, _Metadata, Deltas}, Counter}) ->
     [{delta_send, Deltas}, {delta_send_protocol, {Id, Node, Counter}}];
 extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
-    [{delta_send_protocol, {Id, Node, Counter}}];
-%% plumtree messages: only count server-computed tree messages.
-extract_log_type_and_payload({prune, Root, From}) ->
-    Servers = servers(),
-    case sets:is_element(Root, Servers) of
-        true ->
-            [{broadcast_protocol, {Root, From}}];
-        false ->
-            []
-    end;
-extract_log_type_and_payload({ignored_i_have, MessageId, _Mod, Round, Root, From}) ->
-    Servers = servers(),
-    case sets:is_element(Root, Servers) of
-        true ->
-            [{broadcast_protocol, {MessageId, Round, Root, From}}];
-        false ->
-            []
-    end;
-extract_log_type_and_payload({graft, MessageId, _Mod, Round, Root, From}) ->
-    Servers = servers(),
-    case sets:is_element(Root, Servers) of
-        true ->
-            [{broadcast_protocol, {MessageId, Round, Root, From}}];
-        false ->
-            []
-    end;
-extract_log_type_and_payload({broadcast, MessageId, {Id, _Type, _Metadata, State}, _Mod, Round, Root, From}) ->
-    Servers = servers(),
-    case sets:is_element(Root, Servers) of
-        true ->
-            [{broadcast, State}, {broadcast_protocol, {Id, MessageId, Round, Root, From}}];
-        false ->
-            []
-    end;
-extract_log_type_and_payload({i_have, MessageId, _Mod, Round, Root, From}) ->
-    Servers = servers(),
-    case sets:is_element(Root, Servers) of
-        true ->
-            [{broadcast_protocol, {MessageId, Round, Root, From}}];
-        false ->
-            []
-    end.
+    [{delta_send_protocol, {Id, Node, Counter}}].
 
 %% @private
 init_aae_sync(Peer, Store) ->

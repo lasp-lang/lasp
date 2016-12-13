@@ -6,7 +6,8 @@ This assumes:
 
 ```bash
 $ cd bin/
-$ LASP_BRANCH=dcos_again \
+$ STACK_NAME=dcos \
+  LASP_BRANCH=dcos_again \
   CLIENT_NUMBER=32 \
   PARTITION_PROBABILITY=0 ./start-dcos-runner.sh
 ```

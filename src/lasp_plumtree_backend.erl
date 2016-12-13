@@ -23,6 +23,10 @@
 
 -behaviour(plumtree_broadcast_handler).
 
+%% API
+-export([start_link/0,
+         start_link/1]).
+
 %% plumtree_broadcast_handler callbacks
 -export([broadcast_data/1,
          merge/2,
@@ -43,6 +47,21 @@
 
 %% Broadcast record.
 -record(broadcast, {timestamp}).
+
+%%%===================================================================
+%%% API
+%%%===================================================================
+
+%% @doc Same as start_link([]).
+-spec start_link() -> {ok, pid()} | ignore | {error, term()}.
+start_link() ->
+    start_link([]).
+
+%% @doc Start and link to calling process.
+-spec start_link(list())-> {ok, pid()} | ignore | {error, term()}.
+start_link(Opts) ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
+
 
 %%%===================================================================
 %%% plumtree_broadcast_handler callbacks

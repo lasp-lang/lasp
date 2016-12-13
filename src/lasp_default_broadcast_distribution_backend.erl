@@ -1022,13 +1022,21 @@ code_change(_OldVsn, State, _Extra) ->
 broadcast({Id, Type, Metadata, Value}) ->
     case broadcast_tree_mode() of
         true ->
-            Clock = orddict:fetch(clock, Metadata),
-            Broadcast = #broadcast{id=Id,
-                                   clock=Clock,
-                                   type=Type,
-                                   metadata=Metadata,
-                                   value=Value},
-            ok = plumtree_broadcast:broadcast(Broadcast, ?MODULE),
+            Servers = sets:to_list(sprinter:servers()),
+            case length(Servers) of
+                0 ->
+                    ok;
+                _ ->
+                    Root = hd(Servers),
+                    EagerPeers = plumtree_broadcast:debug_get_peers(node(), Root),
+                    BroadcastFun = fun(Peer) ->
+                                        send({aae_send,
+                                              node(),
+                                              {Id, Type, Metadata, Value}},
+                                              Peer)
+                                   end,
+                    lists:foreach(BroadcastFun, EagerPeers)
+            end,
             ok;
         false ->
             ok

@@ -42,6 +42,9 @@
          terminate/2,
          code_change/3]).
 
+%% transmission callbacks
+-export([extract_log_type_and_payload/1]).
+
 %% State record.
 -record(state, {}).
 
@@ -201,3 +204,18 @@ code_change(_OldVsn, State, _Extra) ->
 schedule_heartbeat() ->
     Interval = lasp_config:get(heartbeat_interval, 10000),
     timer:send_after(Interval, heartbeat).
+
+%%%===================================================================
+%%% Transmission functions
+%%%===================================================================
+
+extract_log_type_and_payload({prune, Root, From}) ->
+    [{broadcast_protocol, {Root, From}}];
+extract_log_type_and_payload({ignored_i_have, MessageId, _Mod, Round, Root, From}) ->
+    [{broadcast_protocol, {MessageId, Round, Root, From}}];
+extract_log_type_and_payload({graft, MessageId, _Mod, Round, Root, From}) ->
+    [{broadcast_protocol, {MessageId, Round, Root, From}}];
+extract_log_type_and_payload({broadcast, MessageId, {Id, _Type, _Metadata, State}, _Mod, Round, Root, From}) ->
+    [{broadcast, State}, {broadcast_protocol, {Id, MessageId, Round, Root, From}}];
+extract_log_type_and_payload({i_have, MessageId, _Mod, Round, Root, From}) ->
+    [{broadcast_protocol, {MessageId, Round, Root, From}}].

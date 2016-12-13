@@ -61,9 +61,9 @@ end_per_testcase(Case, _Config) ->
 
 all() ->
     [
-     % peer_to_peer_state_based_with_aae_test,
-     peer_to_peer_state_based_with_aae_and_tree_test
-     % peer_to_peer_delta_based_with_aae_test%%,
+     peer_to_peer_state_based_with_aae_test,
+     peer_to_peer_state_based_with_aae_and_tree_test,
+     peer_to_peer_delta_based_with_aae_test%%,
      %%peer_to_peer_state_based_ps_with_aae_test,
      %%peer_to_peer_state_based_ps_with_aae_and_tree_test,
      %%peer_to_peer_delta_based_ps_with_aae_test

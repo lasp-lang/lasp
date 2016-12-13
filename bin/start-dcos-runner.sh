@@ -4,6 +4,7 @@ DCOS=$(dcos config show core.dcos_url)
 ELB_HOST=$(./elb-host.sh)
 
 ENV_VARS=(
+  STACK_NAME
   LASP_BRANCH
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
@@ -66,3 +67,4 @@ EOF
 
 echo ">>> Adding dcos-runner-$CLIENT_NUMBER-$PARTITION_PROBABILITY to Marathon"
 curl -s -k -H 'Content-type: application/json' -X POST -d @dcos-runner.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
+dcos task log --follow lasp-server

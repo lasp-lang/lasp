@@ -265,5 +265,4 @@ extract_log_type_and_payload(Message) ->
 %% @private
 servers() ->
     {ok, Servers} = sprinter:servers(),
-    lager:info("Servers: ~p", [Servers]),
     Servers.

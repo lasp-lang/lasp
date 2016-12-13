@@ -211,7 +211,7 @@ code_change(_OldVsn, State, _Extra) ->
 schedule_heartbeat() ->
     Servers = servers(),
 
-    case sets:is_element(node(), Servers) of
+    case lists:member(node(), Servers) of
         true ->
             Interval = lasp_config:get(heartbeat_interval, 10000),
             timer:send_after(Interval, heartbeat);
@@ -225,7 +225,7 @@ schedule_heartbeat() ->
 
 extract_log_type_and_payload({prune, Root, From}) ->
     Servers = servers(),
-    case sets:is_element(Root, Servers) of
+    case lists:member(Root, Servers) of
         true ->
             [{broadcast_protocol, {Root, From}}];
         false ->
@@ -233,7 +233,7 @@ extract_log_type_and_payload({prune, Root, From}) ->
     end;
 extract_log_type_and_payload({ignored_i_have, MessageId, _Mod, Round, Root, From}) ->
     Servers = servers(),
-    case sets:is_element(Root, Servers) of
+    case lists:member(Root, Servers) of
         true ->
             [{broadcast_protocol, {MessageId, Round, Root, From}}];
         false ->
@@ -241,7 +241,7 @@ extract_log_type_and_payload({ignored_i_have, MessageId, _Mod, Round, Root, From
     end;
 extract_log_type_and_payload({graft, MessageId, _Mod, Round, Root, From}) ->
     Servers = servers(),
-    case sets:is_element(Root, Servers) of
+    case lists:member(Root, Servers) of
         true ->
             [{broadcast_protocol, {MessageId, Round, Root, From}}];
         false ->
@@ -249,7 +249,7 @@ extract_log_type_and_payload({graft, MessageId, _Mod, Round, Root, From}) ->
     end;
 extract_log_type_and_payload({broadcast, MessageId, Timestamp, _Mod, Round, Root, From}) ->
     Servers = servers(),
-    case sets:is_element(Root, Servers) of
+    case lists:member(Root, Servers) of
         true ->
             [{broadcast_protocol, {Timestamp, MessageId, Round, Root, From}}];
         false ->
@@ -257,7 +257,7 @@ extract_log_type_and_payload({broadcast, MessageId, Timestamp, _Mod, Round, Root
     end;
 extract_log_type_and_payload({i_have, MessageId, _Mod, Round, Root, From}) ->
     Servers = servers(),
-    case sets:is_element(Root, Servers) of
+    case lists:member(Root, Servers) of
         true ->
             [{broadcast_protocol, {MessageId, Round, Root, From}}];
         false ->

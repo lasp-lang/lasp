@@ -758,7 +758,7 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     %% Get the active set from the membership protocol.
     Members = case broadcast_tree_mode() of
         true ->
-            Servers = sets:to_list(servers()),
+            Servers = servers(),
             case length(Servers) of
                 0 ->
                     [];

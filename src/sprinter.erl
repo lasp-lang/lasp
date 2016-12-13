@@ -76,6 +76,7 @@ graph() ->
 was_connected() ->
     gen_server:call(?MODULE, was_connected, infinity).
 
+-spec servers() -> {ok, [node()]}.
 servers() ->
     gen_server:call(?MODULE, servers, infinity).
 
@@ -130,12 +131,12 @@ init([]) ->
             lager:info("Not running in Mesos; disabling Marathon service."),
             case lasp_config:get(lasp_server, undefined) of
                 undefined ->
-                    sets:new();
+                    [];
                 Server ->
-                    sets:from_list([Server])
+                    [Server]
             end;
         _ ->
-            sets:new()
+            []
     end,
 
     {ok, #state{servers=Servers,
@@ -212,11 +213,14 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     %% Attempt to connect nodes that are not connected.
     AttemptedNodes = maybe_connect(ToConnectNodes, SeenNodes),
 
+    ServerNames = node_names(sets:to_list(Servers)),
+    ClientNames = node_names(sets:to_list(Clients))),
+
     schedule_membership_refresh(),
 
-    plumtree_debug(hd(sets:to_list(Servers)), sets:to_list(Servers) ++ sets:to_list(Clients)),
+    plumtree_debug(hd(ServerNames), ServerNames ++ ClientNames),
 
-    {noreply, State#state{servers=Servers, attempted_nodes=AttemptedNodes}};
+    {noreply, State#state{servers=ServerNames, attempted_nodes=AttemptedNodes}};
 handle_info(?ARTIFACT_MESSAGE, State) ->
     %% Get bucket name.
     BucketName = bucket_name(),
@@ -500,6 +504,12 @@ schedule_membership_refresh() ->
     %% Add random jitter.
     Jitter = rand_compat:uniform(?REFRESH_INTERVAL),
     timer:send_after(?REFRESH_INTERVAL + Jitter, ?REFRESH_MESSAGE).
+
+%% @private
+node_names([]) ->
+    [];
+node_names([{Name, _Ip, _Port}|T]) ->
+    [Name|node_names(T)].
 
 %% @private
 plumtree_debug(Root, Nodes) ->

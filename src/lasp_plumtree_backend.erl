@@ -175,8 +175,13 @@ handle_cast(Msg, State) ->
 
 %% @private
 handle_info(heartbeat, State) ->
-    %% Send message with monotonically increasing integer.
+    %% Generate message with monotonically increasing integer.
     Timestamp = time_compat:unique_integer([monotonic, positive]),
+
+    %% Insert a new message into the table.
+    true = ets:insert(?MODULE, [{Timestamp, true}]),
+
+    %% Send message with monotonically increasing integer.
     ok = plumtree_broadcast:broadcast(#broadcast{timestamp=Timestamp}, ?MODULE),
 
     %% Schedule report.

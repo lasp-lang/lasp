@@ -503,7 +503,7 @@ schedule_membership_refresh() ->
 
 %% @private
 plumtree_debug(Root, Nodes) ->
-    Tree = plumtree_brodcast:debug_get_tree(Root, Nodes),
+    Tree = plumtree_broadcast:debug_get_tree(Root, Nodes),
     lists:foreach(
         fun({Node, Peers}) ->
             lager:info("PLUMTREE DEBUG: Root ~p, Node ~p, Peers ~p", [Root, Node, Peers])

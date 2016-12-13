@@ -61,9 +61,6 @@
 %% debug callbacks
 -export([local_bind/4]).
 
-%% broadcast interface
--export([broadcast/1]).
-
 %% transmission callbacks
 -export([extract_log_type_and_payload/1]).
 
@@ -802,7 +799,20 @@ handle_info(aae_sync, #state{store=Store} = State) ->
     lasp_logger:extended("Beginning AAE synchronization."),
 
     %% Get the active set from the membership protocol.
-    {ok, Members} = membership(),
+    Members = case broadcast_tree_mode() of
+        true ->
+            Servers = sets:to_list(servers()),
+            case length(Servers) of
+                0 ->
+                    [];
+                _ ->
+                    Root = hd(Servers),
+                    plumtree_eager_peers(Root)
+            end;
+        false ->
+            {ok, Members1} = membership(),
+            Members1
+    end,
 
     %% Remove ourself and compute exchange peers.
     Peers = compute_exchange(without_me(Members)),
@@ -912,30 +922,6 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-%% @private
-broadcast({Id, Type, Metadata, Value}) ->
-    case broadcast_tree_mode() of
-        true ->
-            Servers = sets:to_list(servers()),
-            case length(Servers) of
-                0 ->
-                    ok;
-                _ ->
-                    Root = hd(Servers),
-                    EagerPeers = plumtree_eager_peers(Root),
-                    BroadcastFun = fun(Peer) ->
-                                        send({aae_send,
-                                              node(),
-                                              {Id, Type, Metadata, Value}},
-                                              Peer)
-                                   end,
-                    lists:foreach(BroadcastFun, EagerPeers)
-            end,
-            ok;
-        false ->
-            ok
-    end.
 
 %% @private
 local_bind(Id, Type, Metadata, Value) ->
@@ -1326,7 +1312,7 @@ reactive_server() ->
 %% @private
 plumtree_eager_peers(Root) ->
     {EagerPeers, _LazyPeers} = plumtree_broadcast:debug_get_peers(node(), Root),
-    EagerPeers.
+    ordsets:to_list(EagerPeers).
 
 %% @private
 servers() ->

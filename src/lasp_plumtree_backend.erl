@@ -172,7 +172,7 @@ handle_cast(Msg, State) ->
 handle_info(heartbeat, State) ->
     %% Send message with monotonically increasing integer.
     Timestamp = time_compat:unique_integer([monotonic, positive]),
-    ok = plumtree_broadcast:broadcast(Timestamp, ?MODULE),
+    ok = plumtree_broadcast:broadcast(#broadcast{timestamp=Timestamp}, ?MODULE),
 
     %% Schedule report.
     schedule_heartbeat(),

@@ -30,7 +30,8 @@
 -export([start_link/0,
          start_link/1,
          graph/0,
-         was_connected/0]).
+         was_connected/0,
+         servers/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -73,6 +74,9 @@ graph() ->
 
 was_connected() ->
     gen_server:call(?MODULE, was_connected, infinity).
+
+servers() ->
+    gen_server:call(?MODULE, servers, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -129,6 +133,10 @@ init([]) ->
     {reply, term(), #state{}}.
 
 %% @private
+handle_call(servers, _From, State) ->
+    Servers = servers_from_marathon(),
+    {reply, {ok, Servers}, State};
+
 handle_call(was_connected, _From, #state{was_connected=WasConnected}=State) ->
     {reply, {ok, WasConnected}, State};
 

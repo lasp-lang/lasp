@@ -154,8 +154,8 @@ handle_call({graft, Timestamp}, _From, State) ->
     Result = case ets:lookup(?MODULE, Timestamp) of
         [] ->
             {error, {not_found, Timestamp}};
-        [Object] ->
-            {ok, Object}
+        [{Timestamp, _}] ->
+            {ok, Timestamp}
     end,
     {reply, Result, State};
 handle_call({merge, Timestamp}, _From, State) ->

@@ -148,6 +148,9 @@ start(_Case, _Config, Options) ->
                         ok = rpc:call(Node, application, set_env,
                                       [plumtree, broadcast_exchange_timer, SimulationsSyncInterval]),
 
+                        %% Configure server.
+                        ok = rpc:call(Node, lasp_config, set, [lasp_server, Server]),
+
                         %% Configure who should be the server and who's
                         %% the client.
                         Simulation = proplists:get_value(simulation, Options, undefined),

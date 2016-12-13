@@ -125,7 +125,18 @@ init([]) ->
             schedule_membership_refresh()
     end,
 
-    Servers = sets:new(),
+    Servers = case os:getenv("MESOS_TASK_ID") of
+        false ->
+            lager:info("Not running in Mesos; disabling Marathon service."),
+            case lasp_config:get(lasp_server, undefined) of
+                undefined ->
+                    sets:new();
+                Server ->
+                    sets:from_list([Server])
+            end;
+        _ ->
+            sets:new()
+    end,
 
     {ok, #state{servers=Servers,
                 is_connected=false,

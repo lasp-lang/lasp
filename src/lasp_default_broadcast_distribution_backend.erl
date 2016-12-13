@@ -1028,7 +1028,7 @@ broadcast({Id, Type, Metadata, Value}) ->
                     ok;
                 _ ->
                     Root = hd(Servers),
-                    EagerPeers = plumtree_broadcast:debug_get_peers(node(), Root),
+                    EagerPeers = plumtree_eager_peers(Root),
                     BroadcastFun = fun(Peer) ->
                                         send({aae_send,
                                               node(),
@@ -1401,3 +1401,8 @@ i_am_client() ->
 %% @private
 reactive_server() ->
     lasp_config:get(reactive_server, false).
+
+%% @private
+plumtree_eager_peers(Root) ->
+    {EagerPeers, _LazyPeers} = plumtree_broadcast:debug_get_peers(node(), Root),
+    EagerPeers.

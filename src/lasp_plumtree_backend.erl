@@ -152,6 +152,8 @@ handle_call({is_stale, Timestamp}, _From, State) ->
 handle_call({graft, Timestamp}, _From, State) ->
     Result = case ets:lookup(?MODULE, Timestamp) of
         [] ->
+            lager:info("Timestamp: ~p not found for graft.", [Timestamp]),
+            lager:info("Table contents: ~p", [ets:all(?MODULE)]),
             {error, {not_found, Timestamp}};
         [{Timestamp, _}] ->
             {ok, Timestamp}

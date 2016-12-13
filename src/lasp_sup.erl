@@ -111,11 +111,11 @@ init(_Args) ->
     WebSpecs = web_specs(),
 
     BaseSpecs0 = [Unique,
+                  Sprinter,
                   Partisan,
                   PlumtreeBackend,
                   DistributionBackend,
                   Plumtree,
-                  Sprinter,
                   Process] ++ WebSpecs,
 
     DagEnabled = application:get_env(?APP, dag_enabled, false),

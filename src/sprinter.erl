@@ -214,7 +214,7 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     AttemptedNodes = maybe_connect(ToConnectNodes, SeenNodes),
 
     ServerNames = node_names(sets:to_list(Servers)),
-    ClientNames = node_names(sets:to_list(Clients))),
+    ClientNames = node_names(sets:to_list(Clients)),
 
     schedule_membership_refresh(),
 

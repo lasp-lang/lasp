@@ -36,5 +36,5 @@ fi
 if [[ $platform == 'linux' ]]; then
   google-chrome ${DCOS_URL}
 else
-  open ${DCOS_URL}
+  open "http://${DCOS_URL}"
 fi

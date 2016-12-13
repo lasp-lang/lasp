@@ -237,7 +237,7 @@ extract_log_type_and_payload({broadcast, MessageId, Timestamp, _Mod, Round, Root
     Servers = servers(),
     case sets:is_element(Root, Servers) of
         true ->
-            [{broadcast, Timestamp}, {broadcast_protocol, {Timestamp, MessageId, Round, Root, From}}];
+            [{broadcast_protocol, {Timestamp, MessageId, Round, Root, From}}];
         false ->
             []
     end;

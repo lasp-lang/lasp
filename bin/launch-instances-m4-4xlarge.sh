@@ -24,4 +24,17 @@ dcos config set core.dcos_url "http://${DCOS_URL}"
 echo "Installing marathon-lb."
 yes | dcos package install marathon-lb
 
-google-chrome ${DCOS_URL}
+# Determine platform.
+platform='unknown'
+unamestr=`uname`
+if [[ "$unamestr" == 'Linux' ]]; then
+  platform='linux'
+else
+  platform='darwin'
+fi
+
+if [[ $platform == 'linux' ]]; then
+  google-chrome ${DCOS_URL}
+else
+  open ${DCOS_URL}
+fi

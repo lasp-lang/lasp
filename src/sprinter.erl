@@ -124,7 +124,11 @@ init([]) ->
             %% All nodes should attempt to refresh the membership.
             schedule_membership_refresh()
     end,
-    {ok, #state{is_connected=false,
+
+    Servers = sets:new(),
+
+    {ok, #state{servers=Servers,
+                is_connected=false,
                 was_connected=false,
                 attempted_nodes=sets:new(),
                 graph=digraph:new()}}.

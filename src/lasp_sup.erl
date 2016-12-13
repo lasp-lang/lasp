@@ -94,6 +94,11 @@ init(_Args) ->
                             permanent, 5000, worker,
                             [lasp_default_broadcast_distribution_backend]},
 
+    PlumtreeBackend = {lasp_plumtree_backend,
+                       {lasp_plumtree_backend, start_link, []},
+                        permanent, 5000, worker,
+                        [lasp_plumtree_backend]},
+
     Plumtree = {plumtree_sup,
                 {plumtree_sup, start_link, []},
                  permanent, infinity, supervisor, [plumtree_sup]},
@@ -113,6 +118,7 @@ init(_Args) ->
     BaseSpecs0 = [Unique,
                   BroadcastBuffer,
                   Partisan,
+                  PlumtreeBackend,
                   DistributionBackend,
                   Plumtree,
                   Sprinter,

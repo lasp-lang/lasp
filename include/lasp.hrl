@@ -107,6 +107,8 @@
 -define(ENROLLABLE_GAMES, {<<"enrollable_games">>, ?SET_TYPE}).
 -define(ENROLLMENT_INTERVAL, 500).
 
+-define(SIMPLE_BAG, {<<"bag">>, ?COUNTER_TYPE}).
+
 -define(BOOLEAN_TYPE, boolean).
 -define(COUNTER_TYPE, gcounter).
 -define(GMAP_TYPE, gmap).
@@ -131,6 +133,7 @@
 %% Simulation helpers.
 -define(AAE_INTERVAL, 10000).
 -define(IMPRESSION_INTERVAL, 10000). %% 10 seconds
+-define(EVENT_INTERVAL, 10000). %% 10 seconds
 -define(STATUS_INTERVAL, 10000).
 -define(EVAL_NUMBER, 1).
 -define(LOG_INTERVAL, 10000).
@@ -146,3 +149,4 @@
 -record(contract, {id}).
 
 -define(MAX_IMPRESSIONS_DEFAULT, 10).
+-define(MAX_EVENTS_DEFAULT, 10).

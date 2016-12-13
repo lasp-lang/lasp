@@ -23,7 +23,6 @@
 
 -behaviour(gen_server).
 -behaviour(lasp_distribution_backend).
--behaviour(plumtree_broadcast_handler).
 
 %% Administrative controls.
 -export([reset/0]).
@@ -51,13 +50,6 @@
          wait_needed/2,
          thread/3]).
 
-%% plumtree_broadcast_handler callbacks
--export([broadcast_data/1,
-         merge/2,
-         is_stale/1,
-         graft/1,
-         exchange/1]).
-
 %% gen_server callbacks
 -export([init/1,
          handle_call/3,
@@ -80,13 +72,6 @@
 %% State record.
 -record(state, {store :: store(),
                 actor :: binary()}).
-
-%% Broadcast record.
--record(broadcast, {id :: id(),
-                    type :: type(),
-                    clock :: lasp_vclock:vclock(),
-                    metadata :: metadata(),
-                    value :: value()}).
 
 -define(DELTA_GC_INTERVAL, 60000).
 -define(PLUMTREE_MEMORY_INTERVAL, 10000).
@@ -155,87 +140,6 @@ start_link() ->
 -spec start_link(list())-> {ok, pid()} | ignore | {error, term()}.
 start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
-
-%%%===================================================================
-%%% plumtree_broadcast_handler callbacks
-%%%===================================================================
-
--type clock() :: lasp_vclock:vclock().
-
--type broadcast_message() :: #broadcast{}.
--type broadcast_id() :: id().
--type broadcast_clock() :: clock().
--type broadcast_payload() :: {id(), type(), metadata(), value()}.
-
-%% @doc Returns from the broadcast message the identifier and the payload.
--spec broadcast_data(broadcast_message()) ->
-    {{broadcast_id(), broadcast_clock()}, broadcast_payload()}.
-broadcast_data(#broadcast{id=Id,
-                          type=Type,
-                          clock=Clock,
-                          metadata=Metadata,
-                          value=Value}) ->
-    {{Id, Clock}, {Id, Type, Metadata, Value}}.
-
-%% @doc Perform a merge of an incoming object with an object in the
-%%      local datastore, as long as we haven't seen a more recent clock
-%%      for the same object.
--spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) ->
-    boolean().
-merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
-    case is_stale({Id, Clock}) of
-        true ->
-            false;
-        false ->
-            %% Bind information.
-            {ok, _} = ?MODULE:local_bind(Id, Type, Metadata, Value),
-            true
-    end;
-merge(BroadcastId, Payload) ->
-    lager:error("Incoming merge didn't match; broadcast_id: ~p payload: ~p", [BroadcastId, Payload]),
-    false.
-
-%% @doc Use the clock on the object to determine if this message is
-%%      stale or not.
--spec is_stale({broadcast_id(), broadcast_clock()}) -> boolean().
-is_stale({Id, Clock}) ->
-    gen_server:call(?MODULE, {is_stale, Id, Clock}, infinity).
-
-%% @doc Given a message identifier and a clock, return a given message.
--spec graft({broadcast_id(), broadcast_clock()}) ->
-    stale | {ok, broadcast_payload()} | {error, term()}.
-graft({Id, Clock}) ->
-    gen_server:call(?MODULE, {graft, Id, Clock}, infinity).
-
-%% @doc Anti-entropy mechanism.
--spec exchange(node()) -> {ok, pid()}.
-exchange(Peer) ->
-    case lasp_config:get(mode, state_based) of
-        delta_based ->
-            %% Ignore the standard anti-entropy mechanism from plumtree.
-            %%
-            %% Spawn a process that terminates immediately, because the
-            %% broadcast exchange timer tracks the number of in progress
-            %% exchanges and bounds it by that limit.
-            %%
-            Pid = spawn_link(fun() -> ok end),
-            {ok, Pid};
-        state_based ->
-            case broadcast_tree_mode() of
-                true ->
-                    %% Plumtree AAE.
-                    gen_server:call(?MODULE, {exchange, Peer}, infinity);
-                false ->
-                    %% No AAE through this mechanism.
-                    %%
-                    %% Spawn a process that terminates immediately, because the
-                    %% broadcast exchange timer tracks the number of in progress
-                    %% exchanges and bounds it by that limit.
-                    %%
-                    Pid = spawn_link(fun() -> ok end),
-                    {ok, Pid}
-            end
-    end.
 
 %%%===================================================================
 %%% lasp_distribution_backend callbacks

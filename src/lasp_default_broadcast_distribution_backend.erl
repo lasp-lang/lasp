@@ -178,19 +178,7 @@ update(Id, Operation, Actor) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {update, Id, Operation, Actor},
                                                         infinity),
-    ReturnState = case orddict:find(dynamic, Metadata) of
-                      {ok, true} ->
-                          %% Ignore: this is a dynamic variable.
-                          Value;
-                      _ ->
-                          case lasp_config:get(mode, state_based) of
-                              state_based ->
-                                  Value;
-                              pure_op_based ->
-                                  ok %% @todo
-                          end
-                  end,
-    {ok, {Id, Type, Metadata, ReturnState}}.
+    {ok, {Id, Type, Metadata, Value}}.
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -203,19 +191,7 @@ bind(Id, Value0) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {bind, Id, Value0},
                                                         infinity),
-    ReturnState = case orddict:find(dynamic, Metadata) of
-                      {ok, true} ->
-                          %% Ignore: this is a dynamic variable.
-                          Value;
-                      _ ->
-                          case lasp_config:get(mode, state_based) of
-                              state_based ->
-                                  Value;
-                              pure_op_based ->
-                                  ok %% todo
-                          end
-                  end,
-    {ok, {Id, Type, Metadata, ReturnState}}.
+    {ok, {Id, Type, Metadata, Value}}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%

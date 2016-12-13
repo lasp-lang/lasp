@@ -156,6 +156,7 @@ handle_call({graft, Timestamp}, _From, State) ->
             lager:info("Table contents: ~p", [ets:all(?MODULE)]),
             {error, {not_found, Timestamp}};
         [{Timestamp, _}] ->
+            lager:info("Processed graft for timestamp ~p", [Timestamp]),
             {ok, Timestamp}
     end,
     {reply, Result, State};

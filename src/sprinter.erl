@@ -180,6 +180,7 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     PeerServiceManager = lasp_config:peer_service_manager(),
 
     Servers = servers_from_marathon(),
+    Clients = clients_from_marathon(),
 
     %% Get list of nodes to connect to: this specialized logic isn't
     %% required when the node count is small, but is required with a
@@ -195,7 +196,7 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
         {server, partisan_client_server_peer_service_manager} ->
             %% If we're a server, and we're in client/server mode, then
             %% always initiate connections with clients.
-            clients_from_marathon();
+            Clients;
         {client, partisan_hyparview_peer_service_manager} ->
             %% If we're the server, and we're in HyParView, clients will
             %% ask the server to join the overlay and force outbound
@@ -212,6 +213,8 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     AttemptedNodes = maybe_connect(ToConnectNodes, SeenNodes),
 
     schedule_membership_refresh(),
+
+    plumtree_debug(hd(sets:to_list(Servers)), sets:to_list(Servers) ++ sets:to_list(Clients)),
 
     {noreply, State#state{servers=Servers, attempted_nodes=AttemptedNodes}};
 handle_info(?ARTIFACT_MESSAGE, State) ->
@@ -498,3 +501,12 @@ schedule_membership_refresh() ->
     Jitter = rand_compat:uniform(?REFRESH_INTERVAL),
     timer:send_after(?REFRESH_INTERVAL + Jitter, ?REFRESH_MESSAGE).
 
+%% @private
+plumtree_debug(Root, Nodes) ->
+    Tree = plumtree_brodcast:debug_get_tree(Root, Nodes),
+    lists:foreach(
+        fun({Node, Peers}) ->
+            lager:info("PLUMTREE DEBUG: Root ~p, Node ~p, Peers ~p", [Root, Node, Peers])
+        end,
+        Tree
+    ).

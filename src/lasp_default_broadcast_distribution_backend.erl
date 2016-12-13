@@ -980,7 +980,6 @@ log_transmission(ToLog, PeerCount) ->
 schedule_aae_synchronization() ->
     ShouldAAESync = state_based_mode()
             andalso (not tutorial_mode())
-            andalso (not broadcast_tree_mode())
             andalso (
               peer_to_peer_mode()
               orelse

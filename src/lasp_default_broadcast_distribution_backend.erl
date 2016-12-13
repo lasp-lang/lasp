@@ -1022,7 +1022,7 @@ code_change(_OldVsn, State, _Extra) ->
 broadcast({Id, Type, Metadata, Value}) ->
     case broadcast_tree_mode() of
         true ->
-            Servers = sets:to_list(sprinter:servers()),
+            Servers = sets:to_list(servers()),
             case length(Servers) of
                 0 ->
                     ok;
@@ -1077,7 +1077,7 @@ get(Id, Store) ->
 collect_deltas(Peer, Type, DeltaMap, PeerLastAck, DeltaCounter) ->
     orddict:fold(
         fun(Counter, {Origin, Delta}, Deltas) ->
-            case (Counter >= PeerLastAck) andalso 
+            case (Counter >= PeerLastAck) andalso
                  (Counter < DeltaCounter) andalso
                  Origin /= Peer of
                 true ->
@@ -1256,17 +1256,47 @@ extract_log_type_and_payload({delta_send, Node, {Id, _Type, _Metadata, Deltas}, 
     [{delta_send, Deltas}, {delta_send_protocol, {Id, Node, Counter}}];
 extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
     [{delta_send_protocol, {Id, Node, Counter}}];
-%% plumtree messages:
+%% plumtree messages: only count server-computed tree messages.
 extract_log_type_and_payload({prune, Root, From}) ->
-    [{broadcast_protocol, {Root, From}}];
+    Servers = servers(),
+    case sets:is_element(Root, Servers) of
+        true ->
+            [{broadcast_protocol, {Root, From}}];
+        false ->
+            []
+    end;
 extract_log_type_and_payload({ignored_i_have, MessageId, _Mod, Round, Root, From}) ->
-    [{broadcast_protocol, {MessageId, Round, Root, From}}];
+    Servers = servers(),
+    case sets:is_element(Root, Servers) of
+        true ->
+            [{broadcast_protocol, {MessageId, Round, Root, From}}];
+        false ->
+            []
+    end;
 extract_log_type_and_payload({graft, MessageId, _Mod, Round, Root, From}) ->
-    [{broadcast_protocol, {MessageId, Round, Root, From}}];
+    Servers = servers(),
+    case sets:is_element(Root, Servers) of
+        true ->
+            [{broadcast_protocol, {MessageId, Round, Root, From}}];
+        false ->
+            []
+    end;
 extract_log_type_and_payload({broadcast, MessageId, {Id, _Type, _Metadata, State}, _Mod, Round, Root, From}) ->
-    [{broadcast, State}, {broadcast_protocol, {Id, MessageId, Round, Root, From}}];
+    Servers = servers(),
+    case sets:is_element(Root, Servers) of
+        true ->
+            [{broadcast, State}, {broadcast_protocol, {Id, MessageId, Round, Root, From}}];
+        false ->
+            []
+    end;
 extract_log_type_and_payload({i_have, MessageId, _Mod, Round, Root, From}) ->
-    [{broadcast_protocol, {MessageId, Round, Root, From}}].
+    Servers = servers(),
+    case sets:is_element(Root, Servers) of
+        true ->
+            [{broadcast_protocol, {MessageId, Round, Root, From}}];
+        false ->
+            []
+    end.
 
 %% @private
 init_aae_sync(Peer, Store) ->
@@ -1406,3 +1436,7 @@ reactive_server() ->
 plumtree_eager_peers(Root) ->
     {EagerPeers, _LazyPeers} = plumtree_broadcast:debug_get_peers(node(), Root),
     EagerPeers.
+
+%% @private
+servers() ->
+    sprinter:servers().

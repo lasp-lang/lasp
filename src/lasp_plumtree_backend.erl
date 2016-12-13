@@ -137,7 +137,7 @@ handle_call({graft, Timestamp}, _From, State) ->
     end,
     {reply, Result, State};
 handle_call({merge, Timestamp}, _From, State) ->
-    ok = ets:insert(?MODULE, [{Timestamp, true}]),
+    true = ets:insert(?MODULE, [{Timestamp, true}]),
     {reply, ok, State};
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),

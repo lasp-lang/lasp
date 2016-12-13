@@ -210,15 +210,51 @@ schedule_heartbeat() ->
 %%%===================================================================
 
 extract_log_type_and_payload({prune, Root, From}) ->
-    [{broadcast_protocol, {Root, From}}];
+    Servers = servers(),
+    case sets:is_element(Root, Servers) of
+        true ->
+            [{broadcast_protocol, {Root, From}}];
+        false ->
+            []
+    end;
 extract_log_type_and_payload({ignored_i_have, MessageId, _Mod, Round, Root, From}) ->
-    [{broadcast_protocol, {MessageId, Round, Root, From}}];
+    Servers = servers(),
+    case sets:is_element(Root, Servers) of
+        true ->
+            [{broadcast_protocol, {MessageId, Round, Root, From}}];
+        false ->
+            []
+    end;
 extract_log_type_and_payload({graft, MessageId, _Mod, Round, Root, From}) ->
-    [{broadcast_protocol, {MessageId, Round, Root, From}}];
+    Servers = servers(),
+    case sets:is_element(Root, Servers) of
+        true ->
+            [{broadcast_protocol, {MessageId, Round, Root, From}}];
+        false ->
+            []
+    end;
 extract_log_type_and_payload({broadcast, MessageId, Timestamp, _Mod, Round, Root, From}) ->
-    [{broadcast, Timestamp}, {broadcast_protocol, {Timestamp, MessageId, Round, Root, From}}];
+    Servers = servers(),
+    case sets:is_element(Root, Servers) of
+        true ->
+            [{broadcast, Timestamp}, {broadcast_protocol, {Timestamp, MessageId, Round, Root, From}}];
+        false ->
+            []
+    end;
 extract_log_type_and_payload({i_have, MessageId, _Mod, Round, Root, From}) ->
-    [{broadcast_protocol, {MessageId, Round, Root, From}}];
+    Servers = servers(),
+    case sets:is_element(Root, Servers) of
+        true ->
+            [{broadcast_protocol, {MessageId, Round, Root, From}}];
+        false ->
+            []
+    end;
 extract_log_type_and_payload(Message) ->
     lager:info("No match for extracted payload: ~p", [Message]),
     [].
+
+%% @private
+servers() ->
+    {ok, Servers} = sprinter:servers(),
+    lager:info("Servers: ~p", [Servers]),
+    Servers.

@@ -215,7 +215,10 @@ extract_log_type_and_payload({ignored_i_have, MessageId, _Mod, Round, Root, From
     [{broadcast_protocol, {MessageId, Round, Root, From}}];
 extract_log_type_and_payload({graft, MessageId, _Mod, Round, Root, From}) ->
     [{broadcast_protocol, {MessageId, Round, Root, From}}];
-extract_log_type_and_payload({broadcast, MessageId, {Id, _Type, _Metadata, State}, _Mod, Round, Root, From}) ->
-    [{broadcast, State}, {broadcast_protocol, {Id, MessageId, Round, Root, From}}];
+extract_log_type_and_payload({broadcast, MessageId, Timestamp, _Mod, Round, Root, From}) ->
+    [{broadcast, Timestamp}, {broadcast_protocol, {Timestamp, MessageId, Round, Root, From}}];
 extract_log_type_and_payload({i_have, MessageId, _Mod, Round, Root, From}) ->
-    [{broadcast_protocol, {MessageId, Round, Root, From}}].
+    [{broadcast_protocol, {MessageId, Round, Root, From}}];
+extract_log_type_and_payload(Message) ->
+    lager:info("No match for extracted payload: ~p", [Message]),
+    [].

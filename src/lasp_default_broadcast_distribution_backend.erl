@@ -1210,7 +1210,8 @@ client_server_mode() ->
 
 %% @private
 peer_to_peer_mode() ->
-    lasp_config:peer_service_manager() == partisan_hyparview_peer_service_manager.
+    lasp_config:peer_service_manager() == partisan_hyparview_peer_service_manager orelse
+    lasp_config:peer_service_manager() == partisan_default_peer_service_manager.
 
 %% @private
 i_am_server() ->

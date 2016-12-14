@@ -758,8 +758,16 @@ handle_info(aae_sync, #state{store=Store, gossip_peers=GossipPeers} = State) ->
 
     lasp_logger:extended("Beginning AAE synchronization."),
 
+    Members = case broadcast_tree_mode() of
+        true ->
+            GossipPeers;
+        false ->
+            {ok, Members1} = membership(),
+            Members1
+    end,
+
     %% Remove ourself and compute exchange peers.
-    Peers = compute_exchange(without_me(GossipPeers)),
+    Peers = compute_exchange(without_me(Members)),
 
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 

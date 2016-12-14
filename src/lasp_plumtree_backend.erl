@@ -220,8 +220,13 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 schedule_heartbeat() ->
-    Interval = lasp_config:get(heartbeat_interval, 10000),
-    timer:send_after(Interval, heartbeat).
+    case lasp_config:get(broadcast, false) of
+        true ->
+            Interval = lasp_config:get(heartbeat_interval, 10000),
+            timer:send_after(Interval, heartbeat);
+        false ->
+            ok
+    end.
 
 %%%===================================================================
 %%% Transmission functions

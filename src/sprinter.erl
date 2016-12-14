@@ -43,6 +43,9 @@
          terminate/2,
          code_change/3]).
 
+%% debug functions
+-export([debug_get_tree/2]).
+
 -include("lasp.hrl").
 
 -define(REFRESH_INTERVAL, 20000).
@@ -558,7 +561,7 @@ populate_graph(Nodes, Graph) ->
 
 %% @private
 populate_tree(Root, Nodes, Tree) ->
-    DebugTree = plumtree_broadcast:debug_get_tree(Root, Nodes),
+    DebugTree = debug_get_tree(Root, Nodes),
     lists:foreach(
         fun({Node, Peers}) ->
             case Peers of
@@ -587,3 +590,15 @@ add_edges(Name, Membership, Graph) ->
         Graph,
         Membership
     ).
+
+-spec debug_get_tree(node(), [node()]) ->
+                            [{node(), {ordsets:ordset(node()), ordsets:ordset(node())}}].
+debug_get_tree(Root, Nodes) ->
+    [begin
+         Peers = try plumtree_broadcast:debug_get_peers(Node, Root, 5000)
+                 catch _:Error ->
+                           lager:info("Call to node ~p to get root tree ~p failed: ~p", [Node, Root, Error]),
+                           down
+                 end,
+         {Node, Peers}
+     end || Node <- Nodes].

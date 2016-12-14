@@ -105,7 +105,15 @@ handle_info(log, #state{}=State) ->
     lasp_marathon_simulations:log_message_queue_size("log"),
 
     %% Print number of enabled ads.
-    {ok, Ads} = lasp:query(?ADS),
+    {ok, Ads} = lasp:query(?ADS_WITH_CONTRACTS),
+
+    lists:foreach(
+        fun({#ad{counter=Counter}, _Contract}) ->
+            {ok, Value} = lasp:query(Counter),
+            lager:info("Impressions on ~p : ~p", [Counter, Value])
+        end,
+        sets:to_list(Ads)
+    ),
 
     lager:info("Enabled advertisements: ~p", [sets:size(Ads)]),
 

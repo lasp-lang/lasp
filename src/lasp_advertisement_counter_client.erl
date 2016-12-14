@@ -144,7 +144,7 @@ handle_info(view, #state{actor=Actor,
             %% Increment counter.
             {ok, _} = lasp:update(Counter, increment, Actor),
             {ok, Value} = lasp:query(Counter),
-            
+
             lager:info("Impressions seen: ~p, node: ~p", [Value, Actor]),
 
             %% Increment impressions.

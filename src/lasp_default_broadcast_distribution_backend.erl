@@ -764,7 +764,7 @@ handle_info(aae_sync, #state{store=Store} = State) ->
                     [];
                 _ ->
                     Root = hd(Servers),
-                    plumtree_eager_peers(Root)
+                    plumtree_gossip_peers(Root)
             end;
         false ->
             {ok, Members1} = membership(),
@@ -1225,9 +1225,32 @@ reactive_server() ->
     lasp_config:get(reactive_server, false).
 
 %% @private
-plumtree_eager_peers(Root) ->
-    {EagerPeers, _LazyPeers} = plumtree_broadcast:debug_get_peers(node(), Root),
-    ordsets:to_list(EagerPeers).
+plumtree_gossip_peers(Root) ->
+    Nodes = lasp_config:get(lasp_nodes, []),
+    lager:info("PLUMTREE DEBUG: Nodes: ~p", [Nodes]),
+    Tree = plumtree_broadcast:debug_get_tree(Root, Nodes),
+    FolderFun = fun({Node, {Eager, _Lazy} = Peers}, InLinks) ->
+                        lager:info("PLUMTREE DEBUG: Root ~p, Node ~p, Peers ~p",
+                                   [Root, Node, Peers]),
+
+                        case lists:member(node(), Eager) of
+                            true ->
+                                InLinks ++ [Node];
+                            false ->
+                                InLinks
+                        end
+                end,
+    InLinks = lists:foldl(FolderFun, [], Tree),
+
+    {EagerPeers, LazyPeers} = plumtree_broadcast:debug_get_peers(node(), Root),
+    lager:info("PLUMTREE DEBUG: EagerPeers: ~p, LazyPeers: ~p",
+               [EagerPeers, LazyPeers]),
+    OutLinks = ordsets:to_list(EagerPeers),
+
+    GossipPeers = lists:usort(InLinks ++ OutLinks),
+    lager:info("PLUMTREE DEBUG: Gossip Peers: ~p", [GossipPeers]),
+
+    GossipPeers.
 
 %% @private
 servers() ->

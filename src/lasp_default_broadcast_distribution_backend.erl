@@ -1228,7 +1228,7 @@ reactive_server() ->
 %% @private
 plumtree_gossip_peers(Root) ->
     {ok, Nodes} = sprinter:nodes(),
-    Tree = plumtree_broadcast:debug_get_tree(Root, Nodes),
+    Tree = sprinter:debug_get_tree(Root, Nodes),
     FolderFun = fun({Node, Peers}, In) ->
                         case Peers of
                             down ->

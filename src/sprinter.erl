@@ -246,19 +246,13 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
 
     ServerNames = node_names(sets:to_list(Servers)),
     ClientNames = node_names(sets:to_list(Clients)),
-
-    Root = hd(ServerNames),
     Nodes = ServerNames ++ ClientNames,
 
     schedule_membership_refresh(),
 
-    Tree = digraph:new(),
-    populate_tree(Root, Nodes, Tree),
-
     {noreply, State#state{nodes=Nodes,
                           servers=ServerNames,
-                          attempted_nodes=AttemptedNodes,
-                          tree=Tree}};
+                          attempted_nodes=AttemptedNodes}};
 
 handle_info(?ARTIFACT_MESSAGE, State) ->
     %% Get bucket name.
@@ -285,44 +279,20 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
 
     %% Get all running nodes, because we need the list of *everything*
     %% to analyze the graph for connectedness.
-    ClientsFromMarathon = clients_from_marathon(),
-    ServersFromMarathon = servers_from_marathon(),
-    Nodes = sets:union(ClientsFromMarathon, ServersFromMarathon),
+    Clients = clients_from_marathon(),
+    Servers = servers_from_marathon(),
+    ServerNames = node_names(sets:to_list(Servers)),
+    ClientNames = node_names(sets:to_list(Clients)),
+    Root = hd(ServerNames),
+    Nodes = ServerNames ++ ClientNames,
+
+    %% Build the tree.
+    Tree = digraph:new(),
+    populate_tree(Root, Nodes, Tree),
 
     %% Build the graph.
     Graph = digraph:new(),
-
-    %% Get bucket name.
-    BucketName = bucket_name(),
-
-    GraphFun = fun({N, _, _}=Peer, OrphanedNodes) ->
-                       Node = prefix(atom_to_list(N)),
-                       try
-                           Result = erlcloud_s3:get_object(BucketName, Node),
-                           Body = proplists:get_value(content, Result, undefined),
-                           case Body of
-                               undefined ->
-                                   OrphanedNodes;
-                               _ ->
-                                   Membership = binary_to_term(Body),
-                                   case Membership of
-                                       [N] ->
-                                           populate_graph(N, [], Graph),
-                                           [Peer|OrphanedNodes];
-                                       _ ->
-                                           populate_graph(N, Membership, Graph),
-                                           OrphanedNodes
-                                   end
-                           end
-                       catch
-                           _:{aws_error, Error} ->
-                               populate_graph(N, [], Graph),
-                               lager:info("Could not get graph object; ~p", [Error]),
-                               OrphanedNodes
-                       end
-               end,
-
-    Orphaned = sets:fold(GraphFun, [], Nodes),
+    Orphaned = populate_graph(Nodes, Graph),
 
     {SymmetricViews, VisitedNames} = breath_first(node(), Graph, ordsets:new()),
     AllNodesVisited = sets:size(Nodes) == length(VisitedNames),
@@ -353,7 +323,8 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
 
     {noreply, State#state{is_connected=Connected,
                           was_connected=WasConnected,
-                          graph=Graph}};
+                          graph=Graph,
+                          tree=Tree}};
 
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -456,19 +427,6 @@ get_request(Url, DecodeFun) ->
             {error, invalid}
     end.
 
-%% @private
-populate_graph(Name, Membership, Graph) ->
-    %% Add node to graph.
-    digraph:add_vertex(Graph, Name),
-
-    lists:foldl(fun(N, _) ->
-                        %% Add node to graph.
-                        digraph:add_vertex(Graph, N),
-
-                        %% Add edge to graph.
-                        digraph:add_edge(Graph, Name, N)
-                end, Graph, Membership).
-
 breath_first(Root, Graph, Visited0) ->
     %% Check if every link is bidirectional
     %% If not, stop traversal
@@ -563,16 +521,69 @@ node_names([{Name, _Ip, _Port}|T]) ->
     [Name|node_names(T)].
 
 %% @private
+populate_graph(Nodes, Graph) ->
+    %% Get bucket name.
+    BucketName = bucket_name(),
+
+    lists:foldl(
+        fun(Node, OrphanedNodes) ->
+            File = prefix(atom_to_list(Node)),
+            try
+                Result = erlcloud_s3:get_object(BucketName, File),
+                Body = proplists:get_value(content, Result, undefined),
+                case Body of
+                    undefined ->
+                        OrphanedNodes;
+                    _ ->
+                        Membership = binary_to_term(Body),
+                        case Membership of
+                            [Node] ->
+                                add_edges(Node, [], Graph),
+                                [Node|OrphanedNodes];
+                            _ ->
+                                add_edges(Node, Membership, Graph),
+                                OrphanedNodes
+                        end
+                end
+            catch
+                _:{aws_error, Error} ->
+                    add_edges(Node, [], Graph),
+                    lager:info("Could not get graph object; ~p", [Error]),
+                    OrphanedNodes
+            end
+        end,
+        [],
+        Nodes
+    ).
+
+%% @private
 populate_tree(Root, Nodes, Tree) ->
     DebugTree = plumtree_broadcast:debug_get_tree(Root, Nodes),
     lists:foreach(
         fun({Node, Peers}) ->
             case Peers of
                 down ->
-                    populate_graph(Node, [], Tree);
+                    add_edges(Node, [], Tree);
                 {Eager, _Lazy} ->
-                    populate_graph(Node, Eager, Tree)
+                    add_edges(Node, Eager, Tree)
             end
         end,
         DebugTree
+    ).
+
+%% @private
+add_edges(Name, Membership, Graph) ->
+    %% Add node to graph.
+    digraph:add_vertex(Graph, Name),
+
+    lists:foldl(
+        fun(N, _) ->
+            %% Add node to graph.
+            digraph:add_vertex(Graph, N),
+
+            %% Add edge to graph.
+            digraph:add_edge(Graph, Name, N)
+        end,
+        Graph,
+        Membership
     ).

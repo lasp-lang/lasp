@@ -111,8 +111,8 @@ init(_Args) ->
     WebSpecs = web_specs(),
 
     BaseSpecs0 = [Unique,
-                  Sprinter,
                   Partisan,
+                  Sprinter,
                   PlumtreeBackend,
                   DistributionBackend,
                   Plumtree,

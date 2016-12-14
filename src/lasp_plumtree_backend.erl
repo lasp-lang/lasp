@@ -85,6 +85,8 @@ broadcast_data(#broadcast{timestamp=Timestamp}) ->
 %%      local datastore.
 -spec merge(broadcast_id(), broadcast_payload()) -> boolean().
 merge(Timestamp, Timestamp) ->
+    lager:info("Heartbeat received: ~p", [Timestamp]),
+
     case is_stale(Timestamp) of
         true ->
             false;

@@ -350,6 +350,7 @@ init([]) ->
     schedule_memory_utilization_report(),
 
     {ok, #state{actor=Actor,
+                gossip_peers=[],
                 store=Store}}.
 
 %% @private

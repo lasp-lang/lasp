@@ -207,6 +207,9 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     %% only probabilistic.
     %%
     ToConnectNodes = case {Tag, PeerServiceManager} of
+        {_, partisan_default_peer_service_manager} ->
+            %% Full connectivity.
+            Servers ++ Clients;
         {client, partisan_client_server_peer_service_manager} ->
             %% If we're a client, and we're in client/server mode, then
             %% always connect with the server.

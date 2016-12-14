@@ -1228,16 +1228,12 @@ reactive_server() ->
 %% @private
 plumtree_gossip_peers(Root) ->
     {ok, Nodes} = sprinter:nodes(),
-    lager:info("PLUMTREE DEBUG: Nodes: ~p", [Nodes]),
     Tree = plumtree_broadcast:debug_get_tree(Root, Nodes),
     FolderFun = fun({Node, Peers}, In) ->
                         case Peers of
                             down ->
                                 In;
                             {Eager, _Lazy} ->
-                                lager:info("PLUMTREE DEBUG: Root ~p, Node ~p, Peers ~p",
-                                           [Root, Node, Peers]),
-
                                 case lists:member(node(), Eager) of
                                     true ->
                                         In ++ [Node];
@@ -1248,9 +1244,7 @@ plumtree_gossip_peers(Root) ->
                 end,
     InLinks = lists:foldl(FolderFun, [], Tree),
 
-    {EagerPeers, LazyPeers} = plumtree_broadcast:debug_get_peers(node(), Root),
-    lager:info("PLUMTREE DEBUG: EagerPeers: ~p, LazyPeers: ~p",
-               [EagerPeers, LazyPeers]),
+    {EagerPeers, _LazyPeers} = plumtree_broadcast:debug_get_peers(node(), Root),
     OutLinks = ordsets:to_list(EagerPeers),
 
     GossipPeers = lists:usort(InLinks ++ OutLinks),

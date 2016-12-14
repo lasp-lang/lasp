@@ -298,7 +298,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
     Orphaned = populate_graph(Nodes, Graph),
 
     {SymmetricViews, VisitedNames} = breath_first(node(), Graph, ordsets:new()),
-    AllNodesVisited = sets:size(Nodes) == length(VisitedNames),
+    AllNodesVisited = length(Nodes) == length(VisitedNames),
 
     Connected = SymmetricViews andalso AllNodesVisited,
 

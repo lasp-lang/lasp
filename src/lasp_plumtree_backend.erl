@@ -212,13 +212,16 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 schedule_heartbeat() ->
+    Node = node(),
     Servers = servers(),
 
-    case lists:member(node(), Servers) of
+    case lists:member(Node, Servers) of
         true ->
             Interval = lasp_config:get(heartbeat_interval, 10000),
             timer:send_after(Interval, heartbeat);
         false ->
+            lager:info("Node ~p not in ~p; not scheduling heartbeat.",
+                       [Node, Servers]),
             ok
     end.
 

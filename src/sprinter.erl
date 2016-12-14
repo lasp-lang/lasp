@@ -232,11 +232,13 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     ServerNames = node_names(sets:to_list(Servers)),
     ClientNames = node_names(sets:to_list(Clients)),
 
+    Nodes = ServerNames ++ ClientNames,
+
     schedule_membership_refresh(),
 
     plumtree_debug(hd(ServerNames), ServerNames ++ ClientNames),
 
-    {noreply, State#state{servers=ServerNames, attempted_nodes=AttemptedNodes}};
+    {noreply, State#state{nodes=Nodes, servers=ServerNames, attempted_nodes=AttemptedNodes}};
 handle_info(?ARTIFACT_MESSAGE, State) ->
     %% Get bucket name.
     BucketName = bucket_name(),

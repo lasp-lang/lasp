@@ -1,5 +1,4 @@
-
-% -------------------------------------------------------------------
+%% -------------------------------------------------------------------
 %%
 %% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
 %%
@@ -32,7 +31,8 @@
          start_link/1,
          graph/0,
          was_connected/0,
-         servers/0]).
+         servers/0,
+         nodes/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -54,7 +54,7 @@
 -define(ARTIFACT_MESSAGE,  artifact).
 
 %% State record.
--record(state, {is_connected, was_connected, attempted_nodes, graph, servers}).
+-record(state, {is_connected, was_connected, attempted_nodes, graph, servers, nodes}).
 
 %%%===================================================================
 %%% API
@@ -79,6 +79,10 @@ was_connected() ->
 -spec servers() -> {ok, [node()]}.
 servers() ->
     gen_server:call(?MODULE, servers, infinity).
+
+-spec nodes() -> {ok, [node()]}.
+nodes() ->
+    gen_server:call(?MODULE, nodes, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -128,7 +132,6 @@ init([]) ->
 
     Servers = case os:getenv("MESOS_TASK_ID") of
         false ->
-            lager:info("Not running in Mesos; disabling Marathon service."),
             case lasp_config:get(lasp_server, undefined) of
                 undefined ->
                     [];
@@ -139,7 +142,17 @@ init([]) ->
             []
     end,
 
-    {ok, #state{servers=Servers,
+    Nodes = case os:getenv("MESOS_TASK_ID") of
+        false ->
+            %% Assumes full membership.
+            PeerServiceManager = lasp_config:peer_service_manager(),
+            PeerServiceManager:members();
+        _ ->
+            []
+    end,
+
+    {ok, #state{nodes=Nodes,
+                servers=Servers,
                 is_connected=false,
                 was_connected=false,
                 attempted_nodes=sets:new(),
@@ -150,6 +163,9 @@ init([]) ->
     {reply, term(), #state{}}.
 
 %% @private
+handle_call(nodes, _From, #state{nodes=Nodes}=State) ->
+    {reply, {ok, Nodes}, State};
+
 handle_call(servers, _From, #state{servers=Servers}=State) ->
     {reply, {ok, Servers}, State};
 

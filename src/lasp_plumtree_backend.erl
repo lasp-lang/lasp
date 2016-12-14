@@ -175,17 +175,25 @@ handle_cast(Msg, State) ->
 
 %% @private
 handle_info(heartbeat, State) ->
-    %% Generate message with monotonically increasing integer.
-    Timestamp = time_compat:unique_integer([monotonic, positive]),
+    Node = node(),
+    Servers = servers(),
 
-    %% Insert a new message into the table.
-    true = ets:insert(?MODULE, [{Timestamp, true}]),
+    case lists:member(Node, Servers) of
+        true ->
+            %% Generate message with monotonically increasing integer.
+            Timestamp = time_compat:unique_integer([monotonic, positive]),
 
-    %% Send message with monotonically increasing integer.
-    ok = plumtree_broadcast:broadcast(#broadcast{timestamp=Timestamp}, ?MODULE),
+            %% Insert a new message into the table.
+            true = ets:insert(?MODULE, [{Timestamp, true}]),
 
-    lager:info("Heartbeat triggered: sending ping ~p to ensure tree.",
-               [Timestamp]),
+            %% Send message with monotonically increasing integer.
+            ok = plumtree_broadcast:broadcast(#broadcast{timestamp=Timestamp}, ?MODULE),
+
+            lager:info("Heartbeat triggered: sending ping ~p to ensure tree.",
+                       [Timestamp]);
+        false ->
+            ok
+    end,
 
     %% Schedule report.
     schedule_heartbeat(),
@@ -212,18 +220,8 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 schedule_heartbeat() ->
-    Node = node(),
-    Servers = servers(),
-
-    case lists:member(Node, Servers) of
-        true ->
-            Interval = lasp_config:get(heartbeat_interval, 10000),
-            timer:send_after(Interval, heartbeat);
-        false ->
-            lager:info("Node ~p not in ~p; not scheduling heartbeat.",
-                       [Node, Servers]),
-            ok
-    end.
+    Interval = lasp_config:get(heartbeat_interval, 10000),
+    timer:send_after(Interval, heartbeat).
 
 %%%===================================================================
 %%% Transmission functions

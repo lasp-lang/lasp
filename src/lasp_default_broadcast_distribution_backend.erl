@@ -1229,15 +1229,15 @@ plumtree_gossip_peers(Root) ->
     Nodes = lasp_config:get(lasp_nodes, []),
     lager:info("PLUMTREE DEBUG: Nodes: ~p", [Nodes]),
     Tree = plumtree_broadcast:debug_get_tree(Root, Nodes),
-    FolderFun = fun({Node, {Eager, _Lazy} = Peers}, InLinks) ->
+    FolderFun = fun({Node, {Eager, _Lazy} = Peers}, In) ->
                         lager:info("PLUMTREE DEBUG: Root ~p, Node ~p, Peers ~p",
                                    [Root, Node, Peers]),
 
                         case lists:member(node(), Eager) of
                             true ->
-                                InLinks ++ [Node];
+                                In ++ [Node];
                             false ->
-                                InLinks
+                                In
                         end
                 end,
     InLinks = lists:foldl(FolderFun, [], Tree),

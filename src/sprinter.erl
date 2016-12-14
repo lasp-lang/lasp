@@ -291,7 +291,12 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
 
     %% Build the tree.
     Tree = digraph:new(),
-    populate_tree(Root, Nodes, Tree),
+    case lasp_config:get(broadcast, false) of
+        true ->
+            populate_tree(Root, Nodes, Tree);
+        false ->
+            ok
+    end,
 
     %% Build the graph.
     Graph = digraph:new(),

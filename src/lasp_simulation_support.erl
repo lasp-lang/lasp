@@ -150,6 +150,9 @@ start(_Case, _Config, Options) ->
 
                         %% Configure server.
                         ok = rpc:call(Node, lasp_config, set, [lasp_server, Server]),
+                        %% Configure nodes.
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [lasp_nodes, Nodes]),
 
                         %% Configure who should be the server and who's
                         %% the client.

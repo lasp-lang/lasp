@@ -54,7 +54,7 @@ generate_links(NodeList) ->
 -else.
 
 to_json(ReqData, State) ->
-    {ok, {Vertices, Edges}} = sprinter:graph(),
+    {ok, {Vertices, Edges}} = sprinter:tree(),
     Nodes = [#{id => Name, name => Name, group => 1} || Name <- Vertices],
     Links = [#{source => V1, target => V2} || {V1, V2} <- Edges],
     Encoded = jsx:encode(#{nodes => Nodes, links => Links}),

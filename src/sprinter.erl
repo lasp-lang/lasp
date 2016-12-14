@@ -30,6 +30,7 @@
 -export([start_link/0,
          start_link/1,
          graph/0,
+         tree/0,
          was_connected/0,
          servers/0,
          nodes/0]).
@@ -54,7 +55,13 @@
 -define(ARTIFACT_MESSAGE,  artifact).
 
 %% State record.
--record(state, {is_connected, was_connected, attempted_nodes, graph, servers, nodes}).
+-record(state, {is_connected,
+                was_connected,
+                attempted_nodes,
+                graph,
+                tree,
+                servers,
+                nodes}).
 
 %%%===================================================================
 %%% API
@@ -72,6 +79,9 @@ start_link(Opts) ->
 
 graph() ->
     gen_server:call(?MODULE, graph, infinity).
+
+tree() ->
+    gen_server:call(?MODULE, tree, infinity).
 
 was_connected() ->
     gen_server:call(?MODULE, was_connected, infinity).
@@ -157,7 +167,8 @@ init([]) ->
                 is_connected=false,
                 was_connected=false,
                 attempted_nodes=sets:new(),
-                graph=digraph:new()}}.
+                graph=digraph:new(),
+                tree=digraph:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -174,11 +185,11 @@ handle_call(was_connected, _From, #state{was_connected=WasConnected}=State) ->
     {reply, {ok, WasConnected}, State};
 
 handle_call(graph, _From, #state{graph=Graph}=State) ->
-    Vertices = digraph:vertices(Graph),
-    Edges = lists:map(fun(Edge) ->
-                      {_E, V1, V2, _Label} = digraph:edge(Graph, Edge),
-                      {V1, V2}
-              end, digraph:edges(Graph)),
+    {Vertices, Edges} = vertices_and_edges(Graph),
+    {reply, {ok, {Vertices, Edges}}, State};
+
+handle_call(tree, _From, #state{tree=Tree}=State) ->
+    {Vertices, Edges} = vertices_and_edges(Tree),
     {reply, {ok, {Vertices, Edges}}, State};
 
 handle_call(Msg, _From, State) ->
@@ -193,7 +204,7 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
+handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes, tree=Tree0}=State) ->
     Tag = partisan_config:get(tag, client),
     PeerServiceManager = lasp_config:peer_service_manager(),
 
@@ -236,13 +247,18 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     ServerNames = node_names(sets:to_list(Servers)),
     ClientNames = node_names(sets:to_list(Clients)),
 
+    Root = hd(ServerNames),
     Nodes = ServerNames ++ ClientNames,
 
     schedule_membership_refresh(),
 
-    plumtree_debug(hd(ServerNames), ServerNames ++ ClientNames),
+    Tree1 = populate_tree(Root, Nodes, Tree0),
 
-    {noreply, State#state{nodes=Nodes, servers=ServerNames, attempted_nodes=AttemptedNodes}};
+    {noreply, State#state{nodes=Nodes,
+                          servers=ServerNames,
+                          attempted_nodes=AttemptedNodes,
+                          tree=Tree1}};
+
 handle_info(?ARTIFACT_MESSAGE, State) ->
     %% Get bucket name.
     BucketName = bucket_name(),
@@ -528,17 +544,34 @@ schedule_membership_refresh() ->
     timer:send_after(?REFRESH_INTERVAL + Jitter, ?REFRESH_MESSAGE).
 
 %% @private
+vertices_and_edges(Graph) ->
+    Vertices = digraph:vertices(Graph),
+    Edges = lists:map(
+        fun(Edge) ->
+            {_E, V1, V2, _Label} = digraph:edge(Graph, Edge),
+            {V1, V2}
+        end,
+        digraph:edges(Graph)
+    ),
+    {Vertices, Edges}.
+
+%% @private
 node_names([]) ->
     [];
 node_names([{Name, _Ip, _Port}|T]) ->
     [Name|node_names(T)].
 
 %% @private
-plumtree_debug(Root, Nodes) ->
-    Tree = plumtree_broadcast:debug_get_tree(Root, Nodes),
+populate_tree(Root, Nodes, Tree) ->
+    DebugTree = plumtree_broadcast:debug_get_tree(Root, Nodes),
     lists:foreach(
         fun({Node, Peers}) ->
-            lager:info("PLUMTREE DEBUG: Root ~p, Node ~p, Peers ~p", [Root, Node, Peers])
+            case Peers of
+                down ->
+                    populate_graph(Node, [], Tree);
+                {Eager, _Lazy} ->
+                    populate_graph(Node, Eager, Tree)
+            end
         end,
-        Tree
+        DebugTree
     ).

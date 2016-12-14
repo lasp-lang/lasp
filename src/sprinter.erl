@@ -204,7 +204,7 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes, tree=Tree0}=State) ->
+handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     Tag = partisan_config:get(tag, client),
     PeerServiceManager = lasp_config:peer_service_manager(),
 
@@ -252,12 +252,13 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes, tree=Tree0}=Stat
 
     schedule_membership_refresh(),
 
-    Tree1 = populate_tree(Root, Nodes, Tree0),
+    Tree = digraph:new(),
+    populate_tree(Root, Nodes, Tree),
 
     {noreply, State#state{nodes=Nodes,
                           servers=ServerNames,
                           attempted_nodes=AttemptedNodes,
-                          tree=Tree1}};
+                          tree=Tree}};
 
 handle_info(?ARTIFACT_MESSAGE, State) ->
     %% Get bucket name.

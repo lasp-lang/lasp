@@ -146,7 +146,8 @@ init([]) ->
         false ->
             %% Assumes full membership.
             PeerServiceManager = lasp_config:peer_service_manager(),
-            PeerServiceManager:members();
+            {ok, Members} = PeerServiceManager:members(),
+            Members;
         _ ->
             []
     end,

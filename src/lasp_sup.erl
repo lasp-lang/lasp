@@ -85,6 +85,13 @@ init(_Args) ->
                                       PeerServiceDefault),
     partisan_config:set(partisan_peer_service_manager, PeerService),
 
+    %% XXX: Temporarily override peer service manager using full
+    %% membership manager for debugging.
+    %%
+    %% Manually configure the peer service to use full mesh.
+    partisan_config:set(partisan_peer_service_manager,
+                        partisan_default_peer_service_manager),
+
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},
                  permanent, infinity, supervisor, [partisan_sup]},

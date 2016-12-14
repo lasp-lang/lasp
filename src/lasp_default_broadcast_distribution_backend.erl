@@ -65,11 +65,13 @@
 
 %% State record.
 -record(state, {store :: store(),
+                gossip_peers :: [],
                 actor :: binary()}).
 
 -define(DELTA_GC_INTERVAL, 60000).
 -define(PLUMTREE_MEMORY_INTERVAL, 10000).
 -define(MEMORY_UTILIZATION_INTERVAL, 10000).
+-define(PEER_REFRESH_INTERVAL, 10000).
 
 %% Definitions for the bind/read fun abstraction.
 
@@ -327,6 +329,7 @@ init([]) ->
     schedule_aae_synchronization(),
     schedule_delta_synchronization(),
     schedule_delta_garbage_collection(),
+    schedule_peer_refresh(),
 
     {ok, Actor} = lasp_unique:unique(),
 
@@ -750,29 +753,13 @@ handle_info(memory_utilization_report, State) ->
 
     {noreply, State};
 
-handle_info(aae_sync, #state{store=Store} = State) ->
+handle_info(aae_sync, #state{store=Store, gossip_peers=GossipPeers} = State) ->
     lasp_marathon_simulations:log_message_queue_size("aae_sync"),
 
     lasp_logger:extended("Beginning AAE synchronization."),
 
-    %% Get the active set from the membership protocol.
-    Members = case broadcast_tree_mode() of
-        true ->
-            Servers = servers(),
-            case length(Servers) of
-                0 ->
-                    [];
-                _ ->
-                    Root = hd(Servers),
-                    plumtree_gossip_peers(Root)
-            end;
-        false ->
-            {ok, Members1} = membership(),
-            Members1
-    end,
-
     %% Remove ourself and compute exchange peers.
-    Peers = compute_exchange(without_me(Members)),
+    Peers = compute_exchange(without_me(GossipPeers)),
 
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
@@ -816,6 +803,23 @@ handle_info(delta_sync, #state{}=State) ->
     schedule_delta_synchronization(),
 
     {noreply, State#state{}};
+handle_info(peer_refresh, State) ->
+    %% TODO: Temporary hack until the Plumtree can propagate tree
+    %% information in the metadata messages.  Therefore, manually poll
+    %% periodically with jitter.
+    Servers = servers(),
+    GossipPeers = case length(Servers) of
+        0 ->
+            [];
+        _ ->
+            Root = hd(Servers),
+            plumtree_gossip_peers(Root)
+    end,
+
+    %% Schedule next synchronization.
+    schedule_peer_refresh(),
+
+    {noreply, State#state{gossip_peers=GossipPeers}};
 handle_info(delta_gc, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_gc"),
 
@@ -1031,6 +1035,17 @@ schedule_delta_synchronization() ->
     end.
 
 %% @private
+schedule_peer_refresh() ->
+    case broadcast_tree_mode() of
+        true ->
+            Interval = lasp_config:get(peer_refresh_interval, ?PEER_REFRESH_INTERVAL),
+            Jitter = rand_compat:uniform(Interval),
+            timer:send_after(Jitter + ?PEER_REFRESH_INTERVAL, peer_refresh);
+        false ->
+            ok
+    end.
+
+%% @private
 schedule_delta_garbage_collection() ->
     case delta_based_mode() of
         true ->
@@ -1038,6 +1053,7 @@ schedule_delta_garbage_collection() ->
         false ->
             ok
     end.
+
 %% @private
 schedule_plumtree_memory_report() ->
     case lasp_config:get(memory_report, false) of

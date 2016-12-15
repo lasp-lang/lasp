@@ -41,7 +41,7 @@ mailbox(Message) ->
     mailbox(Message, []).
 
 mailbox(Message, Args) ->
-    case lasp_config:get(mailbox_logging, false) of
+    case lasp_config:get(mailbox_logging, true) of
         true ->
             lager:info(Message, Args);
         _ ->

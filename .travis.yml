@@ -4,12 +4,16 @@ otp_release:
 install:
   - make
   - ./rebar3 update
+before_script:
+  - epmd -daemon
 script:
   - make eunit
   - make xref
   - make ct
   - make peer-to-peer-ad-counter-simulation
   - make client-server-ad-counter-simulation
+  - make peer-to-peer-game-tournament-simulation
+  - make client-server-game-tournament-simulation
 notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D

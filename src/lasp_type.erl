@@ -39,6 +39,7 @@
 
 types() ->
     [
+        {awset, {state_awset, undefined}},
         {awset_ps, {state_awset_ps, undefined}},
         {boolean, {state_boolean, undefined}},
         {gcounter, {state_gcounter, undefined}},

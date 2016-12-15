@@ -77,10 +77,10 @@ init(_Args) ->
 
     %% Configure the peer service.
     PeerServiceDefault = list_to_atom(os:getenv("PEER_SERVICE", "partisan_client_server_peer_service_manager")),
-    PeerService = application:get_env(?APP,
+    PeerService = application:get_env(partisan,
                                       partisan_peer_service_manager,
                                       PeerServiceDefault),
-    lasp_config:set(partisan_peer_service_manager, PeerService),
+    partisan_config:set(partisan_peer_service_manager, PeerService),
 
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},
@@ -123,7 +123,7 @@ init(_Args) ->
     end,
 
     %% Configure Plumtree logging.
-    TransLogMFA = {lasp_instrumentation, transmission, [broadcast]},
+    TransLogMFA = {lasp_instrumentation, transmission, []},
     partisan_config:set(transmission_logging_mfa, TransLogMFA),
 
     InstrDefault = list_to_atom(os:getenv("INSTRUMENTATION", "false")),
@@ -146,7 +146,10 @@ init(_Args) ->
     %% Setup the advertisement counter example, if necessary.
     AdSpecs = advertisement_counter_child_specs(),
 
-    Children = Children0 ++ AdSpecs,
+    %% Setup the game tournament example, if necessary.
+    TournamentSpecs = game_tournament_child_specs(),
+
+    Children = Children0 ++ AdSpecs ++ TournamentSpecs,
 
     %% Configure defaults.
     configure_defaults(),
@@ -164,8 +167,12 @@ web_specs() ->
     %%
     case os:getenv("WEB_PORT", "false") of
         "false" ->
-            lasp_config:set(web_port, random_port()),
-            ok;
+            case lasp_config:get(web_port, undefined) of
+                undefined ->
+                    lasp_config:set(web_port, random_port());
+                _ ->
+                    ok
+            end;
         WebPort ->
             lasp_config:set(web_port, list_to_integer(WebPort)),
             ok
@@ -259,13 +266,6 @@ configure_defaults() ->
                                                PartitionProbabilityDefault),
     lasp_config:set(partition_probability, PartitionProbability),
 
-    %% Peer service.
-    PeerService = application:get_env(plumtree,
-                                      peer_service,
-                                      partisan_peer_service),
-    PeerServiceManager = PeerService:manager(),
-    lasp_config:set(peer_service_manager, PeerServiceManager),
-
     %% Exchange mode.
     case Mode of
         delta_based ->
@@ -334,14 +334,17 @@ advertisement_counter_child_specs() ->
     lasp_config:set(ad_counter_simulation_client, AdClientEnabled),
     lager:info("AdClientEnabled: ~p", [AdClientEnabled]),
 
+    ImpressionNumberDefault = 4800,
+    ImpressionNumber = application:get_env(?APP,
+                                           max_impressions,
+                                           ImpressionNumberDefault),
+    lasp_config:set(max_impressions, ImpressionNumber),
+
     ImpressionVelocityDefault = list_to_integer(os:getenv("IMPRESSION_VELOCITY", "1")),
     ImpressionVelocity = application:get_env(?APP,
                                              impression_velocity,
                                              ImpressionVelocityDefault),
     lasp_config:set(impression_velocity, ImpressionVelocity),
-
-    %% 16 keeps the system running 1h, with 16 clients, and `ImpressionVelocity = 1'
-    lasp_config:set(max_impressions, 16),
 
     ClientSpecs = case AdClientEnabled of
         true ->
@@ -390,3 +393,54 @@ random_port() ->
     {ok, {_, Port}} = inet:sockname(Socket),
     ok = gen_tcp:close(Socket),
     Port.
+
+%% @private
+game_tournament_child_specs() ->
+    %% Figure out who is acting as the client.
+    TournClientDefault = list_to_atom(os:getenv("TOURNAMENT_SIM_CLIENT", "false")),
+    TournClientEnabled = application:get_env(?APP,
+                                          tournament_simulation_client,
+                                          TournClientDefault),
+    lasp_config:set(tournament_simulation_client, TournClientEnabled),
+    lager:info("TournClientEnabled: ~p", [TournClientEnabled]),
+
+    ClientSpecs = case TournClientEnabled of
+        true ->
+            TournCounterClient = {lasp_game_tournament_client,
+                                  {lasp_game_tournament_client, start_link, []},
+                                   permanent, 5000, worker,
+                                   [lasp_game_tournament_client]},
+
+            %% Configure proper partisan tag.
+            partisan_config:set(tag, client),
+
+            [TournCounterClient];
+        false ->
+            []
+    end,
+
+    %% Figure out who is acting as the server.
+    TournServerDefault = list_to_atom(os:getenv("TOURNAMENT_SIM_SERVER", "false")),
+    TournServerEnabled = application:get_env(?APP,
+                                             tournament_simulation_server,
+                                             TournServerDefault),
+    lasp_config:set(tournament_simulation_server, TournServerEnabled),
+    lager:info("TournServerEnabled: ~p", [TournServerEnabled]),
+
+    ServerSpecs = case TournServerEnabled of
+        true ->
+            TournServer = {lasp_game_tournament_server,
+                           {lasp_game_tournament_server, start_link, []},
+                            permanent, 5000, worker,
+                            [lasp_game_tournament_server]},
+
+            %% Configure proper partisan tag.
+            partisan_config:set(tag, server),
+
+            [TournServer];
+        false ->
+            []
+    end,
+
+    ClientSpecs ++ ServerSpecs.
+

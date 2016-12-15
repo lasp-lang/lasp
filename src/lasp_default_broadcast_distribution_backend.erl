@@ -72,6 +72,9 @@
 %% broadcast interface
 -export([broadcast/1]).
 
+%% transmission callbacks
+-export([extract_log_type_and_payload/1]).
+
 -include("lasp.hrl").
 
 %% State record.
@@ -220,7 +223,7 @@ exchange(Peer) ->
             Pid = spawn_link(fun() -> ok end),
             {ok, Pid};
         state_based ->
-            case lasp_config:get(broadcast, false) of
+            case broadcast_tree_mode() of
                 true ->
                     %% Plumtree AAE.
                     gen_server:call(?MODULE, {exchange, Peer}, infinity);
@@ -509,7 +512,7 @@ init([]) ->
 
 %% Reset all Lasp application state.
 handle_call(reset, _From, #state{store=Store}=State) ->
-    log_message_queue_size("reset"),
+    lasp_marathon_simulations:log_message_queue_size("reset"),
 
     %% Terminate all Lasp processes.
     _ = lasp_process_sup:terminate(),
@@ -523,7 +526,7 @@ handle_call(reset, _From, #state{store=Store}=State) ->
 %% broadcast the value to the remote nodes.
 handle_call({declare, Id, Type}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    log_message_queue_size("declare/2"),
+    lasp_marathon_simulations:log_message_queue_size("declare/2"),
 
     Result = ?CORE:declare(Id, Type, ?CLOCK_INIT(Actor), Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
@@ -533,7 +536,7 @@ handle_call({declare, Id, Type}, _From,
 %% have local metadata.
 handle_call({declare, Id, IncomingMetadata, Type}, _From,
             #state{store=Store, counter=Counter}=State) ->
-    log_message_queue_size("declare/3"),
+    lasp_marathon_simulations:log_message_queue_size("declare/3"),
 
     Metadata0 = case get(Id, Store) of
         {ok, {_, _, Metadata, _}} ->
@@ -548,7 +551,7 @@ handle_call({declare, Id, IncomingMetadata, Type}, _From,
 %% metadata and result in the broadcast operation.
 handle_call({declare_dynamic, Id, Type}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    log_message_queue_size("declare_dynamic"),
+    lasp_marathon_simulations:log_message_queue_size("declare_dynamic"),
 
     Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT(Actor), Store),
     {reply, Result, State#state{counter=increment_counter(Counter)}};
@@ -557,7 +560,7 @@ handle_call({declare_dynamic, Id, Type}, _From,
 %% stream can result in observable nondeterminism.
 %%
 handle_call({stream, Id, Function}, _From, #state{store=Store}=State) ->
-    log_message_queue_size("stream"),
+    lasp_marathon_simulations:log_message_queue_size("stream"),
 
     {ok, _Pid} = ?CORE:stream(Id, Function, Store),
     {reply, ok, State};
@@ -565,7 +568,7 @@ handle_call({stream, Id, Function}, _From, #state{store=Store}=State) ->
 %% Local query operation.
 %% Return the value of a value in the datastore to the user.
 handle_call({query, Id}, _From, #state{store=Store}=State) ->
-    log_message_queue_size("query"),
+    lasp_marathon_simulations:log_message_queue_size("query"),
 
     {ok, Value} = ?CORE:query(Id, Store),
     {reply, {ok, Value}, State};
@@ -574,7 +577,7 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    log_message_queue_size("bind/2"),
+    lasp_marathon_simulations:log_message_queue_size("bind/2"),
 
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
@@ -589,7 +592,7 @@ handle_call({bind, Id, Value}, _From,
 %% this could change if the other module is later refactored.
 handle_call({bind, Id, Metadata0, Value}, _From,
             #state{store=Store, counter=Counter}=State) ->
-    log_message_queue_size("bind/3"),
+    lasp_marathon_simulations:log_message_queue_size("bind/3"),
 
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
@@ -598,7 +601,7 @@ handle_call({bind, Id, Metadata0, Value}, _From,
 
 %% Bind two variables together.
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
-    log_message_queue_size("bind_to"),
+    lasp_marathon_simulations:log_message_queue_size("bind_to"),
 
     {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?WRITE, ?READ),
     {reply, ok, State};
@@ -611,7 +614,7 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 %%
 handle_call({update, Id, Operation, CRDTActor}, _From,
             #state{store=Store, actor=Actor, counter=Counter}=State) ->
-    log_message_queue_size("update"),
+    lasp_marathon_simulations:log_message_queue_size("update"),
 
     Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
                            ?CLOCK_INIT(Actor), Store),
@@ -623,21 +626,21 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
 handle_call({thread, Module, Function, Args},
             _From,
             #state{store=Store}=State) ->
-    log_message_queue_size("thread"),
+    lasp_marathon_simulations:log_message_queue_size("thread"),
 
     ok = ?CORE:thread(Module, Function, Args, Store),
     {reply, ok, State};
 
 %% Block, enforcing lazy evaluation of the provided function.
 handle_call({wait_needed, Id, Threshold}, From, #state{store=Store}=State) ->
-    log_message_queue_size("wait_needed"),
+    lasp_marathon_simulations:log_message_queue_size("wait_needed"),
 
     ReplyFun = fun(ReadThreshold) -> {reply, {ok, ReadThreshold}, State} end,
     ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
 
 %% Attempt to read a value.
 handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
-    log_message_queue_size("read"),
+    lasp_marathon_simulations:log_message_queue_size("read"),
 
     ReplyFun = fun({_Id, Type, Metadata, Value}) ->
                     {reply, {ok, {_Id, Type, Metadata, Value}}, State};
@@ -650,7 +653,7 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
 
 %% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
-    log_message_queue_size("filter"),
+    lasp_marathon_simulations:log_message_queue_size("filter"),
 
     {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?WRITE, ?READ),
     {reply, ok, State};
@@ -659,7 +662,7 @@ handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
 handle_call({product, Left, Right, Product},
             _From,
             #state{store=Store}=State) ->
-    log_message_queue_size("product"),
+    lasp_marathon_simulations:log_message_queue_size("product"),
 
     {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?WRITE,
                                ?READ, ?READ),
@@ -669,7 +672,7 @@ handle_call({product, Left, Right, Product},
 handle_call({intersection, Left, Right, Intersection},
             _From,
             #state{store=Store}=State) ->
-    log_message_queue_size("intersection"),
+    lasp_marathon_simulations:log_message_queue_size("intersection"),
 
     {ok, _Pid} = ?CORE:intersection(Left, Right, Intersection, Store,
                                     ?WRITE, ?READ, ?READ),
@@ -677,7 +680,7 @@ handle_call({intersection, Left, Right, Intersection},
 
 %% Spawn a process to compute the union.
 handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
-    log_message_queue_size("union"),
+    lasp_marathon_simulations:log_message_queue_size("union"),
 
     {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?WRITE, ?READ,
                              ?READ),
@@ -685,14 +688,14 @@ handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
 
 %% Spawn a process to perform a map.
 handle_call({map, Id, Function, AccId}, _From, #state{store=Store}=State) ->
-    log_message_queue_size("map"),
+    lasp_marathon_simulations:log_message_queue_size("map"),
 
     {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?WRITE, ?READ),
     {reply, ok, State};
 
 %% Spawn a process to perform a fold.
 handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
-    log_message_queue_size("fold"),
+    lasp_marathon_simulations:log_message_queue_size("fold"),
 
     {ok, _Pid} = ?CORE:fold(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, ok, State};
@@ -703,7 +706,7 @@ handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
 %% given we've shown we already have some connection to retrieve data
 %% for that node.  If not, return the the value and repair the tree.
 handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
-    log_message_queue_size("graft"),
+    lasp_marathon_simulations:log_message_queue_size("graft"),
 
     Result = case get(Id, Store) of
         {ok, {Id, Type, Metadata, Value}} ->
@@ -722,7 +725,7 @@ handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
 %% Given a message identifer, return stale if we've seen an object with
 %% a vector clock that's greater than the provided one.
 handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
-    log_message_queue_size("is_stale"),
+    lasp_marathon_simulations:log_message_queue_size("is_stale"),
 
     Result = case get(Id, Store) of
         {ok, {_, _, Metadata, _}} ->
@@ -736,7 +739,7 @@ handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
 
 %% Naive anti-entropy mechanism; pairwise state shipping.
 handle_call({exchange, Peer}, _From, #state{store=Store}=State) ->
-    log_message_queue_size("exchange"),
+    lasp_marathon_simulations:log_message_queue_size("exchange"),
 
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
@@ -761,7 +764,7 @@ handle_call(Msg, _From, State) ->
 %% periodically ship delta-interval or entire state.
 handle_cast({delta_exchange, Peer, ObjectFilterFun},
             #state{store=Store, gc_counter=GCCounter}=State) ->
-    log_message_queue_size("delta_exchange"),
+    lasp_marathon_simulations:log_message_queue_size("delta_exchange"),
 
     lasp_logger:extended("Exchange starting for ~p", [Peer]),
 
@@ -803,7 +806,7 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
 
 handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
             #state{store=Store, actor=Actor}=State) ->
-    log_message_queue_size("aae_send"),
+    lasp_marathon_simulations:log_message_queue_size("aae_send"),
 
     ?CORE:receive_value(Store, {aae_send,
                                 From,
@@ -812,7 +815,7 @@ handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
                                ?CLOCK_INIT(Actor)}),
 
     %% Send back just the updated state for the object received.
-    case i_am_server_and_should_react() of
+    case client_server_mode() andalso i_am_server() andalso reactive_server() of
         true ->
             ObjectFilterFun = fun(Id1) ->
                                       Id =:= Id1
@@ -826,7 +829,7 @@ handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
 
 handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
             #state{store=Store, actor=Actor}=State) ->
-    log_message_queue_size("delta_send"),
+    lasp_marathon_simulations:log_message_queue_size("delta_send"),
 
     ?CORE:receive_delta(Store, {delta_send,
                                 From,
@@ -838,7 +841,7 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
     send({delta_ack, node(), Id, Counter}, From),
 
     %% Send back just the updated state for the object received.
-    case i_am_server_and_should_react() of
+    case client_server_mode() andalso i_am_server() andalso reactive_server() of
         true ->
             ObjectFilterFun = fun(Id1) ->
                                       Id =:= Id1
@@ -851,7 +854,7 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
     {noreply, State};
 
 handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
-    log_message_queue_size("delta_ack"),
+    lasp_marathon_simulations:log_message_queue_size("delta_ack"),
 
     ?CORE:receive_delta(Store, {delta_ack, Id, From, Counter}),
     {noreply, State};
@@ -864,7 +867,7 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(plumtree_memory_report, State) ->
-    log_message_queue_size("plumtree_memory_report"),
+    lasp_marathon_simulations:log_message_queue_size("plumtree_memory_report"),
 
     %% Log
     plumtree_memory_report(),
@@ -875,7 +878,7 @@ handle_info(plumtree_memory_report, State) ->
     {noreply, State};
 
 handle_info(memory_utilization_report, State) ->
-    log_message_queue_size("memory_utilization_report"),
+    lasp_marathon_simulations:log_message_queue_size("memory_utilization_report"),
 
     %% Log
     memory_utilization_report(),
@@ -886,15 +889,15 @@ handle_info(memory_utilization_report, State) ->
     {noreply, State};
 
 handle_info(aae_sync, #state{store=Store} = State) ->
-    log_message_queue_size("aae_sync"),
+    lasp_marathon_simulations:log_message_queue_size("aae_sync"),
 
     lasp_logger:extended("Beginning AAE synchronization."),
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
 
-    %% Remove ourself.
-    Peers = Members -- [node()],
+    %% Remove ourself and compute exchange peers.
+    Peers = compute_exchange(without_me(Members)),
 
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
@@ -906,15 +909,14 @@ handle_info(aae_sync, #state{store=Store} = State) ->
 
     {noreply, State};
 handle_info(delta_sync, #state{}=State) ->
-    log_message_queue_size("delta_sync"),
+    lasp_marathon_simulations:log_message_queue_size("delta_sync"),
 
     lasp_logger:extended("Beginning delta synchronization."),
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
 
-    PeerServiceManager = lasp_config:get(peer_service_manager,
-                                         partisan_peer_service),
+    PeerServiceManager = lasp_config:peer_service_manager(),
     lager:info("Manager is: ~p, Members are: ~p",
                [PeerServiceManager, Members]),
 
@@ -944,7 +946,7 @@ handle_info(delta_sync, #state{}=State) ->
 
     {noreply, State#state{}};
 handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
-    log_message_queue_size("delta_gc"),
+    lasp_marathon_simulations:log_message_queue_size("delta_gc"),
 
     MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
     Function =
@@ -1049,7 +1051,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 broadcast({Id, Type, Metadata, Value}) ->
-    case lasp_config:get(broadcast, false) of
+    case broadcast_tree_mode() of
         true ->
             Clock = orddict:fetch(clock, Metadata),
             Broadcast = #broadcast{id=Id,
@@ -1154,11 +1156,16 @@ do(Function, Args) ->
 -endif.
 
 %% @private
-log_transmission({Type, Payload}, PeerCount) ->
+log_transmission(ToLog, PeerCount) ->
     try
         case lasp_config:get(instrumentation, false) of
             true ->
-                ok = lasp_instrumentation:transmission(Type, Payload, PeerCount),
+                lists:foreach(
+                    fun({Type, Payload}) ->
+                        ok = lasp_instrumentation:transmission(Type, Payload, PeerCount)
+                    end,
+                    ToLog
+                ),
                 ok;
             false ->
                 ok
@@ -1171,54 +1178,68 @@ log_transmission({Type, Payload}, PeerCount) ->
 
 %% @private
 schedule_aae_synchronization() ->
-    ShouldAAESync = case lasp_config:get(mode, state_based) of
-        delta_based ->
-            false;
-        state_based ->
-            case lasp_config:get(tutorial, false) of
-                true ->
-                    false;
-                false ->
-                    not lasp_config:get(broadcast, false)
-                    orelse not i_am_server_and_should_react()
-            end
-    end,
+    ShouldAAESync = state_based_mode()
+            andalso (not tutorial_mode())
+            andalso (not broadcast_tree_mode())
+            andalso (
+              peer_to_peer_mode()
+              orelse
+              (
+               client_server_mode()
+               andalso
+               not (i_am_server() andalso reactive_server())
+              )
+            ),
 
     case ShouldAAESync of
         true ->
             Interval = lasp_config:get(aae_interval, 10000),
-            %% Add random jitter.
-            Jitter = rand_compat:uniform(Interval),
-            timer:send_after(Interval + Jitter, aae_sync);
+            case lasp_config:get(jitter, false) of
+                true ->
+                    %% Add random jitter.
+                    Jitter = rand_compat:uniform(Interval),
+                    timer:send_after(Interval + Jitter, aae_sync);
+                false ->
+                    timer:send_after(Interval, aae_sync)
+            end;
         false ->
             ok
     end.
 
 %% @private
 schedule_delta_synchronization() ->
-    ShouldDeltaSync = case lasp_config:get(mode, state_based) of
-        delta_based ->
-            not i_am_server_and_should_react();
-        state_based ->
-            false
-    end,
+    ShouldDeltaSync = delta_based_mode()
+            andalso (
+              peer_to_peer_mode()
+              orelse
+              (
+               client_server_mode()
+               andalso
+               not (i_am_server() andalso reactive_server())
+              )
+            ),
 
     case ShouldDeltaSync of
         true ->
             Interval = lasp_config:get(delta_interval, 10000),
-            %% Add random jitter.
-            Jitter = rand_compat:uniform(Interval),
-            timer:send_after(Interval + Jitter, delta_sync);
+            case lasp_config:get(jitter, false) of
+                true ->
+                    %% Add random jitter.
+                    Jitter = rand_compat:uniform(Interval),
+                    timer:send_after(Interval + Jitter, delta_sync);
+                false ->
+                    timer:send_after(Interval, delta_sync)
+            end;
         false ->
             ok
     end.
 
 %% @private
 schedule_delta_garbage_collection() ->
-    case lasp_config:get(mode, state_based) of
-        delta_based ->
+    case delta_based_mode() of
+        true ->
             timer:send_after(?DELTA_GC_INTERVAL, delta_gc);
-        state_based ->
+        false ->
             ok
     end.
 %% @private
@@ -1255,8 +1276,7 @@ memory_utilization_report() ->
 %% @private
 send(Msg, Peer) ->
     log_transmission(extract_log_type_and_payload(Msg), 1),
-    PeerServiceManager = lasp_config:get(peer_service_manager,
-                                         partisan_peer_service),
+    PeerServiceManager = lasp_config:peer_service_manager(),
     case PeerServiceManager:forward_message(Peer, ?MODULE, Msg) of
         ok ->
             ok;
@@ -1266,12 +1286,25 @@ send(Msg, Peer) ->
     end.
 
 %% @private
-extract_log_type_and_payload({aae_send, _Node, {_Id, _Type, _Metadata, State}}) ->
-    {aae_send, State};
-extract_log_type_and_payload({delta_send, _Node, {_Id, _Type, _Metadata, Deltas}, Counter}) ->
-    {delta_send, {Deltas, Counter}};
-extract_log_type_and_payload({delta_ack, _Node, _Id, Counter}) ->
-    {delta_ack, Counter}.
+%% state_based messages:
+extract_log_type_and_payload({aae_send, _Node, {Id, _Type, _Metadata, State}}) ->
+    [{aae_send, State}, {aae_send_protocol, Id}];
+%% delta_based messages:
+extract_log_type_and_payload({delta_send, Node, {Id, _Type, _Metadata, Deltas}, Counter}) ->
+    [{delta_send, Deltas}, {delta_send_protocol, {Id, Node, Counter}}];
+extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
+    [{delta_send_protocol, {Id, Node, Counter}}];
+%% plumtree messages:
+extract_log_type_and_payload({prune, Root, From}) ->
+    [{broadcast_protocol, {Root, From}}];
+extract_log_type_and_payload({ignored_i_have, MessageId, _Mod, Round, Root, From}) ->
+    [{broadcast_protocol, {MessageId, Round, Root, From}}];
+extract_log_type_and_payload({graft, MessageId, _Mod, Round, Root, From}) ->
+    [{broadcast_protocol, {MessageId, Round, Root, From}}];
+extract_log_type_and_payload({broadcast, MessageId, {Id, _Type, _Metadata, State}, _Mod, Round, Root, From}) ->
+    [{broadcast, State}, {broadcast_protocol, {Id, MessageId, Round, Root, From}}];
+extract_log_type_and_payload({i_have, MessageId, _Mod, Round, Root, From}) ->
+    [{broadcast_protocol, {MessageId, Round, Root, From}}].
 
 %% @private
 init_aae_sync(Peer, Store) ->
@@ -1319,11 +1352,10 @@ shuffle(L) ->
 
 %% @private
 compute_exchange(Peers) ->
-    PeerServiceManager = lasp_config:get(peer_service_manager,
-                                         partisan_peer_service),
+    PeerServiceManager = lasp_config:peer_service_manager(),
 
     Probability = lasp_config:get(partition_probability, 0),
-    lager:info("Probability of partition: ~p", [Probability]),
+    lasp_logger:extended("Probability of partition: ~p", [Probability]),
     Percent = lasp_support:puniform(100),
 
     case Percent =< Probability of
@@ -1366,31 +1398,37 @@ buffer_broadcast(Payload) ->
     lasp_broadcast_buffer:buffer(Payload).
 
 %% @private
-log_message_queue_size(Method) ->
-    {message_queue_len, MessageQueueLen} = process_info(self(), message_queue_len),
-    lasp_logger:mailbox("MAILBOX " ++ Method ++ " message processed; messages remaining: ~p", [MessageQueueLen]).
-
-%% @private
 without_me(Members) ->
     Members -- [node()].
 
 %% @private
-i_am_server_and_should_react() ->
-    PeerServiceManager = lasp_config:get(peer_service_manager, partisan_peer_service),
-    case PeerServiceManager of
-        partisan_client_server_peer_service_manager ->
-            case partisan_config:get(tag, undefined) of
-                server ->
-                    case lasp_config:get(reactive_server, false) of
-                        true ->
-                            %% I'm the server in the reactive client-server mode.
-                            true;
-                        _ ->
-                            false
-                    end;
-                _ ->
-                    false
-            end;
-        _ ->
-            false
-    end.
+state_based_mode() ->
+    lasp_config:get(mode, state_based) == state_based.
+
+%% @private
+delta_based_mode() ->
+    lasp_config:get(mode, state_based) == delta_based.
+
+%% @private
+broadcast_tree_mode() ->
+    lasp_config:get(broadcast, false).
+
+%% @private
+tutorial_mode() ->
+    lasp_config:get(tutorial, false).
+
+%% @private
+client_server_mode() ->
+    lasp_config:peer_service_manager() == partisan_client_server_peer_service_manager.
+
+%% @private
+peer_to_peer_mode() ->
+    lasp_config:peer_service_manager() == partisan_hyparview_peer_service_manager.
+
+%% @private
+i_am_server() ->
+    partisan_config:get(tag, undefined) == server.
+
+%% @private
+reactive_server() ->
+    lasp_config:get(reactive_server, false).

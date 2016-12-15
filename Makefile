@@ -29,7 +29,7 @@ packageclean:
 
 check: test xref dialyzer
 
-test: ct eunit simulations
+test: ct eunit ad-counter-simulations game-tournament-simulations
 
 lint:
 	${REBAR} as lint lint
@@ -40,7 +40,8 @@ eunit:
 ct:
 	${REBAR} as test ct --suite=lasp_SUITE
 
-simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation ad-counter-overcounting ad-counter-partition-overcounting
+ad-counter-simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation ad-counter-overcounting ad-counter-partition-overcounting
+game-tournament-simulations: client-server-game-tournament-simulation peer-to-peer-game-tournament-simulation
 
 peer-to-peer-ad-counter-simulation:
 	${REBAR} as test ct --suite=lasp_peer_to_peer_advertisement_counter_SUITE
@@ -53,6 +54,12 @@ ad-counter-overcounting:
 
 ad-counter-partition-overcounting:
 	${REBAR} as test ct --suite=lasp_advertisement_counter_partition_overcounting_SUITE
+
+peer-to-peer-game-tournament-simulation:
+	${REBAR} as test ct --suite=lasp_peer_to_peer_game_tournament_SUITE
+
+client-server-game-tournament-simulation:
+	${REBAR} as test ct --suite=lasp_client_server_game_tournament_SUITE
 
 ##
 ## Release targets
@@ -93,9 +100,6 @@ publish:
 shell:
 	${REBAR} shell --apps lasp
 
-dcos:
-	bin/dcos-deploy.sh
-
 ##
 ## Evaluation related targets
 ##
@@ -117,14 +121,6 @@ part-div:
 	pkill -9 beam.smp; \
 		clear; \
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_partition_overcounting_SUITE
-
-evaluate-local: SHELL:=/bin/bash
-evaluate-local:
-	priv/evaluate-local.sh
-
-evaluate-docker: SHELL:=/bin/bash
-evaluate-docker:
-	priv/evaluate-docker.sh
 
 logs:
 	tail -F priv/lager/*/log/*.log

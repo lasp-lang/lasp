@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 %%
 
--module(lasp_peer_to_peer_advertisement_counter_SUITE).
+-module(lasp_peer_to_peer_game_tournament_SUITE).
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 %% common_test callbacks
@@ -81,10 +81,10 @@ default_test(_Config) ->
 %% ===================================================================
 
 peer_to_peer_state_based_with_aae_test(Config) ->
-    lasp_simulation_support:run(peer_to_peer_ad_counter_state_based_with_aae_test,
+    lasp_simulation_support:run(peer_to_peer_game_tournament_state_based_with_aae_test,
         Config,
         [{mode, state_based},
-         {simulation, ad_counter},
+         {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
          {set, orset},
          {broadcast, false},
@@ -92,10 +92,10 @@ peer_to_peer_state_based_with_aae_test(Config) ->
     ok.
 
 peer_to_peer_state_based_with_aae_and_tree_test(Config) ->
-    lasp_simulation_support:run(peer_to_peer_ad_counter_state_based_with_aae_and_tree_test,
+    lasp_simulation_support:run(peer_to_peer_game_tournament_state_based_with_aae_and_tree_test,
         Config,
         [{mode, state_based},
-         {simulation, ad_counter},
+         {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
          {set, orset},
          {broadcast, true},
@@ -103,10 +103,10 @@ peer_to_peer_state_based_with_aae_and_tree_test(Config) ->
     ok.
 
 peer_to_peer_delta_based_with_aae_test(Config) ->
-    lasp_simulation_support:run(peer_to_peer_ad_counter_delta_based_with_aae_test,
+    lasp_simulation_support:run(peer_to_peer_game_tournament_delta_based_with_aae_test,
         Config,
         [{mode, delta_based},
-         {simulation, ad_counter},
+         {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
          {set, orset},
          {broadcast, false},
@@ -114,10 +114,10 @@ peer_to_peer_delta_based_with_aae_test(Config) ->
     ok.
 
 peer_to_peer_state_based_ps_with_aae_test(Config) ->
-    lasp_simulation_support:run(peer_to_peer_ad_counter_state_based_ps_with_aae_test,
+    lasp_simulation_support:run(peer_to_peer_game_tournament_state_based_ps_with_aae_test,
         Config,
         [{mode, state_based},
-         {simulation, ad_counter},
+         {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
          {set, awset_ps},
          {broadcast, false},
@@ -125,10 +125,10 @@ peer_to_peer_state_based_ps_with_aae_test(Config) ->
     ok.
 
 peer_to_peer_state_based_ps_with_aae_and_tree_test(Config) ->
-    lasp_simulation_support:run(peer_to_peer_ad_counter_state_based_ps_with_aae_and_tree_test,
+    lasp_simulation_support:run(peer_to_peer_game_tournament_state_based_ps_with_aae_and_tree_test,
         Config,
         [{mode, state_based},
-         {simulation, ad_counter},
+         {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
          {set, awset_ps},
          {broadcast, true},
@@ -136,10 +136,10 @@ peer_to_peer_state_based_ps_with_aae_and_tree_test(Config) ->
     ok.
 
 peer_to_peer_delta_based_ps_with_aae_test(Config) ->
-    lasp_simulation_support:run(peer_to_peer_ad_counter_delta_based_ps_with_aae_test,
+    lasp_simulation_support:run(peer_to_peer_game_tournament_delta_based_ps_with_aae_test,
         Config,
         [{mode, delta_based},
-         {simulation, ad_counter},
+         {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
          {set, awset_ps},
          {broadcast, false},

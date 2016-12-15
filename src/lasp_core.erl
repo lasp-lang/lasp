@@ -467,7 +467,12 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                                     {ok, WDT, Counter0, DeltaMap0};
                                 delta_based ->
                                     {DeltaTime, Delta} = timer:tc(fun() ->
-                                        lasp_type:delta(Type, state_driven, Value, Value0)
+                                        case lasp_config:get(join_decompositions, false) of
+                                            true ->
+                                                lasp_type:delta(Type, state_driven, Value, Value0);
+                                            false ->
+                                                Value
+                                        end
                                     end),
                                     lager:info("Join decomposition took ~p microseconds", [DeltaTime]),
                                     {ok, SWD1} = reply_to_all(WDT, [],

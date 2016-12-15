@@ -67,6 +67,9 @@ CLIENT_MEMORY=1024.0
 SERVER_CPU=2
 CLIENT_CPU=0.5
 
+# Docker image
+IMAGE=vitorenesduarte/lasp-dev
+
 cat <<EOF > lasp-server.json
 {
   "acceptedResourceRoles": [
@@ -81,7 +84,7 @@ cat <<EOF > lasp-server.json
   "container": {
     "type": "DOCKER",
     "docker": {
-      "image": "vitorenesduarte/lasp-dev-no-clone",
+      "image": "$IMAGE",
       "network": "HOST",
       "forcePullImage": true,
       "parameters": [
@@ -149,7 +152,7 @@ cat <<EOF > lasp-client.json
   "container": {
     "type": "DOCKER",
     "docker": {
-      "image": "vitorenesduarte/lasp-dev-no-clone",
+      "image": "$IMAGE",
       "network": "HOST",
       "forcePullImage": true,
       "parameters": [

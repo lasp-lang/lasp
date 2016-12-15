@@ -1,12 +1,12 @@
 #!/bin/sh
 
 KEY_NAME=dcos
-STACK_NAME=dcos-m3-2xlarge
+STACK_NAME=dcos-m3-2xlarge-ha
 
 echo "Launching Oregon."
 aws cloudformation create-stack \
   --stack-name ${STACK_NAME} \
-  --template-url https://s3-us-west-2.amazonaws.com/cf-templates-akuyolple9l-us-west-2/2016256mQk-template-m3.2xlarge840l39dhog1rubdph6j2it3xr \
+  --template-url https://s3-us-west-2.amazonaws.com/cf-templates-akuyolple9l-us-west-2/2016343unS-HA-m3.2xlargeqc3w6invj9v2yhfcuq4dndn29 \
   --capabilities CAPABILITY_IAM \
   --parameters ParameterKey=KeyName,ParameterValue=${KEY_NAME} \
                ParameterKey=PublicSlaveInstanceCount,ParameterValue=50 \

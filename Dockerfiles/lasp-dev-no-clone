@@ -11,7 +11,7 @@ RUN cd /tmp && \
     apt-get -y install erlang
 
 RUN cd /opt && \
-    git clone https://github.com/lasp-lang/lasp.git -b $LASP_BRANCH && \
+    git clone https://github.com/lasp-lang/lasp.git -b dcos_again && \
     cd lasp && \
     make stage
 

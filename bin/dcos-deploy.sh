@@ -68,7 +68,7 @@ SERVER_CPU=2
 CLIENT_CPU=0.5
 
 # Docker image
-IMAGE=vitorenesduarte/lasp-dev-no-clone
+IMAGE=vitorenesduarte/lasp-dev
 
 cat <<EOF > lasp-server.json
 {

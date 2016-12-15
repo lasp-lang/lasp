@@ -23,7 +23,6 @@
 
 -behaviour(gen_server).
 -behaviour(lasp_distribution_backend).
--behaviour(plumtree_broadcast_handler).
 
 %% Administrative controls.
 -export([reset/0]).
@@ -51,13 +50,6 @@
          wait_needed/2,
          thread/3]).
 
-%% plumtree_broadcast_handler callbacks
--export([broadcast_data/1,
-         merge/2,
-         is_stale/1,
-         graft/1,
-         exchange/1]).
-
 %% gen_server callbacks
 -export([init/1,
          handle_call/3,
@@ -69,28 +61,17 @@
 %% debug callbacks
 -export([local_bind/4]).
 
-%% broadcast interface
--export([broadcast/1]).
-
-%% transmission callbacks
--export([extract_log_type_and_payload/1]).
-
 -include("lasp.hrl").
 
 %% State record.
 -record(state, {store :: store(),
+                gossip_peers :: [],
                 actor :: binary()}).
-
-%% Broadcast record.
--record(broadcast, {id :: id(),
-                    type :: type(),
-                    clock :: lasp_vclock:vclock(),
-                    metadata :: metadata(),
-                    value :: value()}).
 
 -define(DELTA_GC_INTERVAL, 60000).
 -define(PLUMTREE_MEMORY_INTERVAL, 10000).
 -define(MEMORY_UTILIZATION_INTERVAL, 10000).
+-define(PEER_REFRESH_INTERVAL, 10000).
 
 %% Definitions for the bind/read fun abstraction.
 
@@ -157,116 +138,18 @@ start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
 
 %%%===================================================================
-%%% plumtree_broadcast_handler callbacks
-%%%===================================================================
-
--type clock() :: lasp_vclock:vclock().
-
--type broadcast_message() :: #broadcast{}.
--type broadcast_id() :: id().
--type broadcast_clock() :: clock().
--type broadcast_payload() :: {id(), type(), metadata(), value()}.
-
-%% @doc Returns from the broadcast message the identifier and the payload.
--spec broadcast_data(broadcast_message()) ->
-    {{broadcast_id(), broadcast_clock()}, broadcast_payload()}.
-broadcast_data(#broadcast{id=Id,
-                          type=Type,
-                          clock=Clock,
-                          metadata=Metadata,
-                          value=Value}) ->
-    {{Id, Clock}, {Id, Type, Metadata, Value}}.
-
-%% @doc Perform a merge of an incoming object with an object in the
-%%      local datastore, as long as we haven't seen a more recent clock
-%%      for the same object.
--spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) ->
-    boolean().
-merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
-    case is_stale({Id, Clock}) of
-        true ->
-            false;
-        false ->
-            %% Bind information.
-            {ok, _} = ?MODULE:local_bind(Id, Type, Metadata, Value),
-            true
-    end;
-merge(BroadcastId, Payload) ->
-    lager:error("Incoming merge didn't match; broadcast_id: ~p payload: ~p", [BroadcastId, Payload]),
-    false.
-
-%% @doc Use the clock on the object to determine if this message is
-%%      stale or not.
--spec is_stale({broadcast_id(), broadcast_clock()}) -> boolean().
-is_stale({Id, Clock}) ->
-    gen_server:call(?MODULE, {is_stale, Id, Clock}, infinity).
-
-%% @doc Given a message identifier and a clock, return a given message.
--spec graft({broadcast_id(), broadcast_clock()}) ->
-    stale | {ok, broadcast_payload()} | {error, term()}.
-graft({Id, Clock}) ->
-    gen_server:call(?MODULE, {graft, Id, Clock}, infinity).
-
-%% @doc Anti-entropy mechanism.
--spec exchange(node()) -> {ok, pid()}.
-exchange(Peer) ->
-    case lasp_config:get(mode, state_based) of
-        delta_based ->
-            %% Ignore the standard anti-entropy mechanism from plumtree.
-            %%
-            %% Spawn a process that terminates immediately, because the
-            %% broadcast exchange timer tracks the number of in progress
-            %% exchanges and bounds it by that limit.
-            %%
-            Pid = spawn_link(fun() -> ok end),
-            {ok, Pid};
-        state_based ->
-            case broadcast_tree_mode() of
-                true ->
-                    %% Plumtree AAE.
-                    gen_server:call(?MODULE, {exchange, Peer}, infinity);
-                false ->
-                    %% No AAE through this mechanism.
-                    %%
-                    %% Spawn a process that terminates immediately, because the
-                    %% broadcast exchange timer tracks the number of in progress
-                    %% exchanges and bounds it by that limit.
-                    %%
-                    Pid = spawn_link(fun() -> ok end),
-                    {ok, Pid}
-            end
-    end.
-
-%%%===================================================================
 %%% lasp_distribution_backend callbacks
 %%%===================================================================
 
 %% @doc Declare a new dataflow variable of a given type.
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
-    case lasp_config:get(mode, state_based) of
-        delta_based ->
-            gen_server:call(?MODULE, {declare, Id, Type}, infinity);
-        state_based ->
-            {ok, Variable} = gen_server:call(?MODULE,
-                                             {declare, Id, Type}, infinity),
-            buffer_broadcast(Variable),
-            {ok, Variable}
-    end.
+    gen_server:call(?MODULE, {declare, Id, Type}, infinity).
 
 %% @doc Declare a new dynamic variable of a given type.
 -spec declare_dynamic(id(), type()) -> {ok, var()}.
 declare_dynamic(Id, Type) ->
-    case lasp_config:get(mode, state_based) of
-        delta_based ->
-            gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity);
-        state_based ->
-            {ok, Variable} = gen_server:call(?MODULE,
-                                             {declare_dynamic, Id, Type},
-                                             infinity),
-            buffer_broadcast(Variable),
-            {ok, Variable}
-    end.
+    gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity).
 
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.
@@ -294,23 +177,7 @@ update(Id, Operation, Actor) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {update, Id, Operation, Actor},
                                                         infinity),
-    ReturnState = case orddict:find(dynamic, Metadata) of
-                      {ok, true} ->
-                          %% Ignore: this is a dynamic variable.
-                          Value;
-                      _ ->
-                          case lasp_config:get(mode, state_based) of
-                              delta_based  ->
-                                  %% No broadcasting for the delta.
-                                  Value;
-                              state_based ->
-                                  buffer_broadcast({Id, Type, Metadata, Value}),
-                                  Value;
-                              pure_op_based ->
-                                  ok %% @todo
-                          end
-                  end,
-    {ok, {Id, Type, Metadata, ReturnState}}.
+    {ok, {Id, Type, Metadata, Value}}.
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -323,23 +190,7 @@ bind(Id, Value0) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {bind, Id, Value0},
                                                         infinity),
-    ReturnState = case orddict:find(dynamic, Metadata) of
-                      {ok, true} ->
-                          %% Ignore: this is a dynamic variable.
-                          Value;
-                      _ ->
-                          case lasp_config:get(mode, state_based) of
-                              delta_based ->
-                                  %% No broadcasting for the delta.
-                                  Value;
-                              state_based ->
-                                  buffer_broadcast({Id, Type, Metadata, Value}),
-                                  Value;
-                              pure_op_based ->
-                                  ok %% todo
-                          end
-                  end,
-    {ok, {Id, Type, Metadata, ReturnState}}.
+    {ok, {Id, Type, Metadata, Value}}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -478,6 +329,7 @@ init([]) ->
     schedule_aae_synchronization(),
     schedule_delta_synchronization(),
     schedule_delta_garbage_collection(),
+    schedule_peer_refresh(),
 
     {ok, Actor} = lasp_unique:unique(),
 
@@ -498,6 +350,7 @@ init([]) ->
     schedule_memory_utilization_report(),
 
     {ok, #state{actor=Actor,
+                gossip_peers=[],
                 store=Store}}.
 
 %% @private
@@ -901,13 +754,18 @@ handle_info(memory_utilization_report, State) ->
 
     {noreply, State};
 
-handle_info(aae_sync, #state{store=Store} = State) ->
+handle_info(aae_sync, #state{store=Store, gossip_peers=GossipPeers} = State) ->
     lasp_marathon_simulations:log_message_queue_size("aae_sync"),
 
     lasp_logger:extended("Beginning AAE synchronization."),
 
-    %% Get the active set from the membership protocol.
-    {ok, Members} = membership(),
+    Members = case broadcast_tree_mode() of
+        true ->
+            GossipPeers;
+        false ->
+            {ok, Members1} = membership(),
+            Members1
+    end,
 
     %% Remove ourself and compute exchange peers.
     Peers = compute_exchange(without_me(Members)),
@@ -954,6 +812,23 @@ handle_info(delta_sync, #state{}=State) ->
     schedule_delta_synchronization(),
 
     {noreply, State#state{}};
+handle_info(peer_refresh, State) ->
+    %% TODO: Temporary hack until the Plumtree can propagate tree
+    %% information in the metadata messages.  Therefore, manually poll
+    %% periodically with jitter.
+    Servers = servers(),
+    GossipPeers = case length(Servers) of
+        0 ->
+            [];
+        _ ->
+            Root = hd(Servers),
+            plumtree_gossip_peers(Root)
+    end,
+
+    %% Schedule next synchronization.
+    schedule_peer_refresh(),
+
+    {noreply, State#state{gossip_peers=GossipPeers}};
 handle_info(delta_gc, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_gc"),
 
@@ -1019,22 +894,6 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-broadcast({Id, Type, Metadata, Value}) ->
-    case broadcast_tree_mode() of
-        true ->
-            Clock = orddict:fetch(clock, Metadata),
-            Broadcast = #broadcast{id=Id,
-                                   clock=Clock,
-                                   type=Type,
-                                   metadata=Metadata,
-                                   value=Value},
-            ok = plumtree_broadcast:broadcast(Broadcast, ?MODULE),
-            ok;
-        false ->
-            ok
-    end.
-
-%% @private
 local_bind(Id, Type, Metadata, Value) ->
     case gen_server:call(?MODULE, {bind, Id, Metadata, Value}, infinity) of
         {error, not_found} ->
@@ -1069,7 +928,7 @@ get(Id, Store) ->
 collect_deltas(Peer, Type, DeltaMap, PeerLastAck, DeltaCounter) ->
     orddict:fold(
         fun(Counter, {Origin, Delta}, Deltas) ->
-            case (Counter >= PeerLastAck) andalso 
+            case (Counter >= PeerLastAck) andalso
                  (Counter < DeltaCounter) andalso
                  Origin /= Peer of
                 true ->
@@ -1131,7 +990,6 @@ log_transmission(ToLog, PeerCount) ->
 schedule_aae_synchronization() ->
     ShouldAAESync = state_based_mode()
             andalso (not tutorial_mode())
-            andalso (not broadcast_tree_mode())
             andalso (
               peer_to_peer_mode()
               orelse
@@ -1186,6 +1044,17 @@ schedule_delta_synchronization() ->
     end.
 
 %% @private
+schedule_peer_refresh() ->
+    case broadcast_tree_mode() of
+        true ->
+            Interval = lasp_config:get(peer_refresh_interval, ?PEER_REFRESH_INTERVAL),
+            Jitter = rand_compat:uniform(Interval),
+            timer:send_after(Jitter + ?PEER_REFRESH_INTERVAL, peer_refresh);
+        false ->
+            ok
+    end.
+
+%% @private
 schedule_delta_garbage_collection() ->
     case delta_based_mode() of
         true ->
@@ -1193,6 +1062,7 @@ schedule_delta_garbage_collection() ->
         false ->
             ok
     end.
+
 %% @private
 schedule_plumtree_memory_report() ->
     case lasp_config:get(memory_report, false) of
@@ -1247,18 +1117,7 @@ extract_log_type_and_payload({aae_send, _Node, {Id, _Type, _Metadata, State}}) -
 extract_log_type_and_payload({delta_send, Node, {Id, _Type, _Metadata, Deltas}, Counter}) ->
     [{delta_send, Deltas}, {delta_send_protocol, {Id, Node, Counter}}];
 extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
-    [{delta_send_protocol, {Id, Node, Counter}}];
-%% plumtree messages:
-extract_log_type_and_payload({prune, Root, From}) ->
-    [{broadcast_protocol, {Root, From}}];
-extract_log_type_and_payload({ignored_i_have, MessageId, _Mod, Round, Root, From}) ->
-    [{broadcast_protocol, {MessageId, Round, Root, From}}];
-extract_log_type_and_payload({graft, MessageId, _Mod, Round, Root, From}) ->
-    [{broadcast_protocol, {MessageId, Round, Root, From}}];
-extract_log_type_and_payload({broadcast, MessageId, {Id, _Type, _Metadata, State}, _Mod, Round, Root, From}) ->
-    [{broadcast, State}, {broadcast_protocol, {Id, MessageId, Round, Root, From}}];
-extract_log_type_and_payload({i_have, MessageId, _Mod, Round, Root, From}) ->
-    [{broadcast_protocol, {MessageId, Round, Root, From}}].
+    [{delta_send_protocol, {Id, Node, Counter}}].
 
 %% @private
 init_aae_sync(Peer, Store) ->
@@ -1351,10 +1210,6 @@ compute_exchange(Peers) ->
     end.
 
 %% @private
-buffer_broadcast(Payload) ->
-    lasp_broadcast_buffer:buffer(Payload).
-
-%% @private
 without_me(Members) ->
     Members -- [node()].
 
@@ -1380,7 +1235,8 @@ client_server_mode() ->
 
 %% @private
 peer_to_peer_mode() ->
-    lasp_config:peer_service_manager() == partisan_hyparview_peer_service_manager.
+    lasp_config:peer_service_manager() == partisan_hyparview_peer_service_manager orelse
+    lasp_config:peer_service_manager() == partisan_default_peer_service_manager.
 
 %% @private
 i_am_server() ->
@@ -1393,3 +1249,35 @@ i_am_client() ->
 %% @private
 reactive_server() ->
     lasp_config:get(reactive_server, false).
+
+%% @private
+plumtree_gossip_peers(Root) ->
+    {ok, Nodes} = sprinter:nodes(),
+    Tree = sprinter:debug_get_tree(Root, Nodes),
+    FolderFun = fun({Node, Peers}, In) ->
+                        case Peers of
+                            down ->
+                                In;
+                            {Eager, _Lazy} ->
+                                case lists:member(node(), Eager) of
+                                    true ->
+                                        In ++ [Node];
+                                    false ->
+                                        In
+                                end
+                        end
+                end,
+    InLinks = lists:foldl(FolderFun, [], Tree),
+
+    {EagerPeers, _LazyPeers} = plumtree_broadcast:debug_get_peers(node(), Root),
+    OutLinks = ordsets:to_list(EagerPeers),
+
+    GossipPeers = lists:usort(InLinks ++ OutLinks),
+    lager:info("PLUMTREE DEBUG: Gossip Peers: ~p", [GossipPeers]),
+
+    GossipPeers.
+
+%% @private
+servers() ->
+    {ok, Servers} = sprinter:servers(),
+    Servers.

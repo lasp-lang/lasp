@@ -94,6 +94,11 @@ init(_Args) ->
                             permanent, 5000, worker,
                             [lasp_default_broadcast_distribution_backend]},
 
+    PlumtreeBackend = {lasp_plumtree_backend,
+                       {lasp_plumtree_backend, start_link, []},
+                        permanent, 5000, worker,
+                        [lasp_plumtree_backend]},
+
     Plumtree = {plumtree_sup,
                 {plumtree_sup, start_link, []},
                  permanent, infinity, supervisor, [plumtree_sup]},
@@ -103,19 +108,14 @@ init(_Args) ->
                  permanent, 5000, worker,
                  [sprinter]},
 
-    BroadcastBuffer = {lasp_broadcast_buffer,
-                       {lasp_broadcast_buffer, start_link, []},
-                        permanent, 5000, worker,
-                        [lasp_broadcast_buffer]},
-
     WebSpecs = web_specs(),
 
     BaseSpecs0 = [Unique,
-                  BroadcastBuffer,
                   Partisan,
+                  Sprinter,
+                  PlumtreeBackend,
                   DistributionBackend,
                   Plumtree,
-                  Sprinter,
                   Process] ++ WebSpecs,
 
     DagEnabled = application:get_env(?APP, dag_enabled, false),

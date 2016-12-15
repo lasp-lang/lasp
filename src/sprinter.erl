@@ -30,7 +30,10 @@
 -export([start_link/0,
          start_link/1,
          graph/0,
-         was_connected/0]).
+         tree/0,
+         was_connected/0,
+         servers/0,
+         nodes/0]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -39,6 +42,9 @@
          handle_info/2,
          terminate/2,
          code_change/3]).
+
+%% debug functions
+-export([debug_get_tree/2]).
 
 -include("lasp.hrl").
 
@@ -52,7 +58,13 @@
 -define(ARTIFACT_MESSAGE,  artifact).
 
 %% State record.
--record(state, {is_connected, was_connected, attempted_nodes, graph}).
+-record(state, {is_connected,
+                was_connected,
+                attempted_nodes,
+                graph,
+                tree,
+                servers,
+                nodes}).
 
 %%%===================================================================
 %%% API
@@ -71,8 +83,19 @@ start_link(Opts) ->
 graph() ->
     gen_server:call(?MODULE, graph, infinity).
 
+tree() ->
+    gen_server:call(?MODULE, tree, infinity).
+
 was_connected() ->
     gen_server:call(?MODULE, was_connected, infinity).
+
+-spec servers() -> {ok, [node()]}.
+servers() ->
+    gen_server:call(?MODULE, servers, infinity).
+
+-spec nodes() -> {ok, [node()]}.
+nodes() ->
+    gen_server:call(?MODULE, nodes, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -119,25 +142,57 @@ init([]) ->
             %% All nodes should attempt to refresh the membership.
             schedule_membership_refresh()
     end,
-    {ok, #state{is_connected=false,
+
+    Servers = case os:getenv("MESOS_TASK_ID") of
+        false ->
+            case lasp_config:get(lasp_server, undefined) of
+                undefined ->
+                    [];
+                Server ->
+                    [Server]
+            end;
+        _ ->
+            []
+    end,
+
+    Nodes = case os:getenv("MESOS_TASK_ID") of
+        false ->
+            %% Assumes full membership.
+            PeerServiceManager = lasp_config:peer_service_manager(),
+            {ok, Members} = PeerServiceManager:members(),
+            Members;
+        _ ->
+            []
+    end,
+
+    {ok, #state{nodes=Nodes,
+                servers=Servers,
+                is_connected=false,
                 was_connected=false,
                 attempted_nodes=sets:new(),
-                graph=digraph:new()}}.
+                graph=digraph:new(),
+                tree=digraph:new()}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
 %% @private
+handle_call(nodes, _From, #state{nodes=Nodes}=State) ->
+    {reply, {ok, Nodes}, State};
+
+handle_call(servers, _From, #state{servers=Servers}=State) ->
+    {reply, {ok, Servers}, State};
+
 handle_call(was_connected, _From, #state{was_connected=WasConnected}=State) ->
     {reply, {ok, WasConnected}, State};
 
 handle_call(graph, _From, #state{graph=Graph}=State) ->
-    Vertices = digraph:vertices(Graph),
-    Edges = lists:map(fun(Edge) ->
-                      {_E, V1, V2, _Label} = digraph:edge(Graph, Edge),
-                      {V1, V2}
-              end, digraph:edges(Graph)),
+    {Vertices, Edges} = vertices_and_edges(Graph),
+    {reply, {ok, {Vertices, Edges}}, State};
+
+handle_call(tree, _From, #state{tree=Tree}=State) ->
+    {Vertices, Edges} = vertices_and_edges(Tree),
     {reply, {ok, {Vertices, Edges}}, State};
 
 handle_call(Msg, _From, State) ->
@@ -156,6 +211,9 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     Tag = partisan_config:get(tag, client),
     PeerServiceManager = lasp_config:peer_service_manager(),
 
+    Servers = servers_from_marathon(),
+    Clients = clients_from_marathon(),
+
     %% Get list of nodes to connect to: this specialized logic isn't
     %% required when the node count is small, but is required with a
     %% larger node count to ensure the network stabilizes correctly
@@ -163,19 +221,22 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     %% only probabilistic.
     %%
     ToConnectNodes = case {Tag, PeerServiceManager} of
+        {_, partisan_default_peer_service_manager} ->
+            %% Full connectivity.
+            sets:union(Servers, Clients);
         {client, partisan_client_server_peer_service_manager} ->
             %% If we're a client, and we're in client/server mode, then
             %% always connect with the server.
-            servers_from_marathon();
+            Servers;
         {server, partisan_client_server_peer_service_manager} ->
             %% If we're a server, and we're in client/server mode, then
             %% always initiate connections with clients.
-            clients_from_marathon();
+            Clients;
         {client, partisan_hyparview_peer_service_manager} ->
             %% If we're the server, and we're in HyParView, clients will
             %% ask the server to join the overlay and force outbound
             %% conenctions to the clients.
-            servers_from_marathon();
+            Servers;
         {server, partisan_hyparview_peer_service_manager} ->
             %% If we're in HyParView, and we're a client, only ever
             %% do nothing -- force all connection to go through the
@@ -186,9 +247,16 @@ handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
     %% Attempt to connect nodes that are not connected.
     AttemptedNodes = maybe_connect(ToConnectNodes, SeenNodes),
 
+    ServerNames = node_names(sets:to_list(Servers)),
+    ClientNames = node_names(sets:to_list(Clients)),
+    Nodes = ServerNames ++ ClientNames,
+
     schedule_membership_refresh(),
 
-    {noreply, State#state{attempted_nodes=AttemptedNodes}};
+    {noreply, State#state{nodes=Nodes,
+                          servers=ServerNames,
+                          attempted_nodes=AttemptedNodes}};
+
 handle_info(?ARTIFACT_MESSAGE, State) ->
     %% Get bucket name.
     BucketName = bucket_name(),
@@ -214,47 +282,28 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
 
     %% Get all running nodes, because we need the list of *everything*
     %% to analyze the graph for connectedness.
-    ClientsFromMarathon = clients_from_marathon(),
-    ServersFromMarathon = servers_from_marathon(),
-    Nodes = sets:union(ClientsFromMarathon, ServersFromMarathon),
+    Clients = clients_from_marathon(),
+    Servers = servers_from_marathon(),
+    ServerNames = node_names(sets:to_list(Servers)),
+    ClientNames = node_names(sets:to_list(Clients)),
+    Root = hd(ServerNames),
+    Nodes = ServerNames ++ ClientNames,
+
+    %% Build the tree.
+    Tree = digraph:new(),
+    case lasp_config:get(broadcast, false) of
+        true ->
+            populate_tree(Root, Nodes, Tree);
+        false ->
+            ok
+    end,
 
     %% Build the graph.
     Graph = digraph:new(),
-
-    %% Get bucket name.
-    BucketName = bucket_name(),
-
-    GraphFun = fun({N, _, _}=Peer, OrphanedNodes) ->
-                       Node = prefix(atom_to_list(N)),
-                       try
-                           Result = erlcloud_s3:get_object(BucketName, Node),
-                           Body = proplists:get_value(content, Result, undefined),
-                           case Body of
-                               undefined ->
-                                   OrphanedNodes;
-                               _ ->
-                                   Membership = binary_to_term(Body),
-                                   case Membership of
-                                       [N] ->
-                                           populate_graph(N, [], Graph),
-                                           [Peer|OrphanedNodes];
-                                       _ ->
-                                           populate_graph(N, Membership, Graph),
-                                           OrphanedNodes
-                                   end
-                           end
-                       catch
-                           _:{aws_error, Error} ->
-                               populate_graph(N, [], Graph),
-                               lager:info("Could not get graph object; ~p", [Error]),
-                               OrphanedNodes
-                       end
-               end,
-
-    Orphaned = sets:fold(GraphFun, [], Nodes),
+    Orphaned = populate_graph(Nodes, Graph),
 
     {SymmetricViews, VisitedNames} = breath_first(node(), Graph, ordsets:new()),
-    AllNodesVisited = sets:size(Nodes) == length(VisitedNames),
+    AllNodesVisited = length(Nodes) == length(VisitedNames),
 
     Connected = SymmetricViews andalso AllNodesVisited,
 
@@ -282,7 +331,8 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
 
     {noreply, State#state{is_connected=Connected,
                           was_connected=WasConnected,
-                          graph=Graph}};
+                          graph=Graph,
+                          tree=Tree}};
 
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -385,19 +435,6 @@ get_request(Url, DecodeFun) ->
             {error, invalid}
     end.
 
-%% @private
-populate_graph(Name, Membership, Graph) ->
-    %% Add node to graph.
-    digraph:add_vertex(Graph, Name),
-
-    lists:foldl(fun(N, _) ->
-                        %% Add node to graph.
-                        digraph:add_vertex(Graph, N),
-
-                        %% Add edge to graph.
-                        digraph:add_edge(Graph, Name, N)
-                end, Graph, Membership).
-
 breath_first(Root, Graph, Visited0) ->
     %% Check if every link is bidirectional
     %% If not, stop traversal
@@ -473,3 +510,100 @@ schedule_membership_refresh() ->
     Jitter = rand_compat:uniform(?REFRESH_INTERVAL),
     timer:send_after(?REFRESH_INTERVAL + Jitter, ?REFRESH_MESSAGE).
 
+%% @private
+vertices_and_edges(Graph) ->
+    Vertices = digraph:vertices(Graph),
+    Edges = lists:map(
+        fun(Edge) ->
+            {_E, V1, V2, _Label} = digraph:edge(Graph, Edge),
+            {V1, V2}
+        end,
+        digraph:edges(Graph)
+    ),
+    {Vertices, Edges}.
+
+%% @private
+node_names([]) ->
+    [];
+node_names([{Name, _Ip, _Port}|T]) ->
+    [Name|node_names(T)].
+
+%% @private
+populate_graph(Nodes, Graph) ->
+    %% Get bucket name.
+    BucketName = bucket_name(),
+
+    lists:foldl(
+        fun(Node, OrphanedNodes) ->
+            File = prefix(atom_to_list(Node)),
+            try
+                Result = erlcloud_s3:get_object(BucketName, File),
+                Body = proplists:get_value(content, Result, undefined),
+                case Body of
+                    undefined ->
+                        OrphanedNodes;
+                    _ ->
+                        Membership = binary_to_term(Body),
+                        case Membership of
+                            [Node] ->
+                                add_edges(Node, [], Graph),
+                                [Node|OrphanedNodes];
+                            _ ->
+                                add_edges(Node, Membership, Graph),
+                                OrphanedNodes
+                        end
+                end
+            catch
+                _:{aws_error, Error} ->
+                    add_edges(Node, [], Graph),
+                    lager:info("Could not get graph object; ~p", [Error]),
+                    OrphanedNodes
+            end
+        end,
+        [],
+        Nodes
+    ).
+
+%% @private
+populate_tree(Root, Nodes, Tree) ->
+    DebugTree = debug_get_tree(Root, Nodes),
+    lists:foreach(
+        fun({Node, Peers}) ->
+            case Peers of
+                down ->
+                    add_edges(Node, [], Tree);
+                {Eager, _Lazy} ->
+                    add_edges(Node, Eager, Tree)
+            end
+        end,
+        DebugTree
+    ).
+
+%% @private
+add_edges(Name, Membership, Graph) ->
+    %% Add node to graph.
+    digraph:add_vertex(Graph, Name),
+
+    lists:foldl(
+        fun(N, _) ->
+            %% Add node to graph.
+            digraph:add_vertex(Graph, N),
+
+            %% Add edge to graph.
+            digraph:add_edge(Graph, Name, N)
+        end,
+        Graph,
+        Membership
+    ).
+
+-spec debug_get_tree(node(), [node()]) ->
+                            [{node(), {ordsets:ordset(node()), ordsets:ordset(node())}}].
+debug_get_tree(Root, Nodes) ->
+    [begin
+         Peers = try plumtree_broadcast:debug_get_peers(Node, Root, 5000)
+                 catch _:Error ->
+                           lager:info("Call to node ~p to get root tree ~p failed: ~p", [Node, Root, Error]),
+                           down
+                 end,
+         {Node, Peers}
+     end || Node <- Nodes].

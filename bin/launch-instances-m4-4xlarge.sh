@@ -6,10 +6,10 @@ STACK_NAME=dcos-m4-4xlarge
 echo "Launching Oregon."
 aws cloudformation create-stack \
   --stack-name ${STACK_NAME} \
-  --template-url https://s3-us-west-2.amazonaws.com/cf-templates-akuyolple9l-us-west-2/2016348aHI-HA-m4.4xlarge2drq2cmkzv8ucvbt2ljfxhia4i \\
+  --template-url https://s3-us-west-2.amazonaws.com/cf-templates-akuyolple9l-us-west-2/2016348aHI-HA-m4.4xlarge2drq2cmkzv8ucvbt2ljfxhia4i \
   --capabilities CAPABILITY_IAM \
   --parameters ParameterKey=KeyName,ParameterValue=${KEY_NAME} \
-               ParameterKey=PublicSlaveInstanceCount,ParameterValue=70 \
+               ParameterKey=PublicSlaveInstanceCount,ParameterValue=35 \
                ParameterKey=OAuthEnabled,ParameterValue=false \
                ParameterKey=SlaveInstanceCount,ParameterValue=0
 

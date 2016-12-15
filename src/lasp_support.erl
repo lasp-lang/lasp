@@ -259,7 +259,7 @@ start_runner() ->
                              ?EXCHANGE_TIMER),
     ok = application:set_env(plumtree,
                              broadcast_mods,
-                             [lasp_default_broadcast_distribution_backend]),
+                             [lasp_plumtree_backend]),
 
     {ok, _} = application:ensure_all_started(lasp),
 

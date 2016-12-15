@@ -61,6 +61,7 @@ end_per_testcase(Case, _Config) ->
 
 all() ->
     [
+     full_peer_to_peer_state_based_with_aae_and_tree_test,
      peer_to_peer_state_based_with_aae_test,
      peer_to_peer_state_based_with_aae_and_tree_test,
      peer_to_peer_delta_based_with_aae_test%%,
@@ -79,6 +80,17 @@ default_test(_Config) ->
 %% ===================================================================
 %% peer-to-peer
 %% ===================================================================
+
+full_peer_to_peer_state_based_with_aae_and_tree_test(Config) ->
+    lasp_simulation_support:run(peer_to_peer_ad_counter_state_based_with_aae_and_tree_test,
+        Config,
+        [{mode, state_based},
+         {simulation, ad_counter},
+         {partisan_peer_service_manager, partisan_default_peer_service_manager},
+         {set, orset},
+         {broadcast, true},
+         {evaluation_identifier, full_peer_to_peer_state_based_with_aae_and_tree}]),
+    ok.
 
 peer_to_peer_state_based_with_aae_test(Config) ->
     lasp_simulation_support:run(peer_to_peer_ad_counter_state_based_with_aae_test,

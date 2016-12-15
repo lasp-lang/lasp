@@ -697,11 +697,14 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
             #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_send"),
 
-    ?CORE:receive_delta(Store, {delta_send,
-                                From,
-                               {Id, Type, _Metadata, Deltas},
-                               ?CLOCK_INCR(Actor),
-                               ?CLOCK_INIT(Actor)}),
+    {Time, _Value} = timer:tc(fun() ->
+                    ?CORE:receive_delta(Store, {delta_send,
+                                                From,
+                                               {Id, Type, _Metadata, Deltas},
+                                               ?CLOCK_INCR(Actor),
+                                               ?CLOCK_INIT(Actor)})
+             end),
+    lager:info("Receiving delta took: ~p microseconds.", [Time]),
 
     %% Acknowledge message.
     send({delta_ack, node(), Id, Counter}, From),

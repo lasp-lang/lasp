@@ -173,10 +173,7 @@ query(Id) ->
 %%
 -spec update(id(), operation(), actor()) -> {ok, var()} | error().
 update(Id, Operation, Actor) ->
-    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
-                                                        {update, Id, Operation, Actor},
-                                                        infinity),
-    {ok, {Id, Type, Metadata, Value}}.
+    gen_server:call(?MODULE, {update, Id, Operation, Actor}, infinity).
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -186,10 +183,7 @@ update(Id, Operation, Actor) ->
 %%
 -spec bind(id(), value()) -> {ok, var()}.
 bind(Id, Value0) ->
-    {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
-                                                        {bind, Id, Value0},
-                                                        infinity),
-    {ok, {Id, Type, Metadata, Value}}.
+    gen_server:call(?MODULE, {bind, Id, Value0}, infinity).
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%

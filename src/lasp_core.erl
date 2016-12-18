@@ -24,7 +24,7 @@
 -include("lasp.hrl").
 
 %% Core API.
--export([start/1,
+-export([start_link/1,
          bind/3,
          bind/4,
          bind_to/3,
@@ -92,9 +92,9 @@
               end).
 
 %% @doc Initialize the storage backend.
--spec start(atom()) -> {ok, store()} | {error, term()}.
-start(Identifier) ->
-    do(start, [Identifier]).
+-spec start_link(atom()) -> {ok, store()} | {error, term()}.
+start_link(Identifier) ->
+    do(start_link, [Identifier]).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -762,7 +762,7 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     lasp_process:start_dag_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
                                 TransFun, {AccId, BindFun(Store)}]).
 
-%% @doc Lap values from one lattice into another.
+%% @doc Map values from one lattice into another.
 %%
 %%      Applies the given `Function' as a map over the items in `Id',
 %%      placing the result in `AccId', both of which need to be declared

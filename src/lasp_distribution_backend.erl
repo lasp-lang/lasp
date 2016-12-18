@@ -265,7 +265,7 @@ init([]) ->
     Identifier = node(),
 
     %% Start the storage backend.
-    {ok, Store} = case ?CORE:start(Identifier) of
+    {ok, Store} = case ?CORE:start_link(Identifier) of
         {ok, Pid} ->
             {ok, Pid};
         {error, {already_started, Pid}} ->

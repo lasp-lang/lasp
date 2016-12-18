@@ -25,7 +25,7 @@
 
 -include("lasp.hrl").
 
--callback start(atom())-> {ok, store()} | ignore | {error, term()}.
+-callback start_link(atom())-> {ok, store()} | ignore | {error, term()}.
 
 -callback put(store(), id(), variable()) -> ok | {error, atom()}.
 

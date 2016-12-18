@@ -64,12 +64,7 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {store :: store(),
-                gossip_peers :: [],
-                actor :: binary()}).
-
--define(DELTA_GC_INTERVAL, 60000).
--define(PEER_REFRESH_INTERVAL, 10000).
+-record(state, {store :: store(), gossip_peers :: [], actor :: binary()}).
 
 %% Definitions for the bind/read fun abstraction.
 
@@ -321,7 +316,7 @@ init([]) ->
     schedule_aae_synchronization(),
     schedule_delta_synchronization(),
     schedule_delta_garbage_collection(),
-    schedule_peer_refresh(),
+    schedule_plumtree_peer_refresh(),
 
     {ok, Actor} = lasp_unique:unique(),
 
@@ -726,7 +721,7 @@ handle_info(delta_sync, #state{}=State) ->
     schedule_delta_synchronization(),
 
     {noreply, State#state{}};
-handle_info(peer_refresh, State) ->
+handle_info(plumtree_peer_refresh, State) ->
     %% TODO: Temporary hack until the Plumtree can propagate tree
     %% information in the metadata messages.  Therefore, manually poll
     %% periodically with jitter.
@@ -741,7 +736,7 @@ handle_info(peer_refresh, State) ->
     end,
 
     %% Schedule next synchronization.
-    schedule_peer_refresh(),
+    schedule_plumtree_peer_refresh(),
 
     {noreply, State#state{gossip_peers=GossipPeers}};
 handle_info(delta_gc, #state{store=Store}=State) ->
@@ -959,12 +954,14 @@ schedule_delta_synchronization() ->
     end.
 
 %% @private
-schedule_peer_refresh() ->
+schedule_plumtree_peer_refresh() ->
     case broadcast_tree_mode() of
         true ->
-            Interval = lasp_config:get(peer_refresh_interval, ?PEER_REFRESH_INTERVAL),
+            Interval = lasp_config:get(plumtree_peer_refresh_interval,
+                                       ?PLUMTREE_PEER_REFRESH_INTERVAL),
             Jitter = rand_compat:uniform(Interval),
-            timer:send_after(Jitter + ?PEER_REFRESH_INTERVAL, peer_refresh);
+            timer:send_after(Jitter + ?PLUMTREE_PEER_REFRESH_INTERVAL,
+                             plumtree_peer_refresh);
         false ->
             ok
     end.

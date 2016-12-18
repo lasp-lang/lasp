@@ -1,3 +1,9 @@
+%% Delta synchronization interval.
+-define(DELTA_GC_INTERVAL, 60000).
+
+%% Plumtree peer refresh interval.
+-define(PLUMTREE_PEER_REFRESH_INTERVAL, 10000).
+
 %% Default mode.
 -define(DEFAULT_MODE, state_based).
 

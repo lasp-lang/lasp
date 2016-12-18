@@ -147,7 +147,7 @@
         {?SIM_STATUS_TRACKING, ?SIM_STATUS_STRUCTURE}).
 
 %% Simulation helpers.
--define(AAE_INTERVAL, 10000).
+-define(STATE_INTERVAL, 10000).
 -define(IMPRESSION_INTERVAL, 10000). %% 10 seconds
 -define(STATUS_INTERVAL, 10000).
 -define(EVAL_NUMBER, 1).

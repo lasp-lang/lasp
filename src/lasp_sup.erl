@@ -289,13 +289,13 @@ configure_defaults() ->
                                 normal)
     end,
 
-    %% AAE interval.
-    AAEIntervalDefault = list_to_integer(os:getenv("AAE_INTERVAL", "10000")),
-    AAEInterval = application:get_env(?APP,
-                                      aae_interval,
-                                      AAEIntervalDefault),
-    lasp_config:set(aae_interval, AAEInterval),
-    application:set_env(plumtree, broadcast_exchange_timer, AAEInterval),
+    %% State interval.
+    StateIntervalDefault = list_to_integer(os:getenv("STATE_INTERVAL", "10000")),
+    StateInterval = application:get_env(?APP,
+                                        state_interval,
+                                        StateIntervalDefault),
+    lasp_config:set(state_interval, StateInterval),
+    application:set_env(plumtree, broadcast_exchange_timer, StateInterval),
 
     %% Delta interval.
     DeltaIntervalDefault = list_to_integer(os:getenv("DELTA_INTERVAL", "10000")),

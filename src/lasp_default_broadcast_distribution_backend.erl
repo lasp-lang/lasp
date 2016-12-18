@@ -263,7 +263,7 @@ init([]) ->
                      erlang:monotonic_time(),
                      erlang:unique_integer()),
 
-    schedule_aae_synchronization(),
+    schedule_state_synchronization(),
     schedule_delta_synchronization(),
     schedule_delta_garbage_collection(),
     schedule_plumtree_peer_refresh(),
@@ -563,7 +563,7 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}},
             ObjectFilterFun = fun(Id1) ->
                                       Id =:= Id1
                               end,
-            init_aae_sync(From, ObjectFilterFun, Store);
+            init_state_sync(From, ObjectFilterFun, Store);
         false ->
             ok
     end,
@@ -613,10 +613,10 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 
-handle_info(aae_sync, #state{store=Store, gossip_peers=GossipPeers} = State) ->
-    lasp_marathon_simulations:log_message_queue_size("aae_sync"),
+handle_info(state_sync, #state{store=Store, gossip_peers=GossipPeers} = State) ->
+    lasp_marathon_simulations:log_message_queue_size("state_sync"),
 
-    lasp_logger:extended("Beginning AAE synchronization."),
+    lasp_logger:extended("Beginning state synchronization."),
 
     Members = case broadcast_tree_mode() of
         true ->
@@ -632,10 +632,10 @@ handle_info(aae_sync, #state{store=Store, gossip_peers=GossipPeers} = State) ->
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
-    lists:foreach(fun(Peer) -> init_aae_sync(Peer, Store) end, Peers),
+    lists:foreach(fun(Peer) -> init_state_sync(Peer, Store) end, Peers),
 
     %% Schedule next synchronization.
-    schedule_aae_synchronization(),
+    schedule_state_synchronization(),
 
     {noreply, State};
 handle_info(delta_sync, #state{}=State) ->
@@ -847,8 +847,8 @@ log_transmission(ToLog, PeerCount) ->
     end.
 
 %% @private
-schedule_aae_synchronization() ->
-    ShouldAAESync = state_based_mode()
+schedule_state_synchronization() ->
+    ShouldSync = state_based_mode()
             andalso (not tutorial_mode())
             andalso (
               peer_to_peer_mode()
@@ -860,16 +860,16 @@ schedule_aae_synchronization() ->
               )
             ),
 
-    case ShouldAAESync of
+    case ShouldSync of
         true ->
-            Interval = lasp_config:get(aae_interval, 10000),
+            Interval = lasp_config:get(state_interval, 10000),
             case lasp_config:get(jitter, false) of
                 true ->
                     %% Add random jitter.
                     Jitter = rand_compat:uniform(Interval),
-                    timer:send_after(Interval + Jitter, aae_sync);
+                    timer:send_after(Interval + Jitter, state_sync);
                 false ->
-                    timer:send_after(Interval, aae_sync)
+                    timer:send_after(Interval, state_sync)
             end;
         false ->
             ok
@@ -948,13 +948,13 @@ extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
     [{delta_send_protocol, {Id, Node, Counter}}].
 
 %% @private
-init_aae_sync(Peer, Store) ->
+init_state_sync(Peer, Store) ->
     ObjectFilterFun = fun(_) -> true end,
-    init_aae_sync(Peer, ObjectFilterFun, Store).
+    init_state_sync(Peer, ObjectFilterFun, Store).
 
 %% @private
-init_aae_sync(Peer, ObjectFilterFun, Store) ->
-    lasp_logger:extended("Initializing AAE synchronization with peer: ~p", [Peer]),
+init_state_sync(Peer, ObjectFilterFun, Store) ->
+    lasp_logger:extended("Initializing state synchronization with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->

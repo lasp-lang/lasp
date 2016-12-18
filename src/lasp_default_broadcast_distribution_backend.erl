@@ -69,7 +69,6 @@
                 actor :: binary()}).
 
 -define(DELTA_GC_INTERVAL, 60000).
--define(PLUMTREE_MEMORY_INTERVAL, 10000).
 -define(MEMORY_UTILIZATION_INTERVAL, 10000).
 -define(PEER_REFRESH_INTERVAL, 10000).
 
@@ -346,7 +345,6 @@ init([]) ->
     end,
 
     %% Schedule reports.
-    schedule_plumtree_memory_report(),
     schedule_memory_utilization_report(),
 
     {ok, #state{actor=Actor,
@@ -735,17 +733,6 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(plumtree_memory_report, State) ->
-    lasp_marathon_simulations:log_message_queue_size("plumtree_memory_report"),
-
-    %% Log
-    plumtree_memory_report(),
-
-    %% Schedule report.
-    schedule_plumtree_memory_report(),
-
-    {noreply, State};
-
 handle_info(memory_utilization_report, State) ->
     lasp_marathon_simulations:log_message_queue_size("memory_utilization_report"),
 
@@ -1067,15 +1054,6 @@ schedule_delta_garbage_collection() ->
     end.
 
 %% @private
-schedule_plumtree_memory_report() ->
-    case lasp_config:get(memory_report, false) of
-        true ->
-            timer:send_after(?PLUMTREE_MEMORY_INTERVAL, plumtree_memory_report);
-        false ->
-            ok
-    end.
-
-%% @private
 schedule_memory_utilization_report() ->
     case lasp_config:get(instrumentation, false) of
         true ->
@@ -1083,14 +1061,6 @@ schedule_memory_utilization_report() ->
         false ->
             ok
     end.
-
-%% @private
-plumtree_memory_report() ->
-    PlumtreeBroadcast = erlang:whereis(plumtree_broadcast),
-    lager:info("Plumtree message queue: ~p",
-               [process_info(PlumtreeBroadcast, message_queue_len)]),
-    lager:info("Our message queue: ~p",
-               [process_info(self(), message_queue_len)]).
 
 %% @private
 memory_utilization_report() ->

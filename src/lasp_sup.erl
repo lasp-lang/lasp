@@ -94,6 +94,11 @@ init(_Args) ->
                             permanent, 5000, worker,
                             [lasp_default_broadcast_distribution_backend]},
 
+    PlumtreeMemoryReport = {lasp_plumtree_memory_report,
+                            {lasp_plumtree_memory_report, start_link, []},
+                             permanent, 5000, worker,
+                             [lasp_plumtree_memory_report]},
+
     PlumtreeBackend = {lasp_plumtree_backend,
                        {lasp_plumtree_backend, start_link, []},
                         permanent, 5000, worker,
@@ -114,6 +119,7 @@ init(_Args) ->
                   Partisan,
                   Sprinter,
                   PlumtreeBackend,
+                  PlumtreeMemoryReport,
                   DistributionBackend,
                   Plumtree,
                   Process] ++ WebSpecs,

@@ -170,21 +170,21 @@
 
 %% Definitions for the bind/read fun abstraction.
 
--define(BIND, fun(_AccId, _AccValue, _Store) ->
+-define(CORE_BIND, fun(_AccId, _AccValue, _Store) ->
                 ?CORE:bind(_AccId, _AccValue, _Store)
               end).
 
--define(WRITE, fun(_Store) ->
+-define(CORE_WRITE, fun(_Store) ->
                  fun(_AccId, _AccValue) ->
                    {ok, _} = ?CORE:bind_var(_AccId, _AccValue, _Store)
                  end
                end).
 
--define(READ, fun(_Id, _Threshold) ->
+-define(CORE_READ, fun(_Id, _Threshold) ->
                 ?CORE:read_var(_Id, _Threshold, Store)
               end).
 
--define(BLOCKING, fun() -> {noreply, State} end).
+-define(NOREPLY, fun() -> {noreply, State} end).
 
 %% Metadata mutation macros.
 
@@ -217,4 +217,3 @@
             Merged = lasp_vclock:merge([TheirClock, OurClock]),
             orddict:store(clock, Merged, Metadata)
     end).
-

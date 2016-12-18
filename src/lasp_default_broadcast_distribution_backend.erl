@@ -381,7 +381,7 @@ handle_call({bind, Id, Metadata0, Value}, _From,
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("bind_to"),
 
-    {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?WRITE, ?READ),
+    {ok, _Pid} = ?CORE:bind_to(Id, DVId, Store, ?CORE_WRITE, ?CORE_READ),
     {reply, ok, State};
 
 %% Perform an update, and ensure that we bump the logical clock as we
@@ -414,7 +414,7 @@ handle_call({wait_needed, Id, Threshold}, From, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("wait_needed"),
 
     ReplyFun = fun(ReadThreshold) -> {reply, {ok, ReadThreshold}, State} end,
-    ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?BLOCKING);
+    ?CORE:wait_needed(Id, Threshold, Store, From, ReplyFun, ?NOREPLY);
 
 %% Attempt to read a value.
 handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
@@ -425,15 +425,15 @@ handle_call({read, Id, Threshold}, From, #state{store=Store}=State) ->
                   ({error, Error}) ->
                     {reply, {error, Error}, State}
                end,
-    Value0 = ?CORE:read(Id, Threshold, Store, From, ReplyFun, ?BLOCKING),
+    Value0 = ?CORE:read(Id, Threshold, Store, From, ReplyFun, ?NOREPLY),
     declare_if_not_found(Value0, Id, State, ?CORE, read,
-                         [Id, Threshold, Store, From, ReplyFun, ?BLOCKING]);
+                         [Id, Threshold, Store, From, ReplyFun, ?NOREPLY]);
 
 %% Spawn a process to perform a filter.
 handle_call({filter, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("filter"),
 
-    {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?WRITE, ?READ),
+    {ok, _Pid} = ?CORE:filter(Id, Function, AccId, Store, ?CORE_WRITE, ?CORE_READ),
     {reply, ok, State};
 
 %% Spawn a process to compute a product.
@@ -442,8 +442,8 @@ handle_call({product, Left, Right, Product},
             #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("product"),
 
-    {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?WRITE,
-                               ?READ, ?READ),
+    {ok, _Pid} = ?CORE:product(Left, Right, Product, Store, ?CORE_WRITE,
+                               ?CORE_READ, ?CORE_READ),
     {reply, ok, State};
 
 %% Spawn a process to compute the intersection.
@@ -453,29 +453,29 @@ handle_call({intersection, Left, Right, Intersection},
     lasp_marathon_simulations:log_message_queue_size("intersection"),
 
     {ok, _Pid} = ?CORE:intersection(Left, Right, Intersection, Store,
-                                    ?WRITE, ?READ, ?READ),
+                                    ?CORE_WRITE, ?CORE_READ, ?CORE_READ),
     {reply, ok, State};
 
 %% Spawn a process to compute the union.
 handle_call({union, Left, Right, Union}, _From, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("union"),
 
-    {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?WRITE, ?READ,
-                             ?READ),
+    {ok, _Pid} = ?CORE:union(Left, Right, Union, Store, ?CORE_WRITE, ?CORE_READ,
+                             ?CORE_READ),
     {reply, ok, State};
 
 %% Spawn a process to perform a map.
 handle_call({map, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("map"),
 
-    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?WRITE, ?READ),
+    {ok, _Pid} = ?CORE:map(Id, Function, AccId, Store, ?CORE_WRITE, ?CORE_READ),
     {reply, ok, State};
 
 %% Spawn a process to perform a fold.
 handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("fold"),
 
-    {ok, _Pid} = ?CORE:fold(Id, Function, AccId, Store, ?BIND, ?READ),
+    {ok, _Pid} = ?CORE:fold(Id, Function, AccId, Store, ?CORE_BIND, ?CORE_READ),
     {reply, ok, State};
 
 %% @private

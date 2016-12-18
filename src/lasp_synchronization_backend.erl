@@ -22,7 +22,6 @@
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -export([broadcast_tree_mode/0,
-         delta_based_mode/0,
          tutorial_mode/0,
          client_server_mode/0,
          peer_to_peer_mode/0,
@@ -127,8 +126,3 @@ i_am_client() ->
 %% @private
 reactive_server() ->
     lasp_config:get(reactive_server, false).
-
-%% @private
-delta_based_mode() ->
-    lasp_config:get(mode, state_based) == delta_based.
-

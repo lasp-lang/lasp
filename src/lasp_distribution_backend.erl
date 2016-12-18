@@ -260,9 +260,6 @@ init([]) ->
     %% Seed the process at initialization.
     ?SYNC_BACKEND:seed(),
 
-    schedule_delta_synchronization(),
-    schedule_delta_garbage_collection(),
-
     {ok, Actor} = lasp_unique:unique(),
 
     Identifier = node(),
@@ -284,7 +281,7 @@ init([]) ->
             lasp_state_based_synchronization_backend:start_link([Store, Actor]),
             ok;
         delta_based ->
-            %% lasp_delta_based_synchronization_backend:start_link(Store, Actor),
+            lasp_delta_based_synchronization_backend:start_link([Store, Actor]),
             ok
     end,
 
@@ -484,199 +481,18 @@ handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:fold(Id, Function, AccId, Store, ?CORE_BIND, ?CORE_READ),
     {reply, ok, State};
 
-%% @private
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
 
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
-%% Anti-entropy mechanism for causal consistency of delta-CRDT;
-%% periodically ship delta-interval or entire state.
-handle_cast({delta_exchange, Peer, ObjectFilterFun},
-            #state{store=Store}=State) ->
-    lasp_marathon_simulations:log_message_queue_size("delta_exchange"),
 
-    lasp_logger:extended("Exchange starting for ~p", [Peer]),
-
-    Mutator = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
-                           delta_counter=Counter, delta_map=DeltaMap,
-                           delta_ack_map=AckMap0}=Object}) ->
-        case ObjectFilterFun(Id) of
-            true ->
-                Ack = case orddict:find(Peer, AckMap0) of
-                    {ok, {Ack0, _GCCounter}} ->
-                        Ack0;
-                    error ->
-                        0
-                end,
-
-                Min = lists_min(orddict:fetch_keys(DeltaMap)),
-
-                Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
-                    true ->
-                        Value;
-                    false ->
-                        collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
-                end,
-
-                ClientInReactiveMode =
-                (?SYNC_BACKEND:client_server_mode() andalso
-                 ?SYNC_BACKEND:i_am_client() andalso ?SYNC_BACKEND:reactive_server()),
-
-                AckMap = case Ack < Counter orelse ClientInReactiveMode of
-                    true ->
-                        send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
-
-                        orddict:map(
-                            fun(Peer0, {Ack0, GCCounter0}) ->
-                                case Peer0 of
-                                    Peer ->
-                                        {Ack0, GCCounter0 + 1};
-                                    _ ->
-                                        {Ack0, GCCounter0}
-                                end
-                            end,
-                            AckMap0
-                        );
-                    false ->
-                        AckMap0
-                end,
-
-                {Object#dv{delta_ack_map=AckMap}, Id};
-            false ->
-                {Object, skip}
-        end
-    end,
-
-    %% TODO: Should this be parallel?
-    {ok, _} = lasp_storage_backend:do(update_all, [Store, Mutator]),
-
-    lasp_logger:extended("Exchange finished for ~p", [Peer]),
-
-    {noreply, State};
-
-handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
-            #state{store=Store, actor=Actor}=State) ->
-    lasp_marathon_simulations:log_message_queue_size("delta_send"),
-
-    {Time, _Value} = timer:tc(fun() ->
-                    ?CORE:receive_delta(Store, {delta_send,
-                                                From,
-                                               {Id, Type, _Metadata, Deltas},
-                                               ?CLOCK_INCR(Actor),
-                                               ?CLOCK_INIT(Actor)})
-             end),
-    lager:info("Receiving delta took: ~p microseconds.", [Time]),
-
-    %% Acknowledge message.
-    send({delta_ack, node(), Id, Counter}, From),
-
-    %% Send back just the updated state for the object received.
-    case ?SYNC_BACKEND:client_server_mode() andalso
-         ?SYNC_BACKEND:i_am_server() andalso ?SYNC_BACKEND:reactive_server() of
-        true ->
-            ObjectFilterFun = fun(Id1) ->
-                                      Id =:= Id1
-                              end,
-            init_delta_sync(From, ObjectFilterFun);
-        false ->
-            ok
-    end,
-
-    {noreply, State};
-
-handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
-    lasp_marathon_simulations:log_message_queue_size("delta_ack"),
-
-    ?CORE:receive_delta(Store, {delta_ack, Id, From, Counter}),
-    {noreply, State};
-
-%% @private
 handle_cast(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-
-handle_info(delta_sync, #state{}=State) ->
-    lasp_marathon_simulations:log_message_queue_size("delta_sync"),
-
-    lasp_logger:extended("Beginning delta synchronization."),
-
-    %% Get the active set from the membership protocol.
-    {ok, Members} = membership(),
-
-    %% Remove ourself and compute exchange peers.
-    Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
-
-    lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
-
-    %% Ship buffered updates for the fanout value.
-    WithoutConvergenceFun = fun(Id) ->
-                              Id =/= ?SIM_STATUS_STRUCTURE
-                      end,
-    lists:foreach(fun(Peer) ->
-                          init_delta_sync(Peer, WithoutConvergenceFun) end,
-                  Peers),
-
-    %% Synchronize convergence structure.
-    WithConvergenceFun = fun(Id) ->
-                              Id =:= ?SIM_STATUS_STRUCTURE
-                      end,
-    lists:foreach(fun(Peer) ->
-                          init_delta_sync(Peer, WithConvergenceFun) end,
-                  ?SYNC_BACKEND:without_me(Members)),
-
-    %% Schedule next synchronization.
-    schedule_delta_synchronization(),
-
-    {noreply, State#state{}};
-
-handle_info(delta_gc, #state{store=Store}=State) ->
-    lasp_marathon_simulations:log_message_queue_size("delta_gc"),
-
-    MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter,
-                                   ?MAX_GC_COUNTER),
-
-    %% Generate garbage collection function.
-    Mutator = fun({Id, #dv{delta_map=DeltaMap0,
-                           delta_ack_map=AckMap0}=Object}) ->
-
-        %% Only keep in the ack map nodes with gc counter
-        %% below `MaxGCCounter'.
-        PruneFun = fun(_Node, {_Ack, GCCounter}) ->
-            GCCounter < MaxGCCounter
-        end,
-
-        PrunedAckMap = orddict:filter(PruneFun, AckMap0),
-
-        %% Determine the min ack present in the ack map
-        MinAck = lists_min([Ack || {_Node, {Ack, _GCCounter}} <- PrunedAckMap]),
-
-        %% Remove unnecessary deltas from the delta map
-        DeltaMapGCFun = fun(Counter, {_Origin, _Delta}) ->
-            Counter >= MinAck
-        end,
-
-        DeltaMapGC = orddict:filter(DeltaMapGCFun, DeltaMap0),
-
-        lager:info("\n\n\n--------------------GC--------------------"),
-        lager:info("GC stats for ~p", [Id]),
-        lager:info("Delta Map size: before ~p | after ~p", [orddict:size(DeltaMap0), orddict:size(DeltaMapGC)]),
-        lager:info("Ack Map size:   before ~p | after ~p", [orddict:size(AckMap0), orddict:size(PrunedAckMap)]),
-        lager:info("--------------------GC--------------------\n\n\n"),
-
-        {Object#dv{delta_map=DeltaMapGC, delta_ack_map=PrunedAckMap}, Id}
-    end,
-
-    {ok, Results} = lasp_storage_backend:do(update_all, [Store, Mutator]),
-    lager:info("Garbage collection complete for objects: ~p", [Results]),
-
-    %% Schedule next GC and reset counter.
-    schedule_delta_garbage_collection(),
-
-    {noreply, State};
 
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -729,23 +545,6 @@ get(Id, Store) ->
     ?CORE:read(Id, Threshold, Store, self(), ReplyFun, BlockingFun).
 
 %% @private
-collect_deltas(Peer, Type, DeltaMap, PeerLastAck, DeltaCounter) ->
-    orddict:fold(
-        fun(Counter, {Origin, Delta}, Deltas) ->
-            case (Counter >= PeerLastAck) andalso
-                 (Counter < DeltaCounter) andalso
-                 Origin /= Peer of
-                true ->
-                    lasp_type:merge(Type, Deltas, Delta);
-                false ->
-                    Deltas
-            end
-        end,
-        lasp_type:new(Type),
-        DeltaMap
-    ).
-
-%% @private
 declare_if_not_found({error, not_found}, {StorageId, TypeId},
                      #state{store=Store, actor=Actor}, Module, Function, Args) ->
     {ok, {{StorageId, TypeId}, _, _, _}} = ?CORE:declare(StorageId, TypeId,
@@ -753,92 +552,3 @@ declare_if_not_found({error, not_found}, {StorageId, TypeId},
     erlang:apply(Module, Function, Args);
 declare_if_not_found(Result, _Id, _State, _Module, _Function, _Args) ->
     Result.
-
-%% @private
-log_transmission(ToLog, PeerCount) ->
-    try
-        case lasp_config:get(instrumentation, false) of
-            true ->
-                lists:foreach(
-                    fun({Type, Payload}) ->
-                        ok = lasp_instrumentation:transmission(Type, Payload, PeerCount)
-                    end,
-                    ToLog
-                ),
-                ok;
-            false ->
-                ok
-        end
-    catch
-        _:Error ->
-            lager:error("Couldn't log transmission: ~p", [Error]),
-            ok
-    end.
-
-%% @private
-schedule_delta_synchronization() ->
-    ShouldDeltaSync = ?SYNC_BACKEND:delta_based_mode()
-            andalso (
-              ?SYNC_BACKEND:peer_to_peer_mode()
-              orelse
-              (
-               ?SYNC_BACKEND:client_server_mode()
-               andalso
-               not (?SYNC_BACKEND:i_am_server() andalso ?SYNC_BACKEND:reactive_server())
-              )
-            ),
-
-    case ShouldDeltaSync of
-        true ->
-            Interval = lasp_config:get(delta_interval, 10000),
-            case lasp_config:get(jitter, false) of
-                true ->
-                    %% Add random jitter.
-                    Jitter = rand_compat:uniform(Interval),
-                    timer:send_after(Interval + Jitter, delta_sync);
-                false ->
-                    timer:send_after(Interval, delta_sync)
-            end;
-        false ->
-            ok
-    end.
-
-%% @private
-schedule_delta_garbage_collection() ->
-    case ?SYNC_BACKEND:delta_based_mode() of
-        true ->
-            timer:send_after(?DELTA_GC_INTERVAL, delta_gc);
-        false ->
-            ok
-    end.
-
-%% @private
-send(Msg, Peer) ->
-    log_transmission(extract_log_type_and_payload(Msg), 1),
-    PeerServiceManager = lasp_config:peer_service_manager(),
-    case PeerServiceManager:forward_message(Peer, ?MODULE, Msg) of
-        ok ->
-            ok;
-        _Error ->
-            % lager:error("Failed send to ~p for reason ~p", [Peer, Error]),
-            ok
-    end.
-
-%% @private
-%% delta_based messages:
-extract_log_type_and_payload({delta_send, Node, {Id, _Type, _Metadata, Deltas}, Counter}) ->
-    [{delta_send, Deltas}, {delta_send_protocol, {Id, Node, Counter}}];
-extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
-    [{delta_send_protocol, {Id, Node, Counter}}].
-
-%% @private
-init_delta_sync(Peer, ObjectFilterFun) ->
-    gen_server:cast(?MODULE, {delta_exchange, Peer, ObjectFilterFun}).
-
-%% @private
-membership() ->
-    lasp_peer_service:members().
-
-%% @private
-lists_min([]) -> 0;
-lists_min(L) -> lists:min(L).

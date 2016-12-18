@@ -131,6 +131,4 @@ schedule_plumtree_memory_report() ->
 plumtree_memory_report() ->
     PlumtreeBroadcast = erlang:whereis(plumtree_broadcast),
     lager:info("Plumtree message queue: ~p",
-               [process_info(PlumtreeBroadcast, message_queue_len)]),
-    lager:info("Our message queue: ~p",
-               [process_info(self(), message_queue_len)]).
+               [process_info(PlumtreeBroadcast, message_queue_len)]).

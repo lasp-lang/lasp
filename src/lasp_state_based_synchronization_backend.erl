@@ -22,6 +22,7 @@
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).
+-behaviour(lasp_synchronization_backend).
 
 %% API
 -export([start_link/1]).
@@ -34,10 +35,21 @@
          terminate/2,
          code_change/3]).
 
+%% lasp_synchronization_backend callbacks
+-export([extract_log_type_and_payload/1]).
+
 -include("lasp.hrl").
 
 %% State record.
 -record(state, {store :: store(), gossip_peers :: [], actor :: binary()}).
+
+%%%===================================================================
+%%% lasp_synchronization_backend callbacks
+%%%===================================================================
+
+%% state_based messages:
+extract_log_type_and_payload({state_send, _Node, {Id, _Type, _Metadata, State}}) ->
+    [{state_send, State}, {state_send_protocol, Id}].
 
 %%%===================================================================
 %%% API
@@ -173,27 +185,6 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-log_transmission(ToLog, PeerCount) ->
-    try
-        case lasp_config:get(instrumentation, false) of
-            true ->
-                lists:foreach(
-                    fun({Type, Payload}) ->
-                        ok = lasp_instrumentation:transmission(Type, Payload, PeerCount)
-                    end,
-                    ToLog
-                ),
-                ok;
-            false ->
-                ok
-        end
-    catch
-        _:Error ->
-            lager:error("Couldn't log transmission: ~p", [Error]),
-            ok
-    end.
-
-%% @private
 schedule_state_synchronization() ->
     ShouldSync = true
             andalso (not ?SYNC_BACKEND:tutorial_mode())
@@ -236,23 +227,6 @@ schedule_plumtree_peer_refresh() ->
     end.
 
 %% @private
-send(Msg, Peer) ->
-    log_transmission(extract_log_type_and_payload(Msg), 1),
-    PeerServiceManager = lasp_config:peer_service_manager(),
-    case PeerServiceManager:forward_message(Peer, ?MODULE, Msg) of
-        ok ->
-            ok;
-        _Error ->
-            % lager:error("Failed send to ~p for reason ~p", [Peer, Error]),
-            ok
-    end.
-
-%% @private
-%% state_based messages:
-extract_log_type_and_payload({state_send, _Node, {Id, _Type, _Metadata, State}}) ->
-    [{state_send, State}, {state_send_protocol, Id}].
-
-%% @private
 init_state_sync(Peer, Store) ->
     ObjectFilterFun = fun(_) -> true end,
     init_state_sync(Peer, ObjectFilterFun, Store).
@@ -268,7 +242,7 @@ init_state_sync(Peer, ObjectFilterFun, Store) ->
                         _ ->
                             case ObjectFilterFun(Id) of
                                 true ->
-                                    send({state_send, node(), {Id, Type, Metadata, Value}}, Peer),
+                                    ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}}, Peer),
                                     [{ok, {Id, Type, Metadata, Value}}|Acc0];
                                 false ->
                                     Acc0
@@ -277,6 +251,7 @@ init_state_sync(Peer, ObjectFilterFun, Store) ->
                end,
     %% TODO: Should this be parallel?
     {ok, _} = lasp_storage_backend:do(fold, [Store, Function, []]),
+    lasp_logger:extended("Completed state synchronization with peer: ~p", [Peer]),
     ok.
 
 %% @private

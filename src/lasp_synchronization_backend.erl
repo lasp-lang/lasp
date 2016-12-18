@@ -21,6 +21,11 @@
 -module(lasp_synchronization_backend).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
+-callback(extract_log_type_and_payload(term()) -> [{term(), term()}]).
+
+-export([send/3,
+         log_transmission/2]).
+
 -export([broadcast_tree_mode/0,
          tutorial_mode/0,
          client_server_mode/0,
@@ -126,3 +131,36 @@ i_am_client() ->
 %% @private
 reactive_server() ->
     lasp_config:get(reactive_server, false).
+
+%% @private
+send(Mod, Msg, Peer) ->
+    log_transmission(Mod:extract_log_type_and_payload(Msg), 1),
+    PeerServiceManager = lasp_config:peer_service_manager(),
+    case PeerServiceManager:forward_message(Peer, Mod, Msg) of
+        ok ->
+            ok;
+        _Error ->
+            % lager:error("Failed send to ~p for reason ~p", [Peer, Error]),
+            ok
+    end.
+
+%% @private
+log_transmission(ToLog, PeerCount) ->
+    try
+        case lasp_config:get(instrumentation, false) of
+            true ->
+                lists:foreach(
+                    fun({Type, Payload}) ->
+                        ok = lasp_instrumentation:transmission(Type, Payload, PeerCount)
+                    end,
+                    ToLog
+                ),
+                ok;
+            false ->
+                ok
+        end
+    catch
+        _:Error ->
+            lager:error("Couldn't log transmission: ~p", [Error]),
+            ok
+    end.

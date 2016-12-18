@@ -22,6 +22,7 @@
 -author("Christopher Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).
+-behaviour(lasp_synchronization_backend).
 
 %% API
 -export([start_link/1]).
@@ -34,10 +35,23 @@
          terminate/2,
          code_change/3]).
 
+%% lasp_synchronization_backend callbacks
+-export([extract_log_type_and_payload/1]).
+
 -include("lasp.hrl").
 
 %% State record.
 -record(state, {store :: store(), gossip_peers :: [], actor :: binary()}).
+
+%%%===================================================================
+%%% lasp_synchronization_backend callbacks
+%%%===================================================================
+
+%% delta_based messages:
+extract_log_type_and_payload({delta_send, Node, {Id, _Type, _Metadata, Deltas}, Counter}) ->
+    [{delta_send, Deltas}, {delta_send_protocol, {Id, Node, Counter}}];
+extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
+    [{delta_send_protocol, {Id, Node, Counter}}].
 
 %%%===================================================================
 %%% API
@@ -106,7 +120,7 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
 
                 AckMap = case Ack < Counter orelse ClientInReactiveMode of
                     true ->
-                        send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
+                        ?SYNC_BACKEND:send(?MODULE, {delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
 
                         orddict:map(
                             fun(Peer0, {Ack0, GCCounter0}) ->
@@ -150,7 +164,7 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
     lager:info("Receiving delta took: ~p microseconds.", [Time]),
 
     %% Acknowledge message.
-    send({delta_ack, node(), Id, Counter}, From),
+    ?SYNC_BACKEND:send(?MODULE, {delta_ack, node(), Id, Counter}, From),
 
     %% Send back just the updated state for the object received.
     case ?SYNC_BACKEND:client_server_mode() andalso
@@ -296,27 +310,6 @@ collect_deltas(Peer, Type, DeltaMap, PeerLastAck, DeltaCounter) ->
     ).
 
 %% @private
-log_transmission(ToLog, PeerCount) ->
-    try
-        case lasp_config:get(instrumentation, false) of
-            true ->
-                lists:foreach(
-                    fun({Type, Payload}) ->
-                        ok = lasp_instrumentation:transmission(Type, Payload, PeerCount)
-                    end,
-                    ToLog
-                ),
-                ok;
-            false ->
-                ok
-        end
-    catch
-        _:Error ->
-            lager:error("Couldn't log transmission: ~p", [Error]),
-            ok
-    end.
-
-%% @private
 schedule_delta_synchronization() ->
     ShouldDeltaSync = true
             andalso (
@@ -347,25 +340,6 @@ schedule_delta_synchronization() ->
 %% @private
 schedule_delta_garbage_collection() ->
     timer:send_after(?DELTA_GC_INTERVAL, delta_gc).
-
-%% @private
-send(Msg, Peer) ->
-    log_transmission(extract_log_type_and_payload(Msg), 1),
-    PeerServiceManager = lasp_config:peer_service_manager(),
-    case PeerServiceManager:forward_message(Peer, ?MODULE, Msg) of
-        ok ->
-            ok;
-        _Error ->
-            % lager:error("Failed send to ~p for reason ~p", [Peer, Error]),
-            ok
-    end.
-
-%% @private
-%% delta_based messages:
-extract_log_type_and_payload({delta_send, Node, {Id, _Type, _Metadata, Deltas}, Counter}) ->
-    [{delta_send, Deltas}, {delta_send_protocol, {Id, Node, Counter}}];
-extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
-    [{delta_send_protocol, {Id, Node, Counter}}].
 
 %% @private
 init_delta_sync(Peer, ObjectFilterFun) ->

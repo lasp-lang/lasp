@@ -66,56 +66,6 @@
 %% State record.
 -record(state, {store :: store(), gossip_peers :: [], actor :: binary()}).
 
-%% Definitions for the bind/read fun abstraction.
-
--define(BIND, fun(_AccId, _AccValue, _Store) ->
-                ?CORE:bind(_AccId, _AccValue, _Store)
-              end).
-
--define(WRITE, fun(_Store) ->
-                 fun(_AccId, _AccValue) ->
-                   {ok, _} = ?CORE:bind_var(_AccId, _AccValue, _Store)
-                 end
-               end).
-
--define(READ, fun(_Id, _Threshold) ->
-                ?CORE:read_var(_Id, _Threshold, Store)
-              end).
-
--define(BLOCKING, fun() -> {noreply, State} end).
-
-%% Metadata mutation macros.
-
--define(CLOCK_INIT(BackendActor), fun(Metadata) ->
-                                    VClock = lasp_vclock:increment(BackendActor, lasp_vclock:fresh()),
-                                    orddict:store(clock, VClock, Metadata)
-                                  end).
-
--define(CLOCK_INCR(BackendActor), fun(Metadata) ->
-                                        Clock = orddict:fetch(clock, Metadata),
-                                        VClock = lasp_vclock:increment(BackendActor, Clock),
-                                        orddict:store(clock, VClock, Metadata)
-                                  end).
-
--define(CLOCK_MERG, fun(Metadata) ->
-            %% Incoming request has to have a clock, given it's coming
-            %% in the broadcast path.
-            TheirClock = orddict:fetch(clock, Metadata0),
-
-            %% We may not have a clock yet, if we are first initializing
-            %% an object.
-            OurClock = case orddict:find(clock, Metadata) of
-                {ok, Clock} ->
-                    Clock;
-                _ ->
-                    lasp_vclock:fresh()
-            end,
-
-            %% Merge the clocks.
-            Merged = lasp_vclock:merge([TheirClock, OurClock]),
-            orddict:store(clock, Merged, Metadata)
-    end).
-
 %%%===================================================================
 %%% API
 %%%===================================================================

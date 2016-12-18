@@ -442,10 +442,7 @@ bind(Origin, Id, Value, MetadataFun, Store) ->
 -spec bind_var(node(), id(), value(), function(), store()) ->
     {ok, var()} | not_found().
 bind_var(Origin, Id, Value, MetadataFun, Store) ->
-    Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
-                      waiting_delta_threads=WDT, waiting_threads=WT,
-                      delta_counter=Counter0, delta_map=DeltaMap0,
-                      delta_ack_map=AckMap}=Object) ->
+    Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0, waiting_threads=WT, delta_counter=Counter0, delta_map=DeltaMap0, delta_ack_map=AckMap}=Object) ->
             Metadata = MetadataFun(Metadata0),
             case {Id, Type, Metadata0, Value0} of
                 %% As long as *both* the metadata and value haven't
@@ -462,9 +459,9 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                             {ok, SW} = reply_to_all(WT, [],
                                                     {ok, {Id, Type, Metadata, Merged}}),
 
-                            {ok, SWD, Counter, DeltaMap} = case lasp_config:get(mode, state_based) of
+                            {ok, Counter, DeltaMap} = case lasp_config:get(mode, state_based) of
                                 state_based ->
-                                    {ok, WDT, Counter0, DeltaMap0};
+                                    {ok, Counter0, DeltaMap0};
                                 delta_based ->
                                     {DeltaTime, Delta} = timer:tc(fun() ->
                                         case lasp_config:get(join_decompositions, false) of
@@ -475,15 +472,10 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                                         end
                                     end),
                                     lager:info("Join decomposition took ~p microseconds", [DeltaTime]),
-                                    {ok, SWD1} = reply_to_all(WDT, [],
-                                                              {ok, {Id, Type, Metadata, Delta}}),
                                     DeltaMap1 = store_delta(Origin, Counter0, Delta, DeltaMap0),
-                                    {ok, SWD1, increment_counter(Counter0), DeltaMap1}
+                                    {ok, increment_counter(Counter0), DeltaMap1}
                             end,
-                            NewObject = #dv{type=Type, metadata=Metadata, value=Merged,
-                                            waiting_delta_threads=SWD, waiting_threads=SW,
-                                            delta_counter=Counter,
-                                            delta_map=DeltaMap, delta_ack_map=AckMap},
+                            NewObject = #dv{type=Type, metadata=Metadata, value=Merged, waiting_threads=SW, delta_counter=Counter, delta_map=DeltaMap, delta_ack_map=AckMap},
                             %% Return value is a delta state.
                             {NewObject, {ok, {Id, Type, Metadata, Merged}}};
                         false ->

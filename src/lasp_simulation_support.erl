@@ -175,6 +175,15 @@ start(_Case, _Config, Options) ->
                                     _ ->
                                         ok = rpc:call(Node, lasp_config, set,
                                                       [tournament_simulation_client, true])
+                                end;
+                            simple ->
+                                case Node of
+                                    Server ->
+                                        ok = rpc:call(Node, lasp_config, set,
+                                                      [simple_simulation_server, true]);
+                                    _ ->
+                                        ok = rpc:call(Node, lasp_config, set,
+                                                      [simple_simulation_client, true])
                                 end
                         end,
 
@@ -238,7 +247,13 @@ start(_Case, _Config, Options) ->
                         %% Configure max impression number.
                         MaxImpressions = 30,
                         ok = rpc:call(Node, lasp_config, set,
-                                      [max_impressions, MaxImpressions])
+                                      [max_impressions, MaxImpressions]),
+
+                        %% Configure max event number
+                        MaxEvents = 10,
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [max_events, MaxEvents])
+
                    end,
     lists:map(ConfigureFun, Nodes),
 

@@ -4,6 +4,12 @@
 %% Synchronize state interval.
 -define(STATE_SYNC_INTERVAL, 10000).
 
+%% Report interval.
+-define(MEMORY_UTILIZATION_INTERVAL, 10000).
+
+%% Report interval.
+-define(PLUMTREE_MEMORY_INTERVAL, 10000).
+
 %% General timeout value.
 -define(TIMEOUT, 100000).
 

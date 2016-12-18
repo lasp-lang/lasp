@@ -99,6 +99,11 @@ init(_Args) ->
                              permanent, 5000, worker,
                              [lasp_plumtree_memory_report]},
 
+    MemoryUtilizationReport = {lasp_memory_utilization_report,
+                               {lasp_memory_utilization_report, start_link, []},
+                                permanent, 5000, worker,
+                                [lasp_memory_utilization_report]},
+
     PlumtreeBackend = {lasp_plumtree_backend,
                        {lasp_plumtree_backend, start_link, []},
                         permanent, 5000, worker,
@@ -120,6 +125,7 @@ init(_Args) ->
                   Sprinter,
                   PlumtreeBackend,
                   PlumtreeMemoryReport,
+                  MemoryUtilizationReport,
                   DistributionBackend,
                   Plumtree,
                   Process] ++ WebSpecs,

@@ -18,7 +18,7 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_plumtree_memory_report).
+-module(lasp_memory_utilization_report).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).
@@ -67,18 +67,21 @@ init([]) ->
                      erlang:unique_integer()),
 
     %% Schedule reports.
-    schedule_plumtree_memory_report(),
+    schedule_memory_utilization_report(),
 
     {ok, #state{}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
+
+%% @private
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
     {reply, ok, State}.
 
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
+
 %% @private
 handle_cast(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -86,14 +89,14 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(plumtree_memory_report, State) ->
-    lasp_marathon_simulations:log_message_queue_size("plumtree_memory_report"),
+handle_info(memory_utilization_report, State) ->
+    lasp_marathon_simulations:log_message_queue_size("memory_utilization_report"),
 
     %% Log
-    plumtree_memory_report(),
+    memory_utilization_report(),
 
     %% Schedule report.
-    schedule_plumtree_memory_report(),
+    schedule_memory_utilization_report(),
 
     {noreply, State};
 
@@ -117,16 +120,17 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-schedule_plumtree_memory_report() ->
-    case lasp_config:get(memory_report, false) of
+schedule_memory_utilization_report() ->
+    case lasp_config:get(instrumentation, false) of
         true ->
-            timer:send_after(?PLUMTREE_MEMORY_INTERVAL, plumtree_memory_report);
+            timer:send_after(?MEMORY_UTILIZATION_INTERVAL, memory_utilization_report);
         false ->
             ok
     end.
 
 %% @private
-plumtree_memory_report() ->
-    PlumtreeBroadcast = erlang:whereis(plumtree_broadcast),
-    lager:info("Plumtree message queue: ~p",
-               [process_info(PlumtreeBroadcast, message_queue_len)]).
+memory_utilization_report() ->
+    TotalBytes = erlang:memory(total),
+    TotalKBytes = TotalBytes / 1024,
+    TotalMBytes = TotalKBytes / 1024,
+    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]).

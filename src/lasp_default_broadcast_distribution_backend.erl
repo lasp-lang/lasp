@@ -69,7 +69,6 @@
                 actor :: binary()}).
 
 -define(DELTA_GC_INTERVAL, 60000).
--define(MEMORY_UTILIZATION_INTERVAL, 10000).
 -define(PEER_REFRESH_INTERVAL, 10000).
 
 %% Definitions for the bind/read fun abstraction.
@@ -337,9 +336,6 @@ init([]) ->
             _ = lager:error("Failed to initialize backend: ~p", [Reason]),
             {error, Reason}
     end,
-
-    %% Schedule reports.
-    schedule_memory_utilization_report(),
 
     {ok, #state{actor=Actor,
                 gossip_peers=[],
@@ -727,16 +723,6 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(memory_utilization_report, State) ->
-    lasp_marathon_simulations:log_message_queue_size("memory_utilization_report"),
-
-    %% Log
-    memory_utilization_report(),
-
-    %% Schedule report.
-    schedule_memory_utilization_report(),
-
-    {noreply, State};
 
 handle_info(aae_sync, #state{store=Store, gossip_peers=GossipPeers} = State) ->
     lasp_marathon_simulations:log_message_queue_size("aae_sync"),
@@ -1046,23 +1032,6 @@ schedule_delta_garbage_collection() ->
         false ->
             ok
     end.
-
-%% @private
-schedule_memory_utilization_report() ->
-    case lasp_config:get(instrumentation, false) of
-        true ->
-            timer:send_after(?MEMORY_UTILIZATION_INTERVAL, memory_utilization_report);
-        false ->
-            ok
-    end.
-
-%% @private
-memory_utilization_report() ->
-    TotalBytes = erlang:memory(total),
-    TotalKBytes = TotalBytes / 1024,
-    TotalMBytes = TotalKBytes / 1024,
-    %lasp_instrumentation:memory(TotalBytes),
-    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]).
 
 %% @private
 send(Msg, Peer) ->

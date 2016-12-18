@@ -328,8 +328,8 @@ timestamp() ->
     Mega * 1000000 + Sec.
 
 %% @private
-get_transmission_type(aae_send) -> aae_send;
-get_transmission_type(aae_send_protocol) -> aae_send_protocol;
+get_transmission_type(state_send) -> state_send;
+get_transmission_type(state_send_protocol) -> state_send_protocol;
 get_transmission_type(broadcast) -> broadcast;
 get_transmission_type(broadcast_protocol) -> broadcast_protocol;
 get_transmission_type(delta_send) -> delta_send;

@@ -945,16 +945,16 @@ reply_to_all([From|T], StillWaiting, Result) ->
 reply_to_all([], StillWaiting, _Result) ->
     {ok, StillWaiting}.
 
--spec receive_value(store(), {aae_send, node(), value(), function(),
+-spec receive_value(store(), {state_send, node(), value(), function(),
                               function()}) -> ok | error.
-receive_value(Store, {aae_send, Origin, {Id, Type, Metadata, Value},
+receive_value(Store, {state_send, Origin, {Id, Type, Metadata, Value},
                       MetadataFunBind, MetadataFunDeclare}) ->
     case do(get, [Store, Id]) of
         {ok, _Object} ->
             {ok, _} = bind(Origin, Id, Value, MetadataFunBind, Store);
         {error, not_found} ->
             {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
-            receive_value(Store, {aae_send, Origin, {Id, Type, Metadata, Value},
+            receive_value(Store, {state_send, Origin, {Id, Type, Metadata, Value},
                                   MetadataFunBind, MetadataFunDeclare})
     end,
     ok.

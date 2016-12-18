@@ -337,9 +337,7 @@ init([]) ->
             {error, Reason}
     end,
 
-    {ok, #state{actor=Actor,
-                gossip_peers=[],
-                store=Store}}.
+    {ok, #state{actor=Actor, gossip_peers=[], store=Store}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -582,7 +580,7 @@ handle_call({exchange, Peer}, _From, #state{store=Store}=State) ->
                             %% Ignore: this is a dynamic variable.
                             ok;
                         _ ->
-                            send({aae_send, node(), {Id, Type, Metadata, Value}}, Peer)
+                            send({state_send, node(), {Id, Type, Metadata, Value}}, Peer)
                     end,
                     [{ok, {Id, Type, Metadata, Value}}|Acc0]
                end,
@@ -658,11 +656,11 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
 
     {noreply, State};
 
-handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
+handle_cast({state_send, From, {Id, Type, _Metadata, Value}},
             #state{store=Store, actor=Actor}=State) ->
-    lasp_marathon_simulations:log_message_queue_size("aae_send"),
+    lasp_marathon_simulations:log_message_queue_size("state_send"),
 
-    ?CORE:receive_value(Store, {aae_send,
+    ?CORE:receive_value(Store, {state_send,
                                 From,
                                {Id, Type, _Metadata, Value},
                                ?CLOCK_INCR(Actor),
@@ -1047,8 +1045,8 @@ send(Msg, Peer) ->
 
 %% @private
 %% state_based messages:
-extract_log_type_and_payload({aae_send, _Node, {Id, _Type, _Metadata, State}}) ->
-    [{aae_send, State}, {aae_send_protocol, Id}];
+extract_log_type_and_payload({state_send, _Node, {Id, _Type, _Metadata, State}}) ->
+    [{state_send, State}, {state_send_protocol, Id}];
 %% delta_based messages:
 extract_log_type_and_payload({delta_send, Node, {Id, _Type, _Metadata, Deltas}, Counter}) ->
     [{delta_send, Deltas}, {delta_send_protocol, {Id, Node, Counter}}];
@@ -1071,7 +1069,7 @@ init_aae_sync(Peer, ObjectFilterFun, Store) ->
                         _ ->
                             case ObjectFilterFun(Id) of
                                 true ->
-                                    send({aae_send, node(), {Id, Type, Metadata, Value}}, Peer),
+                                    send({state_send, node(), {Id, Type, Metadata, Value}}, Peer),
                                     [{ok, {Id, Type, Metadata, Value}}|Acc0];
                                 false ->
                                     Acc0

@@ -123,7 +123,7 @@ start(_Case, _Config, Options) ->
                                                                        partisan_peer_service]),
                             ok = rpc:call(Node, application, set_env, [plumtree,
                                                                        broadcast_mods,
-                                                                       [lasp_default_broadcast_distribution_backend]]),
+                                                                       [lasp_plumtree_backend]]),
                             ok = rpc:call(Node, application, set_env, [lasp,
                                                                        data_root,
                                                                        NodeDir])
@@ -147,6 +147,12 @@ start(_Case, _Config, Options) ->
                         %% Configure plumtree AAE interval to be the same.
                         ok = rpc:call(Node, application, set_env,
                                       [plumtree, broadcast_exchange_timer, SimulationsSyncInterval]),
+
+                        %% Configure server.
+                        ok = rpc:call(Node, lasp_config, set, [lasp_server, Server]),
+                        %% Configure nodes.
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [lasp_nodes, Nodes]),
 
                         %% Configure who should be the server and who's
                         %% the client.
@@ -230,14 +236,9 @@ start(_Case, _Config, Options) ->
                                       [evaluation_identifier, list_to_atom(RealEvalIdentifier)]),
 
                         %% Configure max impression number.
-                        MaxImpressions = 10,
+                        MaxImpressions = 30,
                         ok = rpc:call(Node, lasp_config, set,
-                                      [max_impressions, MaxImpressions]),
-
-                        %% Configure impression velocity.
-                        ImpressionVelocity = 4800,
-                        ok = rpc:call(Node, lasp_config, set,
-                                      [impression_velocity, ImpressionVelocity])
+                                      [max_impressions, MaxImpressions])
                    end,
     lists:map(ConfigureFun, Nodes),
 

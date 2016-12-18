@@ -5,13 +5,33 @@ Lasp
 
 ## Overview
 
-Lasp is a Language for Distributed, Eventually Consistent Computations.
+Lasp is a programming model for synchronization-free computations.
 
-## Information
+## Installing
 
-See all of our papers, examples, and installation guides on the [official Lasp website](https://lasp-lang.org).
+Lasp requires Erlang 18 or greater.  Once you have Erlang installed, do
+the following to install and build Lasp.
 
-## Riak Core Backend
+```
+$ git clone git@github.com:lasp-lang/lasp.git
+$ cd lasp
+$ make
+```
 
-The Riak Core backend for Lasp is **deprecated**.  If you need it for
-it, the last supported release is tagged `riak-core-distribution`.
+## Running a shell
+
+You can run a Erlang shell where you can interact with a Lasp node by
+doing the following:
+
+```
+$ make shell
+```
+
+## Running the test suite
+
+To run the test suite, which will execute all of the Lasp scenarios, use
+the following command.
+
+```
+$ make check
+```

@@ -23,7 +23,6 @@
 
 -behaviour(gen_server).
 -behaviour(lasp_distribution_backend).
--behaviour(plumtree_broadcast_handler).
 
 %% Administrative controls.
 -export([reset/0]).
@@ -51,13 +50,6 @@
          wait_needed/2,
          thread/3]).
 
-%% plumtree_broadcast_handler callbacks
--export([broadcast_data/1,
-         merge/2,
-         is_stale/1,
-         graft/1,
-         exchange/1]).
-
 %% gen_server callbacks
 -export([init/1,
          handle_call/3,
@@ -69,30 +61,17 @@
 %% debug callbacks
 -export([local_bind/4]).
 
-%% broadcast interface
--export([broadcast/1]).
-
-%% transmission callbacks
--export([extract_log_type_and_payload/1]).
-
 -include("lasp.hrl").
 
 %% State record.
 -record(state, {store :: store(),
-                actor :: binary(),
-                counter :: non_neg_integer(),
-                gc_counter :: non_neg_integer()}).
-
-%% Broadcast record.
--record(broadcast, {id :: id(),
-                    type :: type(),
-                    clock :: lasp_vclock:vclock(),
-                    metadata :: metadata(),
-                    value :: value()}).
+                gossip_peers :: [],
+                actor :: binary()}).
 
 -define(DELTA_GC_INTERVAL, 60000).
 -define(PLUMTREE_MEMORY_INTERVAL, 10000).
 -define(MEMORY_UTILIZATION_INTERVAL, 10000).
+-define(PEER_REFRESH_INTERVAL, 10000).
 
 %% Definitions for the bind/read fun abstraction.
 
@@ -159,116 +138,18 @@ start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
 
 %%%===================================================================
-%%% plumtree_broadcast_handler callbacks
-%%%===================================================================
-
--type clock() :: lasp_vclock:vclock().
-
--type broadcast_message() :: #broadcast{}.
--type broadcast_id() :: id().
--type broadcast_clock() :: clock().
--type broadcast_payload() :: {id(), type(), metadata(), value()}.
-
-%% @doc Returns from the broadcast message the identifier and the payload.
--spec broadcast_data(broadcast_message()) ->
-    {{broadcast_id(), broadcast_clock()}, broadcast_payload()}.
-broadcast_data(#broadcast{id=Id,
-                          type=Type,
-                          clock=Clock,
-                          metadata=Metadata,
-                          value=Value}) ->
-    {{Id, Clock}, {Id, Type, Metadata, Value}}.
-
-%% @doc Perform a merge of an incoming object with an object in the
-%%      local datastore, as long as we haven't seen a more recent clock
-%%      for the same object.
--spec merge({broadcast_id(), broadcast_clock()}, broadcast_payload()) ->
-    boolean().
-merge({Id, Clock}, {Id, Type, Metadata, Value}) ->
-    case is_stale({Id, Clock}) of
-        true ->
-            false;
-        false ->
-            %% Bind information.
-            {ok, _} = ?MODULE:local_bind(Id, Type, Metadata, Value),
-            true
-    end;
-merge(BroadcastId, Payload) ->
-    lager:error("Incoming merge didn't match; broadcast_id: ~p payload: ~p", [BroadcastId, Payload]),
-    false.
-
-%% @doc Use the clock on the object to determine if this message is
-%%      stale or not.
--spec is_stale({broadcast_id(), broadcast_clock()}) -> boolean().
-is_stale({Id, Clock}) ->
-    gen_server:call(?MODULE, {is_stale, Id, Clock}, infinity).
-
-%% @doc Given a message identifier and a clock, return a given message.
--spec graft({broadcast_id(), broadcast_clock()}) ->
-    stale | {ok, broadcast_payload()} | {error, term()}.
-graft({Id, Clock}) ->
-    gen_server:call(?MODULE, {graft, Id, Clock}, infinity).
-
-%% @doc Anti-entropy mechanism.
--spec exchange(node()) -> {ok, pid()}.
-exchange(Peer) ->
-    case lasp_config:get(mode, state_based) of
-        delta_based ->
-            %% Ignore the standard anti-entropy mechanism from plumtree.
-            %%
-            %% Spawn a process that terminates immediately, because the
-            %% broadcast exchange timer tracks the number of in progress
-            %% exchanges and bounds it by that limit.
-            %%
-            Pid = spawn_link(fun() -> ok end),
-            {ok, Pid};
-        state_based ->
-            case broadcast_tree_mode() of
-                true ->
-                    %% Plumtree AAE.
-                    gen_server:call(?MODULE, {exchange, Peer}, infinity);
-                false ->
-                    %% No AAE through this mechanism.
-                    %%
-                    %% Spawn a process that terminates immediately, because the
-                    %% broadcast exchange timer tracks the number of in progress
-                    %% exchanges and bounds it by that limit.
-                    %%
-                    Pid = spawn_link(fun() -> ok end),
-                    {ok, Pid}
-            end
-    end.
-
-%%%===================================================================
 %%% lasp_distribution_backend callbacks
 %%%===================================================================
 
 %% @doc Declare a new dataflow variable of a given type.
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
-    case lasp_config:get(mode, state_based) of
-        delta_based ->
-            gen_server:call(?MODULE, {declare, Id, Type}, infinity);
-        state_based ->
-            {ok, Variable} = gen_server:call(?MODULE,
-                                             {declare, Id, Type}, infinity),
-            buffer_broadcast(Variable),
-            {ok, Variable}
-    end.
+    gen_server:call(?MODULE, {declare, Id, Type}, infinity).
 
 %% @doc Declare a new dynamic variable of a given type.
 -spec declare_dynamic(id(), type()) -> {ok, var()}.
 declare_dynamic(Id, Type) ->
-    case lasp_config:get(mode, state_based) of
-        delta_based ->
-            gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity);
-        state_based ->
-            {ok, Variable} = gen_server:call(?MODULE,
-                                             {declare_dynamic, Id, Type},
-                                             infinity),
-            buffer_broadcast(Variable),
-            {ok, Variable}
-    end.
+    gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity).
 
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.
@@ -296,23 +177,7 @@ update(Id, Operation, Actor) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {update, Id, Operation, Actor},
                                                         infinity),
-    ReturnState = case orddict:find(dynamic, Metadata) of
-                      {ok, true} ->
-                          %% Ignore: this is a dynamic variable.
-                          Value;
-                      _ ->
-                          case lasp_config:get(mode, state_based) of
-                              delta_based  ->
-                                  %% No broadcasting for the delta.
-                                  Value;
-                              state_based ->
-                                  buffer_broadcast({Id, Type, Metadata, Value}),
-                                  Value;
-                              pure_op_based ->
-                                  ok %% @todo
-                          end
-                  end,
-    {ok, {Id, Type, Metadata, ReturnState}}.
+    {ok, {Id, Type, Metadata, Value}}.
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -325,23 +190,7 @@ bind(Id, Value0) ->
     {ok, {Id, Type, Metadata, Value}} = gen_server:call(?MODULE,
                                                         {bind, Id, Value0},
                                                         infinity),
-    ReturnState = case orddict:find(dynamic, Metadata) of
-                      {ok, true} ->
-                          %% Ignore: this is a dynamic variable.
-                          Value;
-                      _ ->
-                          case lasp_config:get(mode, state_based) of
-                              delta_based ->
-                                  %% No broadcasting for the delta.
-                                  Value;
-                              state_based ->
-                                  buffer_broadcast({Id, Type, Metadata, Value}),
-                                  Value;
-                              pure_op_based ->
-                                  ok %% todo
-                          end
-                  end,
-    {ok, {Id, Type, Metadata, ReturnState}}.
+    {ok, {Id, Type, Metadata, Value}}.
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -480,11 +329,10 @@ init([]) ->
     schedule_aae_synchronization(),
     schedule_delta_synchronization(),
     schedule_delta_garbage_collection(),
+    schedule_peer_refresh(),
 
     {ok, Actor} = lasp_unique:unique(),
 
-    Counter = 0,
-    GCCounter = 0,
     Identifier = node(),
 
     {ok, Store} = case ?CORE:start(Identifier) of
@@ -502,9 +350,8 @@ init([]) ->
     schedule_memory_utilization_report(),
 
     {ok, #state{actor=Actor,
-                counter=Counter,
-                store=Store,
-                gc_counter=GCCounter}}.
+                gossip_peers=[],
+                store=Store}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -525,17 +372,17 @@ handle_call(reset, _From, #state{store=Store}=State) ->
 %% Local declare operation, which will need to initialize metadata and
 %% broadcast the value to the remote nodes.
 handle_call({declare, Id, Type}, _From,
-            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+            #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("declare/2"),
 
     Result = ?CORE:declare(Id, Type, ?CLOCK_INIT(Actor), Store),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Incoming bind request, where we do not have information about the
 %% variable yet.  In this case, take the remote metadata, if we don't
 %% have local metadata.
 handle_call({declare, Id, IncomingMetadata, Type}, _From,
-            #state{store=Store, counter=Counter}=State) ->
+            #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("declare/3"),
 
     Metadata0 = case get(Id, Store) of
@@ -545,16 +392,16 @@ handle_call({declare, Id, IncomingMetadata, Type}, _From,
             IncomingMetadata
     end,
     Result = ?CORE:declare(Id, Type, ?CLOCK_MERG, Metadata0, Store),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Issue a local dynamic declare operation, which should initialize
 %% metadata and result in the broadcast operation.
 handle_call({declare_dynamic, Id, Type}, _From,
-            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+            #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("declare_dynamic"),
 
     Result = ?CORE:declare_dynamic(Id, Type, ?CLOCK_INIT(Actor), Store),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Stream values out of the Lasp system; using the values from this
 %% stream can result in observable nondeterminism.
@@ -576,13 +423,13 @@ handle_call({query, Id}, _From, #state{store=Store}=State) ->
 %% Issue a local bind, which should increment the local clock and
 %% broadcast the result.
 handle_call({bind, Id, Value}, _From,
-            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+            #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("bind/2"),
 
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_INCR(Actor), Store]),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Incoming bind operation; merge incoming clock with the remote clock.
 %%
@@ -591,13 +438,13 @@ handle_call({bind, Id, Value}, _From,
 %% clock to be incremented again and a subsequent broadcast.  However,
 %% this could change if the other module is later refactored.
 handle_call({bind, Id, Metadata0, Value}, _From,
-            #state{store=Store, counter=Counter}=State) ->
+            #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("bind/3"),
 
     Result0 = ?CORE:bind(Id, Value, ?CLOCK_MERG, Store),
     Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                   [Id, Value, ?CLOCK_MERG, Store]),
-    {reply, Result, State#state{counter=increment_counter(Counter)}};
+    {reply, Result, State};
 
 %% Bind two variables together.
 handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
@@ -613,14 +460,14 @@ handle_call({bind_to, Id, DVId}, _From, #state{store=Store}=State) ->
 %% necessary, where the vclock is serialized *per-node*.
 %%
 handle_call({update, Id, Operation, CRDTActor}, _From,
-            #state{store=Store, actor=Actor, counter=Counter}=State) ->
+            #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("update"),
 
     Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
                            ?CLOCK_INIT(Actor), Store),
     {ok, Result} = declare_if_not_found(Result0, Id, State, ?CORE, update,
                                         [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
-    {reply, {ok, Result}, State#state{counter=increment_counter(Counter)}};
+    {reply, {ok, Result}, State};
 
 %% Spawn a function.
 handle_call({thread, Module, Function, Args},
@@ -763,46 +610,65 @@ handle_call(Msg, _From, State) ->
 %% Anti-entropy mechanism for causal consistency of delta-CRDT;
 %% periodically ship delta-interval or entire state.
 handle_cast({delta_exchange, Peer, ObjectFilterFun},
-            #state{store=Store, gc_counter=GCCounter}=State) ->
+            #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_exchange"),
 
     lasp_logger:extended("Exchange starting for ~p", [Peer]),
 
-    Function = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
-                            delta_counter=Counter, delta_map=DeltaMap,
-                            delta_ack_map=AckMap}},
-                   Acc0) ->
-                       case ObjectFilterFun(Id) of
-                           true ->
-                               Ack = case orddict:find(Peer, AckMap) of
-                                         {ok, {Ack0, _GCed}} ->
-                                             Ack0;
-                                         error ->
-                                             0
-                                     end,
-                               Min = case orddict:fetch_keys(DeltaMap) of
-                                   [] ->
-                                       0;
-                                   Keys ->
-                                       lists:min(Keys)
-                               end,
-                               Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
-                                   true ->
-                                       Value;
-                                   false ->
-                                       collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
-                               end,
-                               send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
-                               [{ok, Id}|Acc0];
-                           false ->
-                               Acc0
-                       end
-               end,
-    %% TODO: Should this be parallel?
-    {ok, Result} = do(fold, [Store, Function, []]),
-    lasp_logger:extended("Finished exchange peer: ~p; sent ~p objects", [Peer, length(Result)]),
+    Mutator = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
+                           delta_counter=Counter, delta_map=DeltaMap,
+                           delta_ack_map=AckMap0}=Object}) ->
+        case ObjectFilterFun(Id) of
+            true ->
+                Ack = case orddict:find(Peer, AckMap0) of
+                    {ok, {Ack0, _GCCounter}} ->
+                        Ack0;
+                    error ->
+                        0
+                end,
 
-    {noreply, State#state{gc_counter=increment_counter(GCCounter)}};
+                Min = lists_min(orddict:fetch_keys(DeltaMap)),
+
+                Deltas = case orddict:is_empty(DeltaMap) orelse Min > Ack of
+                    true ->
+                        Value;
+                    false ->
+                        collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
+                end,
+
+                ClientInReactiveMode = (client_server_mode() andalso i_am_client() andalso reactive_server()),
+
+                AckMap = case Ack < Counter orelse ClientInReactiveMode of
+                    true ->
+                        send({delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
+
+                        orddict:map(
+                            fun(Peer0, {Ack0, GCCounter0}) ->
+                                case Peer0 of
+                                    Peer ->
+                                        {Ack0, GCCounter0 + 1};
+                                    _ ->
+                                        {Ack0, GCCounter0}
+                                end
+                            end,
+                            AckMap0
+                        );
+                    false ->
+                        AckMap0
+                end,
+
+                {Object#dv{delta_ack_map=AckMap}, Id};
+            false ->
+                {Object, skip}
+        end
+    end,
+
+    %% TODO: Should this be parallel?
+    {ok, _} = do(update_all, [Store, Mutator]),
+
+    lasp_logger:extended("Exchange finished for ~p", [Peer]),
+
+    {noreply, State};
 
 handle_cast({aae_send, From, {Id, Type, _Metadata, Value}},
             #state{store=Store, actor=Actor}=State) ->
@@ -831,11 +697,14 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
             #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_send"),
 
-    ?CORE:receive_delta(Store, {delta_send,
-                                From,
-                               {Id, Type, _Metadata, Deltas},
-                               ?CLOCK_INCR(Actor),
-                               ?CLOCK_INIT(Actor)}),
+    {Time, _Value} = timer:tc(fun() ->
+                    ?CORE:receive_delta(Store, {delta_send,
+                                                From,
+                                               {Id, Type, _Metadata, Deltas},
+                                               ?CLOCK_INCR(Actor),
+                                               ?CLOCK_INIT(Actor)})
+             end),
+    lager:info("Receiving delta took: ~p microseconds.", [Time]),
 
     %% Acknowledge message.
     send({delta_ack, node(), Id, Counter}, From),
@@ -888,13 +757,18 @@ handle_info(memory_utilization_report, State) ->
 
     {noreply, State};
 
-handle_info(aae_sync, #state{store=Store} = State) ->
+handle_info(aae_sync, #state{store=Store, gossip_peers=GossipPeers} = State) ->
     lasp_marathon_simulations:log_message_queue_size("aae_sync"),
 
     lasp_logger:extended("Beginning AAE synchronization."),
 
-    %% Get the active set from the membership protocol.
-    {ok, Members} = membership(),
+    Members = case broadcast_tree_mode() of
+        true ->
+            GossipPeers;
+        false ->
+            {ok, Members1} = membership(),
+            Members1
+    end,
 
     %% Remove ourself and compute exchange peers.
     Peers = compute_exchange(without_me(Members)),
@@ -915,10 +789,6 @@ handle_info(delta_sync, #state{}=State) ->
 
     %% Get the active set from the membership protocol.
     {ok, Members} = membership(),
-
-    PeerServiceManager = lasp_config:peer_service_manager(),
-    lager:info("Manager is: ~p, Members are: ~p",
-               [PeerServiceManager, Members]),
 
     %% Remove ourself and compute exchange peers.
     Peers = compute_exchange(without_me(Members)),
@@ -945,90 +815,67 @@ handle_info(delta_sync, #state{}=State) ->
     schedule_delta_synchronization(),
 
     {noreply, State#state{}};
-handle_info(delta_gc, #state{gc_counter=GCCounter0, store=Store}=State) ->
+handle_info(peer_refresh, State) ->
+    %% TODO: Temporary hack until the Plumtree can propagate tree
+    %% information in the metadata messages.  Therefore, manually poll
+    %% periodically with jitter.
+    Servers = servers(),
+    GossipPeers = case length(Servers) of
+        0 ->
+            [];
+        _ ->
+            Root = hd(Servers),
+            plumtree_gossip_peers(Root)
+    end,
+
+    %% Schedule next synchronization.
+    schedule_peer_refresh(),
+
+    {noreply, State#state{gossip_peers=GossipPeers}};
+handle_info(delta_gc, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_gc"),
 
-    MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter, ?MAX_GC_COUNTER),
-    Function =
-        fun({Id, #dv{delta_map=DeltaMap0, delta_ack_map=AckMap0,
-                     delta_counter=Counter}=_Object},
-            Acc0) ->
-                case orddict:is_empty(DeltaMap0) of
-                    true ->
-                        Acc0;
-                    false ->
-                        %% Remove disconnected or slow node() entries from the AckMap.
-                        %% disconnected or slow: seen the previous GC & no change
-                        RemovedAckMap0 =
-                            orddict:filter(fun(_Node, {Ack, GCed}) ->
-                                                   (GCed == false) orelse (Ack == Counter)
-                                           end, AckMap0),
-                        case orddict:size(RemovedAckMap0) of
-                            0 ->
-                                Acc0;
-                            _ ->
-                                %% Mark remained entries as seen this GC.
-                                RemovedAckMap =
-                                    orddict:fold(
-                                      fun(Node, {Ack, _GCed}, RemovedAckMap1) ->
-                                              orddict:store(Node, {Ack, true},
-                                                            RemovedAckMap1)
-                                      end, orddict:new(), RemovedAckMap0),
-                                %% Collect garbage deltas.
-                                MinAck =
-                                    lists:min([Ack || {_Node, {Ack, _GCed}} <- RemovedAckMap]),
-                                %% size() should be bigger than 0.
-                                MinAck1 =
-                                    case orddict:size(DeltaMap0) of
-                                        1 ->
-                                            MinAck;
-                                        _ ->
-                                            Counters = orddict:fetch_keys(DeltaMap0),
-                                            NotCollectable =
-                                                (MinAck > lists:nth(1, Counters)) andalso
-                                                    (MinAck < lists:nth(2, Counters)),
-                                            case NotCollectable of
-                                                true ->
-                                                    lists:nth(1, Counters);
-                                                false ->
-                                                    MinAck
-                                            end
-                                    end,
-                                DeltaMap = orddict:filter(fun(Counter0, _Delta) ->
-                                                                  Counter0 >= MinAck1
-                                                          end, DeltaMap0),
-                                [{ok, Id, DeltaMap, RemovedAckMap}|Acc0]
-                        end
-                end
+    MaxGCCounter = lasp_config:get(delta_mode_max_gc_counter,
+                                   ?MAX_GC_COUNTER),
+
+    %% Generate garbage collection function.
+    Mutator = fun({Id, #dv{delta_map=DeltaMap0,
+                           delta_ack_map=AckMap0}=Object}) ->
+
+        %% Only keep in the ack map nodes with gc counter
+        %% below `MaxGCCounter'.
+        PruneFun = fun(_Node, {_Ack, GCCounter}) ->
+            GCCounter < MaxGCCounter
         end,
-    GCCounter = case GCCounter0 == MaxGCCounter of
-        false ->
-            GCCounter0;
-        true ->
-            spawn(
-                fun() ->
-                        {ok, Results} = do(fold, [Store, Function, []]),
-                        lists:foreach(
-                          fun({ok, Id, DeltaMap, RemovedAckMap}) ->
-                                  case do(get, [Store, Id]) of
-                                      {ok, Object} ->
-                                          _ = do(put,
-                                                 [Store, Id,
-                                                  Object#dv{delta_map=DeltaMap,
-                                                            delta_ack_map=RemovedAckMap}]),
-                                          ok;
-                                      _ ->
-                                          ok
-                                  end
-                          end, Results)
-                end),
-            0
+
+        PrunedAckMap = orddict:filter(PruneFun, AckMap0),
+
+        %% Determine the min ack present in the ack map
+        MinAck = lists_min([Ack || {_Node, {Ack, _GCCounter}} <- PrunedAckMap]),
+
+        %% Remove unnecessary deltas from the delta map
+        DeltaMapGCFun = fun(Counter, {_Origin, _Delta}) ->
+            Counter >= MinAck
+        end,
+
+        DeltaMapGC = orddict:filter(DeltaMapGCFun, DeltaMap0),
+
+        lager:info("\n\n\n--------------------GC--------------------"),
+        lager:info("GC stats for ~p", [Id]),
+        lager:info("Delta Map size: before ~p | after ~p", [orddict:size(DeltaMap0), orddict:size(DeltaMapGC)]),
+        lager:info("Ack Map size:   before ~p | after ~p", [orddict:size(AckMap0), orddict:size(PrunedAckMap)]),
+        lager:info("--------------------GC--------------------\n\n\n"),
+
+        {Object#dv{delta_map=DeltaMapGC, delta_ack_map=PrunedAckMap}, Id}
     end,
+
+    {ok, Results} = do(update_all, [Store, Mutator]),
+    lager:info("Garbage collection complete for objects: ~p", [Results]),
 
     %% Schedule next GC and reset counter.
     schedule_delta_garbage_collection(),
 
-    {noreply, State#state{gc_counter=GCCounter}};
+    {noreply, State};
 
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -1048,22 +895,6 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-%% @private
-broadcast({Id, Type, Metadata, Value}) ->
-    case broadcast_tree_mode() of
-        true ->
-            Clock = orddict:fetch(clock, Metadata),
-            Broadcast = #broadcast{id=Id,
-                                   clock=Clock,
-                                   type=Type,
-                                   metadata=Metadata,
-                                   value=Value},
-            ok = plumtree_broadcast:broadcast(Broadcast, ?MODULE),
-            ok;
-        false ->
-            ok
-    end.
 
 %% @private
 local_bind(Id, Type, Metadata, Value) ->
@@ -1097,39 +928,21 @@ get(Id, Store) ->
     ?CORE:read(Id, Threshold, Store, self(), ReplyFun, BlockingFun).
 
 %% @private
-increment_counter(Counter) ->
-    Counter + 1.
-
-%% @private
-collect_deltas(Destination, Type, DeltaMap, Min0, Max) ->
-    Counters = orddict:fetch_keys(DeltaMap),
-    Min1 = case lists:member(Min0, Counters) of
-               true ->
-                   Min0;
-               false ->
-                   lists:min(Counters)
-           end,
-    SmallDeltaMap = orddict:filter(fun(Counter, _Delta) ->
-                                           (Counter >= Min1) andalso (Counter < Max)
-                                   end, DeltaMap),
-    Deltas = orddict:fold(fun(_Counter, {Origin, Delta}, Deltas0) ->
-                                  case Origin of
-                                      Destination ->
-                                        Deltas0;
-                                      _ ->
-                                        lasp_type:merge(Type, Deltas0, Delta)
-                                  end
-                          end, lasp_type:new_delta(Type), SmallDeltaMap),
-
-    %% @todo should we remove this once we know everything is working fine?
-    case lasp_type:is_delta(Type, Deltas) of
-        false ->
-            % lager:info("Folded delta group is not a delta");
-            ok;
-        true ->
-            ok
-    end,
-    Deltas.
+collect_deltas(Peer, Type, DeltaMap, PeerLastAck, DeltaCounter) ->
+    orddict:fold(
+        fun(Counter, {Origin, Delta}, Deltas) ->
+            case (Counter >= PeerLastAck) andalso
+                 (Counter < DeltaCounter) andalso
+                 Origin /= Peer of
+                true ->
+                    lasp_type:merge(Type, Deltas, Delta);
+                false ->
+                    Deltas
+            end
+        end,
+        lasp_type:new(Type),
+        DeltaMap
+    ).
 
 %% @private
 declare_if_not_found({error, not_found}, {StorageId, TypeId},
@@ -1180,7 +993,6 @@ log_transmission(ToLog, PeerCount) ->
 schedule_aae_synchronization() ->
     ShouldAAESync = state_based_mode()
             andalso (not tutorial_mode())
-            andalso (not broadcast_tree_mode())
             andalso (
               peer_to_peer_mode()
               orelse
@@ -1235,6 +1047,17 @@ schedule_delta_synchronization() ->
     end.
 
 %% @private
+schedule_peer_refresh() ->
+    case broadcast_tree_mode() of
+        true ->
+            Interval = lasp_config:get(peer_refresh_interval, ?PEER_REFRESH_INTERVAL),
+            Jitter = rand_compat:uniform(Interval),
+            timer:send_after(Jitter + ?PEER_REFRESH_INTERVAL, peer_refresh);
+        false ->
+            ok
+    end.
+
+%% @private
 schedule_delta_garbage_collection() ->
     case delta_based_mode() of
         true ->
@@ -1242,6 +1065,7 @@ schedule_delta_garbage_collection() ->
         false ->
             ok
     end.
+
 %% @private
 schedule_plumtree_memory_report() ->
     case lasp_config:get(memory_report, false) of
@@ -1270,8 +1094,11 @@ plumtree_memory_report() ->
 
 %% @private
 memory_utilization_report() ->
-    TotalBytes = orddict:fetch(total, erlang:memory()),
-    lasp_instrumentation:memory(TotalBytes).
+    TotalBytes = erlang:memory(total),
+    TotalKBytes = TotalBytes / 1024,
+    TotalMBytes = TotalKBytes / 1024,
+    %lasp_instrumentation:memory(TotalBytes),
+    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]).
 
 %% @private
 send(Msg, Peer) ->
@@ -1293,18 +1120,7 @@ extract_log_type_and_payload({aae_send, _Node, {Id, _Type, _Metadata, State}}) -
 extract_log_type_and_payload({delta_send, Node, {Id, _Type, _Metadata, Deltas}, Counter}) ->
     [{delta_send, Deltas}, {delta_send_protocol, {Id, Node, Counter}}];
 extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
-    [{delta_send_protocol, {Id, Node, Counter}}];
-%% plumtree messages:
-extract_log_type_and_payload({prune, Root, From}) ->
-    [{broadcast_protocol, {Root, From}}];
-extract_log_type_and_payload({ignored_i_have, MessageId, _Mod, Round, Root, From}) ->
-    [{broadcast_protocol, {MessageId, Round, Root, From}}];
-extract_log_type_and_payload({graft, MessageId, _Mod, Round, Root, From}) ->
-    [{broadcast_protocol, {MessageId, Round, Root, From}}];
-extract_log_type_and_payload({broadcast, MessageId, {Id, _Type, _Metadata, State}, _Mod, Round, Root, From}) ->
-    [{broadcast, State}, {broadcast_protocol, {Id, MessageId, Round, Root, From}}];
-extract_log_type_and_payload({i_have, MessageId, _Mod, Round, Root, From}) ->
-    [{broadcast_protocol, {MessageId, Round, Root, From}}].
+    [{delta_send_protocol, {Id, Node, Counter}}].
 
 %% @private
 init_aae_sync(Peer, Store) ->
@@ -1330,8 +1146,7 @@ init_aae_sync(Peer, ObjectFilterFun, Store) ->
                     end
                end,
     %% TODO: Should this be parallel?
-    {ok, Result} = do(fold, [Store, Function, []]),
-    lasp_logger:extended("Finished AAE synchronization with peer: ~p; sent ~p objects", [Peer, length(Result)]),
+    {ok, _} = do(fold, [Store, Function, []]),
     ok.
 
 %% @private
@@ -1349,6 +1164,10 @@ select_random_sublist(List, K) ->
 %% @reference http://stackoverflow.com/questions/8817171/shuffling-elements-in-a-list-randomly-re-arrange-list-elements/8820501#8820501
 shuffle(L) ->
     [X || {_, X} <- lists:sort([{lasp_support:puniform(65535), N} || N <- L])].
+
+%% @private
+lists_min([]) -> 0;
+lists_min(L) -> lists:min(L).
 
 %% @private
 compute_exchange(Peers) ->
@@ -1394,10 +1213,6 @@ compute_exchange(Peers) ->
     end.
 
 %% @private
-buffer_broadcast(Payload) ->
-    lasp_broadcast_buffer:buffer(Payload).
-
-%% @private
 without_me(Members) ->
     Members -- [node()].
 
@@ -1423,12 +1238,49 @@ client_server_mode() ->
 
 %% @private
 peer_to_peer_mode() ->
-    lasp_config:peer_service_manager() == partisan_hyparview_peer_service_manager.
+    lasp_config:peer_service_manager() == partisan_hyparview_peer_service_manager orelse
+    lasp_config:peer_service_manager() == partisan_default_peer_service_manager.
 
 %% @private
 i_am_server() ->
     partisan_config:get(tag, undefined) == server.
 
 %% @private
+i_am_client() ->
+    partisan_config:get(tag, undefined) == client.
+
+%% @private
 reactive_server() ->
     lasp_config:get(reactive_server, false).
+
+%% @private
+plumtree_gossip_peers(Root) ->
+    {ok, Nodes} = sprinter:nodes(),
+    Tree = sprinter:debug_get_tree(Root, Nodes),
+    FolderFun = fun({Node, Peers}, In) ->
+                        case Peers of
+                            down ->
+                                In;
+                            {Eager, _Lazy} ->
+                                case lists:member(node(), Eager) of
+                                    true ->
+                                        In ++ [Node];
+                                    false ->
+                                        In
+                                end
+                        end
+                end,
+    InLinks = lists:foldl(FolderFun, [], Tree),
+
+    {EagerPeers, _LazyPeers} = plumtree_broadcast:debug_get_peers(node(), Root),
+    OutLinks = ordsets:to_list(EagerPeers),
+
+    GossipPeers = lists:usort(InLinks ++ OutLinks),
+    lager:info("PLUMTREE DEBUG: Gossip Peers: ~p", [GossipPeers]),
+
+    GossipPeers.
+
+%% @private
+servers() ->
+    {ok, Servers} = sprinter:servers(),
+    Servers.

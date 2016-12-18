@@ -43,6 +43,9 @@ start_link() ->
 %% ===================================================================
 
 init(_Args) ->
+    %% Configure defaults.
+    configure_defaults(),
+
     DepDag = {lasp_dependence_dag,
               {lasp_dependence_dag, start_link, []},
                permanent, 5000, worker, [lasp_dependence_dag]},
@@ -91,6 +94,11 @@ init(_Args) ->
                             permanent, 5000, worker,
                             [lasp_default_broadcast_distribution_backend]},
 
+    PlumtreeBackend = {lasp_plumtree_backend,
+                       {lasp_plumtree_backend, start_link, []},
+                        permanent, 5000, worker,
+                        [lasp_plumtree_backend]},
+
     Plumtree = {plumtree_sup,
                 {plumtree_sup, start_link, []},
                  permanent, infinity, supervisor, [plumtree_sup]},
@@ -100,19 +108,14 @@ init(_Args) ->
                  permanent, 5000, worker,
                  [sprinter]},
 
-    BroadcastBuffer = {lasp_broadcast_buffer,
-                       {lasp_broadcast_buffer, start_link, []},
-                        permanent, 5000, worker,
-                        [lasp_broadcast_buffer]},
-
     WebSpecs = web_specs(),
 
     BaseSpecs0 = [Unique,
-                  BroadcastBuffer,
                   Partisan,
+                  Sprinter,
+                  PlumtreeBackend,
                   DistributionBackend,
                   Plumtree,
-                  Sprinter,
                   Process] ++ WebSpecs,
 
     DagEnabled = application:get_env(?APP, dag_enabled, false),
@@ -150,9 +153,6 @@ init(_Args) ->
     TournamentSpecs = game_tournament_child_specs(),
 
     Children = Children0 ++ AdSpecs ++ TournamentSpecs,
-
-    %% Configure defaults.
-    configure_defaults(),
 
     {ok, {{one_for_one, 5, 10}, Children}}.
 
@@ -222,6 +222,7 @@ configure_defaults() ->
     BroadcastEnabled = application:get_env(?APP,
                                            broadcast,
                                            BroadcastDefault),
+    lager:info("Setting broadcast: ~p", [BroadcastEnabled]),
     lasp_config:set(broadcast, BroadcastEnabled),
 
     SimulationDefault = list_to_atom(os:getenv("SIMULATION", "undefined")),
@@ -334,17 +335,18 @@ advertisement_counter_child_specs() ->
     lasp_config:set(ad_counter_simulation_client, AdClientEnabled),
     lager:info("AdClientEnabled: ~p", [AdClientEnabled]),
 
-    ImpressionNumberDefault = 4800,
+    %% Since IMPRESSION_INTERVAL=10s
+    %% each node, per minute, does 6 impressions.
+    %% We want the experiments to run for 30 minutes.
+    %% Each node, per 30 minutes, does 6*30=180 impressions.
+    %% To have enough impressions for all nodes we need
+    %% 180 * client_number impressions
+    {ok, ClientNumber} = application:get_env(?APP, client_number),
+    ImpressionNumberDefault = 180 * ClientNumber,
     ImpressionNumber = application:get_env(?APP,
                                            max_impressions,
                                            ImpressionNumberDefault),
     lasp_config:set(max_impressions, ImpressionNumber),
-
-    ImpressionVelocityDefault = list_to_integer(os:getenv("IMPRESSION_VELOCITY", "1")),
-    ImpressionVelocity = application:get_env(?APP,
-                                             impression_velocity,
-                                             ImpressionVelocityDefault),
-    lasp_config:set(impression_velocity, ImpressionVelocity),
 
     ClientSpecs = case AdClientEnabled of
         true ->

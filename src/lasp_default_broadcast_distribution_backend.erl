@@ -533,60 +533,6 @@ handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     {ok, _Pid} = ?CORE:fold(Id, Function, AccId, Store, ?BIND, ?READ),
     {reply, ok, State};
 
-%% Graft part of the tree back.  If the value that's being asked for is
-%% stale: that is, it has an earlier vector clock than one that's stored
-%% locally, ignore and return the stale marker, preventing tree repair
-%% given we've shown we already have some connection to retrieve data
-%% for that node.  If not, return the the value and repair the tree.
-handle_call({graft, Id, TheirClock}, _From, #state{store=Store}=State) ->
-    lasp_marathon_simulations:log_message_queue_size("graft"),
-
-    Result = case get(Id, Store) of
-        {ok, {Id, Type, Metadata, Value}} ->
-            OurClock = orddict:fetch(clock, Metadata),
-            case lasp_vclock:equal(TheirClock, OurClock) of
-                true ->
-                    {ok, {Id, Type, Metadata, Value}};
-                false ->
-                    stale
-            end;
-        {error, Error} ->
-            {error, Error}
-    end,
-    {reply, Result, State};
-
-%% Given a message identifer, return stale if we've seen an object with
-%% a vector clock that's greater than the provided one.
-handle_call({is_stale, Id, TheirClock}, _From, #state{store=Store}=State) ->
-    lasp_marathon_simulations:log_message_queue_size("is_stale"),
-
-    Result = case get(Id, Store) of
-        {ok, {_, _, Metadata, _}} ->
-            OurClock = orddict:fetch(clock, Metadata),
-            Stale = lasp_vclock:descends(OurClock, TheirClock),
-            Stale;
-        {error, _Error} ->
-            false
-    end,
-    {reply, Result, State};
-
-%% Naive anti-entropy mechanism; pairwise state shipping.
-handle_call({exchange, Peer}, _From, #state{store=Store}=State) ->
-    lasp_marathon_simulations:log_message_queue_size("exchange"),
-
-    Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
-                    case orddict:find(dynamic, Metadata) of
-                        {ok, true} ->
-                            %% Ignore: this is a dynamic variable.
-                            ok;
-                        _ ->
-                            send({state_send, node(), {Id, Type, Metadata, Value}}, Peer)
-                    end,
-                    [{ok, {Id, Type, Metadata, Value}}|Acc0]
-               end,
-    Pid = spawn_link(fun() -> do(fold, [Store, Function, []]) end),
-    {reply, {ok, Pid}, State};
-
 %% @private
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),

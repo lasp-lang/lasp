@@ -1,3 +1,6 @@
+%% Synchronization backend.
+-define(SYNC_BACKEND, lasp_synchronization_backend).
+
 %% Delta synchronization interval.
 -define(DELTA_GC_INTERVAL, 60000).
 

@@ -21,6 +21,8 @@
 -module(lasp_storage_backend).
 -author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
 
+-export([do/2]).
+
 -include("lasp.hrl").
 
 -callback start(atom())-> {ok, store()} | ignore | {error, term()}.
@@ -39,3 +41,18 @@
 -callback fold(store(), function(), term()) -> {ok, term()}.
 
 -callback reset(store()) -> ok.
+
+-ifdef(TEST).
+
+do(Function, Args) ->
+    Backend = lasp_ets_storage_backend,
+    erlang:apply(Backend, Function, Args).
+
+-else.
+
+%% @doc Execute call to the proper backend.
+do(Function, Args) ->
+    Backend = lasp_config:get(storage_backend, lasp_ets_storage_backend),
+    erlang:apply(Backend, Function, Args).
+
+-endif.

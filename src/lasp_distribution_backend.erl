@@ -258,19 +258,16 @@ reset() ->
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
     %% Seed the process at initialization.
-    rand_compat:seed(erlang:phash2([node()]),
-                     erlang:monotonic_time(),
-                     erlang:unique_integer()),
+    ?SYNC_BACKEND:seed(),
 
-    schedule_state_synchronization(),
     schedule_delta_synchronization(),
     schedule_delta_garbage_collection(),
-    schedule_plumtree_peer_refresh(),
 
     {ok, Actor} = lasp_unique:unique(),
 
     Identifier = node(),
 
+    %% Start the storage backend.
     {ok, Store} = case ?CORE:start(Identifier) of
         {ok, Pid} ->
             {ok, Pid};
@@ -279,6 +276,16 @@ init([]) ->
         {error, Reason} ->
             _ = lager:error("Failed to initialize backend: ~p", [Reason]),
             {error, Reason}
+    end,
+
+    %% Start synchronization backend.
+    case lasp_config:get(mode, ?DEFAULT_MODE) of
+        state_based ->
+            lasp_state_based_synchronization_backend:start_link([Store, Actor]),
+            ok;
+        delta_based ->
+            %% lasp_delta_based_synchronization_backend:start_link(Store, Actor),
+            ok
     end,
 
     {ok, #state{actor=Actor, gossip_peers=[], store=Store}}.
@@ -512,7 +519,9 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
                         collect_deltas(Peer, Type, DeltaMap, Ack, Counter)
                 end,
 
-                ClientInReactiveMode = (client_server_mode() andalso i_am_client() andalso reactive_server()),
+                ClientInReactiveMode =
+                (?SYNC_BACKEND:client_server_mode() andalso
+                 ?SYNC_BACKEND:i_am_client() andalso ?SYNC_BACKEND:reactive_server()),
 
                 AckMap = case Ack < Counter orelse ClientInReactiveMode of
                     true ->
@@ -540,32 +549,9 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
     end,
 
     %% TODO: Should this be parallel?
-    {ok, _} = do(update_all, [Store, Mutator]),
+    {ok, _} = lasp_storage_backend:do(update_all, [Store, Mutator]),
 
     lasp_logger:extended("Exchange finished for ~p", [Peer]),
-
-    {noreply, State};
-
-handle_cast({state_send, From, {Id, Type, _Metadata, Value}},
-            #state{store=Store, actor=Actor}=State) ->
-    lasp_marathon_simulations:log_message_queue_size("state_send"),
-
-    ?CORE:receive_value(Store, {state_send,
-                                From,
-                               {Id, Type, _Metadata, Value},
-                               ?CLOCK_INCR(Actor),
-                               ?CLOCK_INIT(Actor)}),
-
-    %% Send back just the updated state for the object received.
-    case client_server_mode() andalso i_am_server() andalso reactive_server() of
-        true ->
-            ObjectFilterFun = fun(Id1) ->
-                                      Id =:= Id1
-                              end,
-            init_state_sync(From, ObjectFilterFun, Store);
-        false ->
-            ok
-    end,
 
     {noreply, State};
 
@@ -586,7 +572,8 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
     send({delta_ack, node(), Id, Counter}, From),
 
     %% Send back just the updated state for the object received.
-    case client_server_mode() andalso i_am_server() andalso reactive_server() of
+    case ?SYNC_BACKEND:client_server_mode() andalso
+         ?SYNC_BACKEND:i_am_server() andalso ?SYNC_BACKEND:reactive_server() of
         true ->
             ObjectFilterFun = fun(Id1) ->
                                       Id =:= Id1
@@ -612,31 +599,6 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 
-handle_info(state_sync, #state{store=Store, gossip_peers=GossipPeers} = State) ->
-    lasp_marathon_simulations:log_message_queue_size("state_sync"),
-
-    lasp_logger:extended("Beginning state synchronization."),
-
-    Members = case broadcast_tree_mode() of
-        true ->
-            GossipPeers;
-        false ->
-            {ok, Members1} = membership(),
-            Members1
-    end,
-
-    %% Remove ourself and compute exchange peers.
-    Peers = compute_exchange(without_me(Members)),
-
-    lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
-
-    %% Ship buffered updates for the fanout value.
-    lists:foreach(fun(Peer) -> init_state_sync(Peer, Store) end, Peers),
-
-    %% Schedule next synchronization.
-    schedule_state_synchronization(),
-
-    {noreply, State};
 handle_info(delta_sync, #state{}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_sync"),
 
@@ -646,7 +608,7 @@ handle_info(delta_sync, #state{}=State) ->
     {ok, Members} = membership(),
 
     %% Remove ourself and compute exchange peers.
-    Peers = compute_exchange(without_me(Members)),
+    Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
 
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
@@ -664,30 +626,13 @@ handle_info(delta_sync, #state{}=State) ->
                       end,
     lists:foreach(fun(Peer) ->
                           init_delta_sync(Peer, WithConvergenceFun) end,
-                  without_me(Members)),
+                  ?SYNC_BACKEND:without_me(Members)),
 
     %% Schedule next synchronization.
     schedule_delta_synchronization(),
 
     {noreply, State#state{}};
-handle_info(plumtree_peer_refresh, State) ->
-    %% TODO: Temporary hack until the Plumtree can propagate tree
-    %% information in the metadata messages.  Therefore, manually poll
-    %% periodically with jitter.
-    {ok, Servers} = sprinter:servers(),
 
-    GossipPeers = case length(Servers) of
-        0 ->
-            [];
-        _ ->
-            Root = hd(Servers),
-            plumtree_gossip_peers(Root)
-    end,
-
-    %% Schedule next synchronization.
-    schedule_plumtree_peer_refresh(),
-
-    {noreply, State#state{gossip_peers=GossipPeers}};
 handle_info(delta_gc, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("delta_gc"),
 
@@ -725,7 +670,7 @@ handle_info(delta_gc, #state{store=Store}=State) ->
         {Object#dv{delta_map=DeltaMapGC, delta_ack_map=PrunedAckMap}, Id}
     end,
 
-    {ok, Results} = do(update_all, [Store, Mutator]),
+    {ok, Results} = lasp_storage_backend:do(update_all, [Store, Mutator]),
     lager:info("Garbage collection complete for objects: ~p", [Results]),
 
     %% Schedule next GC and reset counter.
@@ -809,21 +754,6 @@ declare_if_not_found({error, not_found}, {StorageId, TypeId},
 declare_if_not_found(Result, _Id, _State, _Module, _Function, _Args) ->
     Result.
 
--ifdef(TEST).
-
-do(Function, Args) ->
-    Backend = lasp_ets_storage_backend,
-    erlang:apply(Backend, Function, Args).
-
--else.
-
-%% @doc Execute call to the proper backend.
-do(Function, Args) ->
-    Backend = lasp_config:get(storage_backend, lasp_ets_storage_backend),
-    erlang:apply(Backend, Function, Args).
-
--endif.
-
 %% @private
 log_transmission(ToLog, PeerCount) ->
     try
@@ -846,44 +776,15 @@ log_transmission(ToLog, PeerCount) ->
     end.
 
 %% @private
-schedule_state_synchronization() ->
-    ShouldSync = state_based_mode()
-            andalso (not tutorial_mode())
-            andalso (
-              peer_to_peer_mode()
-              orelse
-              (
-               client_server_mode()
-               andalso
-               not (i_am_server() andalso reactive_server())
-              )
-            ),
-
-    case ShouldSync of
-        true ->
-            Interval = lasp_config:get(state_interval, 10000),
-            case lasp_config:get(jitter, false) of
-                true ->
-                    %% Add random jitter.
-                    Jitter = rand_compat:uniform(Interval),
-                    timer:send_after(Interval + Jitter, state_sync);
-                false ->
-                    timer:send_after(Interval, state_sync)
-            end;
-        false ->
-            ok
-    end.
-
-%% @private
 schedule_delta_synchronization() ->
-    ShouldDeltaSync = delta_based_mode()
+    ShouldDeltaSync = ?SYNC_BACKEND:delta_based_mode()
             andalso (
-              peer_to_peer_mode()
+              ?SYNC_BACKEND:peer_to_peer_mode()
               orelse
               (
-               client_server_mode()
+               ?SYNC_BACKEND:client_server_mode()
                andalso
-               not (i_am_server() andalso reactive_server())
+               not (?SYNC_BACKEND:i_am_server() andalso ?SYNC_BACKEND:reactive_server())
               )
             ),
 
@@ -903,21 +804,8 @@ schedule_delta_synchronization() ->
     end.
 
 %% @private
-schedule_plumtree_peer_refresh() ->
-    case broadcast_tree_mode() of
-        true ->
-            Interval = lasp_config:get(plumtree_peer_refresh_interval,
-                                       ?PLUMTREE_PEER_REFRESH_INTERVAL),
-            Jitter = rand_compat:uniform(Interval),
-            timer:send_after(Jitter + ?PLUMTREE_PEER_REFRESH_INTERVAL,
-                             plumtree_peer_refresh);
-        false ->
-            ok
-    end.
-
-%% @private
 schedule_delta_garbage_collection() ->
-    case delta_based_mode() of
+    case ?SYNC_BACKEND:delta_based_mode() of
         true ->
             timer:send_after(?DELTA_GC_INTERVAL, delta_gc);
         false ->
@@ -937,41 +825,11 @@ send(Msg, Peer) ->
     end.
 
 %% @private
-%% state_based messages:
-extract_log_type_and_payload({state_send, _Node, {Id, _Type, _Metadata, State}}) ->
-    [{state_send, State}, {state_send_protocol, Id}];
 %% delta_based messages:
 extract_log_type_and_payload({delta_send, Node, {Id, _Type, _Metadata, Deltas}, Counter}) ->
     [{delta_send, Deltas}, {delta_send_protocol, {Id, Node, Counter}}];
 extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
     [{delta_send_protocol, {Id, Node, Counter}}].
-
-%% @private
-init_state_sync(Peer, Store) ->
-    ObjectFilterFun = fun(_) -> true end,
-    init_state_sync(Peer, ObjectFilterFun, Store).
-
-%% @private
-init_state_sync(Peer, ObjectFilterFun, Store) ->
-    lasp_logger:extended("Initializing state synchronization with peer: ~p", [Peer]),
-    Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
-                    case orddict:find(dynamic, Metadata) of
-                        {ok, true} ->
-                            %% Ignore: this is a dynamic variable.
-                            Acc0;
-                        _ ->
-                            case ObjectFilterFun(Id) of
-                                true ->
-                                    send({state_send, node(), {Id, Type, Metadata, Value}}, Peer),
-                                    [{ok, {Id, Type, Metadata, Value}}|Acc0];
-                                false ->
-                                    Acc0
-                            end
-                    end
-               end,
-    %% TODO: Should this be parallel?
-    {ok, _} = do(fold, [Store, Function, []]),
-    ok.
 
 %% @private
 init_delta_sync(Peer, ObjectFilterFun) ->
@@ -982,124 +840,5 @@ membership() ->
     lasp_peer_service:members().
 
 %% @private
-select_random_sublist(List, K) ->
-    lists:sublist(shuffle(List), K).
-
-%% @reference http://stackoverflow.com/questions/8817171/shuffling-elements-in-a-list-randomly-re-arrange-list-elements/8820501#8820501
-shuffle(L) ->
-    [X || {_, X} <- lists:sort([{lasp_support:puniform(65535), N} || N <- L])].
-
-%% @private
 lists_min([]) -> 0;
 lists_min(L) -> lists:min(L).
-
-%% @private
-compute_exchange(Peers) ->
-    PeerServiceManager = lasp_config:peer_service_manager(),
-
-    Probability = lasp_config:get(partition_probability, 0),
-    lasp_logger:extended("Probability of partition: ~p", [Probability]),
-    Percent = lasp_support:puniform(100),
-
-    case Percent =< Probability of
-        true ->
-            case PeerServiceManager of
-                partisan_client_server_peer_service_manager ->
-                    lager:info("Partitioning from server."),
-                    [];
-                _ ->
-                    lager:info("Partitioning ~p% of the network.",
-                               [Percent]),
-
-                    %% Select percentage, minus one node which will be
-                    %% the server node.
-                    K = round((Percent / 100) * length(Peers)),
-                    lager:info("Partitioning ~p%: ~p nodes.",
-                               [Percent, K]),
-                    ServerNodes = case PeerServiceManager:active(server) of
-                        {ok, undefined} ->
-                            [];
-                        {ok, Server} ->
-                            [Server];
-                        error ->
-                            []
-                    end,
-                    lager:info("ServerNodes: ~p", [ServerNodes]),
-
-                    Random = select_random_sublist(Peers, K),
-                    RandomAndServer = lists:usort(ServerNodes ++ Random),
-                    lager:info("Partitioning ~p from ~p during sync.",
-                               [RandomAndServer, Peers -- RandomAndServer]),
-                    Peers -- RandomAndServer
-            end;
-        false ->
-            Peers
-    end.
-
-%% @private
-without_me(Members) ->
-    Members -- [node()].
-
-%% @private
-state_based_mode() ->
-    lasp_config:get(mode, state_based) == state_based.
-
-%% @private
-delta_based_mode() ->
-    lasp_config:get(mode, state_based) == delta_based.
-
-%% @private
-broadcast_tree_mode() ->
-    lasp_config:get(broadcast, false).
-
-%% @private
-tutorial_mode() ->
-    lasp_config:get(tutorial, false).
-
-%% @private
-client_server_mode() ->
-    lasp_config:peer_service_manager() == partisan_client_server_peer_service_manager.
-
-%% @private
-peer_to_peer_mode() ->
-    lasp_config:peer_service_manager() == partisan_hyparview_peer_service_manager orelse
-    lasp_config:peer_service_manager() == partisan_default_peer_service_manager.
-
-%% @private
-i_am_server() ->
-    partisan_config:get(tag, undefined) == server.
-
-%% @private
-i_am_client() ->
-    partisan_config:get(tag, undefined) == client.
-
-%% @private
-reactive_server() ->
-    lasp_config:get(reactive_server, false).
-
-%% @private
-plumtree_gossip_peers(Root) ->
-    {ok, Nodes} = sprinter:nodes(),
-    Tree = sprinter:debug_get_tree(Root, Nodes),
-    FolderFun = fun({Node, Peers}, In) ->
-                        case Peers of
-                            down ->
-                                In;
-                            {Eager, _Lazy} ->
-                                case lists:member(node(), Eager) of
-                                    true ->
-                                        In ++ [Node];
-                                    false ->
-                                        In
-                                end
-                        end
-                end,
-    InLinks = lists:foldl(FolderFun, [], Tree),
-
-    {EagerPeers, _LazyPeers} = plumtree_broadcast:debug_get_peers(node(), Root),
-    OutLinks = ordsets:to_list(EagerPeers),
-
-    GossipPeers = lists:usort(InLinks ++ OutLinks),
-    lager:info("PLUMTREE DEBUG: Gossip Peers: ~p", [GossipPeers]),
-
-    GossipPeers.

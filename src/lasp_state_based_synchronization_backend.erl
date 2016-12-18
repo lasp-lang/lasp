@@ -65,7 +65,7 @@ start_link(Opts) ->
 %%%===================================================================
 
 %% @private
--spec init([store()]) -> {ok, #state{}}.
+-spec init([term()]) -> {ok, #state{}}.
 init([Store, Actor]) ->
     %% Seed the process at initialization.
     ?SYNC_BACKEND:seed(),

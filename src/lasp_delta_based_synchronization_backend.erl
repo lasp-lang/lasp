@@ -60,14 +60,14 @@ extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
 %% @doc Start and link to calling process.
 -spec start_link(list())-> {ok, pid()} | ignore | {error, term()}.
 start_link(Opts) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [Opts], []).
 
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
 
 %% @private
--spec init([]) -> {ok, #state{}}.
+-spec init([term()]) -> {ok, #state{}}.
 init([Store, Actor]) ->
     %% Seed the process at initialization.
     ?SYNC_BACKEND:seed(),

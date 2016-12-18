@@ -89,10 +89,10 @@ init(_Args) ->
                 {partisan_sup, start_link, []},
                  permanent, infinity, supervisor, [partisan_sup]},
 
-    DistributionBackend = {lasp_default_broadcast_distribution_backend,
-                           {lasp_default_broadcast_distribution_backend, start_link, []},
+    DistributionBackend = {lasp_distribution_backend,
+                           {lasp_distribution_backend, start_link, []},
                             permanent, 5000, worker,
-                            [lasp_default_broadcast_distribution_backend]},
+                            [lasp_distribution_backend]},
 
     PlumtreeMemoryReport = {lasp_plumtree_memory_report,
                             {lasp_plumtree_memory_report, start_link, []},
@@ -314,7 +314,7 @@ configure_defaults() ->
     DistributionBackend = application:get_env(
                             ?APP,
                             distribution_backend,
-                            lasp_default_broadcast_distribution_backend),
+                            lasp_distribution_backend),
     lasp_config:set(distribution_backend, DistributionBackend),
 
     %% Delta specific configuration values.

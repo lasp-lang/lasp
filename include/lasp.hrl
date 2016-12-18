@@ -154,10 +154,8 @@
 -define(LOG_INTERVAL, 10000).
 -define(ADS_NUMBER, 1).
 
+%% Storage backend.
 -define(DEFAULT_STORAGE_BACKEND, lasp_ets_storage_backend).
-
--define(DEFAULT_DISTRIBUTION_BACKEND,
-        lasp_default_broadcast_distribution_backend).
 
 %% Lexer and parser.
 -define(SQL_LEXER, lasp_sql_lexer).

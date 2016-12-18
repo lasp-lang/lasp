@@ -92,6 +92,6 @@ identifier(Id, Type) ->
     Identifier.
 
 sync() ->
-    Pid = whereis(lasp_default_broadcast_distribution_backend),
+    Pid = whereis(lasp_distribution_backend),
     Pid ! state_sync,
     ok.

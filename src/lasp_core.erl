@@ -77,17 +77,17 @@
 -export([storage_backend_reset/1]).
 
 %% Definitions for the bind/read fun abstraction.
--define(BIND, fun(_AccId, AccValue, _Store) ->
+-define(BACKEND_BIND, fun(_AccId, AccValue, _Store) ->
                 ?MODULE:bind_var(_AccId, AccValue, _Store)
               end).
 
--define(WRITE, fun(_Store) ->
+-define(BACKEND_WRITE, fun(_Store) ->
                  fun(_AccId, _AccValue) ->
                    {ok, _} = ?MODULE:bind(_AccId, _AccValue, _Store)
                  end
                end).
 
--define(READ, fun(_Id, _Threshold) ->
+-define(BACKEND_READ, fun(_Id, _Threshold) ->
                 ?MODULE:read_var(_Id, _Threshold, Store)
               end).
 
@@ -104,7 +104,7 @@ start(Identifier) ->
 %%
 -spec filter(id(), function(), id(), store()) -> {ok, pid()}.
 filter(Id, Function, AccId, Store) ->
-    filter(Id, Function, AccId, Store, ?WRITE, ?READ).
+    filter(Id, Function, AccId, Store, ?BACKEND_WRITE, ?BACKEND_READ).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -114,7 +114,7 @@ filter(Id, Function, AccId, Store) ->
 %%
 -spec fold(id(), function(), id(), store()) -> {ok, pid()}.
 fold(Id, Function, AccId, Store) ->
-    fold(Id, Function, AccId, Store, ?BIND, ?READ).
+    fold(Id, Function, AccId, Store, ?BACKEND_BIND, ?BACKEND_READ).
 
 %% @doc Map values from one lattice into another.
 %%
@@ -124,7 +124,7 @@ fold(Id, Function, AccId, Store) ->
 %%
 -spec map(id(), function(), id(), store()) -> {ok, pid()}.
 map(Id, Function, AccId, Store) ->
-    map(Id, Function, AccId, Store, ?WRITE, ?READ).
+    map(Id, Function, AccId, Store, ?BACKEND_WRITE, ?BACKEND_READ).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -139,7 +139,7 @@ intersection(Left, Right, Intersection, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read_var(_Right, _Threshold, _Variables)
     end,
-    intersection(Left, Right, Intersection, Store, ?WRITE, ReadLeftFun, ReadRightFun).
+    intersection(Left, Right, Intersection, Store, ?BACKEND_WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Compute the union of two sets.
 %%
@@ -154,7 +154,7 @@ union(Left, Right, Union, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read_var(_Right, _Threshold, _Variables)
     end,
-    union(Left, Right, Union, Store, ?WRITE, ReadLeftFun, ReadRightFun).
+    union(Left, Right, Union, Store, ?BACKEND_WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -169,7 +169,7 @@ product(Left, Right, Product, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read_var(_Right, _Threshold, _Variables)
     end,
-    product(Left, Right, Product, Store, ?WRITE, ReadLeftFun, ReadRightFun).
+    product(Left, Right, Product, Store, ?BACKEND_WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Perform a read for a particular identifier.
 %%
@@ -334,7 +334,7 @@ query_var({_, Type}=Id, Store) ->
 %%
 -spec bind_to(id(), id(), store()) -> {ok, pid()}.
 bind_to(AccId, Id, Store) ->
-    bind_to(AccId, Id, Store, ?WRITE, ?READ).
+    bind_to(AccId, Id, Store, ?BACKEND_WRITE, ?BACKEND_READ).
 
 %% @doc Spawn a function.
 %%
@@ -622,7 +622,7 @@ read_any(Reads, Self, Store) ->
 %%
 -spec bind_to(id(), id(), store(), function()) -> {ok, pid()}.
 bind_to(AccId, Id, Store, BindFun) ->
-    bind_to(AccId, Id, Store, BindFun, ?READ).
+    bind_to(AccId, Id, Store, BindFun, ?BACKEND_READ).
 
 bind_to(AccId, Id, Store, BindFun, ReadFun) ->
     TransFun = fun({_, _, _, V}) -> V end,
@@ -812,7 +812,7 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
 %%      stream can result in observable nondeterminism.
 %%
 stream(Id, Function, Store) ->
-    stream(Id, Function, Store, ?READ).
+    stream(Id, Function, Store, ?BACKEND_READ).
 
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.

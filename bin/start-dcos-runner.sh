@@ -1,16 +1,15 @@
 #!/bin/bash
 
+DCOS=$(dcos config show core.dcos_url)
+ELB_HOST=$(./elb-host.sh)
+
 ENV_VARS=(
-  ID
+  STACK_NAME
   LASP_BRANCH
-  DCOS
-  TOKEN
-  ELB_HOST
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
   CLIENT_NUMBER
   PARTITION_PROBABILITY
-  IMPRESSION_VELOCITY
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -35,7 +34,7 @@ cat <<EOF > dcos-runner.json
   "acceptedResourceRoles": [
     "slave_public"
   ],
-  "id": "$ID-dcos-runner-$CLIENT_NUMBER-$PARTITION_PROBABILITY-$IMPRESSION_VELOCITY",
+  "id": "dcos-runner-$CLIENT_NUMBER-$PARTITION_PROBABILITY",
   "dependencies": [],
   "constraints": [],
   "cpus": $CPU,
@@ -56,19 +55,19 @@ cat <<EOF > dcos-runner.json
   "env": {
     "LASP_BRANCH": "$LASP_BRANCH",
     "DCOS": "$DCOS",
-    "TOKEN": "$TOKEN",
     "ELB_HOST": "$ELB_HOST",
     "AWS_ACCESS_KEY_ID": "$AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY": "$AWS_SECRET_ACCESS_KEY",
     "CLIENT_NUMBER": "$CLIENT_NUMBER",
-    "PARTITION_PROBABILITY": "$PARTITION_PROBABILITY",
-    "IMPRESSION_VELOCITY": "$IMPRESSION_VELOCITY"
+    "PARTITION_PROBABILITY": "$PARTITION_PROBABILITY"
   },
   "healthChecks": []
 }
 EOF
 
-echo ">>> Adding $ID-dcos-runner-$CLIENT_NUMBER-$PARTITION_PROBABILITY-$IMPRESSION_VELOCITY to Marathon"
-curl -s -k -H "Authorization: token=$TOKEN" -H 'Content-type: application/json' -X POST -d @dcos-runner.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
-sleep 10
+echo ">>> Adding dcos-runner-$CLIENT_NUMBER-$PARTITION_PROBABILITY to Marathon"
+curl -s -k -H 'Content-type: application/json' -X POST -d @dcos-runner.json "$DCOS/service/marathon/v2/apps?force=true" > /dev/null
 
+sleep 120
+echo ">>> Tailing server logs."
+dcos task log --follow lasp-server

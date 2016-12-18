@@ -33,6 +33,9 @@
 -callback update(store(), id(), function()) ->
     {ok, any()} | error | {error, atom()}.
 
+-callback update_all(store(), function()) ->
+    {ok, any()} | error | {error, atom()}.
+
 -callback fold(store(), function(), term()) -> {ok, term()}.
 
 -callback reset(store()) -> ok.

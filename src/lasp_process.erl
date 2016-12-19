@@ -146,7 +146,6 @@ init([ReadFuns, TransFun, {To, _}=WriteFun]) ->
         false ->
             ok;
         true ->
-            lager:info("Adding edge from: ~p to ~p", [From, To]),
             ok = lasp_dependence_dag:add_edges(From, To, self(),
                                                ReadFuns,
                                                TransFun,

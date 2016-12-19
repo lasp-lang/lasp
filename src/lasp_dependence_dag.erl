@@ -63,6 +63,9 @@
 %% Defines how often an optimization pass happens.
 -define(CONTRACTION_INTERVAL, 1000).
 
+%% Initial depth of all nodes.
+-define(BASE_DEPTH, 0).
+
 %%%===================================================================
 %%% Type definitions
 %%%===================================================================
@@ -343,7 +346,7 @@ handle_call({in_edges, V}, _From, #state{dag=Dag}=State) ->
     {reply, {ok, Edges}, State};
 
 handle_call({add_vertices, Vs}, _From, #state{dag=Dag}=State) ->
-    [digraph:add_vertex(Dag, V, 0) || V <- Vs],
+    [digraph:add_vertex(Dag, V, ?BASE_DEPTH) || V <- Vs],
     {reply, ok, State};
 
 handle_call(to_dot, _From, #state{dag=Dag}=State) ->
@@ -512,22 +515,28 @@ add_edges(Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
                                                                transform=TransFun,
                                                                write=WriteFun}),
 
-        %% Determine depth.
-        Depth = depth(Dag, Dst, 0),
+        %% Determine depth; but ignore nodes that are transient,
+        %% single-fire processes.
+        case Dst of
+            {_Id, _Type} ->
+                Depth = depth(Dag, Dst, ?BASE_DEPTH),
 
-        %% Re-create destination vertex with new depth.
-        case digraph:vertex(Dag, Dst) of
-            {_, Label} ->
-                case Label of
-                    Depth ->
-                        %% Already correct depth; ignore.
-                        ok;
-                    Depth0 ->
-                        VertexResult = digraph:add_vertex(Dag, Dst, Depth),
-                        lager:info("Vertex: ~p re-created with depth ~p => ~p; result: ~p",
-                                   [Dst, Depth0, Depth, VertexResult]),
-                        lager:info("Vertex: ~p edges: ~p",
-                                   [Dst, digraph:edges(Dag, Dst)])
+                %% Re-create destination vertex with new depth.
+                case digraph:vertex(Dag, Dst) of
+                    {_, Label} ->
+                        case Label of
+                            Depth ->
+                                %% Already correct depth; ignore.
+                                ok;
+                            Depth0 ->
+                                VertexResult = digraph:add_vertex(Dag, Dst, Depth),
+                                lager:info("Vertex: ~p re-created with depth ~p => ~p; result: ~p",
+                                           [Dst, Depth0, Depth, VertexResult]),
+                                lager:info("Vertex: ~p edges: ~p",
+                                           [Dst, digraph:edges(Dag, Dst)])
+                        end;
+                    _ ->
+                        ok
                 end;
             _ ->
                 ok
@@ -601,8 +610,10 @@ get_direct_edges(G, V1, V2) ->
 -spec add_if_pid(digraph:graph(), lasp_vertex()) -> ok.
 add_if_pid(Dag, Pid) when is_pid(Pid) ->
    case digraph:vertex(Dag, Pid) of
-      false -> digraph:add_vertex(Dag, Pid);
-      _ -> ok
+      false ->
+           digraph:add_vertex(Dag, Pid);
+      _ ->
+           ok
    end;
 
 add_if_pid(_, _) ->
@@ -1156,12 +1167,24 @@ v_str({Id, _}) ->
 v_str(V) when is_pid(V)->
     pid_to_list(V).
 
+%% @private
 depth(G, V, Max) ->
-    case digraph:in_neighbours(G, V) of
+    InNeighbors = digraph:in_neighbours(G, V),
+
+    %% Filter out single-fire nodes that are identified by process
+    %% identifier only.
+    FilterFun = fun({_Id, _Type}) ->
+                        true;
+                   (_) ->
+                        false
+                end,
+    Neighbors = lists:filter(FilterFun, InNeighbors),
+
+    case Neighbors of
         [] ->
             Max;
-        Neighbors ->
+        _ ->
             lists:foldl(fun(V1, MaxAcc) ->
-                                max(MaxAcc, depth(G, V1, Max + 1))
-                        end, 0, Neighbors)
+                                max(MaxAcc, depth(G, V1, Max + 1)) end, 
+                        ?BASE_DEPTH, Neighbors)
     end.

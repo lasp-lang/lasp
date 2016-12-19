@@ -486,10 +486,15 @@ add_edges(Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
     end, Src),
 
     {R, St} = case lists:any(fun is_graph_error/1, Status) of
-        true -> {error, State};
+        true ->
+            %% Sometimes if someone tries to read an object
+            %% that's not there, we'll try to make an edge to a
+            %% non-existent vertex and will trigger this
+            %% error.  Ignore.
+            lager:info("Edge could not be generated; ignoring."),
+            {ok, State};
         false ->
             erlang:monitor(process, Pid),
-
 
             %% For all V in Src, append Pid -> {V, Dst}
             %% in the process map.

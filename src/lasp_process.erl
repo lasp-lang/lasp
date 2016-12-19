@@ -151,8 +151,10 @@ init([nodag, ReadFuns, Function, WriteFun]) ->
 init([ReadFuns, TransFun, {To, _}=WriteFun]) ->
     From = [Id || {Id, _} <- ReadFuns],
     case lasp_config:get(dag_enabled, ?DAG_ENABLED) of
-        false -> ok;
+        false ->
+            ok;
         true ->
+            lager:info("Adding edge from: ~p to ~p", [From, To]),
             ok = lasp_dependence_dag:add_edges(From, To, self(),
                                                ReadFuns,
                                                TransFun,

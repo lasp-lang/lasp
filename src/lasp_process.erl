@@ -23,6 +23,8 @@
 
 -behaviour(gen_flow).
 
+-include("lasp.hrl").
+
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.

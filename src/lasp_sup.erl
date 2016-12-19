@@ -261,11 +261,11 @@ configure_defaults() ->
                                        ClientNumberDefault),
     lasp_config:set(client_number, ClientNumber),
 
-    HeavyClientsDefault = list_to_atom(os:getenv("HEAVY_CLIENTS", "false")),
-    HeavyClients = application:get_env(?APP,
-                                       heavy_clients,
-                                       HeavyClientsDefault),
-    lasp_config:set(heavy_clients, HeavyClients),
+    HeavyClientDefault = list_to_atom(os:getenv("HEAVY_CLIENT", "false")),
+    HeavyClient = application:get_env(?APP,
+                                       heavy_client,
+                                       HeavyClientDefault),
+    lasp_config:set(heavy_client, HeavyClient),
 
     ReactiveServerDefault = list_to_atom(os:getenv("REACTIVE_SERVER", "false")),
     ReactiveServer = application:get_env(?APP,

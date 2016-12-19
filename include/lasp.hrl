@@ -1,4 +1,7 @@
-% DAG tracking enabled.
+%% Back propagation.
+-define(BACK_PROPAGATION, true).
+
+%% DAG tracking enabled.
 -define(DAG_ENABLED, true).
 
 %% Synchronization backend.

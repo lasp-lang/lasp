@@ -299,7 +299,28 @@ init([]) ->
     {reply, term(), #state{}}.
 
 handle_call(vertices, _From, #state{dag=Dag}=State) ->
-    {reply, {ok, digraph:vertices(Dag)}, State};
+    %% Retrieve vertices from the graph.
+    Vertices = digraph:vertices(Dag),
+
+    %% Add information about out edges.
+    Terminals = case lasp_config:get(back_propagate_nonterminals, true) of
+                   true ->
+                       Vertices;
+                   false ->
+                       lists:foldl(fun(V, Acc) ->
+                                        case digraph:out_degree(Dag, V) of
+                                            0 ->
+                                                Acc ++ [V];
+                                            _ ->
+                                                Acc
+                                        end
+                                   end, [], Vertices)
+               end,
+
+    %% Annotate vertices with their label.
+    Annotated = lists:map(fun(V) -> digraph:vertex(Dag, V) end, Terminals),
+
+    {reply, {ok, Annotated}, State};
 
 handle_call(n_vertices, _From, #state{dag=Dag}=State) ->
     {reply, {ok, digraph:no_vertices(Dag)}, State};

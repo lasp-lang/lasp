@@ -139,7 +139,16 @@ handle_info(state_sync, #state{store=Store, gossip_peers=GossipPeers} = State) -
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
-    lists:foreach(fun(Peer) -> init_state_sync(Peer, Store) end, Peers),
+    SyncFun = fun(Peer) ->
+                      case lasp_config:get(back_propagation,
+                                           ?BACK_PROPAGATION) of
+                          true ->
+                              init_back_propagation_sync(Peer, Store);
+                          false ->
+                              init_state_sync(Peer, Store)
+                      end
+              end,
+    lists:foreach(SyncFun, Peers),
 
     %% Schedule next synchronization.
     schedule_state_synchronization(),
@@ -230,6 +239,44 @@ schedule_plumtree_peer_refresh() ->
 init_state_sync(Peer, Store) ->
     ObjectFilterFun = fun(_) -> true end,
     init_state_sync(Peer, ObjectFilterFun, Store).
+
+%% @private
+init_back_propagation_sync(Peer, Store) ->
+    lasp_logger:extended("Initializing back propagation state synchronization with peer: ~p", [Peer]),
+
+    SendFun = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}) ->
+                    case orddict:find(dynamic, Metadata) of
+                        {ok, true} ->
+                            %% Ignore: this is a dynamic variable.
+                            ok;
+                        _ ->
+                            ?SYNC_BACKEND:send(?MODULE,
+                                               {state_send, node(), {Id, Type, Metadata, Value}},
+                                               Peer)
+                    end
+               end,
+
+    SyncFun = fun({{_, _Type} = Id, _Depth}) ->
+                      {ok, Object} = lasp_storage_backend:do(get, [Store, Id]),
+                      SendFun({Id, Object});
+                 (_) ->
+                      ok
+              end,
+
+    {ok, Vertices} = lasp_dependence_dag:vertices(),
+
+    SortFun = fun({_, A}, {_, B}) ->
+                      A > B;
+                 (_, _) ->
+                      true
+              end,
+    SortedVertices = lists:sort(SortFun, Vertices),
+
+    lists:map(SyncFun, SortedVertices),
+
+    lasp_logger:extended("Completed back propagation state synchronization with peer: ~p", [Peer]),
+
+    ok.
 
 %% @private
 init_state_sync(Peer, ObjectFilterFun, Store) ->

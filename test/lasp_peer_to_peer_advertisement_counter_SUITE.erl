@@ -61,6 +61,7 @@ end_per_testcase(Case, _Config) ->
 
 all() ->
     [
+     heavy_peer_to_peer_state_based_test,
      full_peer_to_peer_state_based_tree_test,
      peer_to_peer_state_based_test,
      peer_to_peer_state_based_tree_test,
@@ -80,6 +81,18 @@ default_test(_Config) ->
 %% ===================================================================
 %% peer-to-peer
 %% ===================================================================
+
+heavy_peer_to_peer_state_based_test(Config) ->
+    lasp_simulation_support:run(peer_to_peer_ad_counter_state_based_test,
+        Config,
+        [{mode, state_based},
+         {simulation, ad_counter},
+         {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
+         {set, orset},
+         {heavy_client, true},
+         {broadcast, false},
+         {evaluation_identifier, peer_to_peer_state_based}]),
+    ok.
 
 full_peer_to_peer_state_based_tree_test(Config) ->
     lasp_simulation_support:run(peer_to_peer_ad_counter_state_based_tree_test,

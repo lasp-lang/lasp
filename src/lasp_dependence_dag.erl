@@ -315,7 +315,7 @@ handle_call({in_edges, V}, _From, #state{dag=Dag}=State) ->
     {reply, {ok, Edges}, State};
 
 handle_call({add_vertices, Vs}, _From, #state{dag=Dag}=State) ->
-    [digraph:add_vertex(Dag, V) || V <- Vs],
+    [digraph:add_vertex(Dag, V, 0) || V <- Vs],
     {reply, ok, State};
 
 handle_call(to_dot, _From, #state{dag=Dag}=State) ->
@@ -479,10 +479,23 @@ add_edges(Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
     %% (where {Id, Read} = ReadFuns s.t. Id = V)
     Status = lists:map(fun(V) ->
         Read = lists:nth(1, [ReadF || {Id, ReadF} <- ReadFuns, Id =:= V]),
-        digraph:add_edge(Dag, V, Dst, #edge_label{pid=Pid,
-                                                  read=Read,
-                                                  transform=TransFun,
-                                                  write=WriteFun})
+        EdgeResult = digraph:add_edge(Dag, V, Dst, #edge_label{pid=Pid,
+                                                               read=Read,
+                                                               transform=TransFun,
+                                                               write=WriteFun}),
+
+        %% Determine depth.
+        Depth = depth(Dag, Dst, 0),
+        lager:info("Depth of ~p is ~p", [V, Depth]),
+
+        %% Re-create destination vertex with new depth.
+        VertexResult = digraph:add_vertex(Dag, Dst, Depth),
+        lager:info("Vertex: ~p re-created with depth ~p; result: ~p",
+                   [Dst, Depth, VertexResult]),
+        lager:info("Vertex: ~p edges: ~p",
+                   [Dst, digraph:edges(Dag, Dst)]),
+
+        EdgeResult
     end, Src),
 
     {R, St} = case lists:any(fun is_graph_error/1, Status) of
@@ -1105,3 +1118,15 @@ v_str({Id, _}) ->
 
 v_str(V) when is_pid(V)->
     pid_to_list(V).
+
+depth(G, V, Max) ->
+    case digraph:in_neighbours(G, V) of
+        [] ->
+            lager:info("Node ~p has no neighbors.", [V]),
+            Max;
+        Neighbors ->
+            lager:info("Node ~p has ~p neighbors.", [V, length(Neighbors)]),
+            lists:foldl(fun(V1, MaxAcc) ->
+                                max(MaxAcc, depth(G, V1, Max + 1))
+                        end, 0, Neighbors)
+    end.

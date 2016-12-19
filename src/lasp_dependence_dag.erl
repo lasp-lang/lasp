@@ -27,6 +27,7 @@
 %% API
 -export([start_link/0,
          will_form_cycle/2,
+         vertices/0,
          add_edges/6,
          add_vertex/1,
          add_vertices/1]).
@@ -174,6 +175,9 @@ add_vertices([]) ->
 add_vertices(Vs) ->
     gen_server:call(?MODULE, {add_vertices, Vs}, infinity).
 
+vertices() ->
+    gen_server:call(?MODULE, vertices, infinity).
+
 %% @doc Check if linking the given vertices will form a loop.
 %%
 %%      The user may accidentally form a loop while writing a dataflow
@@ -293,6 +297,9 @@ init([]) ->
 
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
+
+handle_call(vertices, _From, #state{dag=Dag}=State) ->
+    {reply, {ok, digraph:vertices(Dag)}, State};
 
 handle_call(n_vertices, _From, #state{dag=Dag}=State) ->
     {reply, {ok, digraph:no_vertices(Dag)}, State};
@@ -486,7 +493,6 @@ add_edges(Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
 
         %% Determine depth.
         Depth = depth(Dag, Dst, 0),
-        lager:info("Depth of ~p is ~p", [V, Depth]),
 
         %% Re-create destination vertex with new depth.
         case digraph:vertex(Dag, Dst) of
@@ -497,7 +503,7 @@ add_edges(Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
                         ok;
                     Depth0 ->
                         VertexResult = digraph:add_vertex(Dag, Dst, Depth),
-                        lager:info("Vertex: ~p re-created with depth ~p =>~p; result: ~p",
+                        lager:info("Vertex: ~p re-created with depth ~p => ~p; result: ~p",
                                    [Dst, Depth0, Depth, VertexResult]),
                         lager:info("Vertex: ~p edges: ~p",
                                    [Dst, digraph:edges(Dag, Dst)])
@@ -515,7 +521,6 @@ add_edges(Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
             %% that's not there, we'll try to make an edge to a
             %% non-existent vertex and will trigger this
             %% error.  Ignore.
-            lager:info("Edge could not be generated; ignoring."),
             {ok, State};
         false ->
             erlang:monitor(process, Pid),
@@ -1133,10 +1138,8 @@ v_str(V) when is_pid(V)->
 depth(G, V, Max) ->
     case digraph:in_neighbours(G, V) of
         [] ->
-            lager:info("Node ~p has no neighbors.", [V]),
             Max;
         Neighbors ->
-            lager:info("Node ~p has ~p neighbors.", [V, length(Neighbors)]),
             lists:foldl(fun(V1, MaxAcc) ->
                                 max(MaxAcc, depth(G, V1, Max + 1))
                         end, 0, Neighbors)

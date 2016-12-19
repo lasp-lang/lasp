@@ -246,6 +246,13 @@ log_convergence() ->
 
 %% @private
 build_dag() ->
+    %% For each identifier, generate a contract.
+    {ContractsId, ContractsType} = ?CONTRACTS,
+    {ok, _} = lasp:declare(ContractsId, ContractsType),
+
+    {AdsId, AdsType} = ?ADS,
+    {ok, _} = lasp:declare(AdsId, AdsType),
+
     %% Compute the Cartesian product of both ads and contracts.
     {AdsContractsId, AdsContractsType} = ?ADS_CONTRACTS,
     {ok, _} = lasp:declare(AdsContractsId, AdsContractsType),

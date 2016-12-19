@@ -275,10 +275,6 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
             %% Do nothing; make declare idempotent at each replica.
             {ok, {Id, Type, Metadata, Value}};
         _ ->
-            case lasp_config:get(dag_enabled, ?DAG_ENABLED) of
-                true -> lasp_dependence_dag:add_vertex({Id, Type});
-                false -> ok
-            end,
             Value = lasp_type:new(Type),
             Metadata = MetadataFun(MetadataNew),
             Counter = 0,
@@ -290,6 +286,12 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
                         _ ->
                             {Id, Type}
                     end,
+            case lasp_config:get(dag_enabled, ?DAG_ENABLED) of
+                true ->
+                    lasp_dependence_dag:add_vertex(NewId);
+                false ->
+                    ok
+            end,
             ok = do(put, [Store, NewId, #dv{value=Value,
                                             type=Type,
                                             metadata=Metadata,

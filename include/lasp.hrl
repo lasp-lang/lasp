@@ -1,3 +1,6 @@
+% DAG tracking enabled.
+-define(DAG_ENABLED, true).
+
 %% Synchronization backend.
 -define(SYNC_BACKEND, lasp_synchronization_backend).
 

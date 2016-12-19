@@ -13,7 +13,7 @@ content_types_provided(Req, Ctx) ->
     {[{"application/json", to_json}], Req, Ctx}.
 
 to_json(ReqData, State) ->
-    Status = case lasp_config:get(dag_enabled, false) of
+    Status = case lasp_config:get(dag_enabled, ?DAG_ENABLED) of
         false -> #{present => false};
         true -> case lasp_dependence_dag:to_dot() of
             {ok, Content} -> #{present => true, dot_content => Content};

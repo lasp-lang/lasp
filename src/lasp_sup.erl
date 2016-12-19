@@ -130,7 +130,7 @@ init(_Args) ->
                   Plumtree,
                   Process] ++ WebSpecs,
 
-    DagEnabled = application:get_env(?APP, dag_enabled, false),
+    DagEnabled = application:get_env(?APP, dag_enabled, ?DAG_ENABLED),
     lasp_config:set(dag_enabled, DagEnabled),
     BaseSpecs = case DagEnabled of
         true -> [DepDag | BaseSpecs0];
@@ -330,7 +330,7 @@ configure_defaults() ->
     %% Automatic contraction configuration.
     %% Only makes sense if the dag is enabled.
     lasp_config:set(incremental_computation_mode, IncrementalComputation),
-    case lasp_config:get(dag_enabled, false) of
+    case lasp_config:get(dag_enabled, ?DAG_ENABLED) of
         true ->
             AutomaticContraction = application:get_env(?APP, automatic_contraction, false),
             lasp_config:set(automatic_contraction, AutomaticContraction);

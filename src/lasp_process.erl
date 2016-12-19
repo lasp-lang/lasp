@@ -82,7 +82,7 @@ start_single_fire_process(Args) ->
 %%
 start_tracked_process(EventCount, [ReadFuns, TransFun, {To, _}=WriteFun]) ->
     From = [Id || {Id, _} <- ReadFuns],
-    case lasp_config:get(dag_enabled, false) of
+    case lasp_config:get(dag_enabled, ?DAG_ENABLED) of
         false -> lasp_process_sup:start_child(EventCount, [ReadFuns, TransFun, WriteFun]);
         true -> case lasp_dependence_dag:will_form_cycle(From, To) of
             false -> lasp_process_sup:start_child(EventCount, [ReadFuns, TransFun, WriteFun]);
@@ -137,7 +137,7 @@ init([nodag, ReadFuns, Function, WriteFun]) ->
 
 init([ReadFuns, TransFun, {To, _}=WriteFun]) ->
     From = [Id || {Id, _} <- ReadFuns],
-    case lasp_config:get(dag_enabled, false) of
+    case lasp_config:get(dag_enabled, ?DAG_ENABLED) of
         false -> ok;
         true ->
             ok = lasp_dependence_dag:add_edges(From, To, self(),

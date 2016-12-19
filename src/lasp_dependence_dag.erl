@@ -489,11 +489,22 @@ add_edges(Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
         lager:info("Depth of ~p is ~p", [V, Depth]),
 
         %% Re-create destination vertex with new depth.
-        VertexResult = digraph:add_vertex(Dag, Dst, Depth),
-        lager:info("Vertex: ~p re-created with depth ~p; result: ~p",
-                   [Dst, Depth, VertexResult]),
-        lager:info("Vertex: ~p edges: ~p",
-                   [Dst, digraph:edges(Dag, Dst)]),
+        case digraph:vertex(Dag, Dst) of
+            {_, Label} ->
+                case Label of
+                    Depth ->
+                        %% Already correct depth; ignore.
+                        ok;
+                    Depth0 ->
+                        VertexResult = digraph:add_vertex(Dag, Dst, Depth),
+                        lager:info("Vertex: ~p re-created with depth ~p =>~p; result: ~p",
+                                   [Dst, Depth0, Depth, VertexResult]),
+                        lager:info("Vertex: ~p edges: ~p",
+                                   [Dst, digraph:edges(Dag, Dst)])
+                end;
+            _ ->
+                ok
+        end,
 
         EdgeResult
     end, Src),

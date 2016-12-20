@@ -308,8 +308,6 @@ init([]) ->
 handle_call({is_root, V}, _From, #state{dag=Dag}=State) ->
     InNeighbours = digraph:in_neighbours(Dag, V),
 
-    lager:info("in_neighbours for ~p: ~p", [V, InNeighbours]),
-
     %% Filter out single-fire processes and only look at nodes that
     %% directly modify it from other data nodes in the system.
     FilterVs = lists:filter(fun({_, _}) ->
@@ -318,11 +316,7 @@ handle_call({is_root, V}, _From, #state{dag=Dag}=State) ->
                                     false
                             end, InNeighbours),
 
-    lager:info("filter_vs for ~p: ~p", [V, FilterVs]),
-
     IsRoot = not (length(FilterVs) > 0),
-
-    lager:info("is_root for ~p: ~p", [V, IsRoot]),
 
     {reply, {ok, IsRoot}, State};
 

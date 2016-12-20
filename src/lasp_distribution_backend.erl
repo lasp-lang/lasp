@@ -360,9 +360,24 @@ handle_call({bind, Id, Value}, _From,
             #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("bind/2"),
 
-    Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
-    Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
-                                  [Id, Value, ?CLOCK_INCR(Actor), Store]),
+    Result = case lasp_config:get(intermediary_node_modification,
+                                  ?INTERMEDIARY_NODE_MODIFICATION) of
+        true ->
+            Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
+            declare_if_not_found(Result0, Id, State, ?CORE, bind,
+                                 [Id, Value, ?CLOCK_INCR(Actor), Store]);
+        false ->
+            {ok, IsRoot} = lasp_dependence_dag:is_root(Id),
+            case IsRoot of
+                false ->
+                    {error, {intermediary_not_modification_prohibited, Id}};
+                true ->
+                    Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
+                    declare_if_not_found(Result0, Id, State, ?CORE, bind,
+                                         [Id, Value, ?CLOCK_INCR(Actor), Store])
+            end
+    end,
+
     {reply, Result, State};
 
 %% Incoming bind operation; merge incoming clock with the remote clock.
@@ -397,11 +412,27 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
             #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("update"),
 
-    Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
-                           ?CLOCK_INIT(Actor), Store),
-    {ok, Result} = declare_if_not_found(Result0, Id, State, ?CORE, update,
-                                        [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
-    {reply, {ok, Result}, State};
+    Result = case lasp_config:get(intermediary_node_modification,
+                                  ?INTERMEDIARY_NODE_MODIFICATION) of
+        true ->
+            Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
+                                   ?CLOCK_INIT(Actor), Store),
+            declare_if_not_found(Result0, Id, State, ?CORE, update,
+                                 [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]);
+        false ->
+            {ok, IsRoot} = lasp_dependence_dag:is_root(Id),
+            case IsRoot of
+                false ->
+                    {error, {intermediary_not_modification_prohibited, Id}};
+                true ->
+                    Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
+                                           ?CLOCK_INIT(Actor), Store),
+                    declare_if_not_found(Result0, Id, State, ?CORE, update,
+                                         [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store])
+            end
+    end,
+
+    {reply, Result, State};
 
 %% Spawn a function.
 handle_call({thread, Module, Function, Args},

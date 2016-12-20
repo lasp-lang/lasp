@@ -1,3 +1,6 @@
+%% Intermediary node modification.
+-define(INTERMEDIARY_NODE_MODIFICATION, false).
+
 %% Back propagation.
 -define(BACK_PROPAGATION, true).
 

@@ -27,6 +27,7 @@
 %% API
 -export([start_link/0,
          will_form_cycle/2,
+         is_root/1,
          vertices/0,
          add_edges/6,
          add_vertex/1,
@@ -178,6 +179,9 @@ add_vertices([]) ->
 add_vertices(Vs) ->
     gen_server:call(?MODULE, {add_vertices, Vs}, infinity).
 
+is_root(V) ->
+    gen_server:call(?MODULE, {is_root, V}, infinity).
+
 vertices() ->
     gen_server:call(?MODULE, vertices, infinity).
 
@@ -301,27 +305,33 @@ init([]) ->
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
+handle_call({is_root, V}, _From, #state{dag=Dag}=State) ->
+    InNeighbours = digraph:in_neighbours(Dag, V),
+
+    lager:info("in_neighbours for ~p: ~p", [V, InNeighbours]),
+
+    %% Filter out single-fire processes and only look at nodes that
+    %% directly modify it from other data nodes in the system.
+    FilterVs = lists:filter(fun({_, _}) ->
+                                    true;
+                               (_) ->
+                                    false
+                            end, InNeighbours),
+
+    lager:info("filter_vs for ~p: ~p", [V, FilterVs]),
+
+    IsRoot = not (length(FilterVs) > 0),
+
+    lager:info("is_root for ~p: ~p", [V, IsRoot]),
+
+    {reply, {ok, IsRoot}, State};
+
 handle_call(vertices, _From, #state{dag=Dag}=State) ->
     %% Retrieve vertices from the graph.
     Vertices = digraph:vertices(Dag),
 
-    %% Add information about out edges.
-    Terminals = case lasp_config:get(back_propagate_nonterminals, true) of
-                   true ->
-                       Vertices;
-                   false ->
-                       lists:foldl(fun(V, Acc) ->
-                                        case digraph:out_degree(Dag, V) of
-                                            0 ->
-                                                Acc ++ [V];
-                                            _ ->
-                                                Acc
-                                        end
-                                   end, [], Vertices)
-               end,
-
     %% Annotate vertices with their label.
-    Annotated = lists:map(fun(V) -> digraph:vertex(Dag, V) end, Terminals),
+    Annotated = lists:map(fun(V) -> digraph:vertex(Dag, V) end, Vertices),
 
     {reply, {ok, Annotated}, State};
 

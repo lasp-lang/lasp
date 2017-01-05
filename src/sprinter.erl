@@ -111,7 +111,7 @@ init([]) ->
             ok;
         _ ->
             %% Configure erlcloud.
-            S3Host = "s3.amazonaws.com",
+            S3Host = "s3-us-west-2.amazonaws.com",
             AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
             SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
             erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
@@ -120,12 +120,15 @@ init([]) ->
             try
                 BucketName = bucket_name(),
                 lager:info("Creating bucket: ~p", [BucketName]),
-                ok = erlcloud_s3:create_bucket(BucketName)
+                ok = erlcloud_s3:create_bucket(BucketName),
+                lager:info("Bucket created.")
             catch
                 _:{aws_error, Error} ->
                     lager:info("Bucket creation failed: ~p", [Error]),
                     ok
             end,
+
+            lager:info("S3 bucket creation succeeded."),
 
             %% Only construct the graph and attempt to repair the graph
             %% from the designated server node.

@@ -195,7 +195,10 @@ create_ads_and_contracts(Ads, Contracts, Actor) ->
                 %% Generate a G-Counter.
                 {ok, {CounterId, _, _, _}} = lasp:declare(?COUNTER_TYPE),
 
-                Ad = #ad{id=Id, name=Id, counter=CounterId},
+                %% Generate a G-Counter.
+                {ok, {RegisterId, _, _, _}} = lasp:declare(state_max_int),
+
+                Ad = #ad{id=Id, name=Id, counter=CounterId, register=RegisterId},
 
                 %% Add it to the advertisement set.
                 {ok, _} = lasp:update(Ads, {add, Ad}, Actor),

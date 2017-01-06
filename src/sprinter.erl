@@ -111,7 +111,7 @@ init([]) ->
             ok;
         _ ->
             %% Configure erlcloud.
-            S3Host = "s3.amazonaws.com",
+            S3Host = "s3-us-west-2.amazonaws.com",
             AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
             SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
             erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
@@ -120,12 +120,15 @@ init([]) ->
             try
                 BucketName = bucket_name(),
                 lager:info("Creating bucket: ~p", [BucketName]),
-                ok = erlcloud_s3:create_bucket(BucketName)
+                ok = erlcloud_s3:create_bucket(BucketName),
+                lager:info("Bucket created.")
             catch
                 _:{aws_error, Error} ->
                     lager:info("Bucket creation failed: ~p", [Error]),
                     ok
             end,
+
+            lager:info("S3 bucket creation succeeded."),
 
             %% Only construct the graph and attempt to repair the graph
             %% from the designated server node.
@@ -286,14 +289,19 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
     Servers = servers_from_marathon(),
     ServerNames = node_names(sets:to_list(Servers)),
     ClientNames = node_names(sets:to_list(Clients)),
-    Root = hd(ServerNames),
     Nodes = ServerNames ++ ClientNames,
 
     %% Build the tree.
     Tree = digraph:new(),
     case lasp_config:get(broadcast, false) of
         true ->
-            populate_tree(Root, Nodes, Tree);
+            try
+                Root = hd(ServerNames),
+                populate_tree(Root, Nodes, Tree)
+            catch
+                _:_ ->
+                    ok
+            end;
         false ->
             ok
     end,

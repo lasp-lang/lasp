@@ -289,14 +289,19 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
     Servers = servers_from_marathon(),
     ServerNames = node_names(sets:to_list(Servers)),
     ClientNames = node_names(sets:to_list(Clients)),
-    Root = hd(ServerNames),
     Nodes = ServerNames ++ ClientNames,
 
     %% Build the tree.
     Tree = digraph:new(),
     case lasp_config:get(broadcast, false) of
         true ->
-            populate_tree(Root, Nodes, Tree);
+            try
+                Root = hd(ServerNames),
+                populate_tree(Root, Nodes, Tree)
+            catch
+                _:_ ->
+                    ok
+            end;
         false ->
             ok
     end,

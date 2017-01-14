@@ -395,28 +395,10 @@ push_logs() ->
                     %% Store logs on S3.
                     lists:foreach(
                         fun({FilePath, S3Id}) ->
-                            Lines = read_file(FilePath),
-                            erlcloud_s3:put_object(BucketName, S3Id, list_to_binary(Lines))
+                            {ok, Binary} = file:read_file(FilePath),
+                            erlcloud_s3:put_object(BucketName, S3Id, Binary)
                         end,
                         lasp_instrumentation:log_files()
                     )
             end
-    end.
-
-%% @private
-read_file(FilePath) ->
-    {ok, FileDescriptor} = file:open(FilePath, [read]),
-    Lines = read_lines(FilePath, FileDescriptor),
-    Lines.
-
-%% @private
-read_lines(FilePath, FileDescriptor) ->
-    case io:get_line(FileDescriptor, '') of
-        eof ->
-            "";
-        {error, Error} ->
-            lager:warning("Error while reading line from file ~p. Error: ~p", [FilePath, Error]),
-            "";
-        Line ->
-            Line ++ read_lines(FilePath, FileDescriptor)
     end.

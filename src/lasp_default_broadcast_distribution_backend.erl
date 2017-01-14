@@ -1100,19 +1100,21 @@ memory_utilization_report() ->
     %lasp_instrumentation:memory(TotalBytes),
     lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]),
 
-    ProcessesInfo = [process_info(PID, [memory, registered_name]) || PID <- processes()],
+    ProcessesInfo = [process_info(PID, [memory, registered_name, message_queue_len]) || PID <- processes()],
     Top = 5,
     Sorted = lists:sublist(
         lists:reverse(
             ordsets:from_list(
-                [{to_mb(M), get_name(I)} || [{memory, M}, {registered_name, I}] <- ProcessesInfo]
+                [{to_mb(M), {get_name(I), MQ}} || [{memory, M},
+                                                   {registered_name, I},
+                                                   {message_queue_len, MQ}] <- ProcessesInfo]
             )
         ),
         Top
     ),
     Log = lists:foldl(
-        fun({M, I}, Acc) ->
-            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(M) ++ "\n"
+        fun({M, {I, MQ}}, Acc) ->
+            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(M) ++ ":" ++ integer_to_list(MQ) ++ "\n"
         end,
         "",
         Sorted

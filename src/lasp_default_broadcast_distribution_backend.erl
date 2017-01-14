@@ -1105,7 +1105,7 @@ memory_utilization_report() ->
     MemorySorted = lists:sublist(
         lists:reverse(
             ordsets:from_list(
-                [{to_mb(M), get_name(I)} || [{memory, M}, {registered_name, I}, {message_queue_len, _MQ}] <- ProcessesInfo]
+                [{to_mb(M), {get_name(I), CF, IC}} || [{current_function, CF}, {initial_call, IC}, {memory, M}, {registered_name, I}, {message_queue_len, _MQ}] <- ProcessesInfo]
             )
         ),
         Top
@@ -1114,15 +1114,19 @@ memory_utilization_report() ->
     MQSorted = lists:sublist(
         lists:reverse(
             ordsets:from_list(
-                [{MQ, get_name(I)} || [{memory, _M}, {registered_name, I}, {message_queue_len, MQ}] <- ProcessesInfo]
+                [{MQ, {get_name(I), CF, IC}} || [{current_function, CF}, {initial_call, IC}, {memory, _M}, {registered_name, I}, {message_queue_len, MQ}] <- ProcessesInfo]
             )
         ),
         Top
     ),
 
     MemoryLog = lists:foldl(
-        fun({M, I}, Acc) ->
-            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(M) ++ "\n"
+        fun({M, {I, {CFM, CFF, CFA}, {ICM, ICF, ICA}}}, Acc) ->
+            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(M) ++ ":"
+            ++ atom_to_list(CFM) ++ "," ++ atom_to_list(CFF) ++ "," ++
+            integer_to_list(CFA) ++ ":" ++
+            atom_to_list(ICM) ++ "," ++ atom_to_list(ICF) ++ "," ++
+            integer_to_list(ICA) ++ "\n"
         end,
         "",
         MemorySorted
@@ -1130,8 +1134,12 @@ memory_utilization_report() ->
     lager:info("\nMEMORY PROCESSES INFO\n" ++ MemoryLog),
 
     MQLog = lists:foldl(
-        fun({MQ, I}, Acc) ->
-            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(MQ) ++ "\n"
+        fun({MQ, {I, {CFM, CFF, CFA}, {ICM, ICF, ICA}}}, Acc) ->
+            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(MQ) ++ ":"
+            ++ atom_to_list(CFM) ++ "," ++ atom_to_list(CFF) ++ "," ++
+            integer_to_list(CFA) ++ ":" ++
+            atom_to_list(ICM) ++ "," ++ atom_to_list(ICF) ++ "," ++
+            integer_to_list(ICA) ++ "\n"
         end,
         "",
         MQSorted

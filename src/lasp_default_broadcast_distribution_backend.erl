@@ -1102,24 +1102,41 @@ memory_utilization_report() ->
 
     ProcessesInfo = [process_info(PID, [memory, registered_name, message_queue_len]) || PID <- processes()],
     Top = 5,
-    Sorted = lists:sublist(
+    MemorySorted = lists:sublist(
         lists:reverse(
             ordsets:from_list(
-                [{to_mb(M), {get_name(I), MQ}} || [{memory, M},
-                                                   {registered_name, I},
-                                                   {message_queue_len, MQ}] <- ProcessesInfo]
+                [{to_mb(M), get_name(I)} || [{memory, M}, {registered_name, I}] <- ProcessesInfo]
             )
         ),
         Top
     ),
-    Log = lists:foldl(
-        fun({M, {I, MQ}}, Acc) ->
-            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(M) ++ ":" ++ integer_to_list(MQ) ++ "\n"
+
+    MQSorted = lists:sublist(
+        lists:reverse(
+            ordsets:from_list(
+                [{MQ, get_name(I)} || [{registered_name, I}, {message_queue_len, MQ}] <- ProcessesInfo]
+            )
+        ),
+        Top
+    ),
+
+    MemoryLog = lists:foldl(
+        fun({M, I}, Acc) ->
+            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(M) ++ "\n"
         end,
         "",
-        Sorted
+        MemorySorted
     ),
-    lager:info("\nPROCESSES INFO\n" ++ Log).
+    lager:info("\nMEMORY PROCESSES INFO\n" ++ MemoryLog),
+
+    MQLog = lists:foldl(
+        fun({MQ, I}, Acc) ->
+            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(MQ) ++ "\n"
+        end,
+        "",
+        MQSorted
+    ),
+    lager:info("\nMQ PROCESSES INFO\n" ++ MQLog).
 
 %% @private
 to_mb(Bytes) ->

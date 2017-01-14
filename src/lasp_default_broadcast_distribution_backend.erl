@@ -1100,7 +1100,7 @@ memory_utilization_report() ->
     %lasp_instrumentation:memory(TotalBytes),
     lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]),
 
-    ProcessesInfo = [process_info(PID, [memory, registered_name, message_queue_len]) || PID <- processes()],
+    ProcessesInfo = [process_info(PID, [current_function, initial_call, memory, registered_name, message_queue_len]) || PID <- processes()],
     Top = 5,
     MemorySorted = lists:sublist(
         lists:reverse(

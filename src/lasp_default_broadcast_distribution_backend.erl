@@ -1105,7 +1105,7 @@ memory_utilization_report() ->
     MemorySorted = lists:sublist(
         lists:reverse(
             ordsets:from_list(
-                [{to_mb(M), get_name(I)} || [{memory, M}, {registered_name, I}] <- ProcessesInfo]
+                [{to_mb(M), get_name(I)} || [{memory, M}, {registered_name, I}, {message_queue_len, _MQ}] <- ProcessesInfo]
             )
         ),
         Top
@@ -1114,7 +1114,7 @@ memory_utilization_report() ->
     MQSorted = lists:sublist(
         lists:reverse(
             ordsets:from_list(
-                [{MQ, get_name(I)} || [{registered_name, I}, {message_queue_len, MQ}] <- ProcessesInfo]
+                [{MQ, get_name(I)} || [{memory, _M}, {registered_name, I}, {message_queue_len, MQ}] <- ProcessesInfo]
             )
         ),
         Top

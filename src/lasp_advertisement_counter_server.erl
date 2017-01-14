@@ -47,7 +47,7 @@
 %% @doc Start and link to calling process.
 -spec start_link() -> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%%===================================================================
 %%% gen_server callbacks

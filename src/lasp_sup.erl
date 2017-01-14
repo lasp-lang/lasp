@@ -343,7 +343,7 @@ advertisement_counter_child_specs() ->
     %% 180 * client_number impressions
     {ok, ClientNumber} = application:get_env(?APP, client_number),
     %% TODO: Change me back to 180.
-    ImpressionNumberDefault = 30 * ClientNumber,
+    ImpressionNumberDefault = 60 * ClientNumber,
     ImpressionNumber = application:get_env(?APP,
                                            max_impressions,
                                            ImpressionNumberDefault),

@@ -396,14 +396,7 @@ push_logs() ->
                     lists:foreach(
                         fun({FilePath, S3Id}) ->
                             Lines = read_file(FilePath),
-                            Logs = lists:foldl(
-                                fun(Line, Acc) ->
-                                    Acc ++ Line
-                                end,
-                                "",
-                                Lines
-                            ),
-                            erlcloud_s3:put_object(BucketName, S3Id, list_to_binary(Logs))
+                            erlcloud_s3:put_object(BucketName, S3Id, list_to_binary(Lines))
                         end,
                         lasp_instrumentation:log_files()
                     )
@@ -420,10 +413,10 @@ read_file(FilePath) ->
 read_lines(FilePath, FileDescriptor) ->
     case io:get_line(FileDescriptor, '') of
         eof ->
-            [];
+            "";
         {error, Error} ->
             lager:warning("Error while reading line from file ~p. Error: ~p", [FilePath, Error]),
-            [];
+            "";
         Line ->
-            [Line | read_lines(FilePath, FileDescriptor)]
+            Line ++ read_lines(FilePath, FileDescriptor)
     end.

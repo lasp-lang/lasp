@@ -1098,7 +1098,36 @@ memory_utilization_report() ->
     TotalKBytes = TotalBytes / 1024,
     TotalMBytes = TotalKBytes / 1024,
     %lasp_instrumentation:memory(TotalBytes),
-    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]).
+    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]),
+
+    ProcessesInfo = [process_info(PID, [memory, registered_name]) || PID <- processes()],
+    Top = 5,
+    Sorted = lists:sublist(
+        lists:reverse(
+            ordsets:from_list(
+                [{to_mb(M), get_name(I)} || [{memory, M}, {registered_name, I}] <- ProcessesInfo]
+            )
+        ),
+        Top
+    ),
+    Log = lists:foldl(
+        fun({M, I}, Acc) ->
+            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(M) ++ "\n"
+        end,
+        "",
+        Sorted
+    ),
+    lager:info("\nPROCESSES INFO\n" ++ Log).
+
+%% @private
+to_mb(Bytes) ->
+    KBytes = Bytes / 1024,
+    MBytes = KBytes / 1024,
+    round(MBytes).
+
+%% @private
+get_name([]) -> undefined;
+get_name(Name) -> Name.
 
 %% @private
 send(Msg, Peer) ->

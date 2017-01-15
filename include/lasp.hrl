@@ -164,7 +164,7 @@
 -define(SQL_LEXER, lasp_sql_lexer).
 -define(SQL_PARSER, lasp_sql_parser).
 
--record(ad, {id, name, image, counter}).
+-record(ad, {id, name, image, counter, register}).
 -record(contract, {id}).
 
 -define(MAX_IMPRESSIONS_DEFAULT, 10).

@@ -46,7 +46,7 @@
 %% @doc Start and link to calling process.
 -spec start_link() -> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -122,7 +122,7 @@ handle_info(view, #state{actor=Actor,
             %% Select random.
             Random = lasp_support:puniform(Size),
 
-            {#ad{counter=Counter} = Ad, _Contract} =
+            {#ad{counter=Counter, register=Register} = Ad, _Contract} =
                 lists:nth(Random, sets:to_list(Ads0)),
 
             %% Spawn a process to disable the advertisement if it goes
@@ -144,6 +144,9 @@ handle_info(view, #state{actor=Actor,
             %% Increment counter.
             {ok, _} = lasp:update(Counter, increment, Actor),
             {ok, Value} = lasp:query(Counter),
+
+            %% Increment register.
+            {ok, _} = lasp:update(Register, increment, Actor),
 
             lager:info("Impressions seen: ~p, node: ~p", [Value, Actor]),
 

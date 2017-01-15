@@ -30,11 +30,11 @@
          web_config/0]).
 
 get(Key, Default) ->
-    mochiglobal:get(Key, Default).
+    lasp_mochiglobal:get(Key, Default).
 
 set(Key, Value) ->
     application:set_env(?APP, Key, Value),
-    mochiglobal:put(Key, Value).
+    lasp_mochiglobal:put(Key, Value).
 
 dispatch() ->
     lists:flatten([

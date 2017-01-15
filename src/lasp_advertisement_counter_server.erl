@@ -47,7 +47,7 @@
 %% @doc Start and link to calling process.
 -spec start_link() -> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -195,7 +195,10 @@ create_ads_and_contracts(Ads, Contracts, Actor) ->
                 %% Generate a G-Counter.
                 {ok, {CounterId, _, _, _}} = lasp:declare(?COUNTER_TYPE),
 
-                Ad = #ad{id=Id, name=Id, counter=CounterId},
+                %% Generate a G-Counter.
+                {ok, {RegisterId, _, _, _}} = lasp:declare(state_max_int),
+
+                Ad = #ad{id=Id, name=Id, counter=CounterId, register=RegisterId},
 
                 %% Add it to the advertisement set.
                 {ok, _} = lasp:update(Ads, {add, Ad}, Actor),

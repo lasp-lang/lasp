@@ -133,4 +133,60 @@ memory_utilization_report() ->
     TotalBytes = erlang:memory(total),
     TotalKBytes = TotalBytes / 1024,
     TotalMBytes = TotalKBytes / 1024,
-    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]).
+    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]),
+
+    ProcessesInfo = [process_info(PID, [current_function, initial_call, memory, registered_name, message_queue_len]) || PID <- processes()],
+    Top = 5,
+    MemorySorted = lists:sublist(
+        lists:reverse(
+            ordsets:from_list(
+                [{to_mb(M), {get_name(I), CF, IC}} || [{current_function, CF}, {initial_call, IC}, {memory, M}, {registered_name, I}, {message_queue_len, _MQ}] <- ProcessesInfo]
+            )
+        ),
+        Top
+    ),
+
+    MQSorted = lists:sublist(
+        lists:reverse(
+            ordsets:from_list(
+                [{MQ, {get_name(I), CF, IC}} || [{current_function, CF}, {initial_call, IC}, {memory, _M}, {registered_name, I}, {message_queue_len, MQ}] <- ProcessesInfo]
+            )
+        ),
+        Top
+    ),
+
+    MemoryLog = lists:foldl(
+        fun({M, {I, {CFM, CFF, CFA}, {ICM, ICF, ICA}}}, Acc) ->
+            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(M) ++ ":"
+            ++ atom_to_list(CFM) ++ "," ++ atom_to_list(CFF) ++ "," ++
+            integer_to_list(CFA) ++ ":" ++
+            atom_to_list(ICM) ++ "," ++ atom_to_list(ICF) ++ "," ++
+            integer_to_list(ICA) ++ "\n"
+        end,
+        "",
+        MemorySorted
+    ),
+    lager:info("\nMEMORY PROCESSES INFO\n" ++ MemoryLog),
+
+    MQLog = lists:foldl(
+        fun({MQ, {I, {CFM, CFF, CFA}, {ICM, ICF, ICA}}}, Acc) ->
+            Acc ++ atom_to_list(I) ++ ":" ++ integer_to_list(MQ) ++ ":"
+            ++ atom_to_list(CFM) ++ "," ++ atom_to_list(CFF) ++ "," ++
+            integer_to_list(CFA) ++ ":" ++
+            atom_to_list(ICM) ++ "," ++ atom_to_list(ICF) ++ "," ++
+            integer_to_list(ICA) ++ "\n"
+        end,
+        "",
+        MQSorted
+    ),
+    lager:info("\nMQ PROCESSES INFO\n" ++ MQLog).
+
+%% @private
+get_name([]) -> undefined;
+get_name(Name) -> Name.
+
+%% @private
+to_mb(Bytes) ->
+    KBytes = Bytes / 1024,
+    MBytes = KBytes / 1024,
+    round(MBytes).

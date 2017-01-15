@@ -18,24 +18,30 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_storage_backend).
--author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
+-module(lasp_node_event_handler).
 
--include("lasp.hrl").
+-behaviour(gen_event).
 
--callback start(atom())-> {ok, store()} | ignore | {error, term()}.
+%% gen_event callbacks
+-export([init/1, handle_event/2, handle_call/2,
+         handle_info/2, terminate/2, code_change/3]).
+-record(state, {}).
 
--callback put(store(), id(), variable()) -> ok | {error, atom()}.
+init([]) ->
+    {ok, #state{}}.
 
--callback get(store(), id()) ->
-    {ok, variable()} | {error, not_found} | {error, atom()}.
+handle_event({service_update, _Services}, State) ->
+    {ok, State}.
 
--callback update(store(), id(), function()) ->
-    {ok, any()} | error | {error, atom()}.
+handle_call(_Event, State) ->
+    {ok, ok, State}.
 
--callback update_all(store(), function()) ->
-    {ok, any()} | error | {error, atom()}.
+handle_info(_Info, State) ->
+    {ok, State}.
 
--callback fold(store(), function(), term()) -> {ok, term()}.
+terminate(_Reason, _State) ->
+    ok.
 
--callback reset(store()) -> ok.
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+

@@ -61,12 +61,12 @@ end_per_testcase(Case, _Config) ->
 
 all() ->
     [
-     client_server_state_based_with_aae_test,
-     client_server_delta_based_with_aae_test,
-     reactive_client_server_state_based_with_aae_test,
-     reactive_client_server_delta_based_with_aae_test
-     %%client_server_state_based_ps_with_aae_test,
-     %%client_server_delta_based_ps_with_aae_test
+     client_server_state_based_test,
+     client_server_delta_based_test,
+     reactive_client_server_state_based_test,
+     reactive_client_server_delta_based_test
+     %%client_server_state_based_ps_test,
+     %%client_server_delta_based_ps_test
     ].
 
 %% ===================================================================
@@ -80,30 +80,30 @@ default_test(_Config) ->
 %% client/server with local replica
 %% ===================================================================
 
-client_server_state_based_with_aae_test(Config) ->
-    lasp_simulation_support:run(client_server_game_tournament_state_based_with_aae_test,
+client_server_state_based_test(Config) ->
+    lasp_simulation_support:run(client_server_game_tournament_state_based_test,
         Config,
         [{mode, state_based},
          {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
          {set, orset},
          {broadcast, false},
-         {evaluation_identifier, client_server_state_based_with_aae}]),
+         {evaluation_identifier, client_server_state_based}]),
     ok.
 
-client_server_delta_based_with_aae_test(Config) ->
-    lasp_simulation_support:run(client_server_game_tournament_delta_based_with_aae_test,
+client_server_delta_based_test(Config) ->
+    lasp_simulation_support:run(client_server_game_tournament_delta_based_test,
         Config,
         [{mode, delta_based},
          {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
          {set, orset},
          {broadcast, false},
-         {evaluation_identifier, client_server_delta_based_with_aae}]),
+         {evaluation_identifier, client_server_delta_based}]),
     ok.
 
-reactive_client_server_state_based_with_aae_test(Config) ->
-    lasp_simulation_support:run(reactive_client_server_game_tournament_state_based_with_aae_test,
+reactive_client_server_state_based_test(Config) ->
+    lasp_simulation_support:run(reactive_client_server_game_tournament_state_based_test,
         Config,
         [{mode, state_based},
          {simulation, game_tournament},
@@ -111,11 +111,11 @@ reactive_client_server_state_based_with_aae_test(Config) ->
          {set, orset},
          {broadcast, false},
          {reactive_server, true},
-         {evaluation_identifier, reactive_client_server_state_based_with_aae}]),
+         {evaluation_identifier, reactive_client_server_state_based}]),
     ok.
 
-reactive_client_server_delta_based_with_aae_test(Config) ->
-    lasp_simulation_support:run(reactive_client_server_game_tournament_delta_based_with_aae_test,
+reactive_client_server_delta_based_test(Config) ->
+    lasp_simulation_support:run(reactive_client_server_game_tournament_delta_based_test,
         Config,
         [{mode, delta_based},
          {simulation, game_tournament},
@@ -123,29 +123,29 @@ reactive_client_server_delta_based_with_aae_test(Config) ->
          {set, orset},
          {broadcast, false},
          {reactive_server, true},
-         {evaluation_identifier, reactive_client_server_delta_based_with_aae}]),
+         {evaluation_identifier, reactive_client_server_delta_based}]),
     ok.
 
-client_server_state_based_ps_with_aae_test(Config) ->
-    lasp_simulation_support:run(client_server_game_tournament_state_based_ps_with_aae_test,
+client_server_state_based_ps_test(Config) ->
+    lasp_simulation_support:run(client_server_game_tournament_state_based_ps_test,
         Config,
         [{mode, state_based},
          {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
          {set, awset_ps},
          {broadcast, false},
-         {evaluation_identifier, client_server_state_based_ps_with_aae}]),
+         {evaluation_identifier, client_server_state_based_ps}]),
     ok.
 
-client_server_delta_based_ps_with_aae_test(Config) ->
-    lasp_simulation_support:run(client_server_game_tournament_delta_based_ps_with_aae_test,
+client_server_delta_based_ps_test(Config) ->
+    lasp_simulation_support:run(client_server_game_tournament_delta_based_ps_test,
         Config,
         [{mode, delta_based},
          {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
          {set, awset_ps},
          {broadcast, false},
-         {evaluation_identifier, client_server_delta_based_ps_with_aae}]),
+         {evaluation_identifier, client_server_delta_based_ps}]),
     ok.
 
 %% ===================================================================

@@ -89,10 +89,20 @@ init(_Args) ->
                 {partisan_sup, start_link, []},
                  permanent, infinity, supervisor, [partisan_sup]},
 
-    DistributionBackend = {lasp_default_broadcast_distribution_backend,
-                           {lasp_default_broadcast_distribution_backend, start_link, []},
+    DistributionBackend = {lasp_distribution_backend,
+                           {lasp_distribution_backend, start_link, []},
                             permanent, 5000, worker,
-                            [lasp_default_broadcast_distribution_backend]},
+                            [lasp_distribution_backend]},
+
+    PlumtreeMemoryReport = {lasp_plumtree_memory_report,
+                            {lasp_plumtree_memory_report, start_link, []},
+                             permanent, 5000, worker,
+                             [lasp_plumtree_memory_report]},
+
+    MemoryUtilizationReport = {lasp_memory_utilization_report,
+                               {lasp_memory_utilization_report, start_link, []},
+                                permanent, 5000, worker,
+                                [lasp_memory_utilization_report]},
 
     PlumtreeBackend = {lasp_plumtree_backend,
                        {lasp_plumtree_backend, start_link, []},
@@ -114,6 +124,8 @@ init(_Args) ->
                   Partisan,
                   Sprinter,
                   PlumtreeBackend,
+                  PlumtreeMemoryReport,
+                  MemoryUtilizationReport,
                   DistributionBackend,
                   Plumtree,
                   Process] ++ WebSpecs,
@@ -277,13 +289,13 @@ configure_defaults() ->
                                 normal)
     end,
 
-    %% AAE interval.
-    AAEIntervalDefault = list_to_integer(os:getenv("AAE_INTERVAL", "10000")),
-    AAEInterval = application:get_env(?APP,
-                                      aae_interval,
-                                      AAEIntervalDefault),
-    lasp_config:set(aae_interval, AAEInterval),
-    application:set_env(plumtree, broadcast_exchange_timer, AAEInterval),
+    %% State interval.
+    StateIntervalDefault = list_to_integer(os:getenv("STATE_INTERVAL", "10000")),
+    StateInterval = application:get_env(?APP,
+                                        state_interval,
+                                        StateIntervalDefault),
+    lasp_config:set(state_interval, StateInterval),
+    application:set_env(plumtree, broadcast_exchange_timer, StateInterval),
 
     %% Delta interval.
     DeltaIntervalDefault = list_to_integer(os:getenv("DELTA_INTERVAL", "10000")),
@@ -302,7 +314,7 @@ configure_defaults() ->
     DistributionBackend = application:get_env(
                             ?APP,
                             distribution_backend,
-                            lasp_default_broadcast_distribution_backend),
+                            lasp_distribution_backend),
     lasp_config:set(distribution_backend, DistributionBackend),
 
     %% Delta specific configuration values.

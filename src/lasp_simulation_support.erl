@@ -140,11 +140,11 @@ start(_Case, _Config, Options) ->
 
                         %% Configure timers.
                         ok = rpc:call(Node, lasp_config, set,
-                                      [state_interval, SimulationsSyncInterval]),
+                                      [aae_interval, SimulationsSyncInterval]),
                         ok = rpc:call(Node, lasp_config, set,
                                       [delta_interval, SimulationsSyncInterval]),
 
-                        %% Configure plumtree interval to be the same.
+                        %% Configure plumtree AAE interval to be the same.
                         ok = rpc:call(Node, application, set_env,
                                       [plumtree, broadcast_exchange_timer, SimulationsSyncInterval]),
 

@@ -61,12 +61,12 @@ end_per_testcase(Case, _Config) ->
 
 all() ->
     [
-     peer_to_peer_state_based_test,
-     peer_to_peer_state_based_tree_test,
-     peer_to_peer_delta_based_test%%,
-     %%peer_to_peer_state_based_ps_test,
-     %%peer_to_peer_state_based_ps_tree_test,
-     %%peer_to_peer_delta_based_ps_test
+     peer_to_peer_state_based_with_aae_test,
+     peer_to_peer_state_based_with_aae_and_tree_test,
+     peer_to_peer_delta_based_with_aae_test%%,
+     %%peer_to_peer_state_based_ps_with_aae_test,
+     %%peer_to_peer_state_based_ps_with_aae_and_tree_test,
+     %%peer_to_peer_delta_based_ps_with_aae_test
     ].
 
 %% ===================================================================
@@ -80,68 +80,68 @@ default_test(_Config) ->
 %% peer-to-peer
 %% ===================================================================
 
-peer_to_peer_state_based_test(Config) ->
-    lasp_simulation_support:run(peer_to_peer_game_tournament_state_based_test,
+peer_to_peer_state_based_with_aae_test(Config) ->
+    lasp_simulation_support:run(peer_to_peer_game_tournament_state_based_with_aae_test,
         Config,
         [{mode, state_based},
          {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
          {set, orset},
          {broadcast, false},
-         {evaluation_identifier, peer_to_peer_state_based}]),
+         {evaluation_identifier, peer_to_peer_state_based_with_aae}]),
     ok.
 
-peer_to_peer_state_based_tree_test(Config) ->
-    lasp_simulation_support:run(peer_to_peer_game_tournament_state_based_tree_test,
+peer_to_peer_state_based_with_aae_and_tree_test(Config) ->
+    lasp_simulation_support:run(peer_to_peer_game_tournament_state_based_with_aae_and_tree_test,
         Config,
         [{mode, state_based},
          {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
          {set, orset},
          {broadcast, true},
-         {evaluation_identifier, peer_to_peer_state_based_tree}]),
+         {evaluation_identifier, peer_to_peer_state_based_with_aae_and_tree}]),
     ok.
 
-peer_to_peer_delta_based_test(Config) ->
-    lasp_simulation_support:run(peer_to_peer_game_tournament_delta_based_test,
+peer_to_peer_delta_based_with_aae_test(Config) ->
+    lasp_simulation_support:run(peer_to_peer_game_tournament_delta_based_with_aae_test,
         Config,
         [{mode, delta_based},
          {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
          {set, orset},
          {broadcast, false},
-         {evaluation_identifier, peer_to_peer_delta_based}]),
+         {evaluation_identifier, peer_to_peer_delta_based_with_aae}]),
     ok.
 
-peer_to_peer_state_based_ps_test(Config) ->
-    lasp_simulation_support:run(peer_to_peer_game_tournament_state_based_ps_test,
+peer_to_peer_state_based_ps_with_aae_test(Config) ->
+    lasp_simulation_support:run(peer_to_peer_game_tournament_state_based_ps_with_aae_test,
         Config,
         [{mode, state_based},
          {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
          {set, awset_ps},
          {broadcast, false},
-         {evaluation_identifier, peer_to_peer_state_based_ps}]),
+         {evaluation_identifier, peer_to_peer_state_based_ps_with_aae}]),
     ok.
 
-peer_to_peer_state_based_ps_tree_test(Config) ->
-    lasp_simulation_support:run(peer_to_peer_game_tournament_state_based_ps_tree_test,
+peer_to_peer_state_based_ps_with_aae_and_tree_test(Config) ->
+    lasp_simulation_support:run(peer_to_peer_game_tournament_state_based_ps_with_aae_and_tree_test,
         Config,
         [{mode, state_based},
          {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
          {set, awset_ps},
          {broadcast, true},
-         {evaluation_identifier, peer_to_peer_state_based_ps_tree}]),
+         {evaluation_identifier, peer_to_peer_state_based_ps_with_aae_and_tree}]),
     ok.
 
-peer_to_peer_delta_based_ps_test(Config) ->
-    lasp_simulation_support:run(peer_to_peer_game_tournament_delta_based_ps_test,
+peer_to_peer_delta_based_ps_with_aae_test(Config) ->
+    lasp_simulation_support:run(peer_to_peer_game_tournament_delta_based_ps_with_aae_test,
         Config,
         [{mode, delta_based},
          {simulation, game_tournament},
          {partisan_peer_service_manager, partisan_hyparview_peer_service_manager},
          {set, awset_ps},
          {broadcast, false},
-         {evaluation_identifier, peer_to_peer_delta_based_ps}]),
+         {evaluation_identifier, peer_to_peer_delta_based_ps_with_aae}]),
     ok.

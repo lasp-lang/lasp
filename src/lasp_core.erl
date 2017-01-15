@@ -24,7 +24,7 @@
 -include("lasp.hrl").
 
 %% Core API.
--export([start_link/1,
+-export([start/1,
          bind/3,
          bind/4,
          bind_to/3,
@@ -77,24 +77,24 @@
 -export([storage_backend_reset/1]).
 
 %% Definitions for the bind/read fun abstraction.
--define(BACKEND_BIND, fun(_AccId, AccValue, _Store) ->
+-define(BIND, fun(_AccId, AccValue, _Store) ->
                 ?MODULE:bind_var(_AccId, AccValue, _Store)
               end).
 
--define(BACKEND_WRITE, fun(_Store) ->
+-define(WRITE, fun(_Store) ->
                  fun(_AccId, _AccValue) ->
                    {ok, _} = ?MODULE:bind(_AccId, _AccValue, _Store)
                  end
                end).
 
--define(BACKEND_READ, fun(_Id, _Threshold) ->
+-define(READ, fun(_Id, _Threshold) ->
                 ?MODULE:read_var(_Id, _Threshold, Store)
               end).
 
 %% @doc Initialize the storage backend.
--spec start_link(atom()) -> {ok, store()} | {error, term()}.
-start_link(Identifier) ->
-    do(start_link, [Identifier]).
+-spec start(atom()) -> {ok, store()} | {error, term()}.
+start(Identifier) ->
+    do(start, [Identifier]).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -104,7 +104,7 @@ start_link(Identifier) ->
 %%
 -spec filter(id(), function(), id(), store()) -> {ok, pid()}.
 filter(Id, Function, AccId, Store) ->
-    filter(Id, Function, AccId, Store, ?BACKEND_WRITE, ?BACKEND_READ).
+    filter(Id, Function, AccId, Store, ?WRITE, ?READ).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -114,7 +114,7 @@ filter(Id, Function, AccId, Store) ->
 %%
 -spec fold(id(), function(), id(), store()) -> {ok, pid()}.
 fold(Id, Function, AccId, Store) ->
-    fold(Id, Function, AccId, Store, ?BACKEND_BIND, ?BACKEND_READ).
+    fold(Id, Function, AccId, Store, ?BIND, ?READ).
 
 %% @doc Map values from one lattice into another.
 %%
@@ -124,7 +124,7 @@ fold(Id, Function, AccId, Store) ->
 %%
 -spec map(id(), function(), id(), store()) -> {ok, pid()}.
 map(Id, Function, AccId, Store) ->
-    map(Id, Function, AccId, Store, ?BACKEND_WRITE, ?BACKEND_READ).
+    map(Id, Function, AccId, Store, ?WRITE, ?READ).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -139,7 +139,7 @@ intersection(Left, Right, Intersection, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read_var(_Right, _Threshold, _Variables)
     end,
-    intersection(Left, Right, Intersection, Store, ?BACKEND_WRITE, ReadLeftFun, ReadRightFun).
+    intersection(Left, Right, Intersection, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Compute the union of two sets.
 %%
@@ -154,7 +154,7 @@ union(Left, Right, Union, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read_var(_Right, _Threshold, _Variables)
     end,
-    union(Left, Right, Union, Store, ?BACKEND_WRITE, ReadLeftFun, ReadRightFun).
+    union(Left, Right, Union, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Compute the cartesian product of two sets.
 %%
@@ -169,7 +169,7 @@ product(Left, Right, Product, Store) ->
     ReadRightFun = fun(_Right, _Threshold, _Variables) ->
             ?MODULE:read_var(_Right, _Threshold, _Variables)
     end,
-    product(Left, Right, Product, Store, ?BACKEND_WRITE, ReadLeftFun, ReadRightFun).
+    product(Left, Right, Product, Store, ?WRITE, ReadLeftFun, ReadRightFun).
 
 %% @doc Perform a read for a particular identifier.
 %%
@@ -334,7 +334,7 @@ query_var({_, Type}=Id, Store) ->
 %%
 -spec bind_to(id(), id(), store()) -> {ok, pid()}.
 bind_to(AccId, Id, Store) ->
-    bind_to(AccId, Id, Store, ?BACKEND_WRITE, ?BACKEND_READ).
+    bind_to(AccId, Id, Store, ?WRITE, ?READ).
 
 %% @doc Spawn a function.
 %%
@@ -442,7 +442,10 @@ bind(Origin, Id, Value, MetadataFun, Store) ->
 -spec bind_var(node(), id(), value(), function(), store()) ->
     {ok, var()} | not_found().
 bind_var(Origin, Id, Value, MetadataFun, Store) ->
-    Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0, waiting_threads=WT, delta_counter=Counter0, delta_map=DeltaMap0, delta_ack_map=AckMap}=Object) ->
+    Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0,
+                      waiting_delta_threads=WDT, waiting_threads=WT,
+                      delta_counter=Counter0, delta_map=DeltaMap0,
+                      delta_ack_map=AckMap}=Object) ->
             Metadata = MetadataFun(Metadata0),
             case {Id, Type, Metadata0, Value0} of
                 %% As long as *both* the metadata and value haven't
@@ -459,9 +462,9 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                             {ok, SW} = reply_to_all(WT, [],
                                                     {ok, {Id, Type, Metadata, Merged}}),
 
-                            {ok, Counter, DeltaMap} = case lasp_config:get(mode, state_based) of
+                            {ok, SWD, Counter, DeltaMap} = case lasp_config:get(mode, state_based) of
                                 state_based ->
-                                    {ok, Counter0, DeltaMap0};
+                                    {ok, WDT, Counter0, DeltaMap0};
                                 delta_based ->
                                     {DeltaTime, Delta} = timer:tc(fun() ->
                                         case lasp_config:get(join_decompositions, false) of
@@ -472,10 +475,15 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                                         end
                                     end),
                                     lager:info("Join decomposition took ~p microseconds", [DeltaTime]),
+                                    {ok, SWD1} = reply_to_all(WDT, [],
+                                                              {ok, {Id, Type, Metadata, Delta}}),
                                     DeltaMap1 = store_delta(Origin, Counter0, Delta, DeltaMap0),
-                                    {ok, increment_counter(Counter0), DeltaMap1}
+                                    {ok, SWD1, increment_counter(Counter0), DeltaMap1}
                             end,
-                            NewObject = #dv{type=Type, metadata=Metadata, value=Merged, waiting_threads=SW, delta_counter=Counter, delta_map=DeltaMap, delta_ack_map=AckMap},
+                            NewObject = #dv{type=Type, metadata=Metadata, value=Merged,
+                                            waiting_delta_threads=SWD, waiting_threads=SW,
+                                            delta_counter=Counter,
+                                            delta_map=DeltaMap, delta_ack_map=AckMap},
                             %% Return value is a delta state.
                             {NewObject, {ok, {Id, Type, Metadata, Merged}}};
                         false ->
@@ -614,7 +622,7 @@ read_any(Reads, Self, Store) ->
 %%
 -spec bind_to(id(), id(), store(), function()) -> {ok, pid()}.
 bind_to(AccId, Id, Store, BindFun) ->
-    bind_to(AccId, Id, Store, BindFun, ?BACKEND_READ).
+    bind_to(AccId, Id, Store, BindFun, ?READ).
 
 bind_to(AccId, Id, Store, BindFun, ReadFun) ->
     TransFun = fun({_, _, _, V}) -> V end,
@@ -754,7 +762,7 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     lasp_process:start_dag_link([[{Left, ReadLeftFun}, {Right, ReadRightFun}],
                                 TransFun, {AccId, BindFun(Store)}]).
 
-%% @doc Map values from one lattice into another.
+%% @doc Lap values from one lattice into another.
 %%
 %%      Applies the given `Function' as a map over the items in `Id',
 %%      placing the result in `AccId', both of which need to be declared
@@ -804,7 +812,7 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
 %%      stream can result in observable nondeterminism.
 %%
 stream(Id, Function, Store) ->
-    stream(Id, Function, Store, ?BACKEND_READ).
+    stream(Id, Function, Store, ?READ).
 
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.
@@ -937,16 +945,16 @@ reply_to_all([From|T], StillWaiting, Result) ->
 reply_to_all([], StillWaiting, _Result) ->
     {ok, StillWaiting}.
 
--spec receive_value(store(), {state_send, node(), value(), function(),
+-spec receive_value(store(), {aae_send, node(), value(), function(),
                               function()}) -> ok | error.
-receive_value(Store, {state_send, Origin, {Id, Type, Metadata, Value},
+receive_value(Store, {aae_send, Origin, {Id, Type, Metadata, Value},
                       MetadataFunBind, MetadataFunDeclare}) ->
     case do(get, [Store, Id]) of
         {ok, _Object} ->
             {ok, _} = bind(Origin, Id, Value, MetadataFunBind, Store);
         {error, not_found} ->
             {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
-            receive_value(Store, {state_send, Origin, {Id, Type, Metadata, Value},
+            receive_value(Store, {aae_send, Origin, {Id, Type, Metadata, Value},
                                   MetadataFunBind, MetadataFunDeclare})
     end,
     ok.

@@ -27,7 +27,7 @@
 -include("lasp.hrl").
 
 %% lasp_storage_backend callbacks
--export([start/1,
+-export([start_link/1,
          put/3,
          update/3,
          update_all/2,
@@ -54,8 +54,8 @@
 %%%===================================================================
 
 %% @doc Start and link to calling process.
--spec start(atom())-> {ok, atom()}.
-start(Identifier) ->
+-spec start_link(atom())-> {ok, atom()}.
+start_link(Identifier) ->
     {ok, _Pid} = gen_server:start_link({local, Identifier},
                                        ?MODULE,
                                        [Identifier],

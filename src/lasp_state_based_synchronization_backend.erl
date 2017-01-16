@@ -48,8 +48,8 @@
 %%%===================================================================
 
 %% state_based messages:
-extract_log_type_and_payload({state_send, _Node, {Id, _Type, _Metadata, State}}) ->
-    [{state_send, State}, {state_send_protocol, Id}].
+extract_log_type_and_payload({state_send, _Node, {Id, Type, _Metadata, State}}) ->
+    [{Id, State}, {Type, State}, {state_send, State}, {state_send_protocol, Id}].
 
 %%%===================================================================
 %%% API

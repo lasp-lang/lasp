@@ -388,17 +388,20 @@ push_logs() ->
                         ok = erlcloud_s3:create_bucket(BucketName)
                     catch
                         _:{aws_error, Error} ->
-                        lager:info("Bucket creation failed: ~p", [Error]),
-                        ok
+                            lager:info("Bucket creation failed: ~p", [Error]),
+                            ok
                     end,
 
                     %% Store logs on S3.
                     lists:foreach(
                         fun({FilePath, S3Id}) ->
                             {ok, Binary} = file:read_file(FilePath),
+                            lager:info("Pushing log ~p.", [S3Id]),
                             erlcloud_s3:put_object(BucketName, S3Id, Binary)
                         end,
                         lasp_instrumentation:log_files()
-                    )
+                    ),
+
+                    lager:info("Pushing logs completed.")
             end
     end.

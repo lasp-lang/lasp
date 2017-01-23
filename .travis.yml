@@ -18,7 +18,7 @@ notifications:
   email: christopher.meiklejohn@gmail.com
   slack: lasp-lang:hiPRNnbUa3zdGrrXZfGRAF7D
   irc: "irc.freenode.org#lasp-lang"
-sudo: required
+sudo: false
 env:
   global:
     - OMIT_HIGH_ULIMIT=true

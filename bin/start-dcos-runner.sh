@@ -1,7 +1,7 @@
 #!/bin/bash
 
 DCOS=$(dcos config show core.dcos_url)
-ELB_HOST=$(./elb-host.sh)
+ELB_HOST=$(./bin/elb-host.sh)
 
 ENV_VARS=(
   STACK_NAME

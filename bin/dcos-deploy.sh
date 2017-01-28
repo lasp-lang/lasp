@@ -96,6 +96,7 @@ cat <<EOF > lasp-server.json
   "env": {
     "LASP_BRANCH": "$LASP_BRANCH",
     "AD_COUNTER_SIM_SERVER": "true",
+    "TAG": "server",
     "DCOS": "$DCOS",
     "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",
@@ -164,6 +165,7 @@ cat <<EOF > lasp-client.json
   "env": {
     "LASP_BRANCH": "$LASP_BRANCH",
     "AD_COUNTER_SIM_CLIENT": "true",
+    "TAG": "client",
     "DCOS": "$DCOS",
     "PEER_SERVICE": "$PEER_SERVICE",
     "MODE": "$MODE",

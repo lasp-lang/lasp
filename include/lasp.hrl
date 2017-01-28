@@ -1,3 +1,24 @@
+%% Synchronization backend.
+-define(SYNC_BACKEND, lasp_synchronization_backend).
+
+%% Delta synchronization interval.
+-define(DELTA_GC_INTERVAL, 60000).
+
+%% Plumtree peer refresh interval.
+-define(PLUMTREE_PEER_REFRESH_INTERVAL, 10000).
+
+%% Default mode.
+-define(DEFAULT_MODE, state_based).
+
+%% Synchronize state interval.
+-define(STATE_SYNC_INTERVAL, 10000).
+
+%% Report interval.
+-define(MEMORY_UTILIZATION_INTERVAL, 10000).
+
+%% Report interval.
+-define(PLUMTREE_MEMORY_INTERVAL, 10000).
+
 %% General timeout value.
 -define(TIMEOUT, 100000).
 
@@ -129,14 +150,15 @@
         {?SIM_STATUS_TRACKING, ?SIM_STATUS_STRUCTURE}).
 
 %% Simulation helpers.
--define(AAE_INTERVAL, 10000).
+-define(STATE_INTERVAL, 10000).
 -define(IMPRESSION_INTERVAL, 10000). %% 10 seconds
 -define(STATUS_INTERVAL, 10000).
 -define(EVAL_NUMBER, 1).
 -define(LOG_INTERVAL, 10000).
 -define(ADS_NUMBER, 1).
 
--define(DEFAULT_DISTRIBUTION_BACKEND, lasp_default_broadcast_distribution_backend).
+%% Storage backend.
+-define(DEFAULT_STORAGE_BACKEND, lasp_ets_storage_backend).
 
 %% Lexer and parser.
 -define(SQL_LEXER, lasp_sql_lexer).
@@ -146,3 +168,53 @@
 -record(contract, {id}).
 
 -define(MAX_IMPRESSIONS_DEFAULT, 10).
+
+%% Definitions for the bind/read fun abstraction.
+
+-define(CORE_BIND, fun(_AccId, _AccValue, _Store) ->
+                ?CORE:bind(_AccId, _AccValue, _Store)
+              end).
+
+-define(CORE_WRITE, fun(_Store) ->
+                 fun(_AccId, _AccValue) ->
+                   {ok, _} = ?CORE:bind_var(_AccId, _AccValue, _Store)
+                 end
+               end).
+
+-define(CORE_READ, fun(_Id, _Threshold) ->
+                ?CORE:read_var(_Id, _Threshold, Store)
+              end).
+
+-define(NOREPLY, fun() -> {noreply, State} end).
+
+%% Metadata mutation macros.
+
+-define(CLOCK_INIT(BackendActor), fun(Metadata) ->
+                                    VClock = lasp_vclock:increment(BackendActor, lasp_vclock:fresh()),
+                                    orddict:store(clock, VClock, Metadata)
+                                  end).
+
+-define(CLOCK_INCR(BackendActor), fun(Metadata) ->
+                                        Clock = orddict:fetch(clock, Metadata),
+                                        VClock = lasp_vclock:increment(BackendActor, Clock),
+                                        orddict:store(clock, VClock, Metadata)
+                                  end).
+
+-define(CLOCK_MERG, fun(Metadata) ->
+            %% Incoming request has to have a clock, given it's coming
+            %% in the broadcast path.
+            TheirClock = orddict:fetch(clock, Metadata0),
+
+            %% We may not have a clock yet, if we are first initializing
+            %% an object.
+            OurClock = case orddict:find(clock, Metadata) of
+                {ok, Clock} ->
+                    Clock;
+                _ ->
+                    lasp_vclock:fresh()
+            end,
+
+            %% Merge the clocks.
+            Merged = lasp_vclock:merge([TheirClock, OurClock]),
+            orddict:store(clock, Merged, Metadata)
+    end).

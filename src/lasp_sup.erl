@@ -336,10 +336,6 @@ advertisement_counter_child_specs() ->
                                {lasp_advertisement_counter_client, start_link, []},
                                 permanent, 5000, worker,
                                 [lasp_advertisement_counter_client]},
-
-            %% Configure proper partisan tag.
-            partisan_config:set(tag, client),
-
             [AdCounterClient];
         false ->
             []
@@ -359,10 +355,6 @@ advertisement_counter_child_specs() ->
                                {lasp_advertisement_counter_server, start_link, []},
                                 permanent, 5000, worker,
                                 [lasp_advertisement_counter_server]},
-
-            %% Configure proper partisan tag.
-            partisan_config:set(tag, server),
-
             [AdCounterServer];
         false ->
             []
@@ -393,10 +385,6 @@ game_tournament_child_specs() ->
                                   {lasp_game_tournament_client, start_link, []},
                                    permanent, 5000, worker,
                                    [lasp_game_tournament_client]},
-
-            %% Configure proper partisan tag.
-            partisan_config:set(tag, client),
-
             [TournCounterClient];
         false ->
             []
@@ -416,10 +404,6 @@ game_tournament_child_specs() ->
                            {lasp_game_tournament_server, start_link, []},
                             permanent, 5000, worker,
                             [lasp_game_tournament_server]},
-
-            %% Configure proper partisan tag.
-            partisan_config:set(tag, server),
-
             [TournServer];
         false ->
             []

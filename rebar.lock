@@ -21,7 +21,7 @@
  {<<"mochiweb">>,{pkg,<<"mochiweb">>,<<"2.12.2">>},1},
  {<<"partisan">>,
   {git,"https://github.com/lasp-lang/partisan",
-       {ref,"d40ceffc351c72119457891b1f915da79e90f427"}},
+       {ref,"eeda6e431acbb4a4ec0721414b127dee9be6ae6c"}},
   0},
  {<<"plumtree">>,
   {git,"https://github.com/lasp-lang/plumtree",

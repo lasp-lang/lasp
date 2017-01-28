@@ -116,6 +116,10 @@ exchange(_Peer) ->
     %% broadcast exchange timer tracks the number of in progress
     %% exchanges and bounds it by that limit.
     %%
+    %% Ignore the anti-entropy mechanism because we don't need to worry
+    %% about reliable delivery: we always know we'll have another
+    %% message to further repair duing the next interval.
+    %%
     Pid = spawn_link(fun() -> ok end),
     {ok, Pid}.
 
@@ -181,7 +185,13 @@ handle_info(heartbeat, State) ->
     case lists:member(Node, Servers) of
         true ->
             %% Generate message with monotonically increasing integer.
-            Timestamp = time_compat:unique_integer([monotonic, positive]),
+            Counter = time_compat:unique_integer([monotonic, positive]),
+
+            %% Make sure the node prefixes the timestamp with it's own
+            %% identifier: this means that we can have this tree
+            %% participate in multiple trees, each rooted at a different
+            %% node.
+            Timestamp = {node(), Counter},
 
             %% Insert a new message into the table.
             true = ets:insert(?MODULE, [{Timestamp, true}]),

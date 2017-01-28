@@ -34,6 +34,7 @@ stop() ->
 
     lists:foreach(
         fun(AppName) ->
+            lager:info("Deleting Marathon app: ~p", [AppName]),
             delete_marathon_app(DCOS, AppName)
         end,
         RunningApps).

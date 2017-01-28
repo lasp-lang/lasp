@@ -238,5 +238,6 @@ reset() ->
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
-    Backend = lasp_config:get(distribution_backend, ?DEFAULT_DISTRIBUTION_BACKEND),
+    Backend = lasp_config:get(distribution_backend,
+                              lasp_distribution_backend),
     erlang:apply(Backend, Function, Args).

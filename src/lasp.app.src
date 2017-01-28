@@ -9,12 +9,11 @@
      {registered,[]},
      {applications,
          [kernel,stdlib,types,gen_flow,lager,gb_trees_ext,sasl,time_compat,
-          webmachine,jsx,os_mon,lasp_support,rand_compat]},
+          webmachine,jsx,os_mon,lasp_support,rand_compat,erlcloud]},
      {mod,{lasp_app,[]}},
      {env,
          [{data_root,"data"},
           {web_ip,"0.0.0.0"},
           {web_port,8080},
           {peer_service,lasp_partisan_peer_service},
-          {distribution_backend,lasp_default_broadcast_distribution_backend},
           {storage_backend,lasp_ets_storage_backend}]}]}.

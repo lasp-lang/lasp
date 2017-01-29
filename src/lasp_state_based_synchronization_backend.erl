@@ -123,7 +123,9 @@ handle_cast(Msg, State) ->
 handle_info(state_sync, #state{store=Store, gossip_peers=GossipPeers} = State) ->
     lasp_marathon_simulations:log_message_queue_size("state_sync"),
 
-    lasp_logger:extended("Beginning state synchronization."),
+    PeerServiceManager = lasp_config:peer_service_manager(),
+    lasp_logger:extended("Beginning state synchronization with backend: ~p",
+                         [PeerServiceManager]),
 
     Members = case ?SYNC_BACKEND:broadcast_tree_mode() of
         true ->

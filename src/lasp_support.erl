@@ -93,6 +93,7 @@ wait_until_left(Nodes, LeavingNode) ->
 
 wait_until_joined(Nodes, ExpectedCluster) ->
     Manager = lasp_peer_service:manager(),
+    ct:pal("Waiting for join to complete with manager: ~p", [Manager]),
     case Manager of
         %% Naively wait until the active views across all nodes sum to
         %% the complete set of nodes; note: this is *good enough* for
@@ -115,6 +116,7 @@ wait_until_joined(Nodes, ExpectedCluster) ->
                                 end, Nodes))
                 end, 60*2, 500)
     end,
+    ct:pal("Finished."),
     ok.
 
 wait_until_offline(Node) ->

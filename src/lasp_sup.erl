@@ -59,47 +59,6 @@ init(_Args) ->
                permanent, 5000, worker,
                [lasp_unique]},
 
-    %% Before initializing the partisan backend, be sure to configure it
-    %% to use the proper ip and ports and tags.
-    case os:getenv("TAG", "false") of
-        "false" ->
-            ok;
-        Tag ->
-            partisan_config:set(tag, list_to_integer(Tag))
-    end,
-
-    case os:getenv("IP", "false") of
-        "false" ->
-            ok;
-        IP ->
-            {ok, IPAddress} = inet_parse:address(IP),
-            partisan_config:set(peer_ip, IPAddress),
-            ok
-    end,
-
-    case os:getenv("PEER_PORT", "false") of
-        "false" ->
-            partisan_config:set(peer_port, random_port()),
-            ok;
-        PeerPort ->
-            partisan_config:set(peer_port, list_to_integer(PeerPort)),
-            ok
-    end,
-
-    case os:getenv("PEER_SERVICE", "false") of
-        "false" ->
-            %% Not configured by environment, use application env
-            %% default.
-            PeerService = application:get_env(partisan,
-                                              partisan_peer_service_manager,
-                                              partisan_client_server_peer_service_manager),
-            partisan_config:set(partisan_peer_service_manager, PeerService),
-            ok;
-        PeerService ->
-            partisan_config:set(partisan_peer_service_manager, list_to_atom(PeerService)),
-            ok
-    end,
-
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},
                  permanent, infinity, supervisor, [partisan_sup]},

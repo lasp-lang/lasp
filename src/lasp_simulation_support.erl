@@ -161,18 +161,26 @@ start(_Case, _Config, Options) ->
                             ad_counter ->
                                 case Node of
                                     Server ->
+                                        ok = rpc:call(Node, partisan_config, set,
+                                                      [tag, server]),
                                         ok = rpc:call(Node, lasp_config, set,
                                                       [ad_counter_simulation_server, true]);
                                     _ ->
+                                        ok = rpc:call(Node, partisan_config, set,
+                                                      [tag, client]),
                                         ok = rpc:call(Node, lasp_config, set,
                                                       [ad_counter_simulation_client, true])
                                 end;
                             game_tournament ->
                                 case Node of
                                     Server ->
+                                        ok = rpc:call(Node, partisan_config, set,
+                                                      [tag, server]),
                                         ok = rpc:call(Node, lasp_config, set,
                                                       [tournament_simulation_server, true]);
                                     _ ->
+                                        ok = rpc:call(Node, partisan_config, set,
+                                                      [tag, client]),
                                         ok = rpc:call(Node, lasp_config, set,
                                                       [tournament_simulation_client, true])
                                 end
@@ -194,10 +202,6 @@ start(_Case, _Config, Options) ->
                         %% Configure reactive server.
                         ReactiveServer = proplists:get_value(reactive_server, Options, false),
                         ok = rpc:call(Node, lasp_config, set, [reactive_server, ReactiveServer]),
-
-                        %% Configure partitions.
-                        PartitionProbability = proplists:get_value(partition_probability, Options, 0),
-                        ok = rpc:call(Node, lasp_config, set, [partition_probability, PartitionProbability]),
 
                         %% Configure broadcast settings.
                         Broadcast = proplists:get_value(broadcast, Options),
@@ -229,6 +233,7 @@ start(_Case, _Config, Options) ->
 
                         %% Configure evaluation identifier.
                         EvalIdentifier = proplists:get_value(evaluation_identifier, Options),
+                        PartitionProbability = 0,
                         RealEvalIdentifier = atom_to_list(EvalIdentifier)
                                           ++ "_" ++ integer_to_list(ClientNumber)
                                           ++ "_" ++ integer_to_list(PartitionProbability),
@@ -320,4 +325,3 @@ node_list(ClientNumber) ->
 %% @private
 client_list(0) -> [];
 client_list(N) -> lists:append(client_list(N - 1), [list_to_atom("client_" ++ integer_to_list(N))]).
-

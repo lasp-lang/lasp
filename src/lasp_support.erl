@@ -268,7 +268,8 @@ start_runner() ->
     ok.
 
 stop_runner() ->
-    application:stop(lasp).
+    application:stop(lasp),
+    application:stop(partisan).
 
 join_to(N, RunnerNode) ->
     PeerPort = rpc:call(N,

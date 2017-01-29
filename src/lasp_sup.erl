@@ -59,10 +59,6 @@ init(_Args) ->
                permanent, 5000, worker,
                [lasp_unique]},
 
-    Partisan = {partisan_sup,
-                {partisan_sup, start_link, []},
-                 permanent, infinity, supervisor, [partisan_sup]},
-
     DistributionBackend = {lasp_distribution_backend,
                            {lasp_distribution_backend, start_link, []},
                             permanent, 5000, worker,
@@ -95,7 +91,6 @@ init(_Args) ->
     WebSpecs = web_specs(),
 
     BaseSpecs0 = [Unique,
-                  Partisan,
                   Sprinter,
                   PlumtreeBackend,
                   PlumtreeMemoryReport,

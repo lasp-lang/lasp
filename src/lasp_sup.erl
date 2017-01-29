@@ -67,7 +67,6 @@ init(_Args) ->
         Tag ->
             partisan_config:set(tag, list_to_integer(Tag))
     end,
-
     case os:getenv("IP", "false") of
         "false" ->
             ok;
@@ -76,7 +75,6 @@ init(_Args) ->
             partisan_config:set(peer_ip, IPAddress),
             ok
     end,
-
     case os:getenv("PEER_PORT", "false") of
         "false" ->
             partisan_config:set(peer_port, random_port()),
@@ -86,16 +84,12 @@ init(_Args) ->
             ok
     end,
 
-    case os:getenv("PEER_SERVICE", "false") of
-        "false" ->
-            partisan_config:set(partisan_peer_service_manager,
-                                partisan_client_server_peer_service_manager),
-            ok;
-        PeerService ->
-            partisan_config:set(partisan_peer_service_manager,
-                                list_to_atom(PeerService)),
-            ok
-    end,
+    %% Configure the peer service.
+    PeerServiceDefault = list_to_atom(os:getenv("PEER_SERVICE", "partisan_client_server_peer_service_manager")),
+    PeerService = application:get_env(partisan,
+                                      partisan_peer_service_manager,
+                                      PeerServiceDefault),
+    partisan_config:set(partisan_peer_service_manager, PeerService),
 
     Partisan = {partisan_sup,
                 {partisan_sup, start_link, []},

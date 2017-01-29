@@ -161,20 +161,20 @@ start(_Case, _Config, Options) ->
                             ad_counter ->
                                 case Node of
                                     Server ->
-                                        ok = rpc:call(Node, lasp_config, set,
-                                                      [ad_counter_simulation_server, true]);
+                                        ok = rpc:call(Node, lasp_config, set, [ad_counter_simulation_server, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, server]);
                                     _ ->
-                                        ok = rpc:call(Node, lasp_config, set,
-                                                      [ad_counter_simulation_client, true])
+                                        ok = rpc:call(Node, lasp_config, set, [ad_counter_simulation_client, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, client])
                                 end;
                             game_tournament ->
                                 case Node of
                                     Server ->
-                                        ok = rpc:call(Node, lasp_config, set,
-                                                      [tournament_simulation_server, true]);
+                                        ok = rpc:call(Node, lasp_config, set, [tournament_simulation_server, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, server]);
                                     _ ->
-                                        ok = rpc:call(Node, lasp_config, set,
-                                                      [tournament_simulation_client, true])
+                                        ok = rpc:call(Node, lasp_config, set, [tournament_simulation_client, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, client])
                                 end
                         end,
 

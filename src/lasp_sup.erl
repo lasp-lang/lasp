@@ -242,20 +242,12 @@ configure_defaults() ->
                                        ReactiveServerDefault),
     lasp_config:set(reactive_server, ReactiveServer),
 
-    PartitionProbabilityDefault = list_to_integer(os:getenv("PARTITION_PROBABILITY", "0")),
-    PartitionProbability = application:get_env(?APP,
-                                               partition_probability,
-                                               PartitionProbabilityDefault),
-    lasp_config:set(partition_probability, PartitionProbability),
-
     %% Exchange mode.
     case Mode of
         delta_based ->
-            application:set_env(plumtree, exchange_selection,
-                                optimized);
+            application:set_env(plumtree, exchange_selection, optimized);
         _ ->
-            application:set_env(plumtree, exchange_selection,
-                                normal)
+            application:set_env(plumtree, exchange_selection, normal)
     end,
 
     %% State interval.

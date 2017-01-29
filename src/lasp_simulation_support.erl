@@ -203,10 +203,6 @@ start(_Case, _Config, Options) ->
                         ReactiveServer = proplists:get_value(reactive_server, Options, false),
                         ok = rpc:call(Node, lasp_config, set, [reactive_server, ReactiveServer]),
 
-                        %% Configure partitions.
-                        PartitionProbability = proplists:get_value(partition_probability, Options, 0),
-                        ok = rpc:call(Node, lasp_config, set, [partition_probability, PartitionProbability]),
-
                         %% Configure broadcast settings.
                         Broadcast = proplists:get_value(broadcast, Options),
                         ok = rpc:call(Node, lasp_config, set,
@@ -237,6 +233,7 @@ start(_Case, _Config, Options) ->
 
                         %% Configure evaluation identifier.
                         EvalIdentifier = proplists:get_value(evaluation_identifier, Options),
+                        PartitionProbability = 0,
                         RealEvalIdentifier = atom_to_list(EvalIdentifier)
                                           ++ "_" ++ integer_to_list(ClientNumber)
                                           ++ "_" ++ integer_to_list(PartitionProbability),

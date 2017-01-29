@@ -50,58 +50,19 @@ seed() ->
 
 %% @private
 compute_exchange(Peers) ->
-    PeerServiceManager = lasp_config:peer_service_manager(),
-
-    Probability = lasp_config:get(partition_probability, 0),
-    lasp_logger:extended("Probability of partition: ~p", [Probability]),
-    Percent = lasp_support:puniform(100),
-
-    case Percent =< Probability of
-        true ->
-            case PeerServiceManager of
-                partisan_client_server_peer_service_manager ->
-                    lager:info("Partitioning from server."),
-                    [];
-                _ ->
-                    lager:info("Partitioning ~p% of the network.",
-                               [Percent]),
-
-                    %% Select percentage, minus one node which will be
-                    %% the server node.
-                    K = round((Percent / 100) * length(Peers)),
-                    lager:info("Partitioning ~p%: ~p nodes.",
-                               [Percent, K]),
-                    ServerNodes = case PeerServiceManager:active(server) of
-                        {ok, undefined} ->
-                            [];
-                        {ok, Server} ->
-                            [Server];
-                        error ->
-                            []
-                    end,
-                    lager:info("ServerNodes: ~p", [ServerNodes]),
-
-                    Random = select_random_sublist(Peers, K),
-                    RandomAndServer = lists:usort(ServerNodes ++ Random),
-                    lager:info("Partitioning ~p from ~p during sync.",
-                               [RandomAndServer, Peers -- RandomAndServer]),
-                    Peers -- RandomAndServer
-            end;
-        false ->
-            Peers
-    end.
+    Peers.
 
 %% @private
 without_me(Members) ->
     Members -- [node()].
 
 %% @private
-select_random_sublist(List, K) ->
-    lists:sublist(shuffle(List), K).
+% select_random_sublist(List, K) ->
+%     lists:sublist(shuffle(List), K).
 
-%% @reference http://stackoverflow.com/questions/8817171/shuffling-elements-in-a-list-randomly-re-arrange-list-elements/8820501#8820501
-shuffle(L) ->
-    [X || {_, X} <- lists:sort([{lasp_support:puniform(65535), N} || N <- L])].
+% %% @reference http://stackoverflow.com/questions/8817171/shuffling-elements-in-a-list-randomly-re-arrange-list-elements/8820501#8820501
+% shuffle(L) ->
+%     [X || {_, X} <- lists:sort([{lasp_support:puniform(65535), N} || N <- L])].
 
 %% @private
 broadcast_tree_mode() ->

@@ -280,7 +280,9 @@ join_to(N, RunnerNode) ->
     ok = rpc:call(RunnerNode,
                   lasp_peer_service,
                   join,
-                  [{N, {127, 0, 0, 1}, PeerPort}]).
+                  [{N, {127, 0, 0, 1}, PeerPort}]),
+    ct:pal("Joining issued: ~p to ~p at port ~p",
+           [N, RunnerNode, PeerPort]).
 
 load_lasp(Node, Config, Case) ->
     PrivDir = proplists:get_value(priv_dir, Config),

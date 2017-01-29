@@ -140,7 +140,7 @@ start_and_join_node(Name, Config, Case) ->
     {ok, Members} = lasp_peer_service:members(),
     join_to(Node, RunnerNode),
     Nodes = Members ++ [Node],
-    wait_until_joined(Nodes, Nodes),
+    ok = wait_until_joined(Nodes, Nodes),
     Node.
 
 start_node(Name, Config, Case) ->

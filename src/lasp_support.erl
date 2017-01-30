@@ -93,6 +93,7 @@ wait_until_left(Nodes, LeavingNode) ->
 
 wait_until_joined(Nodes, ExpectedCluster) ->
     Manager = lasp_peer_service:manager(),
+    ct:pal("Waiting for join to complete with manager: ~p", [Manager]),
     case Manager of
         %% Naively wait until the active views across all nodes sum to
         %% the complete set of nodes; note: this is *good enough* for
@@ -115,6 +116,7 @@ wait_until_joined(Nodes, ExpectedCluster) ->
                                 end, Nodes))
                 end, 60*2, 500)
     end,
+    ct:pal("Finished."),
     ok.
 
 wait_until_offline(Node) ->
@@ -138,7 +140,7 @@ start_and_join_node(Name, Config, Case) ->
     {ok, Members} = lasp_peer_service:members(),
     join_to(Node, RunnerNode),
     Nodes = Members ++ [Node],
-    wait_until_joined(Nodes, Nodes),
+    ok = wait_until_joined(Nodes, Nodes),
     Node.
 
 start_node(Name, Config, Case) ->
@@ -266,7 +268,8 @@ start_runner() ->
     ok.
 
 stop_runner() ->
-    application:stop(lasp).
+    application:stop(lasp),
+    application:stop(partisan).
 
 join_to(N, RunnerNode) ->
     PeerPort = rpc:call(N,
@@ -278,7 +281,9 @@ join_to(N, RunnerNode) ->
     ok = rpc:call(RunnerNode,
                   lasp_peer_service,
                   join,
-                  [{N, {127, 0, 0, 1}, PeerPort}]).
+                  [{N, {127, 0, 0, 1}, PeerPort}]),
+    ct:pal("Joining issued: ~p to ~p at port ~p",
+           [N, RunnerNode, PeerPort]).
 
 load_lasp(Node, Config, Case) ->
     PrivDir = proplists:get_value(priv_dir, Config),

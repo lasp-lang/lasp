@@ -1,8 +1,7 @@
 #!/bin/bash
 
-
 # If we're running in Kubernetes...
-if [ ! -z "$MESOS_TASK_ID" ]; then
+if [ ! -z "$KUBERNETES_PORT" ]; then
   # Else, default to IP.
   if [ -z "$NODE_NAME" ]; then
     export NODE_NAME=${HOSTNAME}@${IP}

@@ -4,7 +4,7 @@
 if [ ! -z "$KUBERNETES_PORT" ]; then
   # Else, default to IP.
   if [ -z "$NODE_NAME" ]; then
-    export NODE_NAME=${HOSTNAME}@${IP}
+    export NODE_NAME=${HOSTNAME}@${KUBERNETES_SERVICE_HOST}
   fi
 fi
 

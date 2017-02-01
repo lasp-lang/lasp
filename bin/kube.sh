@@ -4,6 +4,9 @@ cd /tmp
 
 echo "Deleting all deployments"
 kubectl delete deployments --all
+echo
+
+sleep 30
 
 cat <<EOF > lasp-dev.yaml
   apiVersion: extensions/v1beta1
@@ -11,7 +14,7 @@ cat <<EOF > lasp-dev.yaml
   metadata:
     name: lasp-dev
   spec:
-    replicas: 2
+    replicas: 1
     template:
       metadata:
         labels:
@@ -27,4 +30,14 @@ cat <<EOF > lasp-dev.yaml
             value: kube
 EOF
 
+echo "Creating deployment"
 kubectl create -f /tmp/lasp-dev.yaml
+echo
+
+export POD_NAME=$(kubectl get pods -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
+echo "Podname: " $POD_NAME
+
+sleep 10
+
+echo "Tailing logs."
+kubectl logs --tail=-1 -f $POD_NAME

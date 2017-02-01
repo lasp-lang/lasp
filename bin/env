@@ -7,7 +7,7 @@ if [ ! -z "$MESOS_TASK_ID" ]; then
   if [ -z "$NODE_NAME" ]; then
     export NODE_NAME=${HOSTNAME}@${IP}
   fi
-end
+fi
 
 # If we're running in Mesos...
 if [ ! -z "$MESOS_TASK_ID" ]; then

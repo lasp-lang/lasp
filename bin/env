@@ -70,7 +70,8 @@ echo "COOKIE: ${COOKIE}"
 echo "IP: ${IP}"
 echo "HOSTNAME: ${HOSTNAME}"
 echo "APISERVER: ${APISERVER}"
-echo "TOKEN: ${TOKEN}"
+echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}"
+echo "AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}"
 
 echo "Printing the environment:"
 env

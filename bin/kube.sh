@@ -52,6 +52,10 @@ cat <<EOF > lasp.yaml
             value: ${APISERVER}
           - name: TOKEN
             value: ${TOKEN}
+          - name: AWS_ACCESS_KEY_ID
+            value: ${AWS_ACCESS_KEY_ID}
+          - name: AWS_SECRET_ACCESS_KEY
+            value: ${AWS_SECRET_ACCESS_KEY}
 EOF
 
 echo "Deleting deployments."

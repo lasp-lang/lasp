@@ -2,6 +2,12 @@
 
 cd /tmp
 
+# Get Kubernetes API server.
+APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)
+
+# Get Kubernetes access token.
+TOKEN=$(kubectl describe secret $(kubectl get secrets | grep default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d '\t')
+
 cat <<EOF > lasp.yaml
   apiVersion: v1
   kind: Service
@@ -42,6 +48,10 @@ cat <<EOF > lasp.yaml
             value: "9090"
           - name: LASP_BRANCH
             value: kube
+          - name: APISERVER
+            value: ${APISERVER}
+          - name: TOKEN
+            value: ${TOKEN}
 EOF
 
 echo "Deleting deployments."

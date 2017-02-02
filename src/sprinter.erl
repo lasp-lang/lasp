@@ -260,6 +260,9 @@ handle_info(?REFRESH_MESSAGE, #state{orchestration=Orchestration,
             %% If we're in HyParView, and we're a client, only ever
             %% do nothing -- force all connection to go through the
             %% server.
+            sets:new();
+        {_, _} ->
+            %% Catch all.
             sets:new()
     end,
 
@@ -379,17 +382,17 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @doc Generate a list of Erlang node names.
-generate_nodes(#{<<"app">> := App}) ->
+generate_mesos_nodes(#{<<"app">> := App}) ->
     #{<<"tasks">> := Tasks} = App,
     Nodes = lists:map(fun(Task) ->
                 #{<<"host">> := Host,
                   <<"ports">> := [_WebPort, PeerPort]} = Task,
-        generate_node(Host, PeerPort)
+        generate_mesos_node(Host, PeerPort)
         end, Tasks),
     sets:from_list(Nodes).
 
 %% @doc Generate a single Erlang node name.
-generate_node(Host, PeerPort) ->
+generate_mesos_node(Host, PeerPort) ->
     Name = "lasp-" ++ integer_to_list(PeerPort) ++ "@" ++ binary_to_list(Host),
     {ok, IPAddress} = inet_parse:address(binary_to_list(Host)),
     Node = {list_to_atom(Name), IPAddress, PeerPort},
@@ -431,7 +434,7 @@ ip() ->
     os:getenv("IP", "127.0.0.1").
 
 %% @private
-generate_task_url(Task) ->
+generate_mesos_task_url(Task) ->
     IP = ip(),
     DCOS = dcos(),
     case DCOS of
@@ -442,17 +445,21 @@ generate_task_url(Task) ->
     end.
 
 %% @private
-headers() ->
-    case dcos() of
-        "false" ->
+headers(Orchestration) ->
+    Token = os:getenv("TOKEN"),
+
+    case Orchestration of
+        mesos ->
             [];
+        kubernetes ->
+            [{"Authorization", "Bearer " ++ Token}];
         _ ->
             []
     end.
 
 %% @private
-get_request(Url, DecodeFun) ->
-    Headers = headers(),
+get_request(Url, DecodeFun, Orchestration) ->
+    Headers = headers(Orchestration),
     case httpc:request(get, {Url, Headers}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, Body}} ->
             {ok, DecodeFun(Body)};
@@ -495,24 +502,24 @@ bucket_name() ->
     "lasp-sprinter-metadata".
 
 %% @private
-clients_from_marathon() ->
+clients_from_marathon(Orchestration) ->
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     ClientApp = "lasp-client-" ++ integer_to_list(EvalTimestamp),
-    app_tasks_from_marathon(ClientApp).
+    app_tasks_from_marathon(ClientApp, Orchestration).
 
 %% @private
-servers_from_marathon() ->
+servers_from_marathon(Orchestration) ->
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
     ServerApp = "lasp-server-" ++ integer_to_list(EvalTimestamp),
-    app_tasks_from_marathon(ServerApp).
+    app_tasks_from_marathon(ServerApp, Orchestration).
 
 %% @private
-app_tasks_from_marathon(App) ->
+app_tasks_from_marathon(App, Orchestration) ->
     DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
 
-    case get_request(generate_task_url(App), DecodeFun) of
+    case get_request(generate_mesos_task_url(App), DecodeFun, Orchestration) of
         {ok, Tasks} ->
-            generate_nodes(Tasks);
+            generate_mesos_nodes(Tasks);
         Error ->
             _ = lager:info("Invalid Marathon response: ~p", [Error]),
             sets:new()
@@ -638,16 +645,66 @@ debug_get_tree(Root, Nodes) ->
 clients(Orchestration) ->
     case Orchestration of
         kubernetes ->
-            sets:new();
+            clients_from_kubernetes(Orchestration);
         mesos ->
-            clients_from_marathon()
+            clients_from_marathon(Orchestration)
     end.
 
 %% @private
 servers(Orchestration) ->
     case Orchestration of
         kubernetes ->
-            sets:new();
+            servers_from_kubernetes(Orchestration);
         mesos ->
-            servers_from_marathon()
+            servers_from_marathon(Orchestration)
     end.
+
+%% @private
+clients_from_kubernetes(Orchestration) ->
+    EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
+    LabelSelector = "tag%3Dclient,evaluation-timestamp%3D" ++ integer_to_list(EvalTimestamp),
+    pods_from_kubernetes(LabelSelector, Orchestration).
+
+%% @private
+servers_from_kubernetes(Orchestration) ->
+    EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
+    LabelSelector = "tag%3Dserver,evaluation-timestamp%3D" ++ integer_to_list(EvalTimestamp),
+    pods_from_kubernetes(LabelSelector, Orchestration).
+
+%% @private
+pods_from_kubernetes(LabelSelector, Orchestration) ->
+    DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
+
+    case get_request(generate_pods_url(LabelSelector), DecodeFun, Orchestration) of
+        {ok, PodList} ->
+            generate_pod_nodes(PodList);
+        Error ->
+            _ = lager:info("Invalid Marathon response: ~p", [Error]),
+            sets:new()
+    end.
+
+%% @private
+generate_pods_url(LabelSelector) ->
+    APIServer = os:getenv("APISERVER"),
+    APIServer ++ "/api/v1/pods?labelSelector=" ++ LabelSelector.
+
+%% @private
+generate_pod_nodes(#{<<"items">> := Items}) ->
+    case Items of
+        null ->
+            sets:new();
+        _ ->
+            Nodes = lists:map(fun(Item) ->
+                        #{<<"metadata">> := Metadata} = Item,
+                        #{<<"name">> := Name} = Metadata,
+                        generate_pod_node(Name)
+                end, Items),
+            sets:from_list(Nodes)
+    end.
+
+%% @private
+generate_pod_node(Name) ->
+    Host = os:getenv("LASP_SERVICE_HOST"),
+    {ok, IPAddress} = inet_parse:address(Host),
+    Port = list_to_integer(os:getenv("LASP_SERVICE_PORT_PEER")),
+    {list_to_atom(binary_to_list(Name) ++ "@" ++ Host), IPAddress, Port}.

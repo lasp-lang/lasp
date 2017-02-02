@@ -63,5 +63,8 @@ echo "COOKIE: ${COOKIE}"
 echo "IP: ${IP}"
 echo "HOSTNAME: ${HOSTNAME}"
 
+echo "Printing the environment:"
+env
+
 RELNAME="`dirname \"$0\"`"/lasp
 exec ${RELNAME} foreground "$@"

@@ -2,6 +2,19 @@
 
 cd /tmp
 
+# Configure evaluation timestamp.
+# TODO: Fix me.
+EVAL_TIMESTAMP=1
+
+# Configure client replicas.
+CLIENT_REPLICAS=2
+
+# Configure server replicas.
+SERVER_REPLICAS=1
+
+# Configure branch.
+LASP_BRANCH=kube
+
 # Get Kubernetes API server.
 APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)
 
@@ -30,24 +43,62 @@ cat <<EOF > lasp.yaml
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
-    name: lasp
+    name: lasp-server
   spec:
-    replicas: 1
+    replicas: ${SERVER_REPLICAS}
     template:
       metadata:
         labels:
-          run: lasp
+          evaluation-timestamp: "${EVAL_TIMESTAMP}"
+          tag: server
+          run: lasp-server
       spec:
         containers:
-        - name: lasp
+        - name: lasp-server
           image: cmeiklejohn/lasp-dev
           env:
+          - name: TAG
+            value: server
           - name: WEB_PORT
             value: "8080"
           - name: PEER_PORT
             value: "9090"
           - name: LASP_BRANCH
-            value: kube
+            value: ${LASP_BRANCH}
+          - name: APISERVER
+            value: ${APISERVER}
+          - name: TOKEN
+            value: ${TOKEN}
+          - name: AWS_ACCESS_KEY_ID
+            value: ${AWS_ACCESS_KEY_ID}
+          - name: AWS_SECRET_ACCESS_KEY
+            value: ${AWS_SECRET_ACCESS_KEY}
+---
+  apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    name: lasp-client
+  spec:
+    replicas: ${CLIENT_REPLICAS}
+    template:
+      metadata:
+        labels:
+          evaluation-timestamp: "${EVAL_TIMESTAMP}"
+          tag: client
+          run: lasp-client
+      spec:
+        containers:
+        - name: lasp-client
+          image: cmeiklejohn/lasp-dev
+          env:
+          - name: TAG
+            value: client
+          - name: WEB_PORT
+            value: "8080"
+          - name: PEER_PORT
+            value: "9090"
+          - name: LASP_BRANCH
+            value: ${LASP_BRANCH}
           - name: APISERVER
             value: ${APISERVER}
           - name: TOKEN
@@ -59,6 +110,10 @@ cat <<EOF > lasp.yaml
 EOF
 
 echo "Deleting deployments."
+kubectl delete deployments --all
+echo
+
+echo "Deleting lasp deployments and servies."
 kubectl delete -f /tmp/lasp.yaml
 echo
 

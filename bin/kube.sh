@@ -4,7 +4,7 @@ cd /tmp
 
 # Configure evaluation timestamp.
 # TODO: Fix me.
-EVAL_TIMESTAMP=1
+EVAL_TIMESTAMP=0
 
 # Configure client replicas.
 CLIENT_REPLICAS=2
@@ -73,6 +73,8 @@ cat <<EOF > lasp.yaml
             value: ${AWS_ACCESS_KEY_ID}
           - name: AWS_SECRET_ACCESS_KEY
             value: ${AWS_SECRET_ACCESS_KEY}
+          - name: EVALUATION_TIMESTAMP
+            value: ${EVALUATION_TIMESTAMP}
 ---
   apiVersion: extensions/v1beta1
   kind: Deployment
@@ -107,6 +109,8 @@ cat <<EOF > lasp.yaml
             value: ${AWS_ACCESS_KEY_ID}
           - name: AWS_SECRET_ACCESS_KEY
             value: ${AWS_SECRET_ACCESS_KEY}
+          - name: EVALUATION_TIMESTAMP
+            value: ${EVALUATION_TIMESTAMP}
 EOF
 
 echo "Deleting deployments."

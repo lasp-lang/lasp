@@ -3,6 +3,24 @@
 cd /tmp
 
 cat <<EOF > lasp.yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: lasp
+    labels:
+      run: lasp
+  spec:
+    type: NodePort
+    ports:
+    - port: 8080
+      protocol: TCP
+      name: http
+    - port: 443
+      protocol: TCP
+      name: https
+    selector:
+      run: lasp
+---
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
@@ -18,6 +36,8 @@ cat <<EOF > lasp.yaml
         - name: lasp
           image: cmeiklejohn/lasp-dev
           env:
+          - name: WEB_PORT
+            value: 8080
           - name: LASP_BRANCH
             value: kube
 EOF

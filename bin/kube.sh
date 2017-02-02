@@ -2,12 +2,6 @@
 
 cd /tmp
 
-echo "Deleting all deployments"
-kubectl delete deployments --all
-echo
-
-sleep 30
-
 cat <<EOF > lasp-dev.yaml
   apiVersion: extensions/v1beta1
   kind: Deployment
@@ -30,7 +24,14 @@ cat <<EOF > lasp-dev.yaml
             value: kube
 EOF
 
-echo "Creating deployment"
+echo "Deleting deployments."
+kubectl delete -f /tmp/lasp-dev.yaml
+echo
+
+echo "Sleeping until deployment terminates."
+sleep 30
+
+echo "Creating deployment."
 kubectl create -f /tmp/lasp-dev.yaml
 echo
 

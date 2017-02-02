@@ -2,37 +2,35 @@
 
 cd /tmp
 
-cat <<EOF > lasp-dev.yaml
+cat <<EOF > lasp.yaml
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
-    name: lasp-dev
+    name: lasp
   spec:
     replicas: 1
     template:
       metadata:
         labels:
-          run: lasp-dev
+          run: lasp
       spec:
         containers:
-        - name: lasp-dev
+        - name: lasp
           image: cmeiklejohn/lasp-dev
-          ports:
-          - containerPort: 80
           env:
           - name: LASP_BRANCH
             value: kube
 EOF
 
 echo "Deleting deployments."
-kubectl delete -f /tmp/lasp-dev.yaml
+kubectl delete -f /tmp/lasp.yaml
 echo
 
 echo "Sleeping until deployment terminates."
 sleep 30
 
 echo "Creating deployment."
-kubectl create -f /tmp/lasp-dev.yaml
+kubectl create -f /tmp/lasp.yaml
 echo
 
 export POD_NAME=$(kubectl get pods -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')

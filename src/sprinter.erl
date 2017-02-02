@@ -231,7 +231,10 @@ handle_info(?REFRESH_MESSAGE, #state{orchestration=Orchestration,
     PeerServiceManager = lasp_config:peer_service_manager(),
 
     Servers = servers(Orchestration),
+    lager:info("Found servers: ~p", [Servers]),
+
     Clients = clients(Orchestration),
+    lager:info("Found clients: ~p", [Clients]),
 
     %% Get list of nodes to connect to: this specialized logic isn't
     %% required when the node count is small, but is required with a
@@ -261,10 +264,15 @@ handle_info(?REFRESH_MESSAGE, #state{orchestration=Orchestration,
             %% do nothing -- force all connection to go through the
             %% server.
             sets:new();
-        {_, _} ->
+        {Tag, PeerServiceManager} ->
             %% Catch all.
+            lager:info("Invalid mode: not connecting to any nodes."),
+            lager:info("Tag: ~p; PeerServiceManager: ~p",
+                       [Tag, PeerServiceManager]),
             sets:new()
     end,
+
+    lager:info("Attempting to connect: ~p", [ToConnectNodes]),
 
     %% Attempt to connect nodes that are not connected.
     AttemptedNodes = maybe_connect(ToConnectNodes, SeenNodes),
@@ -314,6 +322,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{orchestration=Orchestration,
 
     %% Build the tree.
     Tree = digraph:new(),
+
     case lasp_config:get(broadcast, false) of
         true ->
             try

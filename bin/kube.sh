@@ -124,10 +124,8 @@ echo "Creating deployment."
 kubectl create -f /tmp/lasp.yaml
 echo
 
-export POD_NAME=$(kubectl get pods -o go-template --template '{{range .items}}{{.metadata.name}}{{"\n"}}{{end}}')
-echo "Podname: " $POD_NAME
-
 sleep 10
 
 echo "Tailing logs."
-kubectl logs --tail=-1 -f $POD_NAME
+export SERVER_POD_NAME=$(kubectl get pods | grep server | awk '{print $1}')
+kubectl logs --tail=-1 -f $SERVER_POD_NAME

@@ -47,7 +47,9 @@ types() ->
         {ivar, {state_ivar, undefined}},
         {orset, {state_orset, undefined}},
         {pair, {state_pair, undefined}},
-        {pncounter, {state_pncounter, undefined}}
+        {pncounter, {state_pncounter, undefined}},
+        {ps_ormap, {state_ps_ormap_naive, undefined}},
+        {ps_orset, {state_ps_orset_naive, undefined}}
     ].
 
 get_mode() ->
@@ -139,6 +141,10 @@ update(Type, Operation, Actor, Value) ->
     end.
 
 %% @private
+get_actor(state_ps_ormap_naive, {{StorageId, _TypeId}, Actor}) ->
+    {StorageId, Actor};
+get_actor(state_ps_orset_naive, {{StorageId, _TypeId}, Actor}) ->
+    {StorageId, Actor};
 get_actor(state_awset_ps, {{StorageId, _TypeId}, Actor}) ->
     {StorageId, Actor};
 get_actor(_Type, {_Id, Actor}) ->

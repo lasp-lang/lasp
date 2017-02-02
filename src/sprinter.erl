@@ -58,7 +58,8 @@
 -define(ARTIFACT_MESSAGE,  artifact).
 
 %% State record.
--record(state, {is_connected,
+-record(state, {orchestration,
+                is_connected,
                 was_connected,
                 attempted_nodes,
                 graph,
@@ -104,12 +105,23 @@ nodes() ->
 %% @private
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
-    %% Don't start the timer if we're not running in Mesos.
-    case os:getenv("MESOS_TASK_ID") of
-        false ->
-            lager:info("Not running in Mesos; disabling Marathon service."),
+    Orchestration = case {os:getenv("MESOS_TASK_ID"),
+                          os:getenv("KUBERNETES_PORT")} of
+        {Value, false} when is_list(Value) ->
+            mesos;
+        {false, Value} when is_list(Value) ->
+            kubernetes;
+        {_, _} ->
+            undefined
+    end,
+
+    case Orchestration of
+        undefined ->
+            lager:info("Not using container orchestration; disabling."),
             ok;
         _ ->
+            lager:info("Orchestration: ~p", [Orchestration]),
+
             %% Configure erlcloud.
             S3Host = "s3-us-west-2.amazonaws.com",
             AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
@@ -136,6 +148,8 @@ init([]) ->
                 server ->
                     schedule_build_graph();
                 client ->
+                    ok;
+                undefined ->
                     ok
             end,
 
@@ -146,8 +160,8 @@ init([]) ->
             schedule_membership_refresh()
     end,
 
-    Servers = case os:getenv("MESOS_TASK_ID") of
-        false ->
+    Servers = case Orchestration of
+        undefined ->
             case lasp_config:get(lasp_server, undefined) of
                 undefined ->
                     [];
@@ -158,8 +172,8 @@ init([]) ->
             []
     end,
 
-    Nodes = case os:getenv("MESOS_TASK_ID") of
-        false ->
+    Nodes = case Orchestration of
+        undefined ->
             %% Assumes full membership.
             PeerServiceManager = lasp_config:peer_service_manager(),
             {ok, Members} = PeerServiceManager:members(),
@@ -172,6 +186,7 @@ init([]) ->
                 servers=Servers,
                 is_connected=false,
                 was_connected=false,
+                orchestration=Orchestration,
                 attempted_nodes=sets:new(),
                 graph=digraph:new(),
                 tree=digraph:new()}}.
@@ -210,12 +225,13 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(?REFRESH_MESSAGE, #state{attempted_nodes=SeenNodes}=State) ->
+handle_info(?REFRESH_MESSAGE, #state{orchestration=Orchestration,
+                                     attempted_nodes=SeenNodes}=State) ->
     Tag = partisan_config:get(tag, client),
     PeerServiceManager = lasp_config:peer_service_manager(),
 
-    Servers = servers_from_marathon(),
-    Clients = clients_from_marathon(),
+    Servers = servers(Orchestration),
+    Clients = clients(Orchestration),
 
     %% Get list of nodes to connect to: this specialized logic isn't
     %% required when the node count is small, but is required with a
@@ -280,13 +296,15 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
     schedule_artifact_upload(),
 
     {noreply, State};
-handle_info(?BUILD_GRAPH_MESSAGE, #state{was_connected=WasConnected0}=State) ->
+handle_info(?BUILD_GRAPH_MESSAGE, #state{orchestration=Orchestration,
+                                         was_connected=WasConnected0}=State) ->
     _ = lager:info("Beginning graph analysis."),
 
     %% Get all running nodes, because we need the list of *everything*
     %% to analyze the graph for connectedness.
-    Clients = clients_from_marathon(),
-    Servers = servers_from_marathon(),
+    Clients = clients(Orchestration),
+    Servers = servers(Orchestration),
+
     ServerNames = node_names(sets:to_list(Servers)),
     ClientNames = node_names(sets:to_list(Clients)),
     Nodes = ServerNames ++ ClientNames,
@@ -615,3 +633,21 @@ debug_get_tree(Root, Nodes) ->
                  end,
          {Node, Peers}
      end || Node <- Nodes].
+
+%% @private
+clients(Orchestration) ->
+    case Orchestration of
+        kubernetes ->
+            sets:new();
+        mesos ->
+            clients_from_marathon()
+    end.
+
+%% @private
+servers(Orchestration) ->
+    case Orchestration of
+        kubernetes ->
+            sets:new();
+        mesos ->
+            servers_from_marathon()
+    end.

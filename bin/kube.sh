@@ -17,7 +17,7 @@ cat <<EOF > lasp.yaml
       name: web
     - port: 9090
       protocol: TCP
-      name: partisan
+      name: peer
     selector:
       run: lasp
 ---

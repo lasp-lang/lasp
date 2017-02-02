@@ -4,8 +4,15 @@
 if [ ! -z "$KUBERNETES_PORT" ]; then
   # Else, default to IP.
   if [ -z "$NODE_NAME" ]; then
-    export NODE_NAME=${HOSTNAME}@${KUBERNETES_SERVICE_HOST}
+    export NODE_NAME=${HOSTNAME}@${LASP_SERVICE_HOST}
   fi
+
+  # The running port should be used as the name, given this is the
+  # only identifier that is available via service discovery.
+  export WEB_PORT=${LASP_SERVICE_PORT_WEB}
+
+  # Peer port
+  export PEER_PORT=${LASP_SERVICE_PORT_PEER}
 fi
 
 # If we're running in Mesos...

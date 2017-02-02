@@ -14,10 +14,10 @@ cat <<EOF > lasp.yaml
     ports:
     - port: 8080
       protocol: TCP
-      name: http
-    - port: 443
+      name: web
+    - port: 9090
       protocol: TCP
-      name: https
+      name: partisan
     selector:
       run: lasp
 ---
@@ -37,7 +37,9 @@ cat <<EOF > lasp.yaml
           image: cmeiklejohn/lasp-dev
           env:
           - name: WEB_PORT
-            value: 8080
+            value: "8080"
+          - name: PEER_PORT
+            value: "9090"
           - name: LASP_BRANCH
             value: kube
 EOF

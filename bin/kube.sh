@@ -25,20 +25,17 @@ cat <<EOF > lasp.yaml
   apiVersion: v1
   kind: Service
   metadata:
-    name: lasp
+    name: redis
     labels:
-      run: lasp
+      run: redis
   spec:
     type: NodePort
     ports:
-    - port: 8080
+    - port: 6379
       protocol: TCP
-      name: web
-    - port: 9090
-      protocol: TCP
-      name: peer
+      name: redis
     selector:
-      run: lasp
+      run: redis
 ---
   apiVersion: extensions/v1beta1
   kind: Deployment

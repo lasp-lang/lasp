@@ -64,6 +64,7 @@
                 attempted_nodes,
                 graph,
                 tree,
+                eredis,
                 servers,
                 nodes}).
 
@@ -119,28 +120,15 @@ init([]) ->
         undefined ->
             lager:info("Not using container orchestration; disabling."),
             ok;
-        _ ->
+        Orchestration ->
             lager:info("Orchestration: ~p", [Orchestration]),
 
-            %% Configure erlcloud.
-            S3Host = "s3-us-west-2.amazonaws.com",
-            AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
-            SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
-            erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
-
-            %% Create S3 bucket.
-            try
-                BucketName = bucket_name(),
-                lager:info("Creating bucket: ~p", [BucketName]),
-                ok = erlcloud_s3:create_bucket(BucketName),
-                lager:info("Bucket created.")
-            catch
-                _:{aws_error, Error} ->
-                    lager:info("Bucket creation failed: ~p", [Error]),
+            case Orchestration of
+                mesos ->
+                    configure_s3_bucket();
+                _ ->
                     ok
             end,
-
-            lager:info("S3 bucket creation succeeded."),
 
             %% Only construct the graph and attempt to repair the graph
             %% from the designated server node.
@@ -182,7 +170,18 @@ init([]) ->
             []
     end,
 
-    {ok, #state{nodes=Nodes,
+    Eredis = case Orchestration of
+        kubernetes ->
+            RedisHost = os:getenv("REDIS_SERVICE_HOST_REDIS", "127.0.0.1"),
+            RedisPort = os:getenv("REDIS_SERVICE_PORT_REDIS", "6379"),
+            {ok, C} = eredis:start_link(RedisHost, list_to_integer(RedisPort)),
+            C;
+        _ ->
+            undefined
+    end,
+
+    {ok, #state{eredis=Eredis,
+                nodes=Nodes,
                 servers=Servers,
                 is_connected=false,
                 was_connected=false,
@@ -288,21 +287,13 @@ handle_info(?REFRESH_MESSAGE, #state{orchestration=Orchestration,
                           attempted_nodes=AttemptedNodes}};
 
 handle_info(?ARTIFACT_MESSAGE, State) ->
-    %% Get bucket name.
-    BucketName = bucket_name(),
-
     %% Get current membership.
     {ok, Nodes} = lasp_peer_service:members(),
 
     %% Store membership.
     Node = prefix(atom_to_list(node())),
     Membership = term_to_binary(Nodes),
-    try
-        erlcloud_s3:put_object(BucketName, Node, Membership)
-    catch
-        _:{aws_error, Error} ->
-            lager:info("Could not upload artifact: ~p", [Error])
-    end,
+    upload_artifact(State, Node, Membership),
 
     schedule_artifact_upload(),
 
@@ -338,7 +329,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{orchestration=Orchestration,
 
     %% Build the graph.
     Graph = digraph:new(),
-    Orphaned = populate_graph(Nodes, Graph),
+    Orphaned = populate_graph(State, Nodes, Graph),
 
     {SymmetricViews, VisitedNames} = breath_first(node(), Graph, ordsets:new()),
     AllNodesVisited = length(Nodes) == length(VisitedNames),
@@ -571,20 +562,15 @@ node_names([{Name, _Ip, _Port}|T]) ->
     [Name|node_names(T)].
 
 %% @private
-populate_graph(Nodes, Graph) ->
-    %% Get bucket name.
-    BucketName = bucket_name(),
-
+populate_graph(State, Nodes, Graph) ->
     lists:foldl(
         fun(Node, OrphanedNodes) ->
             File = prefix(atom_to_list(Node)),
             try
-                Result = erlcloud_s3:get_object(BucketName, File),
-                Body = proplists:get_value(content, Result, undefined),
-                case Body of
+                case download_artifact(State, File) of
                     undefined ->
                         OrphanedNodes;
-                    _ ->
+                    Body ->
                         Membership = binary_to_term(Body),
                         case Membership of
                             [Node] ->
@@ -597,6 +583,7 @@ populate_graph(Nodes, Graph) ->
                 end
             catch
                 _:{aws_error, Error} ->
+                    %% TODO: Move me inside download artifact.
                     add_edges(Node, [], Graph),
                     lager:info("Could not get graph object; ~p", [Error]),
                     OrphanedNodes
@@ -716,5 +703,57 @@ generate_pod_nodes(#{<<"items">> := Items}) ->
 %% @private
 generate_pod_node(Name, Host) ->
     {ok, IPAddress} = inet_parse:address(binary_to_list(Host)),
-    Port = list_to_integer(os:getenv("LASP_SERVICE_PORT_PEER")),
+    Port = list_to_integer(os:getenv("PEER_PORT", "9090")),
     {list_to_atom(binary_to_list(Name) ++ "@" ++ binary_to_list(Host)), IPAddress, Port}.
+
+%% @private
+configure_s3_bucket() ->
+    %% Configure erlcloud.
+    S3Host = "s3-us-west-2.amazonaws.com",
+    AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
+    SecretAccessKey = os:getenv("AWS_SECRET_ACCESS_KEY"),
+    erlcloud_s3:configure(AccessKeyId, SecretAccessKey, S3Host),
+
+    %% Create S3 bucket.
+    try
+        BucketName = bucket_name(),
+        lager:info("Creating bucket: ~p", [BucketName]),
+        ok = erlcloud_s3:create_bucket(BucketName),
+        lager:info("Bucket created.")
+    catch
+        _:{aws_error, Error} ->
+            lager:info("Bucket creation failed: ~p", [Error]),
+            ok
+    end,
+
+    lager:info("S3 bucket creation succeeded.").
+
+%% @private
+upload_artifact(#state{orchestration=Orchestration, eredis=Eredis}, Node, Membership) ->
+    case Orchestration of
+        mesos ->
+            %% Get bucket name.
+            BucketName = bucket_name(),
+
+            %% Upload to S3.
+            try
+                erlcloud_s3:put_object(BucketName, Node, Membership)
+            catch
+                _:{aws_error, Error} ->
+                    lager:info("Could not upload artifact: ~p", [Error])
+            end;
+        kubernetes ->
+            {ok, <<"OK">>} = eredis:q(Eredis, ["SET", Node, Membership])
+    end.
+
+%% @private
+download_artifact(#state{orchestration=Orchestration, eredis=Eredis}, Node) ->
+    case Orchestration of
+        mesos ->
+            BucketName = bucket_name(),
+            Result = erlcloud_s3:get_object(BucketName, Node),
+            proplists:get_value(content, Result, undefined);
+        kubernetes ->
+            {ok, A} = eredis:q(Eredis, ["GET", Node]),
+            A
+    end.

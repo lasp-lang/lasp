@@ -416,7 +416,13 @@ maybe_connect(Nodes, SeenNodes) ->
             sets:subtract(Nodes, SeenNodes)
     end,
 
-    lager:info("Attempting to connect: ~p", [sets:to_list(ToConnect)]),
+    case sets:to_list(ToConnect) of
+        [] ->
+            ok;
+        _ ->
+            lager:info("Attempting to connect: ~p",
+                       [sets:to_list(ToConnect)])
+    end,
 
     %% Attempt connection to any new nodes.
     sets:fold(fun(Node, Acc) -> [connect(Node) | Acc] end, [], ToConnect),

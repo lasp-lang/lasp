@@ -708,6 +708,8 @@ generate_pod_nodes(#{<<"items">> := Items}) ->
                         #{<<"name">> := Name} = Metadata,
                         #{<<"status">> := Status} = Item,
                         #{<<"podIP">> := PodIP} = Status,
+                        lager:info("Status: ~p", [Status]),
+                        lager:info("podIP: ~p", [PodIP]),
                         generate_pod_node(Name, PodIP)
                 end, Items),
             sets:from_list(Nodes)

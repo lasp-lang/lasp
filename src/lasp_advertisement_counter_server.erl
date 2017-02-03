@@ -334,7 +334,7 @@ wait_for_connectedness() ->
         "false" ->
             ok;
         _ ->
-            case sprinter:was_connected() of
+            case sprinter_backend:was_connected() of
                 {ok, true} ->
                     ok;
                 {ok, false} ->

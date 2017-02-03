@@ -706,14 +706,15 @@ generate_pod_nodes(#{<<"items">> := Items}) ->
             Nodes = lists:map(fun(Item) ->
                         #{<<"metadata">> := Metadata} = Item,
                         #{<<"name">> := Name} = Metadata,
-                        generate_pod_node(Name)
+                        #{<<"status">> := Status} = Item,
+                        #{<<"podIP">> := PodIP} = Status,
+                        generate_pod_node(Name, PodIP)
                 end, Items),
             sets:from_list(Nodes)
     end.
 
 %% @private
-generate_pod_node(Name) ->
-    Host = os:getenv("LASP_SERVICE_HOST"),
+generate_pod_node(Name, Host) ->
     {ok, IPAddress} = inet_parse:address(Host),
     Port = list_to_integer(os:getenv("LASP_SERVICE_PORT_PEER")),
     {list_to_atom(binary_to_list(Name) ++ "@" ++ Host), IPAddress, Port}.

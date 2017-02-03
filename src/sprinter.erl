@@ -274,9 +274,6 @@ handle_info(?REFRESH_MESSAGE, #state{orchestration=Orchestration,
             sets:new()
     end,
 
-    lager:info("Attempting to connect: ~p", [sets:to_list(ToConnectNodes)]),
-    lager:info("Already attempted: ~p", [sets:to_list(SeenNodes)]),
-
     %% Attempt to connect nodes that are not connected.
     AttemptedNodes = maybe_connect(ToConnectNodes, SeenNodes),
 
@@ -418,6 +415,8 @@ maybe_connect(Nodes, SeenNodes) ->
         false ->
             sets:subtract(Nodes, SeenNodes)
     end,
+
+    lager:info("Attempting to connect: ~p", [sets:to_list(ToConnect)]),
 
     %% Attempt connection to any new nodes.
     sets:fold(fun(Node, Acc) -> [connect(Node) | Acc] end, [], ToConnect),

@@ -335,13 +335,17 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{orchestration=Orchestration,
     {SymmetricViews, VisitedNames} = breath_first(node(), Graph, ordsets:new()),
     AllNodesVisited = length(Nodes) == length(VisitedNames),
 
+    lager:info("Nodes ~p", [length(Nodes)]),
+    lager:info("VisitedNames ~p", [length(VisitedNames)]),
+    lager:info("SymmetricViews ~p", [SymmetricViews]),
+    lager:info("AllNodesVisited ~p", [AllNodesVisited]),
+
     Connected = SymmetricViews andalso AllNodesVisited,
 
     case Connected of
         true ->
             lager:info("Graph is connected!");
         false ->
-            lager:info("SymmetricViews ~p", [SymmetricViews]),
             lager:info("Visited ~p from ~p: ~p", [length(VisitedNames), node(), VisitedNames]),
             {ok, ServerMembership} = lasp_peer_service:members(),
             lager:info("Membership (~p) ~p", [length(ServerMembership), ServerMembership]),

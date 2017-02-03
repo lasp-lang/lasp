@@ -757,7 +757,9 @@ upload_artifact(#state{orchestration=Orchestration, eredis=Eredis}, Node, Member
                     lager:info("Could not upload artifact: ~p", [Error])
             end;
         kubernetes ->
-            {ok, <<"OK">>} = eredis:q(Eredis, ["SET", Node, Membership])
+            {ok, <<"OK">>} = eredis:q(Eredis, ["SET", Node, Membership]),
+            lager:info("Pushed artifact from Redis: ~p", [Node, Membership]),
+            ok
     end.
 
 %% @private
@@ -768,6 +770,7 @@ download_artifact(#state{orchestration=Orchestration, eredis=Eredis}, Node) ->
             Result = erlcloud_s3:get_object(BucketName, Node),
             proplists:get_value(content, Result, undefined);
         kubernetes ->
-            {ok, A} = eredis:q(Eredis, ["GET", Node]),
-            A
+            {ok, Membership} = eredis:q(Eredis, ["GET", Node]),
+            lager:info("Received artifact from Redis: ~p", [Node, Membership]),
+            Membership
     end.

@@ -7,7 +7,7 @@ cd /tmp
 EVAL_TIMESTAMP=0
 
 # Configure client replicas.
-CLIENT_REPLICAS=2
+CLIENT_REPLICAS=1
 
 # Configure server replicas.
 SERVER_REPLICAS=1

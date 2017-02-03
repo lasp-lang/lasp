@@ -717,6 +717,6 @@ generate_pod_nodes(#{<<"items">> := Items}) ->
 
 %% @private
 generate_pod_node(Name, Host) ->
-    {ok, IPAddress} = inet_parse:address(Host),
+    {ok, IPAddress} = inet_parse:address(binary_to_list(Host)),
     Port = list_to_integer(os:getenv("LASP_SERVICE_PORT_PEER")),
     {list_to_atom(binary_to_list(Name) ++ "@" ++ Host), IPAddress, Port}.

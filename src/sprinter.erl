@@ -230,10 +230,10 @@ handle_info(?REFRESH_MESSAGE, #state{orchestration=Orchestration,
     PeerServiceManager = lasp_config:peer_service_manager(),
 
     Servers = servers(Orchestration),
-    lager:info("Found servers: ~p", [Servers]),
+    lager:info("Found servers: ~p", [sets:to_list(Servers)]),
 
     Clients = clients(Orchestration),
-    lager:info("Found clients: ~p", [Clients]),
+    lager:info("Found clients: ~p", [sets:to_list(Clients)]),
 
     %% Get list of nodes to connect to: this specialized logic isn't
     %% required when the node count is small, but is required with a
@@ -732,11 +732,9 @@ configure_s3_bucket() ->
 upload_artifact(#state{orchestration=Orchestration, eredis=Eredis}, Node, Membership) ->
     case Orchestration of
         mesos ->
-            %% Get bucket name.
-            BucketName = bucket_name(),
-
             %% Upload to S3.
             try
+                BucketName = bucket_name(),
                 erlcloud_s3:put_object(BucketName, Node, Membership)
             catch
                 _:{aws_error, Error} ->

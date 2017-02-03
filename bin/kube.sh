@@ -87,6 +87,18 @@ cat <<EOF > lasp.yaml
             value: ${AWS_SECRET_ACCESS_KEY}
           - name: EVALUATION_TIMESTAMP
             value: ${EVALUATION_TIMESTAMP}
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
 ---
   apiVersion: extensions/v1beta1
   kind: Deployment
@@ -123,6 +135,18 @@ cat <<EOF > lasp.yaml
             value: ${AWS_SECRET_ACCESS_KEY}
           - name: EVALUATION_TIMESTAMP
             value: ${EVALUATION_TIMESTAMP}
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
 EOF
 
 echo "Deleting deployments."

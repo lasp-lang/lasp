@@ -235,6 +235,9 @@ handle_info(?REFRESH_MESSAGE, #state{orchestration=Orchestration,
     Clients = clients(Orchestration),
     lager:info("Found clients: ~p", [sets:to_list(Clients)]),
 
+    {ok, Membership} = lasp_peer_service:members(),
+    lager:info("Membership (~p) ~p", [length(Membership), Membership]),
+
     %% Get list of nodes to connect to: this specialized logic isn't
     %% required when the node count is small, but is required with a
     %% larger node count to ensure the network stabilizes correctly

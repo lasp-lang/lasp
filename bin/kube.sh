@@ -143,5 +143,5 @@ echo
 sleep 10
 
 echo "Tailing logs."
-export SERVER_POD_NAME=$(kubectl get pods | grep server | awk '{print $1}')
+export SERVER_POD_NAME=$(kubectl get pods | grep client | awk '{print $1}')
 kubectl logs --tail=-1 -f $SERVER_POD_NAME

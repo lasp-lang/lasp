@@ -43,6 +43,21 @@ cat <<EOF > lasp.yaml
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
+    name: redis
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          run: redis
+      spec:
+        containers:
+        - name: redis
+          image: redis
+---
+  apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
     name: lasp-server
   spec:
     replicas: ${SERVER_REPLICAS}

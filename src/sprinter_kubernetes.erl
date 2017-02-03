@@ -21,8 +21,24 @@
 -module(sprinter_kubernetes).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
+-include("sprinter.hrl").
+
 -export([clients/0,
-         servers/0]).
+         servers/0,
+         upload_artifact/3,
+         download_artifact/2]).
+
+%% @private
+upload_artifact(#state{eredis=Eredis}, Node, Membership) ->
+    {ok, <<"OK">>} = eredis:q(Eredis, ["SET", Node, Membership]),
+    lager:info("Pushed artifact to Redis: ~p ~p", [Node, Membership]),
+    ok.
+
+%% @private
+download_artifact(#state{eredis=Eredis}, Node) ->
+    {ok, Membership} = eredis:q(Eredis, ["GET", Node]),
+    lager:info("Received artifact from Redis: ~p ~p", [Node, Membership]),
+    Membership.
 
 %% @private
 clients() ->

@@ -21,8 +21,34 @@
 -module(sprinter_mesos).
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
+-include("sprinter.hrl").
+
 -export([clients/0,
-         servers/0]).
+         servers/0,
+         bucket_name/0,
+         upload_artifact/3,
+         download_artifact/2]).
+
+%% @private
+bucket_name() ->
+    "lasp-sprinter-metadata".
+
+%% @private
+download_artifact(_State, Node) ->
+    BucketName = bucket_name(),
+    Result = erlcloud_s3:get_object(BucketName, Node),
+    proplists:get_value(content, Result, undefined).
+
+%% @private
+upload_artifact(_State, Node, Membership) ->
+    %% Upload to S3.
+    try
+        BucketName = bucket_name(),
+        erlcloud_s3:put_object(BucketName, Node, Membership)
+    catch
+        _:{aws_error, Error} ->
+            lager:info("Could not upload artifact: ~p", [Error])
+    end.
 
 %% @private
 clients() ->

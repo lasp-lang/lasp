@@ -57,16 +57,7 @@
 -define(ARTIFACT_INTERVAL, 20000).
 -define(ARTIFACT_MESSAGE,  artifact).
 
-%% State record.
--record(state, {orchestration,
-                is_connected,
-                was_connected,
-                attempted_nodes,
-                graph,
-                tree,
-                eredis,
-                servers,
-                nodes}).
+-include("sprinter.hrl").
 
 %%%===================================================================
 %%% API
@@ -106,26 +97,25 @@ nodes() ->
 %% @private
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
-    Orchestration = case {os:getenv("MESOS_TASK_ID"),
-                          os:getenv("KUBERNETES_PORT")} of
+    Backend = case {os:getenv("MESOS_TASK_ID"), os:getenv("KUBERNETES_PORT")} of
         {Value, false} when is_list(Value) ->
-            mesos;
+            sprinter_mesos;
         {false, Value} when is_list(Value) ->
-            kubernetes;
+            sprinter_kubernetes;
         {_, _} ->
             undefined
     end,
 
-    case Orchestration of
+    case Backend of
         undefined ->
             lager:info("Not using container orchestration; disabling."),
             ok;
-        Orchestration ->
-            lager:info("Orchestration: ~p", [Orchestration]),
+        Backend ->
+            lager:info("Backend: ~p", [Backend]),
 
-            case Orchestration of
-                mesos ->
-                    configure_s3_bucket();
+            case Backend of
+                sprinter_mesos ->
+                    configure_s3_bucket(Backend);
                 _ ->
                     ok
             end,
@@ -148,7 +138,7 @@ init([]) ->
             schedule_membership_refresh()
     end,
 
-    Servers = case Orchestration of
+    Servers = case Backend of
         undefined ->
             case lasp_config:get(lasp_server, undefined) of
                 undefined ->
@@ -160,7 +150,7 @@ init([]) ->
             []
     end,
 
-    Nodes = case Orchestration of
+    Nodes = case Backend of
         undefined ->
             %% Assumes full membership.
             PeerServiceManager = lasp_config:peer_service_manager(),
@@ -170,8 +160,8 @@ init([]) ->
             []
     end,
 
-    Eredis = case Orchestration of
-        kubernetes ->
+    Eredis = case Backend of
+        sprinter_kubernetes ->
             RedisHost = os:getenv("REDIS_SERVICE_HOST", "127.0.0.1"),
             RedisPort = os:getenv("REDIS_SERVICE_PORT", "6379"),
             {ok, C} = eredis:start_link(RedisHost, list_to_integer(RedisPort)),
@@ -185,7 +175,7 @@ init([]) ->
                 servers=Servers,
                 is_connected=false,
                 was_connected=false,
-                orchestration=Orchestration,
+                backend=Backend,
                 attempted_nodes=sets:new(),
                 graph=digraph:new(),
                 tree=digraph:new()}}.
@@ -224,15 +214,15 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(?REFRESH_MESSAGE, #state{orchestration=Orchestration,
+handle_info(?REFRESH_MESSAGE, #state{backend=Backend,
                                      attempted_nodes=SeenNodes}=State) ->
     Tag = partisan_config:get(tag, client),
     PeerServiceManager = lasp_config:peer_service_manager(),
 
-    Servers = servers(Orchestration),
+    Servers = Backend:servers(),
     lager:info("Found servers: ~p", [sets:to_list(Servers)]),
 
-    Clients = clients(Orchestration),
+    Clients = Backend:clients(),
     lager:info("Found clients: ~p", [sets:to_list(Clients)]),
 
     {ok, Membership} = lasp_peer_service:members(),
@@ -299,14 +289,17 @@ handle_info(?ARTIFACT_MESSAGE, State) ->
     schedule_artifact_upload(),
 
     {noreply, State};
-handle_info(?BUILD_GRAPH_MESSAGE, #state{orchestration=Orchestration,
+handle_info(?BUILD_GRAPH_MESSAGE, #state{backend=Backend,
                                          was_connected=WasConnected0}=State) ->
     _ = lager:info("Beginning graph analysis."),
 
     %% Get all running nodes, because we need the list of *everything*
     %% to analyze the graph for connectedness.
-    Clients = clients(Orchestration),
-    Servers = servers(Orchestration),
+    Servers = Backend:servers(),
+    lager:info("Found servers: ~p", [sets:to_list(Servers)]),
+
+    Clients = Backend:clients(),
+    lager:info("Found clients: ~p", [sets:to_list(Clients)]),
 
     ServerNames = node_names(sets:to_list(Servers)),
     ClientNames = node_names(sets:to_list(Clients)),
@@ -331,7 +324,7 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{orchestration=Orchestration,
     %% Build the graph.
     Graph = digraph:new(),
     Orphaned = populate_graph(State, Nodes, Graph),
-    
+
     {Vertices, Edges} = vertices_and_edges(Graph),
     lager:info("Vertices: ~p Edges: ~p", [Vertices, Edges]),
 
@@ -454,10 +447,6 @@ prefix(File) ->
     integer_to_list(EvalTimestamp) ++ "/" ++ File.
 
 %% @private
-bucket_name() ->
-    "lasp-sprinter-metadata".
-
-%% @private
 schedule_build_graph() ->
     %% Add random jitter.
     Jitter = rand_compat:uniform(?BUILD_GRAPH_INTERVAL),
@@ -570,25 +559,7 @@ debug_get_tree(Root, Nodes) ->
      end || Node <- Nodes].
 
 %% @private
-clients(Orchestration) ->
-    case Orchestration of
-        kubernetes ->
-            sprinter_kubernetes:clients();
-        mesos ->
-            sprinter_mesos:clients()
-    end.
-
-%% @private
-servers(Orchestration) ->
-    case Orchestration of
-        kubernetes ->
-            sprinter_kubernetes:servers();
-        mesos ->
-            sprinter_mesos:servers()
-    end.
-
-%% @private
-configure_s3_bucket() ->
+configure_s3_bucket(Backend) ->
     %% Configure erlcloud.
     S3Host = "s3-us-west-2.amazonaws.com",
     AccessKeyId = os:getenv("AWS_ACCESS_KEY_ID"),
@@ -597,7 +568,7 @@ configure_s3_bucket() ->
 
     %% Create S3 bucket.
     try
-        BucketName = bucket_name(),
+        BucketName = Backend:bucket_name(),
         lager:info("Creating bucket: ~p", [BucketName]),
         ok = erlcloud_s3:create_bucket(BucketName),
         lager:info("Bucket created.")
@@ -610,32 +581,9 @@ configure_s3_bucket() ->
     lager:info("S3 bucket creation succeeded.").
 
 %% @private
-upload_artifact(#state{orchestration=Orchestration, eredis=Eredis}, Node, Membership) ->
-    case Orchestration of
-        mesos ->
-            %% Upload to S3.
-            try
-                BucketName = bucket_name(),
-                erlcloud_s3:put_object(BucketName, Node, Membership)
-            catch
-                _:{aws_error, Error} ->
-                    lager:info("Could not upload artifact: ~p", [Error])
-            end;
-        kubernetes ->
-            {ok, <<"OK">>} = eredis:q(Eredis, ["SET", Node, Membership]),
-            lager:info("Pushed artifact to Redis: ~p ~p", [Node, Membership]),
-            ok
-    end.
+upload_artifact(#state{backend=Backend}=State, Node, Membership) ->
+    Backend:upload_artifact(State, Node, Membership).
 
 %% @private
-download_artifact(#state{orchestration=Orchestration, eredis=Eredis}, Node) ->
-    case Orchestration of
-        mesos ->
-            BucketName = bucket_name(),
-            Result = erlcloud_s3:get_object(BucketName, Node),
-            proplists:get_value(content, Result, undefined);
-        kubernetes ->
-            {ok, Membership} = eredis:q(Eredis, ["GET", Node]),
-            lager:info("Received artifact from Redis: ~p ~p", [Node, Membership]),
-            Membership
-    end.
+download_artifact(#state{backend=Backend}=State, Node) ->
+    Backend:download_artifact(State, Node).

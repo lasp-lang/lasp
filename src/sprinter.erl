@@ -758,7 +758,7 @@ upload_artifact(#state{orchestration=Orchestration, eredis=Eredis}, Node, Member
             end;
         kubernetes ->
             {ok, <<"OK">>} = eredis:q(Eredis, ["SET", Node, Membership]),
-            lager:info("Pushed artifact from Redis: ~p", [Node, Membership]),
+            lager:info("Pushed artifact to Redis: ~p ~p", [Node, Membership]),
             ok
     end.
 
@@ -771,6 +771,6 @@ download_artifact(#state{orchestration=Orchestration, eredis=Eredis}, Node) ->
             proplists:get_value(content, Result, undefined);
         kubernetes ->
             {ok, Membership} = eredis:q(Eredis, ["GET", Node]),
-            lager:info("Received artifact from Redis: ~p", [Node, Membership]),
+            lager:info("Received artifact from Redis: ~p ~p", [Node, Membership]),
             Membership
     end.

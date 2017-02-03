@@ -332,11 +332,11 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{orchestration=Orchestration,
     Graph = digraph:new(),
     Orphaned = populate_graph(State, Nodes, Graph),
 
-    {SymmetricViews, VisitedNames} = breath_first(node(), Graph, ordsets:new()),
+    {SymmetricViews, VisitedNames} = breadth_first(node(), Graph, ordsets:new()),
     AllNodesVisited = length(Nodes) == length(VisitedNames),
 
-    lager:info("Nodes ~p", [length(Nodes)]),
-    lager:info("VisitedNames ~p", [length(VisitedNames)]),
+    lager:info("Nodes (~p) ~p", [length(Nodes), Nodes]),
+    lager:info("VisitedNames (~p) ~p", [length(VisitedNames), VisitedNames]),
     lager:info("SymmetricViews ~p", [SymmetricViews]),
     lager:info("AllNodesVisited ~p", [AllNodesVisited]),
 
@@ -481,7 +481,7 @@ get_request(Url, DecodeFun, Orchestration) ->
             {error, invalid}
     end.
 
-breath_first(Root, Graph, Visited0) ->
+breadth_first(Root, Graph, Visited0) ->
     %% Check if every link is bidirectional
     %% If not, stop traversal
     In = ordsets:from_list(digraph:in_neighbours(Graph, Root)),
@@ -493,7 +493,7 @@ breath_first(Root, Graph, Visited0) ->
         true ->
             {SymmetricViews, VisitedNodes} = ordsets:fold(
                 fun(Peer, {SymmetricViews0, VisitedNodes0}) ->
-                    {SymmetricViews1, VisitedNodes1} = breath_first(Peer, Graph, VisitedNodes0),
+                    {SymmetricViews1, VisitedNodes1} = breadth_first(Peer, Graph, VisitedNodes0),
                     {SymmetricViews0 andalso SymmetricViews1, ordsets:union(VisitedNodes0, VisitedNodes1)}
                 end,
                 {true, Visited1},

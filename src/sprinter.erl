@@ -566,7 +566,9 @@ vertices_and_edges(Graph) ->
         end,
         digraph:edges(Graph)
     ),
-    {Vertices, Edges}.
+    Result = {Vertices, Edges},
+    lager:info("Vertices: ~p Edges: ~p", [Vertices, Edges]),
+    Result.
 
 %% @private
 node_names([]) ->

@@ -33,7 +33,7 @@ cat <<EOF > lasp.yaml
     ports:
     - port: 6379
       protocol: TCP
-      name: redis
+      name: tcp
     selector:
       run: redis
 ---

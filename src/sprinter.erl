@@ -172,8 +172,8 @@ init([]) ->
 
     Eredis = case Orchestration of
         kubernetes ->
-            RedisHost = os:getenv("REDIS_SERVICE_HOST_REDIS", "127.0.0.1"),
-            RedisPort = os:getenv("REDIS_SERVICE_PORT_REDIS", "6379"),
+            RedisHost = os:getenv("REDIS_SERVICE_HOST", "127.0.0.1"),
+            RedisPort = os:getenv("REDIS_SERVICE_PORT", "6379"),
             {ok, C} = eredis:start_link(RedisHost, list_to_integer(RedisPort)),
             C;
         _ ->

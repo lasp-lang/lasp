@@ -331,6 +331,9 @@ handle_info(?BUILD_GRAPH_MESSAGE, #state{orchestration=Orchestration,
     %% Build the graph.
     Graph = digraph:new(),
     Orphaned = populate_graph(State, Nodes, Graph),
+    
+    {Vertices, Edges} = vertices_and_edges(Graph),
+    lager:info("Vertices: ~p Edges: ~p", [Vertices, Edges]),
 
     {SymmetricViews, VisitedNames} = breadth_first(node(), Graph, ordsets:new()),
     AllNodesVisited = length(Nodes) == length(VisitedNames),
@@ -566,9 +569,7 @@ vertices_and_edges(Graph) ->
         end,
         digraph:edges(Graph)
     ),
-    Result = {Vertices, Edges},
-    lager:info("Vertices: ~p Edges: ~p", [Vertices, Edges]),
-    Result.
+    {Vertices, Edges}.
 
 %% @private
 node_names([]) ->

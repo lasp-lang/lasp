@@ -43,7 +43,7 @@
  {<<"sext">>,{pkg,<<"sext">>,<<"1.4.0">>},0},
  {<<"sprinter">>,
   {git,"git://github.com/lasp-lang/sprinter.git",
-       {ref,"0163a5ae21aa70f0278a340b60ebf76a59216ef2"}},
+       {ref,"d8da104c7a8795251b0dd2cb42f55a78bf3bd829"}},
   0},
  {<<"time_compat">>,
   {git,"https://github.com/lasp-lang/time_compat",

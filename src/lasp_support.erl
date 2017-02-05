@@ -370,11 +370,10 @@ start_slave(Name, NodeConfig, _Case) ->
     end.
 
 push_logs() ->
-    DCOS = os:getenv("DCOS", "false"),
     LOGS = os:getenv("LOGS", "s3"),
 
-    case DCOS of
-        "false" ->
+    case sprinter:orchestrated() of
+        false ->
             ok;
         _ ->
             lager:info("Will push logs."),
@@ -403,6 +402,23 @@ push_logs() ->
                             {ok, Binary} = file:read_file(FilePath),
                             lager:info("Pushing log ~p.", [S3Id]),
                             erlcloud_s3:put_object(BucketName, S3Id, Binary)
+                        end,
+                        lasp_instrumentation:log_files()
+                    ),
+
+                    lager:info("Pushing logs completed.");
+                "redis" ->
+                    RedisHost = os:getenv("REDIS_SERVICE_HOST", "127.0.0.1"),
+                    RedisPort = os:getenv("REDIS_SERVICE_PORT", "6379"),
+                    {ok, C} = eredis:start_link(RedisHost, list_to_integer(RedisPort)),
+
+                    %% Store logs in Redis.
+                    lists:foreach(
+                        fun({FilePath, S3Id}) ->
+                            {ok, Binary} = file:read_file(FilePath),
+
+                            lager:info("Pushing log ~p.", [S3Id]),
+                            {ok, <<"OK">>} = eredis:q(C, ["SET", S3Id, Binary])
                         end,
                         lasp_instrumentation:log_files()
                     ),

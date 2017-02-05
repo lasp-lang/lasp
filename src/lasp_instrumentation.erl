@@ -202,7 +202,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 termsize(Term) ->
     byte_size(term_to_binary(Term)).
-    %%erts_debug:flat_size(Term) * erlang:system_info(wordsize).
 
 %% @private
 start_transmission_timer() ->

@@ -319,9 +319,7 @@ compute_overcounting(AdList) ->
 
 %% @private
 stop_simulation() ->
-    DCOS = os:getenv("DCOS", "false"),
-
-    case list_to_atom(DCOS) of
+    case sprinter:orchestrated() of
         false ->
             ok;
         _ ->
@@ -330,8 +328,8 @@ stop_simulation() ->
 
 %% @private
 wait_for_connectedness() ->
-    case os:getenv("DCOS", "false") of
-        "false" ->
+    case sprinter:orchestrated() of
+        false ->
             ok;
         _ ->
             case sprinter_backend:was_connected() of

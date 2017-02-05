@@ -377,7 +377,7 @@ push_logs() ->
         "false" ->
             ok;
         _ ->
-            lager:info("Will push logs"),
+            lager:info("Will push logs."),
             case LOGS of
                 "s3" ->
                     %% Configure erlcloud.

@@ -222,17 +222,17 @@ log_dir() ->
 %% @private
 simulation_id() ->
     Simulation = lasp_config:get(simulation, undefined),
-    LocalOrDCOS = case os:getenv("DCOS", "false") of
-        "false" ->
+    Orchestration = case sprinter:orchestrated() of
+        false ->
             "local";
         _ ->
-            "dcos"
+            atom_to_list(sprinter:orchestration())
     end,
     EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
 
     Id = atom_to_list(Simulation) ++ "/"
-      ++ LocalOrDCOS ++ "/"
+      ++ Orchestration ++ "/"
       ++ atom_to_list(EvalIdentifier) ++ "/"
       ++ integer_to_list(EvalTimestamp),
     Id.

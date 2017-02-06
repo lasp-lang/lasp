@@ -1,10 +1,25 @@
 #!/bin/sh
 
-cd /tmp
-
 # Configure evaluation timestamp.
 # TODO: Fix me.
 EVAL_TIMESTAMP=0
+
+# Configure experiment.
+PEER_SERVICE=partisan_client_server_peer_service_manager
+MODE=state_based
+HEAVY_CLIENTS=false
+REACTIVE_SERVER=false
+CLIENT_NUMBER=1
+BROADCAST=false
+SIMULATION=ad_counter
+EVAL_ID=undefined
+PARTITION_PROBABILITY=0
+STATE_INTERVAL=10
+DELTA_INTERVAL=10
+INSTRUMENTATION=true
+LOGS=redis
+EXTENDED_LOGGING=true
+MAILBOX_LOGGING=true
 
 # Configure client replicas.
 CLIENT_REPLICAS=1
@@ -20,6 +35,39 @@ export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d 
 
 # Get Kubernetes access token.
 export TOKEN=$(kubectl describe secret $(kubectl get secrets | grep default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d '\t')
+
+# Environment variables.
+ENV_VARS=(
+  LASP_BRANCH
+  PEER_SERVICE
+  MODE
+  BROADCAST
+  SIMULATION
+  EVAL_ID
+  EVAL_TIMESTAMP
+  CLIENT_NUMBER
+  HEAVY_CLIENTS
+  REACTIVE_SERVER
+  PARTITION_PROBABILITY
+  STATE_INTERVAL
+  DELTA_INTERVAL
+  INSTRUMENTATION
+  LOGS
+  EXTENDED_LOGGING
+  MAILBOX_LOGGING
+  AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY
+)
+
+for ENV_VAR in "${ENV_VARS[@]}"
+do
+  if [ -z "${!ENV_VAR}" ]; then
+    echo ">>> ${ENV_VAR} is not configured; please export it."
+    exit 1
+  fi
+done
+
+cd /tmp
 
 cat <<EOF > lasp.yaml
   apiVersion: v1
@@ -70,23 +118,59 @@ cat <<EOF > lasp.yaml
           image: cmeiklejohn/lasp-dev
           env:
           - name: TAG
-            value: server
+            value: "server"
           - name: WEB_PORT
             value: "8080"
           - name: PEER_PORT
             value: "9090"
           - name: LASP_BRANCH
-            value: ${LASP_BRANCH}
+            value: "${LASP_BRANCH}"
           - name: APISERVER
-            value: ${APISERVER}
+            value: "${APISERVER}"
           - name: TOKEN
-            value: ${TOKEN}
+            value: "${TOKEN}"
           - name: AWS_ACCESS_KEY_ID
-            value: ${AWS_ACCESS_KEY_ID}
+            value: "${AWS_ACCESS_KEY_ID}"
           - name: AWS_SECRET_ACCESS_KEY
-            value: ${AWS_SECRET_ACCESS_KEY}
+            value: "${AWS_SECRET_ACCESS_KEY}"
           - name: EVALUATION_TIMESTAMP
-            value: ${EVALUATION_TIMESTAMP}
+            value: "${EVALUATION_TIMESTAMP}"
+          - name: PEER_SERVICE
+            value: "${PEER_SERVICE}"
+          - name: AD_COUNTER_SIM_CLIENT
+            value: "false"
+          - name: AD_COUNTER_SIM_SERVER
+            value: "true"
+          - name: MODE
+            value: "${MODE}"
+          - name: BROADCAST
+            value: "${BROADCAST}"
+          - name: SIMULATION
+            value: "${SIMULATION}"
+          - name: EVAL_ID
+            value: "${EVAL_ID}"
+          - name: EVAL_TIMESTAMP
+            value: "${EVAL_TIMESTAMP}"
+          - name: CLIENT_NUMBER
+            value: "${CLIENT_NUMBER}"
+          - name: HEAVY_CLIENTS
+            value: "${HEAVY_CLIENTS}"
+          - name: REACTIVE_SERVER
+            value: "${REACTIVE_SERVER}"
+          - name: PARTITION_PROBABILITY
+            value: "${PARTITION_PROBABILITY}"
+          - name: STATE_INTERVAL
+            value: "${STATE_INTERVAL}"
+          - name: DELTA_INTERVAL
+            value: "${DELTA_INTERVAL}"
+          - name: INSTRUMENTATION
+            value: "${INSTRUMENTATION}"
+          - name: LOGS
+            value: "${LOGS}"
+          - name: EXTENDED_LOGGING
+            value: "${EXTENDED_LOGGING}"
+          - name: MAILBOX_LOGGING
+            value: "${MAILBOX_LOGGING}"
           - name: MY_POD_NAME
             valueFrom:
               fieldRef:
@@ -118,23 +202,59 @@ cat <<EOF > lasp.yaml
           image: cmeiklejohn/lasp-dev
           env:
           - name: TAG
-            value: client
+            value: "client"
           - name: WEB_PORT
             value: "8080"
           - name: PEER_PORT
             value: "9090"
           - name: LASP_BRANCH
-            value: ${LASP_BRANCH}
+            value: "${LASP_BRANCH}"
           - name: APISERVER
-            value: ${APISERVER}
+            value: "${APISERVER}"
           - name: TOKEN
-            value: ${TOKEN}
+            value: "${TOKEN}"
           - name: AWS_ACCESS_KEY_ID
-            value: ${AWS_ACCESS_KEY_ID}
+            value: "${AWS_ACCESS_KEY_ID}"
           - name: AWS_SECRET_ACCESS_KEY
-            value: ${AWS_SECRET_ACCESS_KEY}
+            value: "${AWS_SECRET_ACCESS_KEY}"
           - name: EVALUATION_TIMESTAMP
-            value: ${EVALUATION_TIMESTAMP}
+            value: "${EVALUATION_TIMESTAMP}"
+          - name: PEER_SERVICE
+            value: "${PEER_SERVICE}"
+          - name: AD_COUNTER_SIM_CLIENT
+            value: "true"
+          - name: AD_COUNTER_SIM_SERVER
+            value: "false"
+          - name: MODE
+            value: "${MODE}"
+          - name: BROADCAST
+            value: "${BROADCAST}"
+          - name: SIMULATION
+            value: "${SIMULATION}"
+          - name: EVAL_ID
+            value: "${EVAL_ID}"
+          - name: EVAL_TIMESTAMP
+            value: "${EVAL_TIMESTAMP}"
+          - name: CLIENT_NUMBER
+            value: "${CLIENT_NUMBER}"
+          - name: HEAVY_CLIENTS
+            value: "${HEAVY_CLIENTS}"
+          - name: REACTIVE_SERVER
+            value: "${REACTIVE_SERVER}"
+          - name: PARTITION_PROBABILITY
+            value: "${PARTITION_PROBABILITY}"
+          - name: STATE_INTERVAL
+            value: "${STATE_INTERVAL}"
+          - name: DELTA_INTERVAL
+            value: "${DELTA_INTERVAL}"
+          - name: INSTRUMENTATION
+            value: "${INSTRUMENTATION}"
+          - name: LOGS
+            value: "${LOGS}"
+          - name: EXTENDED_LOGGING
+            value: "${EXTENDED_LOGGING}"
+          - name: MAILBOX_LOGGING
+            value: "${MAILBOX_LOGGING}"
           - name: MY_POD_NAME
             valueFrom:
               fieldRef:

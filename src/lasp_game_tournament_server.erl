@@ -273,7 +273,12 @@ stop_simulation() ->
         false ->
             ok;
         _ ->
-            lasp_marathon_simulations:stop()
+            case sprinter:orchestration() of
+                kubernetes ->
+                    lasp_kubernetes_simulations:stop();
+                mesos ->
+                    lasp_marathon_simulations:stop()
+            end
     end.
 
 %% @private

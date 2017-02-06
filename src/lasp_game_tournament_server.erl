@@ -274,9 +274,9 @@ stop_simulation() ->
             ok;
         _ ->
             case sprinter:orchestration() of
-                kubernetes ->
+                {ok, kubernetes} ->
                     lasp_kubernetes_simulations:stop();
-                mesos ->
+                {ok, mesos} ->
                     lasp_marathon_simulations:stop()
             end
     end.

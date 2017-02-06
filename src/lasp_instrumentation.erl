@@ -226,7 +226,8 @@ simulation_id() ->
         false ->
             "local";
         _ ->
-            atom_to_list(sprinter:orchestration())
+            {ok, O} = sprinter:orchestration(),
+            atom_to_list(O)
     end,
     EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),

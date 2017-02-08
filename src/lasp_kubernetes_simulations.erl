@@ -27,7 +27,9 @@ stop() ->
     lists:foreach(
         fun(Deployment) ->
             lager:info("Deleting Kubernetes deployment: ~p", [Deployment]),
-            delete_deployment(Deployment)
+            delete_deployment(Deployment),
+            lager:info("Deleting Kubernetes pods."),
+            delete_pods(Deployment)
         end,
         deployments()).
 
@@ -51,15 +53,54 @@ deployment_url(Deployment) ->
     APIServer ++ "/apis/extensions/v1beta1/namespaces/default/deployments/" ++ Deployment.
 
 %% @private
+delete_pod(#{<<"metadata">> := Metadata}) ->
+    DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
+    #{<<"selfURL">> := Url} = Metadata,
+
+    Headers = headers(),
+    case httpc:request(delete, {Url, Headers}, [], [{body_format, binary}]) of
+        {ok, {{_, 200, _}, _, Body}} ->
+            {ok, DecodeFun(Body)};
+        Other ->
+            _ = lager:info("Request failed; ~p", [Other]),
+            {error, invalid}
+    end.
+
+%% @private
+delete_pods(Run) ->
+    DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
+    PodsUrl = "/api/v1/pods?labelSelector=run%3D" ++ Run,
+
+    case get_request(PodsUrl, DecodeFun) of
+        {ok, Response} ->
+            _ = lager:info("Response: ~p", [Response]),
+            #{<<"items">> := Items} = Response,
+            [delete_pod(Item) || Item <- Items],
+            ok;
+        Error ->
+            _ = lager:info("Invalid Kubernetes response: ~p", [Error]),
+            {error, Error}
+    end.
+
+%% @private
 deployments() ->
     ["lasp-server", "lasp-client", "redis"].
 
 %% @private
+get_request(Url, DecodeFun) ->
+    Headers = headers(),
+    case httpc:request(delete, {Url, Headers}, [], [{body_format, binary}]) of
+        {ok, {{_, 200, _}, _, Body}} ->
+            {ok, DecodeFun(Body)};
+        Other ->
+            _ = lager:info("Request failed; ~p", [Other]),
+            {error, invalid}
+    end.
+
+%% @private
 delete_request(Url, DecodeFun) ->
     Headers = headers(),
-    CascadeUrl = Url ++ "?cascade=true",
-    lager:info("Issuing request to delete resource: ~p", [CascadeUrl]),
-    case httpc:request(delete, {CascadeUrl, Headers}, [], [{body_format, binary}]) of
+    case httpc:request(delete, {Url, Headers}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, Body}} ->
             {ok, DecodeFun(Body)};
         Other ->

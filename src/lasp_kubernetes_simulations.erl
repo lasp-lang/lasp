@@ -57,7 +57,9 @@ deployments() ->
 %% @private
 delete_request(Url, DecodeFun) ->
     Headers = headers(),
-    case httpc:request(delete, {Url, Headers}, [], [{body_format, binary}]) of
+    CascadeUrl = Url ++ "?cascade=true",
+    lager:info("Issuing request to delete resource: ~p", [CascadeUrl]),
+    case httpc:request(delete, {CascadeUrl, Headers}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, Body}} ->
             {ok, DecodeFun(Body)};
         Other ->

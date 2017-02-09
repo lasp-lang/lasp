@@ -273,6 +273,14 @@ echo "Deleting deployments."
 kubectl delete deployments --all
 echo
 
+echo "Deleting replicasets."
+kubectl delete replicasets --all
+echo
+
+echo "Deleting pods."
+kubectl delete pods --all
+echo
+
 echo "Deleting lasp deployments and servies."
 kubectl delete -f /tmp/lasp.yaml
 echo

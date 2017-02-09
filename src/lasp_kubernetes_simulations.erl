@@ -101,6 +101,7 @@ get_request(Url, DecodeFun) ->
 
 %% @private
 delete_request(Url, DecodeFun) ->
+    lager:info("Issuing request to: ~p", [Url]),
     Headers = headers(),
     case httpc:request(delete, {Url, Headers}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, Body}} ->

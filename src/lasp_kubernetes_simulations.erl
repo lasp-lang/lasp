@@ -69,7 +69,9 @@ delete_pod(#{<<"metadata">> := Metadata}) ->
 %% @private
 delete_pods(Run) ->
     DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
-    PodsUrl = "/api/v1/pods?labelSelector=run%3D" ++ Run,
+
+    APIServer = os:getenv("APISERVER"),
+    PodsUrl = APIServer ++ "/api/v1/pods?labelSelector=run%3D" ++ Run,
 
     case get_request(PodsUrl, DecodeFun) of
         {ok, Response} ->

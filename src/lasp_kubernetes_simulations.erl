@@ -55,9 +55,12 @@ deployment_url(Deployment) ->
 %% @private
 delete_pod(#{<<"metadata">> := Metadata}) ->
     DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
-    #{<<"selfLink">> := Url} = Metadata,
+    #{<<"selfLink">> := SelfUrl} = Metadata,
 
-    case delete_request(Url, DecodeFun) of
+    APIServer = os:getenv("APISERVER"),
+    PodUrl = APIServer ++ SelfUrl,
+
+    case delete_request(PodUrl, DecodeFun) of
         {ok, Response} ->
             _ = lager:info("Response: ~p", [Response]),
             ok;

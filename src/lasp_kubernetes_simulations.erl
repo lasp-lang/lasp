@@ -55,7 +55,7 @@ deployment_url(Deployment) ->
 %% @private
 delete_pod(#{<<"metadata">> := Metadata}) ->
     DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
-    #{<<"selfURL">> := Url} = Metadata,
+    #{<<"selfLink">> := Url} = Metadata,
 
     case delete_request(Url, DecodeFun) of
         {ok, Response} ->

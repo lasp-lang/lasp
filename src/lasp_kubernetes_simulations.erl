@@ -57,13 +57,13 @@ delete_pod(#{<<"metadata">> := Metadata}) ->
     DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
     #{<<"selfURL">> := Url} = Metadata,
 
-    Headers = headers(),
-    case httpc:request(delete, {Url, Headers}, [], [{body_format, binary}]) of
-        {ok, {{_, 200, _}, _, Body}} ->
-            {ok, DecodeFun(Body)};
-        Other ->
-            _ = lager:info("Request failed; ~p", [Other]),
-            {error, invalid}
+    case delete_request(Url, DecodeFun) of
+        {ok, Response} ->
+            _ = lager:info("Response: ~p", [Response]),
+            ok;
+        Error ->
+            _ = lager:info("Invalid Kubernetes response: ~p", [Error]),
+            {error, Error}
     end.
 
 %% @private
@@ -91,7 +91,7 @@ deployments() ->
 %% @private
 get_request(Url, DecodeFun) ->
     Headers = headers(),
-    case httpc:request(delete, {Url, Headers}, [], [{body_format, binary}]) of
+    case httpc:request(get, {Url, Headers}, [], [{body_format, binary}]) of
         {ok, {{_, 200, _}, _, Body}} ->
             {ok, DecodeFun(Body)};
         Other ->

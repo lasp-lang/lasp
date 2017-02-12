@@ -58,7 +58,7 @@ delete_pod(#{<<"metadata">> := Metadata}) ->
     #{<<"selfLink">> := SelfUrl} = Metadata,
 
     APIServer = os:getenv("APISERVER"),
-    PodUrl = APIServer ++ SelfUrl,
+    PodUrl = APIServer ++ binary_to_list(SelfUrl),
 
     case delete_request(PodUrl, DecodeFun) of
         {ok, Response} ->

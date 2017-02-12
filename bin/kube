@@ -17,7 +17,7 @@ PARTITION_PROBABILITY=0
 STATE_INTERVAL=10000
 DELTA_INTERVAL=10000
 INSTRUMENTATION=true
-LOGS=s3
+LOGS=redis
 EXTENDED_LOGGING=false
 MAILBOX_LOGGING=false
 
@@ -66,6 +66,8 @@ do
     exit 1
   fi
 done
+
+cp bin/sync-redis.erl /tmp
 
 cd /tmp
 
@@ -297,3 +299,11 @@ sleep 10
 echo "Tailing logs."
 export SERVER_POD_NAME=$(kubectl get pods | grep server | awk '{print $1}')
 kubectl logs --tail=-1 -f $SERVER_POD_NAME
+
+export REDIS_SERVICE_HOST=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1 | cut -f 2-2 -d ":" | sed -e 's/\/\///g')
+export REDIS_SERVICE_PORT=$(kubectl get service redis -o jsonpath="{.spec.ports[*].nodePort}")
+echo "Downloading data from Redis."
+./sync-redis.erl
+
+echo "Terminating redis."
+kubectl delete deployment redis

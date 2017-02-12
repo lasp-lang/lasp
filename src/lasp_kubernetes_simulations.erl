@@ -28,6 +28,8 @@ stop() ->
         fun(Deployment) ->
             lager:info("Deleting Kubernetes deployment: ~p", [Deployment]),
             delete_deployment(Deployment),
+            lager:info("Deleting Kubernetes replicasets."),
+            delete_replicasets(Deployment),
             lager:info("Deleting Kubernetes pods."),
             delete_pods(Deployment)
         end,
@@ -53,6 +55,23 @@ deployment_url(Deployment) ->
     APIServer ++ "/apis/extensions/v1beta1/namespaces/default/deployments/" ++ Deployment.
 
 %% @private
+delete_replicaset(#{<<"metadata">> := Metadata}) ->
+    DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
+    #{<<"selfLink">> := SelfUrl} = Metadata,
+
+    APIServer = os:getenv("APISERVER"),
+    PodUrl = APIServer ++ binary_to_list(SelfUrl),
+
+    case delete_request(PodUrl, DecodeFun) of
+        {ok, Response} ->
+            _ = lager:info("Response: ~p", [Response]),
+            ok;
+        Error ->
+            _ = lager:info("Invalid Kubernetes response: ~p", [Error]),
+            {error, Error}
+    end.
+
+%% @private
 delete_pod(#{<<"metadata">> := Metadata}) ->
     DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
     #{<<"selfLink">> := SelfUrl} = Metadata,
@@ -63,6 +82,24 @@ delete_pod(#{<<"metadata">> := Metadata}) ->
     case delete_request(PodUrl, DecodeFun) of
         {ok, Response} ->
             _ = lager:info("Response: ~p", [Response]),
+            ok;
+        Error ->
+            _ = lager:info("Invalid Kubernetes response: ~p", [Error]),
+            {error, Error}
+    end.
+
+%% @private
+delete_replicasets(Run) ->
+    DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
+
+    APIServer = os:getenv("APISERVER"),
+    PodsUrl = APIServer ++ "/apis/extensions/v1beta1/namespaces/default/replicasets?labelSelector=run%3D" ++ Run,
+
+    case get_request(PodsUrl, DecodeFun) of
+        {ok, Response} ->
+            _ = lager:info("Response: ~p", [Response]),
+            #{<<"items">> := Items} = Response,
+            [delete_replicaset(Item) || Item <- Items],
             ok;
         Error ->
             _ = lager:info("Invalid Kubernetes response: ~p", [Error]),

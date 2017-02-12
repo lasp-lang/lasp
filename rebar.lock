@@ -29,12 +29,12 @@
   0},
  {<<"plumtree">>,
   {git,"https://github.com/lasp-lang/plumtree",
-       {ref,"709275b63b60bb5df5bd3705dcd9e268dca98982"}},
+       {ref,"3be6a4828947951f80c810c5fcfb1dad12126fd2"}},
   0},
  {<<"ranch">>,{pkg,<<"ranch">>,<<"1.2.1">>},0},
  {<<"rand_compat">>,
   {git,"https://github.com/lasp-lang/rand_compat",
-       {ref,"4f658110f57bfd1a3e966a7d65b23d5c8f868167"}},
+       {ref,"87ee4d0a365a6fcf479bcf5b0918a57a705acf78"}},
   0},
  {<<"riak_dt">>,
   {git,"git://github.com/helium/riak_dt.git",
@@ -43,7 +43,7 @@
  {<<"sext">>,{pkg,<<"sext">>,<<"1.4.0">>},0},
  {<<"sprinter">>,
   {git,"git://github.com/lasp-lang/sprinter.git",
-       {ref,"05abc1becfb324af858aa43e443feb55170c7104"}},
+       {ref,"dfa3d6726aa83d714b889acc349c42e9c80a276f"}},
   0},
  {<<"time_compat">>,
   {git,"https://github.com/lasp-lang/time_compat",
@@ -55,7 +55,7 @@
   0},
  {<<"webmachine">>,
   {git,"https://github.com/webmachine/webmachine",
-       {ref,"8f1e4336771e96e24f4d046b671d42289b5113a7"}},
+       {ref,"4edbea20f05dde54cd83e562ec29ae4cc5669f76"}},
   0}]}.
 [
 {pkg_hash,[

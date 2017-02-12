@@ -67,7 +67,10 @@ do
   fi
 done
 
+echo "Copying dependencies for Redis synchronization code to /tmp"
 cp bin/sync-redis.erl /tmp
+mkdir -p /tmp/_build/default/lib/eredis/ebin
+cp -Rpv _build/default/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/ebin
 
 cd /tmp
 

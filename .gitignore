@@ -41,3 +41,4 @@ src/lasp_sql_parser.erl
 bin/a
 dcos.pem
 logs/
+erl_crash.dump

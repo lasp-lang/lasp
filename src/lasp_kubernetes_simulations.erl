@@ -119,7 +119,7 @@ delete_pods(Run) ->
 
 %% @private
 deployments() ->
-    ["lasp-server", "lasp-client", "redis"].
+    ["lasp-server", "lasp-client"].
 
 %% @private
 get_request(Url, DecodeFun) ->

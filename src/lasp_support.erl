@@ -400,7 +400,7 @@ push_logs() ->
                     lists:foreach(
                         fun({FilePath, S3Id}) ->
                             {ok, Binary} = file:read_file(FilePath),
-                            lager:info("Pushing log ~p.", [S3Id]),
+                            lager:info("Pushing log to S3 ~p.", [S3Id]),
                             erlcloud_s3:put_object(BucketName, S3Id, Binary)
                         end,
                         lasp_instrumentation:log_files()
@@ -417,7 +417,7 @@ push_logs() ->
                         fun({FilePath, S3Id}) ->
                             {ok, Binary} = file:read_file(FilePath),
 
-                            lager:info("Pushing log ~p.", [S3Id]),
+                            lager:info("Pushing log to Redis ~p.", [S3Id]),
                             {ok, <<"OK">>} = eredis:q(C, ["SET", S3Id, Binary])
                         end,
                         lasp_instrumentation:log_files()

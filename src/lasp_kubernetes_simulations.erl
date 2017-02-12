@@ -41,8 +41,7 @@ delete_deployment(Deployment) ->
     DeploymentURL = deployment_url(Deployment),
 
     case delete_request(DeploymentURL, DecodeFun) of
-        {ok, Response} ->
-            _ = lager:info("Response: ~p", [Response]),
+        {ok, _Response} ->
             ok;
         Error ->
             _ = lager:info("Invalid Kubernetes response: ~p", [Error]),
@@ -63,8 +62,7 @@ delete_replicaset(#{<<"metadata">> := Metadata}) ->
     PodUrl = APIServer ++ binary_to_list(SelfUrl),
 
     case delete_request(PodUrl, DecodeFun) of
-        {ok, Response} ->
-            _ = lager:info("Response: ~p", [Response]),
+        {ok, _Response} ->
             ok;
         Error ->
             _ = lager:info("Invalid Kubernetes response: ~p", [Error]),
@@ -80,8 +78,7 @@ delete_pod(#{<<"metadata">> := Metadata}) ->
     PodUrl = APIServer ++ binary_to_list(SelfUrl),
 
     case delete_request(PodUrl, DecodeFun) of
-        {ok, Response} ->
-            _ = lager:info("Response: ~p", [Response]),
+        {ok, _Response} ->
             ok;
         Error ->
             _ = lager:info("Invalid Kubernetes response: ~p", [Error]),
@@ -96,9 +93,7 @@ delete_replicasets(Run) ->
     PodsUrl = APIServer ++ "/apis/extensions/v1beta1/namespaces/default/replicasets?labelSelector=run%3D" ++ Run,
 
     case get_request(PodsUrl, DecodeFun) of
-        {ok, Response} ->
-            _ = lager:info("Response: ~p", [Response]),
-            #{<<"items">> := Items} = Response,
+        {ok, #{<<"items">> := Items}} ->
             [delete_replicaset(Item) || Item <- Items],
             ok;
         Error ->
@@ -114,9 +109,7 @@ delete_pods(Run) ->
     PodsUrl = APIServer ++ "/api/v1/pods?labelSelector=run%3D" ++ Run,
 
     case get_request(PodsUrl, DecodeFun) of
-        {ok, Response} ->
-            _ = lager:info("Response: ~p", [Response]),
-            #{<<"items">> := Items} = Response,
+        {ok, #{<<"items">> := Items}} ->
             [delete_pod(Item) || Item <- Items],
             ok;
         Error ->

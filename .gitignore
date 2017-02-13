@@ -40,3 +40,5 @@ src/lasp_sql_lexer.erl
 src/lasp_sql_parser.erl
 bin/a
 dcos.pem
+logs/
+erl_crash.dump

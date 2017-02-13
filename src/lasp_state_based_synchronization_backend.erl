@@ -153,7 +153,7 @@ handle_info(plumtree_peer_refresh, State) ->
     %% TODO: Temporary hack until the Plumtree can propagate tree
     %% information in the metadata messages.  Therefore, manually poll
     %% periodically with jitter.
-    {ok, Servers} = sprinter:servers(),
+    {ok, Servers} = sprinter_backend:servers(),
 
     GossipPeers = case length(Servers) of
         0 ->
@@ -259,8 +259,8 @@ init_state_sync(Peer, ObjectFilterFun, Store) ->
 
 %% @private
 plumtree_gossip_peers(Root) ->
-    {ok, Nodes} = sprinter:nodes(),
-    Tree = sprinter:debug_get_tree(Root, Nodes),
+    {ok, Nodes} = sprinter_backend:nodes(),
+    Tree = sprinter_backend:debug_get_tree(Root, Nodes),
     FolderFun = fun({Node, Peers}, In) ->
                         case Peers of
                             down ->

@@ -202,7 +202,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 termsize(Term) ->
     byte_size(term_to_binary(Term)).
-    %%erts_debug:flat_size(Term) * erlang:system_info(wordsize).
 
 %% @private
 start_transmission_timer() ->
@@ -223,17 +222,18 @@ log_dir() ->
 %% @private
 simulation_id() ->
     Simulation = lasp_config:get(simulation, undefined),
-    LocalOrDCOS = case os:getenv("DCOS", "false") of
-        "false" ->
+    Orchestration = case sprinter:orchestrated() of
+        false ->
             "local";
         _ ->
-            "dcos"
+            {ok, O} = sprinter:orchestration(),
+            atom_to_list(O)
     end,
     EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
 
     Id = atom_to_list(Simulation) ++ "/"
-      ++ LocalOrDCOS ++ "/"
+      ++ Orchestration ++ "/"
       ++ atom_to_list(EvalIdentifier) ++ "/"
       ++ integer_to_list(EvalTimestamp),
     Id.

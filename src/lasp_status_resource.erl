@@ -56,9 +56,9 @@ generate_links(NodeList) ->
 to_json(ReqData, State) ->
     {ok, {Vertices, Edges}} = case lasp_config:get(broadcast, false) of
         true ->
-            sprinter:tree();
+            sprinter_backend:tree();
         false ->
-            sprinter:graph()
+            sprinter_backend:graph()
     end,
     Nodes = [#{id => Name, name => Name, group => 1} || Name <- Vertices],
     Links = [#{source => V1, target => V2} || {V1, V2} <- Edges],

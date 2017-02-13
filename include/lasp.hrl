@@ -5,7 +5,7 @@
 -define(REVERSE_TOPOLOGICAL_SYNC, true).
 
 %% DAG tracking enabled.
--define(DAG_ENABLED, true).
+-define(DAG_ENABLED, false).
 
 %% Synchronization backend.
 -define(SYNC_BACKEND, lasp_synchronization_backend).

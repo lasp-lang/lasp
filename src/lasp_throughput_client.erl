@@ -37,7 +37,7 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {actor, events}).
+-record(state, {actor, events, batch_start, batch_events}).
 
 %%%===================================================================
 %%% API
@@ -63,7 +63,10 @@ init([]) ->
     %% Schedule event.
     schedule_event(),
 
-    {ok, #state{actor=Actor, events=0}}.
+    {ok, #state{actor=Actor,
+                events=0,
+                batch_start=undefined,
+                batch_events=0}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -81,24 +84,45 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(event, #state{actor=Actor,
+                          batch_start=BatchStart0,
+                          batch_events=BatchEvents0,
                           events=Events0}=State) ->
     lasp_marathon_simulations:log_message_queue_size("event"),
+
+    %% Start the batch for every event, if it isn't started yet.
+    BatchStart1 = case BatchStart0 of
+                    undefined ->
+                        erlang:timestamp();
+                     _ ->
+                        BatchStart0
+                 end,
 
     {ok, Value} = lasp:query(?SIMPLE_BAG),
     TotalEvents = sets:size(Value),
 
-    LocalEvents = case TotalEvents > 0 of
+    {LocalEvents, BatchStart, BatchEvents} = case TotalEvents > 0 of
         true ->
             %% The server, once it detects connectedness,
             %% will add one element to the bag.
             %% Until then, clients are not allowed
             %% to add elements to the bag.
             Events1 = Events0 + 1,
+
+            %% If we hit the batch size, restart the batch.
+            {BatchStart2, BatchEvents1} = case BatchEvents0 + 1 == ?BATCH_EVENTS of
+                                              true ->
+                                                  BatchEnd = erlang:timestamp(),
+                                                  log_batch(BatchStart1, BatchEnd, ?BATCH_EVENTS),
+                                                  {undefined, 0};
+                                              false ->
+                                                  {BatchStart1, BatchEvents0 + 1}
+                                          end,
+
             Element = atom_to_list(Actor) ++ "###" ++ integer_to_list(Events1),
 
             lasp:update(?SIMPLE_BAG, {add, Element}, Actor),
 
-            lager:info("Events done: ~p, Events seen: ~p. Node: ~p", [Events1, TotalEvents + 1, Actor]),
+            lager:info("Events done: ~p, Batch events done: ~p, Events seen: ~p. Node: ~p", [Events1, BatchEvents1, TotalEvents + 1, Actor]),
 
             case Events1 == max_events() of
                 true ->
@@ -111,13 +135,15 @@ handle_info(event, #state{actor=Actor,
                 false ->
                     schedule_event()
             end,
-            Events1;
+            {Events1, BatchStart2, BatchEvents1};
         false ->
             schedule_event(),
-            Events0
+            {Events0, undefined, 0}
     end,
 
-    {noreply, State#state{events=LocalEvents}};
+    {noreply, State#state{batch_events=BatchEvents,
+                          batch_start=BatchStart,
+                          events=LocalEvents}};
 
 handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("check_simulation_end"),
@@ -181,6 +207,15 @@ log_convergence() ->
     case lasp_config:get(instrumentation, false) of
         true ->
             lasp_instrumentation:convergence();
+        false ->
+            ok
+    end.
+
+%% @private
+log_batch(Start, End, Events) ->
+    case lasp_config:get(instrumentation, false) of
+        true ->
+            lasp_instrumentation:batch(Start, End, Events);
         false ->
             ok
     end.

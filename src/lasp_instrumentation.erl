@@ -31,6 +31,7 @@
          overcounting/1,
          experiment_started/0,
          convergence/0,
+         batch/3,
          stop/0,
          log_files/0]).
 
@@ -79,6 +80,10 @@ overcounting(Value) ->
 -spec convergence() -> ok | error().
 convergence() ->
     gen_server:call(?MODULE, convergence, infinity).
+
+-spec batch(term(), term(), number()) -> ok | error().
+batch(Start, End, Events) ->
+    gen_server:call(?MODULE, {batch, Start, End, Events}, infinity).
 
 -spec experiment_started() -> ok | error().
 experiment_started() ->
@@ -152,6 +157,10 @@ handle_call({overcounting, Value}, _From, #state{}=State) ->
 
 handle_call(convergence, _From, #state{}=State) ->
     record_convergence(),
+    {reply, ok, State};
+
+handle_call({batch, Start, End, Events}, _From, #state{}=State) ->
+    record_batch(Start, End, Events),
     {reply, ok, State};
 
 handle_call(experiment_started, _From, #state{}=State) ->
@@ -285,6 +294,14 @@ record_convergence() ->
     Filename = main_log(),
     Timestamp = timestamp(),
     Line = get_line(convergence, Timestamp, 0),
+    append_to_file(Filename, Line).
+
+%% @private
+record_batch(Start, End, Events) ->
+    Filename = main_log(),
+    Timestamp = timestamp(),
+    MsDiff = timer:now_diff(Start, End) / 1000,
+    Line = get_line({batch, Start, End, Events, MsDiff}, Timestamp, 0),
     append_to_file(Filename, Line).
 
 %% @private

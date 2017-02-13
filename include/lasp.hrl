@@ -1,7 +1,8 @@
 %% Throughput simulation.
 -define(SIMPLE_BAG, {<<"bag">>, ?GSET_TYPE}).
--define(EVENT_INTERVAL, 10000). %% 10 seconds
--define(MAX_EVENTS_DEFAULT, 10).
+-define(EVENT_INTERVAL, 0). %% 10 seconds
+-define(MAX_EVENTS_DEFAULT, 1000).
+-define(BATCH_EVENTS, 100).
 
 %% Intermediary node modification.
 -define(INTERMEDIARY_NODE_MODIFICATION, false).

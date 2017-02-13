@@ -22,7 +22,7 @@ EXTENDED_LOGGING=false
 MAILBOX_LOGGING=false
 
 # Configure client replicas.
-CLIENT_REPLICAS=1
+CLIENT_REPLICAS=5
 
 # Configure server replicas.
 SERVER_REPLICAS=1

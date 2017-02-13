@@ -367,7 +367,12 @@ handle_call({bind, Id, Value}, _From,
             declare_if_not_found(Result0, Id, State, ?CORE, bind,
                                  [Id, Value, ?CLOCK_INCR(Actor), Store]);
         false ->
-            {ok, IsRoot} = lasp_dependence_dag:is_root(Id),
+            {ok, IsRoot} = case ?DAG_ENABLED of
+                               true ->
+                                   lasp_dependence_dag:is_root(Id);
+                               false ->
+                                   {ok, true}
+                           end,
             case IsRoot of
                 false ->
                     {error, {intermediary_not_modification_prohibited, Id}};

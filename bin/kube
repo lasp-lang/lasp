@@ -297,7 +297,7 @@ echo "Creating deployment."
 kubectl create -f /tmp/lasp.yaml
 echo
 
-sleep 30
+sleep 60
 
 echo "Tailing logs."
 export SERVER_POD_NAME=$(kubectl get pods | grep server | awk '{print $1}')

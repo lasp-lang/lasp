@@ -82,7 +82,7 @@ cat <<EOF > lasp.yaml
     labels:
       run: redis
   spec:
-    type: NodePort
+    type: LoadBalancer
     ports:
     - port: 6379
       protocol: TCP
@@ -303,10 +303,17 @@ echo "Tailing logs."
 export SERVER_POD_NAME=$(kubectl get pods | grep server | awk '{print $1}')
 kubectl logs --tail=-1 -f $SERVER_POD_NAME
 
-export REDIS_SERVICE_HOST=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1 | cut -f 2-2 -d ":" | sed -e 's/\/\///g')
-export REDIS_SERVICE_PORT=$(kubectl get service redis -o jsonpath="{.spec.ports[*].nodePort}")
+if [ "$GCE" ]; then
+  export REDIS_SERVICE_HOST=$(gcloud compute forwarding-rules list | grep TCP | awk '{print $3}')
+  export REDIS_SERVICE_PORT=6379
+else
+  export REDIS_SERVICE_HOST=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1 | cut -f 2-2 -d ":" | sed -e 's/\/\///g')
+  export REDIS_SERVICE_PORT=$(kubectl get service redis -o jsonpath="{.spec.ports[*].nodePort}")
+fi
+
 echo "Downloading data from Redis."
 ./sync-redis.erl
 
-echo "Terminating redis."
-kubectl delete deployment redis
+echo "Deleting lasp deployments and servies."
+kubectl delete -f /tmp/lasp.yaml
+echo

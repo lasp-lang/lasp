@@ -143,10 +143,10 @@ handle_info(state_sync, #state{store=Store, gossip_peers=GossipPeers} = State) -
 
     %% Ship buffered updates for the fanout value.
     SyncFun = fun(Peer) ->
-                      case lasp_config:get(back_propagation,
-                                           ?BACK_PROPAGATION) of
+                      case lasp_config:get(reverse_topological_sync,
+                                           ?REVERSE_TOPOLOGICAL_SYNC) of
                           true ->
-                              init_back_propagation_sync(Peer, Store);
+                              init_reverse_topological_sync(Peer, Store);
                           false ->
                               init_state_sync(Peer, Store)
                       end
@@ -244,8 +244,8 @@ init_state_sync(Peer, Store) ->
     init_state_sync(Peer, ObjectFilterFun, Store).
 
 %% @private
-init_back_propagation_sync(Peer, Store) ->
-    lasp_logger:extended("Initializing back propagation state synchronization with peer: ~p", [Peer]),
+init_reverse_topological_sync(Peer, Store) ->
+    lasp_logger:extended("Initializing reverse toplogical state synchronization with peer: ~p", [Peer]),
 
     SendFun = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}) ->
                     case orddict:find(dynamic, Metadata) of

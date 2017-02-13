@@ -1,8 +1,8 @@
 %% Intermediary node modification.
 -define(INTERMEDIARY_NODE_MODIFICATION, false).
 
-%% Back propagation.
--define(BACK_PROPAGATION, true).
+%% Reverse topological propagation.
+-define(REVERSE_TOPOLOGICAL_SYNC, true).
 
 %% DAG tracking enabled.
 -define(DAG_ENABLED, true).

@@ -122,7 +122,10 @@ init(_Args) ->
     %% Setup the game tournament example, if necessary.
     TournamentSpecs = game_tournament_child_specs(),
 
-    Children = Children0 ++ AdSpecs ++ TournamentSpecs,
+    %% Setup the throughput example, if necessary.
+    ThroughputSpecs = throughput_child_specs(),
+
+    Children = Children0 ++ AdSpecs ++ TournamentSpecs ++ ThroughputSpecs,
 
     {ok, {{one_for_one, 5, 10}, Children}}.
 
@@ -400,3 +403,44 @@ game_tournament_child_specs() ->
 
     ClientSpecs ++ ServerSpecs.
 
+%% @private
+throughput_child_specs() ->
+    %% Figure out who is acting as the client.
+    ClientDefault = list_to_atom(os:getenv("THROUGHPUT_SIM_CLIENT", "false")),
+    ClientEnabled = application:get_env(?APP,
+                                        throughput_simulation_client,
+                                        ClientDefault),
+    lasp_config:set(throughput_simulation_client, ClientEnabled),
+    lager:info("ThroughputClientEnabled: ~p", [ClientEnabled]),
+
+    ClientSpecs = case ClientEnabled of
+        true ->
+            Client = {lasp_throughput_client,
+                      {lasp_throughput_client, start_link, []},
+                       permanent, 5000, worker,
+                       [lasp_throughput_client]},
+            [Client];
+        false ->
+            []
+    end,
+
+    %% Figure out who is acting as the server.
+    ServerDefault = list_to_atom(os:getenv("THROUGHPUT_SIM_SERVER", "false")),
+    ServerEnabled = application:get_env(?APP,
+                                        throughput_simulation_server,
+                                        ServerDefault),
+    lasp_config:set(throughput_simulation_server, ServerEnabled),
+    lager:info("ThroughputServerEnabled: ~p", [ServerEnabled]),
+
+    ServerSpecs = case ServerEnabled of
+        true ->
+            Server = {lasp_throughput_server,
+                      {lasp_throughput_server, start_link, []},
+                       permanent, 5000, worker,
+                       [lasp_throughput_server]},
+            [Server];
+        false ->
+            []
+    end,
+
+    ClientSpecs ++ ServerSpecs.

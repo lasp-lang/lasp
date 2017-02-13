@@ -158,6 +158,15 @@ start(_Case, _Config, Options) ->
                         %% the client.
                         Simulation = proplists:get_value(simulation, Options, undefined),
                         case Simulation of
+                            throughput ->
+                                case Node of
+                                    Server ->
+                                        ok = rpc:call(Node, lasp_config, set, [throughput_simulation_server, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, server]);
+                                    _ ->
+                                        ok = rpc:call(Node, lasp_config, set, [throughput_simulation_client, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, client])
+                                end;
                             ad_counter ->
                                 case Node of
                                     Server ->

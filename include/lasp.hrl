@@ -2,7 +2,7 @@
 -define(INTERMEDIARY_NODE_MODIFICATION, false).
 
 %% Reverse topological propagation.
--define(REVERSE_TOPOLOGICAL_SYNC, true).
+-define(REVERSE_TOPOLOGICAL_SYNC, false).
 
 %% DAG tracking enabled.
 -define(DAG_ENABLED, false).

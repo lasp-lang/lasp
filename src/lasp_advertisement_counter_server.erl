@@ -47,7 +47,7 @@
 %% @doc Start and link to calling process.
 -spec start_link() -> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -145,8 +145,8 @@ handle_info(check_simulation_end, #state{ad_list=AdList}=State) ->
         AdsDisabledAndLogs
     ),
 
-    lager:info("Checking for simulation end: ~p nodes with ads disabled and ~p nodes with logs pushed.",
-               [length(NodesWithAdsDisabled), length(NodesWithLogsPushed)]),
+    lager:info("Checking for simulation end: ~p nodes with ads disabled and ~p nodes with logs pushed: of ~p clients.",
+               [length(NodesWithAdsDisabled), length(NodesWithLogsPushed), client_number()]),
 
     case length(NodesWithLogsPushed) == client_number() of
         true ->
@@ -195,7 +195,10 @@ create_ads_and_contracts(Ads, Contracts, Actor) ->
                 %% Generate a G-Counter.
                 {ok, {CounterId, _, _, _}} = lasp:declare(?COUNTER_TYPE),
 
-                Ad = #ad{id=Id, name=Id, counter=CounterId},
+                %% Generate a G-Counter.
+                {ok, {RegisterId, _, _, _}} = lasp:declare(state_max_int),
+
+                Ad = #ad{id=Id, name=Id, counter=CounterId, register=RegisterId},
 
                 %% Add it to the advertisement set.
                 {ok, _} = lasp:update(Ads, {add, Ad}, Actor),
@@ -316,22 +319,25 @@ compute_overcounting(AdList) ->
 
 %% @private
 stop_simulation() ->
-    DCOS = os:getenv("DCOS", "false"),
-
-    case list_to_atom(DCOS) of
+    case sprinter:orchestrated() of
         false ->
             ok;
         _ ->
-            lasp_marathon_simulations:stop()
+            case sprinter:orchestration() of
+                {ok, kubernetes} ->
+                    lasp_kubernetes_simulations:stop();
+                {ok, mesos} ->
+                    lasp_marathon_simulations:stop()
+            end
     end.
 
 %% @private
 wait_for_connectedness() ->
-    case os:getenv("DCOS", "false") of
-        "false" ->
+    case sprinter:orchestrated() of
+        false ->
             ok;
         _ ->
-            case sprinter:was_connected() of
+            case sprinter_backend:was_connected() of
                 {ok, true} ->
                     ok;
                 {ok, false} ->

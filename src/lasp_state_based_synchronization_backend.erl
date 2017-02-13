@@ -48,8 +48,8 @@
 %%%===================================================================
 
 %% state_based messages:
-extract_log_type_and_payload({state_send, _Node, {Id, _Type, _Metadata, State}}) ->
-    [{state_send, State}, {state_send_protocol, Id}].
+extract_log_type_and_payload({state_send, _Node, {Id, Type, _Metadata, State}}) ->
+    [{Id, State}, {Type, State}, {state_send, State}, {state_send_protocol, Id}].
 
 %%%===================================================================
 %%% API
@@ -123,7 +123,10 @@ handle_cast(Msg, State) ->
 handle_info(state_sync, #state{store=Store, gossip_peers=GossipPeers} = State) ->
     lasp_marathon_simulations:log_message_queue_size("state_sync"),
 
-    lasp_logger:extended("Beginning state synchronization."),
+    PeerServiceManager = lasp_config:peer_service_manager(),
+
+    lasp_logger:extended("Beginning state synchronization: ~p",
+                         [PeerServiceManager]),
 
     Members = case ?SYNC_BACKEND:broadcast_tree_mode() of
         true ->
@@ -159,7 +162,7 @@ handle_info(plumtree_peer_refresh, State) ->
     %% TODO: Temporary hack until the Plumtree can propagate tree
     %% information in the metadata messages.  Therefore, manually poll
     %% periodically with jitter.
-    {ok, Servers} = sprinter:servers(),
+    {ok, Servers} = sprinter_backend:servers(),
 
     GossipPeers = case length(Servers) of
         0 ->
@@ -303,8 +306,8 @@ init_state_sync(Peer, ObjectFilterFun, Store) ->
 
 %% @private
 plumtree_gossip_peers(Root) ->
-    {ok, Nodes} = sprinter:nodes(),
-    Tree = sprinter:debug_get_tree(Root, Nodes),
+    {ok, Nodes} = sprinter_backend:nodes(),
+    Tree = sprinter_backend:debug_get_tree(Root, Nodes),
     FolderFun = fun({Node, Peers}, In) ->
                         case Peers of
                             down ->

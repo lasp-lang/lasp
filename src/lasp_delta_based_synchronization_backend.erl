@@ -48,8 +48,8 @@
 %%%===================================================================
 
 %% delta_based messages:
-extract_log_type_and_payload({delta_send, Node, {Id, _Type, _Metadata, Deltas}, Counter}) ->
-    [{delta_send, Deltas}, {delta_send_protocol, {Id, Node, Counter}}];
+extract_log_type_and_payload({delta_send, Node, {Id, Type, _Metadata, Deltas}, Counter}) ->
+    [{Id, Deltas}, {Type, Deltas}, {delta_send, Deltas}, {delta_send_protocol, {Id, Node, Counter}}];
 extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
     [{delta_send_protocol, {Id, Node, Counter}}].
 

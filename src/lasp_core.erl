@@ -61,7 +61,6 @@
          bind_to/5,
          wait_needed/6,
          read/6,
-         write/4,
          filter/6,
          map/6,
          product/7,
@@ -1005,25 +1004,7 @@ receive_delta(Store, {delta_ack, Id, From, Counter}) ->
 
 %% Internal functions.
 
-%% @private
-%% @doc Send responses to waiting threads, via messages.
-%%
-%%      Perform the following operations:
-%%
-%%      * Reply to all waiting threads via message.
-%%      * Perform binding of any variables which are partially bound.
-%%      * Mark variable as bound.
-%%      * Check thresholds and send notifications, if required.
-%%
--spec write(type(), value(), id(), store()) -> ok.
-write(Type, Value, Key, Store) ->
-    {ok, #dv{metadata=Metadata, waiting_threads=WT}} = do(get, [Store, Key]),
-    {ok, StillWaiting} = reply_to_all(WT, [], {ok, {Key, Type, Metadata, Value}}),
-    V1 = #dv{type=Type, value=Value, waiting_threads=StillWaiting},
-    ok = do(put, [Store, Key, V1]),
-    ok.
-
-%% @private
+% @private
 storage_backend_reset(Store) ->
     do(reset, [Store]).
 

@@ -132,15 +132,14 @@ init([]) ->
     {reply, term(), #state{}}.
 
 handle_call({transmission, Type, Payload, PeerCount}, _From, #state{size_per_type=Map0}=State) ->
-    TransmissionType = get_transmission_type(Type),
     Size = termsize(Payload) * PeerCount,
-    Current = case orddict:find(TransmissionType, Map0) of
+    Current = case orddict:find(Type, Map0) of
         {ok, Value} ->
             Value;
         error ->
             0
     end,
-    Map = orddict:store(TransmissionType, Current + Size, Map0),
+    Map = orddict:store(Type, Current + Size, Map0),
     {reply, ok, State#state{size_per_type=Map}};
 
 handle_call({memory, Size}, _From, #state{}=State) ->
@@ -203,7 +202,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 termsize(Term) ->
     byte_size(term_to_binary(Term)).
-    %%erts_debug:flat_size(Term) * erlang:system_info(wordsize).
 
 %% @private
 start_transmission_timer() ->
@@ -224,17 +222,18 @@ log_dir() ->
 %% @private
 simulation_id() ->
     Simulation = lasp_config:get(simulation, undefined),
-    LocalOrDCOS = case os:getenv("DCOS", "false") of
-        "false" ->
+    Orchestration = case sprinter:orchestrated() of
+        false ->
             "local";
         _ ->
-            "dcos"
+            {ok, O} = sprinter:orchestration(),
+            atom_to_list(O)
     end,
     EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
 
     Id = atom_to_list(Simulation) ++ "/"
-      ++ LocalOrDCOS ++ "/"
+      ++ Orchestration ++ "/"
       ++ atom_to_list(EvalIdentifier) ++ "/"
       ++ integer_to_list(EvalTimestamp),
     Id.
@@ -326,11 +325,3 @@ write_file(Filename, Line, Mode) ->
 timestamp() ->
     {Mega, Sec, _Micro} = erlang:timestamp(),
     Mega * 1000000 + Sec.
-
-%% @private
-get_transmission_type(state_send) -> state_send;
-get_transmission_type(state_send_protocol) -> state_send_protocol;
-get_transmission_type(broadcast) -> broadcast;
-get_transmission_type(broadcast_protocol) -> broadcast_protocol;
-get_transmission_type(delta_send) -> delta_send;
-get_transmission_type(delta_send_protocol) -> delta_send_protocol.

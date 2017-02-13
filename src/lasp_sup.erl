@@ -1,6 +1,6 @@
+%% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
-%% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
+%% Copyright (c) 2017 Christopher S. Meiklejohn.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -59,36 +59,6 @@ init(_Args) ->
                permanent, 5000, worker,
                [lasp_unique]},
 
-    %% Before initializing the partisan backend, be sure to configure it
-    %% to use the proper ip and ports.
-    case os:getenv("IP", "false") of
-        "false" ->
-            ok;
-        IP ->
-            {ok, IPAddress} = inet_parse:address(IP),
-            partisan_config:set(peer_ip, IPAddress),
-            ok
-    end,
-    case os:getenv("PEER_PORT", "false") of
-        "false" ->
-            partisan_config:set(peer_port, random_port()),
-            ok;
-        PeerPort ->
-            partisan_config:set(peer_port, list_to_integer(PeerPort)),
-            ok
-    end,
-
-    %% Configure the peer service.
-    PeerServiceDefault = list_to_atom(os:getenv("PEER_SERVICE", "partisan_client_server_peer_service_manager")),
-    PeerService = application:get_env(partisan,
-                                      partisan_peer_service_manager,
-                                      PeerServiceDefault),
-    partisan_config:set(partisan_peer_service_manager, PeerService),
-
-    Partisan = {partisan_sup,
-                {partisan_sup, start_link, []},
-                 permanent, infinity, supervisor, [partisan_sup]},
-
     DistributionBackend = {lasp_distribution_backend,
                            {lasp_distribution_backend, start_link, []},
                             permanent, 5000, worker,
@@ -109,25 +79,13 @@ init(_Args) ->
                         permanent, 5000, worker,
                         [lasp_plumtree_backend]},
 
-    Plumtree = {plumtree_sup,
-                {plumtree_sup, start_link, []},
-                 permanent, infinity, supervisor, [plumtree_sup]},
-
-    Sprinter = {sprinter,
-                {sprinter, start_link, []},
-                 permanent, 5000, worker,
-                 [sprinter]},
-
     WebSpecs = web_specs(),
 
     BaseSpecs0 = [Unique,
-                  Partisan,
-                  Sprinter,
                   PlumtreeBackend,
                   PlumtreeMemoryReport,
                   MemoryUtilizationReport,
                   DistributionBackend,
-                  Plumtree,
                   Process] ++ WebSpecs,
 
     DagEnabled = application:get_env(?APP, dag_enabled, ?DAG_ENABLED),
@@ -367,10 +325,6 @@ advertisement_counter_child_specs() ->
                                {lasp_advertisement_counter_client, start_link, []},
                                 permanent, 5000, worker,
                                 [lasp_advertisement_counter_client]},
-
-            %% Configure proper partisan tag.
-            partisan_config:set(tag, client),
-
             [AdCounterClient];
         false ->
             []
@@ -390,10 +344,6 @@ advertisement_counter_child_specs() ->
                                {lasp_advertisement_counter_server, start_link, []},
                                 permanent, 5000, worker,
                                 [lasp_advertisement_counter_server]},
-
-            %% Configure proper partisan tag.
-            partisan_config:set(tag, server),
-
             [AdCounterServer];
         false ->
             []
@@ -424,10 +374,6 @@ game_tournament_child_specs() ->
                                   {lasp_game_tournament_client, start_link, []},
                                    permanent, 5000, worker,
                                    [lasp_game_tournament_client]},
-
-            %% Configure proper partisan tag.
-            partisan_config:set(tag, client),
-
             [TournCounterClient];
         false ->
             []
@@ -447,10 +393,6 @@ game_tournament_child_specs() ->
                            {lasp_game_tournament_server, start_link, []},
                             permanent, 5000, worker,
                             [lasp_game_tournament_server]},
-
-            %% Configure proper partisan tag.
-            partisan_config:set(tag, server),
-
             [TournServer];
         false ->
             []

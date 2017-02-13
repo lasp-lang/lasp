@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# If we're running in Kubernetes...
+if [ ! -z "$KUBERNETES_PORT" ]; then
+  # Else, default to IP.
+  if [ -z "$NODE_NAME" ]; then
+    export NODE_NAME=${HOSTNAME}@${MY_POD_IP}
+  fi
+fi
+
 # If we're running in Mesos...
 if [ ! -z "$MESOS_TASK_ID" ]; then
   # Choose publicly routable IP.
@@ -49,11 +57,18 @@ export RELX_REPLACE_OS_VARS=true
 
 echo "MESOS_TASK_ID: ${MESOS_TASK_ID}"
 echo "PORT0: ${PORT0}"
+echo "PEER_PORT: ${PEER_PORT}"
 echo "WEB_PORT: ${WEB_PORT}"
 echo "NODE_NAME: ${NODE_NAME}"
 echo "COOKIE: ${COOKIE}"
 echo "IP: ${IP}"
 echo "HOSTNAME: ${HOSTNAME}"
+echo "APISERVER: ${APISERVER}"
+echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}"
+echo "AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}"
+
+echo "Printing the environment:"
+env
 
 RELNAME="`dirname \"$0\"`"/lasp
 exec ${RELNAME} foreground "$@"

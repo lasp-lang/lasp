@@ -197,7 +197,7 @@ start(_Case, _Config, Options) ->
                         ok = rpc:call(Node, lasp_config, set, [mode, Mode]),
 
                         %% Configure the blocking sync mode.
-                        BlockingSync = proplists:get_value(blocking_sync, Options),
+                        BlockingSync = proplists:get_value(blocking_sync, Options, false),
                         ok = rpc:call(Node, lasp_config, set, [blocking_sync, BlockingSync]),
 
                         %% Configure where code should run.

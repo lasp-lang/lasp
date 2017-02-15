@@ -128,6 +128,23 @@ handle_call(Msg, _From, State) ->
 
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 
+handle_cast({state_ack, From, Id},
+            #state{blocking_syncs=BlockingSyncs0}=State) ->
+    lager:info("Received ack from ~p for ~p", [From, Id]),
+
+    BlockingSyncs = dict:fold(fun(Key, Value, Acc) ->
+                lager:info("Was waiting ~p ~p", [Key, Value]),
+                StillWaiting = lists:delete({From, Id}, Value),
+                lager:info("Now waiting ~p ~p", [Key, StillWaiting]),
+                case length(StillWaiting) == 0 of
+                    true ->
+                        gen_server:reply(From, ok);
+                    false ->
+                        dict:store(Key, StillWaiting, Acc)
+                end
+              end, dict:new(), BlockingSyncs0),
+    {noreply, State#state{blocking_syncs=BlockingSyncs}};
+
 handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
             #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("state_send"),

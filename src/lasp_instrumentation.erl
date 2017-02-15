@@ -304,9 +304,9 @@ record_convergence() ->
 %% @private
 record_batch(Start, End, Events) ->
     Filename = main_log(),
-    Timestamp = timestamp(),
     MsDiff = timer:now_diff(End, Start) / 1000,
-    Line = get_line({batch, Start, End, Events, MsDiff}, Timestamp, 0),
+    BatchLine = get_batch(Start, End, Events, MsDiff),
+    Line = get_line(batch, BatchLine, 0),
     append_to_file(Filename, Line).
 
 %% @private
@@ -326,8 +326,15 @@ record_overcounting(Value) ->
 %% @private
 get_line(Type, Timestamp, Size) ->
     io_lib:format(
-        "~w,~w,~w\n",
+        "~w;~w;~w\n",
         [Type, Timestamp, megasize(Size)]
+    ).
+
+%% @private
+get_batch(Start, End, Events, MsDiff) ->
+    io_lib:format(
+        "~w,~w,~w,~w",
+        [Start, End, Events, MsDiff]
     ).
 
 %% @private

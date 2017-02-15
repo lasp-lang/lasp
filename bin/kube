@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-# Configure evaluation timestamp.
-# TODO: Fix me.
-EVAL_TIMESTAMP=0
-
 # Configure experiment.
 PEER_SERVICE=partisan_client_server_peer_service_manager
 MODE=state_based
@@ -13,7 +9,6 @@ CLIENT_NUMBER=1
 BROADCAST=false
 SIMULATION=throughput
 BLOCKING_SYNC=false
-EVAL_ID=undefined
 PARTITION_PROBABILITY=0
 STATE_INTERVAL=10000
 DELTA_INTERVAL=10000
@@ -25,11 +20,17 @@ MAILBOX_LOGGING=false
 # Configure client replicas.
 CLIENT_REPLICAS=$CLIENT_NUMBER
 
+# Configure evaluation timestamp and identifier.
+EVAL_TIMESTAMP=$(date +%s)
+EVAL_ID="client-server/blocking/true/clients/${CLIENT_NUMBER}"
+echo "Evaluation identifier is:" ${EVAL_ID}
+echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
+
 # Configure server replicas.
 SERVER_REPLICAS=1
 
 # Configure branch.
-LASP_BRANCH=back-propagation
+LASP_BRANCH=blocking-sync
 
 # Get Kubernetes API server.
 export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)

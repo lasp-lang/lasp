@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 # Configure experiment.
+SERVER_REPLICAS=1
+LASP_BRANCH=blocking-sync
 PEER_SERVICE=partisan_client_server_peer_service_manager
 MODE=state_based
 HEAVY_CLIENTS=false
@@ -17,24 +19,6 @@ LOGS=redis
 EXTENDED_LOGGING=false
 MAILBOX_LOGGING=false
 
-# Configure evaluation timestamp and identifier.
-EVAL_TIMESTAMP=$(date +%s)
-EVAL_ID="client-server/blocking/true/clients/${CLIENT_NUMBER}"
-echo "Evaluation identifier is:" ${EVAL_ID}
-echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
-
-# Configure server replicas.
-SERVER_REPLICAS=1
-
-# Configure branch.
-LASP_BRANCH=blocking-sync
-
-# Get Kubernetes API server.
-export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)
-
-# Get Kubernetes access token.
-export TOKEN=$(kubectl describe secret $(kubectl get secrets | grep default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d '\t')
-
 # Environment variables.
 ENV_VARS=(
   LASP_BRANCH
@@ -43,8 +27,6 @@ ENV_VARS=(
   BROADCAST
   SIMULATION
   BLOCKING_SYNC
-  EVAL_ID
-  EVAL_TIMESTAMP
   CLIENT_NUMBER
   HEAVY_CLIENTS
   REACTIVE_SERVER
@@ -66,6 +48,18 @@ do
     exit 1
   fi
 done
+
+# Configure evaluation timestamp and identifier.
+EVAL_TIMESTAMP=$(date +%s)
+EVAL_ID="client-server/blocking/true/clients/${CLIENT_NUMBER}"
+echo "Evaluation identifier is:" ${EVAL_ID}
+echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
+
+# Get Kubernetes API server.
+export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)
+
+# Get Kubernetes access token.
+export TOKEN=$(kubectl describe secret $(kubectl get secrets | grep default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d '\t')
 
 echo "Copying dependencies for Redis synchronization code to /tmp"
 cp bin/sync-redis.erl /tmp

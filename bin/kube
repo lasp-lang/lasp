@@ -28,7 +28,7 @@ CLIENT_REPLICAS=$CLIENT_NUMBER
 SERVER_REPLICAS=1
 
 # Configure branch.
-LASP_BRANCH=kube
+LASP_BRANCH=back-propagation
 
 # Get Kubernetes API server.
 export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)

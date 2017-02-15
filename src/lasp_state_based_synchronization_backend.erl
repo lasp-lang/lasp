@@ -120,7 +120,8 @@ handle_cast(Msg, State) ->
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 
-handle_info(state_sync, #state{store=Store, gossip_peers=GossipPeers} = State) ->
+handle_info({state_sync, ObjectFilterFun},
+            #state{store=Store, gossip_peers=GossipPeers} = State) ->
     lasp_marathon_simulations:log_message_queue_size("state_sync"),
 
     PeerServiceManager = lasp_config:peer_service_manager(),
@@ -146,9 +147,9 @@ handle_info(state_sync, #state{store=Store, gossip_peers=GossipPeers} = State) -
                       case lasp_config:get(reverse_topological_sync,
                                            ?REVERSE_TOPOLOGICAL_SYNC) of
                           true ->
-                              init_reverse_topological_sync(Peer, Store);
+                              init_reverse_topological_sync(Peer, ObjectFilterFun, Store);
                           false ->
-                              init_state_sync(Peer, Store)
+                              init_state_sync(Peer, ObjectFilterFun, Store)
                       end
               end,
     lists:foreach(SyncFun, Peers),
@@ -213,13 +214,14 @@ schedule_state_synchronization() ->
     case ShouldSync of
         true ->
             Interval = lasp_config:get(state_interval, 10000),
+            ObjectFilterFun = fun(_) -> true end,
             case lasp_config:get(jitter, false) of
                 true ->
                     %% Add random jitter.
                     Jitter = rand_compat:uniform(Interval),
-                    timer:send_after(Interval + Jitter, state_sync);
+                    timer:send_after(Interval + Jitter, {state_sync, ObjectFilterFun});
                 false ->
-                    timer:send_after(Interval, state_sync)
+                    timer:send_after(Interval, {state_sync, ObjectFilterFun})
             end;
         false ->
             ok
@@ -239,12 +241,7 @@ schedule_plumtree_peer_refresh() ->
     end.
 
 %% @private
-init_state_sync(Peer, Store) ->
-    ObjectFilterFun = fun(_) -> true end,
-    init_state_sync(Peer, ObjectFilterFun, Store).
-
-%% @private
-init_reverse_topological_sync(Peer, Store) ->
+init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
     lasp_logger:extended("Initializing reverse toplogical state synchronization with peer: ~p", [Peer]),
 
     SendFun = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}) ->
@@ -253,9 +250,14 @@ init_reverse_topological_sync(Peer, Store) ->
                             %% Ignore: this is a dynamic variable.
                             ok;
                         _ ->
-                            ?SYNC_BACKEND:send(?MODULE,
-                                               {state_send, node(), {Id, Type, Metadata, Value}},
-                                               Peer)
+                            case ObjectFilterFun(Id) of
+                                true ->
+                                    ?SYNC_BACKEND:send(?MODULE,
+                                                       {state_send, node(), {Id, Type, Metadata, Value}},
+                                                       Peer);
+                                false ->
+                                    ok
+                            end
                     end
                end,
 

@@ -305,7 +305,7 @@ record_convergence() ->
 record_batch(Start, End, Events) ->
     Filename = main_log(),
     Timestamp = timestamp(),
-    MsDiff = timer:now_diff(Start, End) / 1000,
+    MsDiff = timer:now_diff(End, Start) / 1000,
     Line = get_line({batch, Start, End, Events, MsDiff}, Timestamp, 0),
     append_to_file(Filename, Line).
 

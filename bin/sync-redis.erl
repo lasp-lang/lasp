@@ -11,7 +11,7 @@ main(_) ->
     lists:foreach(fun(Filename) ->
                           {ok, Content} = eredis:q(C, ["GET", Filename]),
                           Path = "logs/" ++ binary_to_list(Filename),
-                          io:format("Path: ~p~n", [Path]),
+                          io:format("Path: /tmp/~p~n", [Path]),
                           ok = filelib:ensure_dir(Path),
                           ok = file:write_file(Path, Content)
                   end, Keys),

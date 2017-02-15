@@ -5,13 +5,13 @@
 EVAL_TIMESTAMP=0
 
 # Configure experiment.
-PEER_SERVICE=partisan_client_server_peer_service_manager
+PEER_SERVICE=partisan_hyparview_peer_service_manager
 MODE=state_based
 HEAVY_CLIENTS=false
 REACTIVE_SERVER=false
 CLIENT_NUMBER=5
 BROADCAST=false
-SIMULATION=ad_counter
+SIMULATION=throughput
 EVAL_ID=undefined
 PARTITION_PROBABILITY=0
 STATE_INTERVAL=10000
@@ -142,9 +142,9 @@ cat <<EOF > lasp.yaml
             value: "${EVALUATION_TIMESTAMP}"
           - name: PEER_SERVICE
             value: "${PEER_SERVICE}"
-          - name: AD_COUNTER_SIM_CLIENT
+          - name: THROUGHPUT_SIM_CLIENT
             value: "false"
-          - name: AD_COUNTER_SIM_SERVER
+          - name: THROUGHPUT_SIM_SERVER
             value: "true"
           - name: MODE
             value: "${MODE}"
@@ -226,9 +226,9 @@ cat <<EOF > lasp.yaml
             value: "${EVALUATION_TIMESTAMP}"
           - name: PEER_SERVICE
             value: "${PEER_SERVICE}"
-          - name: AD_COUNTER_SIM_CLIENT
+          - name: THROUGHPUT_SIM_CLIENT
             value: "true"
-          - name: AD_COUNTER_SIM_SERVER
+          - name: THROUGHPUT_SIM_SERVER
             value: "false"
           - name: MODE
             value: "${MODE}"

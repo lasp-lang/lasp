@@ -6,6 +6,8 @@ if [ ! -z "$KUBERNETES_PORT" ]; then
   if [ -z "$NODE_NAME" ]; then
     export NODE_NAME=${HOSTNAME}@${MY_POD_IP}
   fi
+
+  export IP=${MY_POD_IP}
 fi
 
 # If we're running in Mesos...
@@ -64,6 +66,7 @@ echo "COOKIE: ${COOKIE}"
 echo "IP: ${IP}"
 echo "HOSTNAME: ${HOSTNAME}"
 echo "APISERVER: ${APISERVER}"
+echo "MY_POD_IP: ${MY_POD_IP}"
 echo "AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}"
 echo "AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}"
 

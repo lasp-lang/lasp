@@ -92,7 +92,7 @@ handle_info(event, #state{actor=Actor,
     %% Start the batch for every event, if it isn't started yet.
     BatchStart1 = case BatchStart0 of
                     undefined ->
-                        erlang:timestamp();
+                        timestamp();
                      _ ->
                         BatchStart0
                  end,
@@ -111,7 +111,7 @@ handle_info(event, #state{actor=Actor,
             %% If we hit the batch size, restart the batch.
             {BatchStart2, BatchEvents1} = case BatchEvents0 + 1 == ?BATCH_EVENTS of
                                               true ->
-                                                  BatchEnd = erlang:timestamp(),
+                                                  BatchEnd = timestamp(),
                                                   log_batch(BatchStart1, BatchEnd, ?BATCH_EVENTS),
                                                   {undefined, 0};
                                               false ->
@@ -225,3 +225,8 @@ log_batch(Start, End, Events) ->
 %% @private
 max_events() ->
     lasp_config:get(max_events, ?MAX_EVENTS_DEFAULT).
+
+%% @private
+timestamp() ->
+    {Mega, Sec, _Micro} = erlang:timestamp(),
+    Mega * 1000000 + Sec.

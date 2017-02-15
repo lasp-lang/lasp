@@ -53,6 +53,8 @@
 %%%===================================================================
 
 %% state_based messages:
+extract_log_type_and_payload({state_ack, _From, Id}) ->
+    [{state_ack, Id}];
 extract_log_type_and_payload({state_send, _Node, {Id, Type, _Metadata, State}, _AckRequired}) ->
     [{Id, State}, {Type, State}, {state_send, State}, {state_send_protocol, Id}].
 
@@ -111,16 +113,24 @@ handle_call({blocking_sync, ObjectFilterFun}, From,
     %% Remove ourself and compute exchange peers.
     Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
 
-    %% Send the object.
-    SyncFun = fun(Peer) ->
-                      {Peer, init_state_sync(Peer, ObjectFilterFun, true, Store)}
-              end,
-    Objects = lists:flatmap(SyncFun, Peers),
+    case length(Peers) > 0 of
+         true ->
+            %% Send the object.
+            SyncFun = fun(Peer) ->
+                            {ok, Os} = init_state_sync(Peer, ObjectFilterFun, true, Store),
+                            [{Peer, O} || O <- Os]
+                      end,
+            Objects = lists:flatmap(SyncFun, Peers),
 
-    %% Mark response as waiting.
-    BlockingSyncs = dict:store(From, Objects, BlockingSyncs0),
+            %% Mark response as waiting.
+            BlockingSyncs = dict:store(From, Objects, BlockingSyncs0),
 
-    {noreply, State#state{blocking_syncs=BlockingSyncs}};
+            lager:info("Blocking sync initialized for ~p ~p", [From, Objects]),
+            {noreply, State#state{blocking_syncs=BlockingSyncs}};
+        false ->
+            lager:info("No peers, not blocking.", []),
+            {reply, ok, State}
+    end;
 
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -138,7 +148,8 @@ handle_cast({state_ack, From, Id},
                 lager:info("Now waiting ~p ~p", [Key, StillWaiting]),
                 case length(StillWaiting) == 0 of
                     true ->
-                        gen_server:reply(From, ok);
+                        gen_server:reply(Key, ok),
+                        Acc;
                     false ->
                         dict:store(Key, StillWaiting, Acc)
                 end
@@ -157,7 +168,7 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
 
     case AckRequired of
         true ->
-            ?SYNC_BACKEND:send(?MODULE, {state_ack, node(), Id});
+            ?SYNC_BACKEND:send(?MODULE, {state_ack, node(), Id}, From);
         false ->
             ok
     end,
@@ -358,7 +369,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                             case ObjectFilterFun(Id) of
                                 true ->
                                     ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, Blocking}, Peer),
-                                    [{ok, {Id, Type, Metadata, Value}}|Acc0];
+                                    [Id|Acc0];
                                 false ->
                                     Acc0
                             end

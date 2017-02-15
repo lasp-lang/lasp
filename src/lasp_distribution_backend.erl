@@ -422,8 +422,15 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
         true ->
             Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
                                    ?CLOCK_INIT(Actor), Store),
-            declare_if_not_found(Result0, Id, State, ?CORE, update,
-                                 [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]);
+            Final = declare_if_not_found(Result0, Id, State, ?CORE, update,
+                                 [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
+            case lasp_config:get(blocking_sync, false) of
+                true ->
+                    ok = blocking_sync(Id);
+                false ->
+                    ok
+            end,
+            Final;
         false ->
             {ok, IsRoot} = case ?DAG_ENABLED of
                                true ->
@@ -437,8 +444,17 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
                 true ->
                     Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
                                            ?CLOCK_INIT(Actor), Store),
-                    declare_if_not_found(Result0, Id, State, ?CORE, update,
-                                         [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store])
+                    Final = declare_if_not_found(Result0, Id, State, ?CORE, update,
+                                         [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
+                    lager:info("Update complete."),
+                    case lasp_config:get(blocking_sync, false) of
+                        true ->
+                            ok = blocking_sync(Id);
+                        false ->
+                            ok
+                    end,
+                    lager:info("Returning value."),
+                    Final
             end
     end,
 
@@ -593,3 +609,16 @@ declare_if_not_found({error, not_found}, {StorageId, TypeId},
     erlang:apply(Module, Function, Args);
 declare_if_not_found(Result, _Id, _State, _Module, _Function, _Args) ->
     Result.
+
+%% @private
+blocking_sync(Id) ->
+    ObjectFilterFun = fun(I) -> Id == I end,
+
+    case lasp_config:get(mode, ?DEFAULT_MODE) of
+        state_based ->
+            lager:info("Starting blocking sync."),
+            ok = lasp_state_based_synchronization_backend:blocking_sync(ObjectFilterFun),
+            lager:info("Ending blocking sync.");
+        delta_based ->
+            {error, not_implemented}
+    end.

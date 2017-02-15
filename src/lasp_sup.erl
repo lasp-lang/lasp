@@ -204,6 +204,12 @@ configure_defaults() ->
                                        SimulationDefault),
     lasp_config:set(simulation, Simulation),
 
+    BlockingSyncDefault = list_to_atom(os:getenv("BLOCKING_SYNC", "false")),
+    BlockingSync = application:get_env(?APP,
+                                       blocking_sync,
+                                       BlockingSyncDefault),
+    lasp_config:set(blocking_sync, BlockingSync),
+
     EvaluationIdDefault = list_to_atom(os:getenv("EVAL_ID", "undefined")),
     EvaluationId = application:get_env(?APP,
                                        evaluation_identifier,

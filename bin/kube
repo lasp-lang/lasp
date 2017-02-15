@@ -12,6 +12,7 @@ REACTIVE_SERVER=false
 CLIENT_NUMBER=1
 BROADCAST=false
 SIMULATION=throughput
+BLOCKING_SYNC=false
 EVAL_ID=undefined
 PARTITION_PROBABILITY=0
 STATE_INTERVAL=10000
@@ -43,6 +44,7 @@ ENV_VARS=(
   MODE
   BROADCAST
   SIMULATION
+  BLOCKING_SYNC
   EVAL_ID
   EVAL_TIMESTAMP
   CLIENT_NUMBER
@@ -152,6 +154,8 @@ cat <<EOF > lasp.yaml
             value: "${BROADCAST}"
           - name: SIMULATION
             value: "${SIMULATION}"
+          - name: BLOCKING_SYNC
+            value: "${BLOCKING_SYNC}"
           - name: EVAL_ID
             value: "${EVAL_ID}"
           - name: EVAL_TIMESTAMP
@@ -236,6 +240,8 @@ cat <<EOF > lasp.yaml
             value: "${BROADCAST}"
           - name: SIMULATION
             value: "${SIMULATION}"
+          - name: BLOCKING_SYNC
+            value: "${BLOCKING_SYNC}"
           - name: EVAL_ID
             value: "${EVAL_ID}"
           - name: EVAL_TIMESTAMP

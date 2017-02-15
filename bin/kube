@@ -5,7 +5,7 @@ PEER_SERVICE=partisan_client_server_peer_service_manager
 MODE=state_based
 HEAVY_CLIENTS=false
 REACTIVE_SERVER=false
-CLIENT_NUMBER=1
+CLIENT_REPLICAS=${CLIENT_NUMBER}
 BROADCAST=false
 SIMULATION=throughput
 BLOCKING_SYNC=true
@@ -16,9 +16,6 @@ INSTRUMENTATION=true
 LOGS=redis
 EXTENDED_LOGGING=false
 MAILBOX_LOGGING=false
-
-# Configure client replicas.
-CLIENT_REPLICAS=$CLIENT_NUMBER
 
 # Configure evaluation timestamp and identifier.
 EVAL_TIMESTAMP=$(date +%s)

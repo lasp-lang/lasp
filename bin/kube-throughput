@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+
+CLIENT_NUMBER=2 bin/kube
+CLIENT_NUMBER=4 bin/kube
+CLIENT_NUMBER=8 bin/kube

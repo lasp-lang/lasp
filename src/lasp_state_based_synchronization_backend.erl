@@ -53,7 +53,7 @@
 %%%===================================================================
 
 %% state_based messages:
-extract_log_type_and_payload({state_send, _Node, {Id, Type, _Metadata, State}}) ->
+extract_log_type_and_payload({state_send, _Node, {Id, Type, _Metadata, State}, _AckRequired}) ->
     [{Id, State}, {Type, State}, {state_send, State}, {state_send_protocol, Id}].
 
 %%%===================================================================
@@ -113,7 +113,7 @@ handle_call({blocking_sync, ObjectFilterFun}, From,
 
     %% Send the object.
     SyncFun = fun(Peer) ->
-                      {Peer, init_state_sync(Peer, ObjectFilterFun, Store)}
+                      {Peer, init_state_sync(Peer, ObjectFilterFun, true, Store)}
               end,
     Objects = lists:flatmap(SyncFun, Peers),
 
@@ -128,7 +128,7 @@ handle_call(Msg, _From, State) ->
 
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 
-handle_cast({state_send, From, {Id, Type, _Metadata, Value}},
+handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
             #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("state_send"),
 
@@ -138,6 +138,13 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}},
                                ?CLOCK_INCR(Actor),
                                ?CLOCK_INIT(Actor)}),
 
+    case AckRequired of
+        true ->
+            ?SYNC_BACKEND:send(?MODULE, {state_ack, node(), Id});
+        false ->
+            ok
+    end,
+
     %% Send back just the updated state for the object received.
     case ?SYNC_BACKEND:client_server_mode() andalso
          ?SYNC_BACKEND:i_am_server() andalso
@@ -146,7 +153,7 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}},
             ObjectFilterFun = fun(Id1) ->
                                       Id =:= Id1
                               end,
-            init_state_sync(From, ObjectFilterFun, Store),
+            init_state_sync(From, ObjectFilterFun, false, Store),
             ok;
         false ->
             ok
@@ -190,7 +197,7 @@ handle_info({state_sync, ObjectFilterFun},
                           true ->
                               init_reverse_topological_sync(Peer, ObjectFilterFun, Store);
                           false ->
-                              init_state_sync(Peer, ObjectFilterFun, Store)
+                              init_state_sync(Peer, ObjectFilterFun, false, Store)
                       end
               end,
     lists:foreach(SyncFun, Peers),
@@ -293,9 +300,7 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
                         _ ->
                             case ObjectFilterFun(Id) of
                                 true ->
-                                    ?SYNC_BACKEND:send(?MODULE,
-                                                       {state_send, node(), {Id, Type, Metadata, Value}},
-                                                       Peer);
+                                    ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, false}, Peer);
                                 false ->
                                     ok
                             end
@@ -325,8 +330,8 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
     ok.
 
 %% @private
-init_state_sync(Peer, ObjectFilterFun, Store) ->
-    lasp_logger:extended("Initializing state synchronization with peer: ~p", [Peer]),
+init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
+    lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
@@ -335,7 +340,7 @@ init_state_sync(Peer, ObjectFilterFun, Store) ->
                         _ ->
                             case ObjectFilterFun(Id) of
                                 true ->
-                                    ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}}, Peer),
+                                    ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, Blocking}, Peer),
                                     [{ok, {Id, Type, Metadata, Value}}|Acc0];
                                 false ->
                                     Acc0
@@ -344,7 +349,7 @@ init_state_sync(Peer, ObjectFilterFun, Store) ->
                end,
     %% TODO: Should this be parallel?
     {ok, Objects} = lasp_storage_backend:do(fold, [Store, Function, []]),
-    lasp_logger:extended("Completed state synchronization with peer: ~p", [Peer]),
+    lasp_logger:extended("Completed state propagation with peer: ~p", [Peer]),
     {ok, Objects}.
 
 %% @private

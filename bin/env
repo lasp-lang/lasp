@@ -2,6 +2,8 @@
 
 # If we're running in Kubernetes...
 if [ ! -z "$KUBERNETES_PORT" ]; then
+  echo "Running in Kubernetes..."
+
   # Else, default to IP.
   if [ -z "$NODE_NAME" ]; then
     export NODE_NAME=${HOSTNAME}@${MY_POD_IP}

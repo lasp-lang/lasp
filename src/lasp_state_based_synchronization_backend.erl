@@ -35,13 +35,18 @@
          terminate/2,
          code_change/3]).
 
+-export([blocking_sync/1]).
+
 %% lasp_synchronization_backend callbacks
 -export([extract_log_type_and_payload/1]).
 
 -include("lasp.hrl").
 
 %% State record.
--record(state, {store :: store(), gossip_peers :: [], actor :: binary()}).
+-record(state, {store :: store(),
+                gossip_peers :: [],
+                actor :: binary(),
+                blocking_syncs :: dict:dict()}).
 
 %%%===================================================================
 %%% lasp_synchronization_backend callbacks
@@ -60,6 +65,9 @@ extract_log_type_and_payload({state_send, _Node, {Id, Type, _Metadata, State}}) 
 start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
 
+blocking_sync(ObjectFilterFun) ->
+    gen_server:call(?MODULE, {blocking_sync, ObjectFilterFun}, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -76,11 +84,43 @@ init([Store, Actor]) ->
     %% Schedule periodic plumtree refresh.
     schedule_plumtree_peer_refresh(),
 
-    {ok, #state{gossip_peers=[], store=Store, actor=Actor}}.
+    BlockingSyncs = dict:new(),
+
+    {ok, #state{gossip_peers=[],
+                blocking_syncs=BlockingSyncs,
+                store=Store,
+                actor=Actor}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
+
+handle_call({blocking_sync, ObjectFilterFun}, From,
+            #state{gossip_peers=GossipPeers,
+                   store=Store,
+                   blocking_syncs=BlockingSyncs0}=State) ->
+    %% Get the peers to synchronize with.
+    Members = case ?SYNC_BACKEND:broadcast_tree_mode() of
+        true ->
+            GossipPeers;
+        false ->
+            {ok, Members1} = ?SYNC_BACKEND:membership(),
+            Members1
+    end,
+
+    %% Remove ourself and compute exchange peers.
+    Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
+
+    %% Send the object.
+    SyncFun = fun(Peer) ->
+                      {Peer, init_state_sync(Peer, ObjectFilterFun, Store)}
+              end,
+    Objects = lists:flatmap(SyncFun, Peers),
+
+    %% Mark response as waiting.
+    BlockingSyncs = dict:store(From, Objects, BlockingSyncs0),
+
+    {noreply, State#state{blocking_syncs=BlockingSyncs}};
 
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -106,7 +146,8 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}},
             ObjectFilterFun = fun(Id1) ->
                                       Id =:= Id1
                               end,
-            init_state_sync(From, ObjectFilterFun, Store);
+            init_state_sync(From, ObjectFilterFun, Store),
+            ok;
         false ->
             ok
     end,
@@ -302,9 +343,9 @@ init_state_sync(Peer, ObjectFilterFun, Store) ->
                     end
                end,
     %% TODO: Should this be parallel?
-    {ok, _} = lasp_storage_backend:do(fold, [Store, Function, []]),
+    {ok, Objects} = lasp_storage_backend:do(fold, [Store, Function, []]),
     lasp_logger:extended("Completed state synchronization with peer: ~p", [Peer]),
-    ok.
+    {ok, Objects}.
 
 %% @private
 plumtree_gossip_peers(Root) ->

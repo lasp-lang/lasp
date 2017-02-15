@@ -102,10 +102,10 @@ log_files() ->
 
     OtherLogs = case partisan_config:get(tag, undefined) of
         server ->
-            case lasp_config:get(simulation, throughput) of
-                true ->
+            case lasp_config:get(simulation, undefined) of
+                throughput ->
                     [];
-                false ->
+                _ ->
                     OvercountingLog = overcounting_log(),
                     OvercountingLogS3 = SimulationId ++ "/" ++ overcounting_log_suffix(),
                     [{OvercountingLog, OvercountingLogS3}]

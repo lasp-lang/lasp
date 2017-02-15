@@ -81,7 +81,17 @@ init([Store, Actor]) ->
     ?SYNC_BACKEND:seed(),
 
     %% Schedule periodic state synchronization.
-    schedule_state_synchronization(),
+    case lasp_config:get(blocking_sync, false) of
+        true ->
+            case partisan_config:get(tag, undefined) of
+                server ->
+                    schedule_state_synchronization();
+                _ ->
+                    ok
+            end;
+        false ->
+            schedule_state_synchronization()
+    end,
 
     %% Schedule periodic plumtree refresh.
     schedule_plumtree_peer_refresh(),

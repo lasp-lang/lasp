@@ -88,7 +88,7 @@ init([]) ->
     Eredis = case Result of
         {ok, C} ->
             C ;
-        {error, Error} ->
+        Error ->
             lager:error("Error connecting to redis for workflow management: ~p",
                         [Error]),
             undefined

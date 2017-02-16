@@ -304,7 +304,7 @@ record_convergence() ->
 %% @private
 record_batch(Start, End, Events) ->
     Filename = main_log(),
-    MsDiff = timer:now_diff(End, Start) / 1000,
+    MsDiff = round(timer:now_diff(End, Start) / 1000),
     BatchLine = get_batch(Start, End, Events, MsDiff),
     Line = get_line(batch, BatchLine, 0),
     append_to_file(Filename, Line).

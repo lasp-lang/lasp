@@ -23,7 +23,8 @@
 
 %% API
 -export([start_link/0,
-         start_link/1]).
+         start_link/1,
+         task_completed/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -50,6 +51,11 @@ start_link() ->
 start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
 
+%% @doc Mark a task as completed.
+-spec task_completed(atom(), atom()) -> ok.
+task_completed(Task, Node) ->
+    gen_server:call(?MODULE, {task_completed, Task, Node}, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -62,7 +68,7 @@ init([]) ->
     Result = eredis:start_link(RedisHost, list_to_integer(RedisPort)),
     Eredis = case Result of
         {ok, C} ->
-            C;
+            C ;
         {error, Error} ->
             lager:error("Error connecting to redis for workflow management: ~p",
                         [Error]),

@@ -26,7 +26,8 @@
          start_link/1,
          task_completed/2,
          is_task_completed/1,
-         is_task_completed/2]).
+         is_task_completed/2,
+         task_progress/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -65,9 +66,14 @@ is_task_completed(Task) ->
     gen_server:call(?MODULE, {is_task_completed, Task, ClientNumber}, infinity).
 
 %% @doc Determine if a task is completed.
--spec is_task_completed(atom()) -> ok.
+-spec is_task_completed(atom(), non_neg_integer()) -> ok.
 is_task_completed(Task, NodeCount) ->
     gen_server:call(?MODULE, {is_task_completed, Task, NodeCount}, infinity).
+
+%% @doc Determine if a task is completed.
+-spec task_progress(atom()) -> ok.
+task_progress(Task) ->
+    gen_server:call(?MODULE, {task_progress, Task}, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -94,6 +100,9 @@ init([]) ->
     {reply, term(), #state{}}.
 
 %% @private
+handle_call({task_progress, Task}, _From, #state{eredis=Eredis}=State) ->
+    {ok, Objects} = eredis:q(Eredis, ["KEYS", prefix(Task, "*")]),
+    {reply, {ok, length(Objects)}, State};
 handle_call({is_task_completed, Task, NumNodes}, _From, #state{eredis=Eredis}=State) ->
     {ok, Objects} = eredis:q(Eredis, ["KEYS", prefix(Task, "*")]),
     Result = case length(Objects) of

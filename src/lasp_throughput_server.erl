@@ -94,32 +94,14 @@ handle_cast(Msg, State) ->
 handle_info(check_simulation_end, State) ->
     lasp_marathon_simulations:log_message_queue_size("check_simulation_end"),
 
-    %% A simulation ends for the server when all clients have
-    %% observed that all clients did all events and
-    %% pushed their logs (second component of the map in
-    %% the simulation status instance is true for all clients)
-    {ok, AllEventsAndLogs} = lasp:query(?SIM_STATUS_ID),
-
-    NodesWithLogsPushed = lists:filter(
-        fun({_Node, {_AllEvents, LogsPushed}}) ->
-            LogsPushed
-        end,
-        AllEventsAndLogs
-    ),
-
-    NodesWithAllEvents = lists:filter(
-        fun({_Node, {AllEvents, _LogsPushed}}) ->
-            AllEvents
-        end,
-        AllEventsAndLogs
-    ),
+    {ok, NodesWithAllEvents} = lasp_workflow:task_progress(events),
+    {ok, NodesWithLogsPushed} = lasp_workflow:task_progress(logs),
 
     lager:info("Checking for simulation end: ~p nodes with all events and ~p nodes with logs pushed.",
-               [length(NodesWithAllEvents), length(NodesWithLogsPushed)]),
+               [NodesWithAllEvents, NodesWithLogsPushed]),
 
-    case length(NodesWithLogsPushed) == client_number() of
+    case lasp_workflow:is_task_completed(logs) of
         true ->
-            lager:info("All nodes have pushed their logs"),
             log_convergence(),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(),
@@ -152,10 +134,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 schedule_check_simulation_end() ->
     timer:send_after(?STATUS_INTERVAL, check_simulation_end).
-
-%% @private
-client_number() ->
-    lasp_config:get(client_number, 3).
 
 %% @private
 log_convergence() ->

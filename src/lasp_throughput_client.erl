@@ -131,7 +131,7 @@ handle_info(event, #state{actor=Actor,
                     lager:info("All events done. Node: ~p", [Actor]),
 
                     %% Update Simulation Status Instance
-                    lasp:update(?SIM_STATUS_ID, {apply, Actor, {fst, true}}, Actor),
+                    lasp_workflow:task_completed(events, node()),
                     log_convergence(),
                     schedule_check_simulation_end();
                 false ->
@@ -150,24 +150,12 @@ handle_info(event, #state{actor=Actor,
 handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("check_simulation_end"),
 
-    %% A simulation ends for clients when all clients have
-    %% done all events (first component of the map in
-    %% the simulation status instance is true for all clients)
-    {ok, AllEventsAndLogs} = lasp:query(?SIM_STATUS_ID),
-
-    NodesWithAllEvents = lists:filter(
-        fun({_Node, {AllEvents, _LogsPushed}}) ->
-            AllEvents
-        end,
-        AllEventsAndLogs
-    ),
-
-    case length(NodesWithAllEvents) == client_number() of
+    case lasp_workflow:is_task_completed(events) of
         true ->
             lager:info("All nodes did all events. Node ~p", [Actor]),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(),
-            lasp:update(?SIM_STATUS_ID, {apply, Actor, {snd, true}}, Actor);
+            lasp_workflow:task_completed(logs, node());
         false ->
             schedule_check_simulation_end()
     end,
@@ -199,10 +187,6 @@ schedule_event() ->
 %% @private
 schedule_check_simulation_end() ->
     timer:send_after(?STATUS_INTERVAL, check_simulation_end).
-
-%% @private
-client_number() ->
-    lasp_config:get(client_number, 3).
 
 %% @private
 log_convergence() ->

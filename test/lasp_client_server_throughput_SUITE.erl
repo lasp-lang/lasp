@@ -61,7 +61,8 @@ end_per_testcase(Case, _Config) ->
 
 all() ->
     [
-     peer_to_peer_state_based
+     client_server_state_based_gcounter,
+     client_server_state_based_gset
     ].
 
 %% ===================================================================
@@ -75,14 +76,28 @@ default_test(_Config) ->
 %% peer-to-peer
 %% ===================================================================
 
-peer_to_peer_state_based(Config) ->
-    lasp_simulation_support:run(peer_to_peer_throughput_state_based,
+client_server_state_based_gcounter(Config) ->
+    lasp_simulation_support:run(client_server_state_based_gcounter,
         Config,
         [{mode, state_based},
          {simulation, throughput},
          {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
          {set, orset},
+         {throughput_type, gcounter},
          {broadcast, false},
          {blocking_sync, true},
-         {evaluation_identifier, peer_to_peer_throughput_state_based}]),
+         {evaluation_identifier, client_server_state_based_gcounter}]),
+    ok.
+
+client_server_state_based_gset(Config) ->
+    lasp_simulation_support:run(client_server_state_based_gset,
+        Config,
+        [{mode, state_based},
+         {simulation, throughput},
+         {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
+         {set, orset},
+         {throughput_type, gset},
+         {broadcast, false},
+         {blocking_sync, true},
+         {evaluation_identifier, client_server_state_based_gset}]),
     ok.

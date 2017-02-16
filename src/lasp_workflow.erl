@@ -101,7 +101,9 @@ init([]) ->
 %% @private
 handle_call({task_progress, Task}, _From, #state{eredis=Eredis}=State) ->
     {ok, Objects} = eredis:q(Eredis, ["KEYS", prefix(Task, "*")]),
-    {reply, {ok, length(Objects)}, State};
+    NumObjects = length(Objects),
+    lager:info("Task ~p progress: ~p", [Task, NumObjects]),
+    {reply, {ok, NumObjects}, State};
 handle_call({is_task_completed, Task, NumNodes}, _From, #state{eredis=Eredis}=State) ->
     {ok, Objects} = eredis:q(Eredis, ["KEYS", prefix(Task, "*")]),
     Result = case length(Objects) of

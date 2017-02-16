@@ -97,7 +97,7 @@ handle_info(event, #state{actor=Actor,
                         BatchStart0
                  end,
 
-    {LocalEvents, BatchStart, BatchEvents} = case lasp_workflow:task_complete(convergence, 1) of
+    {LocalEvents, BatchStart, BatchEvents} = case lasp_workflow:is_task_completed(convergence, 1) of
         true ->
             %% The server, once it detects connectedness,
             %% will add one element to the bag.

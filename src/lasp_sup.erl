@@ -79,10 +79,16 @@ init(_Args) ->
                         permanent, 5000, worker,
                         [lasp_plumtree_backend]},
 
+    Workflow = {lasp_workflow,
+                {lasp_workflow, start_link, []},
+                 permanent, 5000, worker,
+                 [lasp_workflow]},
+
     WebSpecs = web_specs(),
 
     BaseSpecs0 = [Unique,
                   PlumtreeBackend,
+                  Workflow,
                   PlumtreeMemoryReport,
                   MemoryUtilizationReport,
                   DistributionBackend,

@@ -25,7 +25,8 @@
 -export([start_link/0,
          start_link/1,
          task_completed/2,
-         is_task_completed/1]).
+         is_task_completed/1,
+         is_task_completed/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -60,8 +61,13 @@ task_completed(Task, Node) ->
 %% @doc Determine if a task is completed.
 -spec is_task_completed(atom()) -> ok.
 is_task_completed(Task) ->
-    gen_server:call(?MODULE, {is_task_completed, Task}, infinity).
+    ClientNumber = lasp_config:get(client_number, 0),
+    gen_server:call(?MODULE, {is_task_completed, Task, ClientNumber}, infinity).
 
+%% @doc Determine if a task is completed.
+-spec is_task_completed(atom()) -> ok.
+is_task_completed(Task, NodeCount) ->
+    gen_server:call(?MODULE, {is_task_completed, Task, NodeCount}, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -88,15 +94,15 @@ init([]) ->
     {reply, term(), #state{}}.
 
 %% @private
-handle_call({is_task_completed, Task}, _From, #state{eredis=Eredis}=State) ->
+handle_call({is_task_completed, Task, NumNodes}, _From, #state{eredis=Eredis}=State) ->
     {ok, Objects} = eredis:q(Eredis, ["KEYS", prefix(Task, "*")]),
-    ClientNumber = lasp_config:get(client_number, 0),
     Result = case length(Objects) of
-        ClientNumber ->
+        NumNodes ->
             lager:info("Task ~p completed on all nodes.", [Task]),
             true;
         Other ->
-            lager:info("Task ~p incomplete: only on ~p nodes.", [Task, Other]),
+            lager:info("Task ~p incomplete: only on ~p/~p nodes.",
+                       [Task, Other, NumNodes]),
             false
     end,
     {reply, Result, State};

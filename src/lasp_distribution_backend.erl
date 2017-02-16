@@ -446,14 +446,12 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
                                            ?CLOCK_INIT(Actor), Store),
                     Final = declare_if_not_found(Result0, Id, State, ?CORE, update,
                                          [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
-                    lager:info("Update complete."),
                     case lasp_config:get(blocking_sync, false) of
                         true ->
                             ok = blocking_sync(Id);
                         false ->
                             ok
                     end,
-                    lager:info("Returning value."),
                     Final
             end
     end,
@@ -616,9 +614,7 @@ blocking_sync(Id) ->
 
     case lasp_config:get(mode, ?DEFAULT_MODE) of
         state_based ->
-            lager:info("Starting blocking sync."),
-            ok = lasp_state_based_synchronization_backend:blocking_sync(ObjectFilterFun),
-            lager:info("Ending blocking sync.");
+            lasp_state_based_synchronization_backend:blocking_sync(ObjectFilterFun);
         delta_based ->
             {error, not_implemented}
     end.

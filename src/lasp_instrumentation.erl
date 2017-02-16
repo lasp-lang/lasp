@@ -306,7 +306,7 @@ record_batch(Start, End, Events) ->
     Filename = main_log(),
     Timestamp = timestamp(),
     MsDiff = round(timer:now_diff(End, Start) / 1000),
-    Line = get_batch_line(Start, End, Events, MsDiff, Timestamp),
+    Line = get_batch_line(Timestamp, Start, End, Events, MsDiff),
     append_to_file(Filename, Line).
 
 %% @private
@@ -331,12 +331,12 @@ get_line(Type, Timestamp, Size) ->
     ).
 
 %% @private
-get_batch_line(Start, End, Events, MsDiff, Timestamp) ->
+get_batch_line(Timestamp, Start, End, Events, MsDiff) ->
     Batch = integer_to_list(timestamp_to_milliseconds(Start)) ++ ","
          ++ integer_to_list(timestamp_to_milliseconds(End)) ++ ","
          ++ integer_to_list(Events) ++ ","
          ++ integer_to_list(MsDiff),
-    "batch;" ++ Batch ++ ";" ++ integer_to_list(Timestamp) ++ "\n".
+    "batch;" ++ integer_to_list(Timestamp) ++ ";" ++ Batch ++ "\n".
 
 %% @private
 timestamp_to_milliseconds(TS) ->

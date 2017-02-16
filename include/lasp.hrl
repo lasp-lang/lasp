@@ -1,5 +1,6 @@
 %% Throughput simulation.
 -define(SIMPLE_BAG, {<<"bag">>, ?GSET_TYPE}).
+-define(SIMPLE_COUNTER, {<<"counter">>, ?GCOUNTER_TYPE}).
 -define(EVENT_INTERVAL, 0). %% seconds
 -define(MAX_EVENTS_DEFAULT, 1000).
 -define(BATCH_EVENTS, 100).
@@ -147,6 +148,7 @@
 -define(COUNTER_TYPE, gcounter).
 -define(GMAP_TYPE, gmap).
 -define(GSET_TYPE, gset).
+-define(GCOUNTER_TYPE, gcounter).
 -define(SET_TYPE, lasp_config:get(set, orset)).
 -define(PAIR_TYPE, pair).
 

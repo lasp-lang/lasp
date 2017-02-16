@@ -411,6 +411,14 @@ game_tournament_child_specs() ->
 
 %% @private
 throughput_child_specs() ->
+    %% Throughput type.
+    ThroughputTypeDefault = list_to_atom(os:getenv("THROUGHPUT_TYPE", "gset")),
+    ThroughputType = application:get_env(?APP,
+                                         throughput_type,
+                                         ThroughputTypeDefault),
+    lasp_config:set(throughput_type, ThroughputType),
+    lager:info("ThroughputType: ~p", [ThroughputType]),
+
     %% Figure out who is acting as the client.
     ClientDefault = list_to_atom(os:getenv("THROUGHPUT_SIM_CLIENT", "false")),
     ClientEnabled = application:get_env(?APP,

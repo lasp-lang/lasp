@@ -121,6 +121,7 @@ handle_info(event, #state{actor=Actor,
             Element = atom_to_list(Actor) ++ "###" ++ integer_to_list(Events1),
 
             lager:info("Issuing bag update."),
+            perform_update(Element, Actor),
             lasp:update(?SIMPLE_BAG, {add, Element}, Actor),
             lager:info("Update bag completed."),
 
@@ -225,3 +226,12 @@ log_batch(Start, End, Events) ->
 %% @private
 max_events() ->
     lasp_config:get(max_events, ?MAX_EVENTS_DEFAULT).
+
+%% @private
+perform_update(Element, Actor) ->
+    case lasp_config:get(throughput_type, gset) of
+        gset ->
+            lasp:update(?SIMPLE_BAG, {add, Element}, Actor);
+        gcounter ->
+            lasp:update(?SIMPLE_COUNTER, increment, Actor)
+    end.

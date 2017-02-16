@@ -334,8 +334,18 @@ get_line(Type, Timestamp, Size) ->
 get_batch(Start, End, Events, MsDiff) ->
     io_lib:format(
         "~w,~w,~w,~w",
-        [Start, End, Events, MsDiff]
+        [
+         timestamp_to_milliseconds(Start),
+         timestamp_to_milliseconds(End),
+         Events,
+         MsDiff
+        ]
     ).
+
+%% @private
+timestamp_to_milliseconds(TS) ->
+    {Mega, Sec, Micro} = TS,
+    (Mega * 1000000 + Sec) * 1000 + round(Micro / 1000).
 
 %% @private
 write_to_file(Filename, Line) ->

@@ -1,6 +1,6 @@
 %% Throughput simulation.
 -define(SIMPLE_BAG, {<<"bag">>, ?GSET_TYPE}).
--define(EVENT_INTERVAL, 0). %% 10 seconds
+-define(EVENT_INTERVAL, 0). %% seconds
 -define(MAX_EVENTS_DEFAULT, 1000).
 -define(BATCH_EVENTS, 100).
 

@@ -65,7 +65,7 @@ all() ->
     [
      client_server_state_based_gcounter,
      client_server_state_based_boolean,
-     client_server_state_based_twopset,
+     % client_server_state_based_twopset,
      client_server_state_based_gset
     ].
 
@@ -128,18 +128,18 @@ client_server_state_based_boolean(Config) ->
                   end, ?RUNS),
     ok.
 
-client_server_state_based_twopset(Config) ->
-    lists:foreach(fun(N) ->
-                        lasp_simulation_support:run(client_server_state_based_twopset,
-                            Config,
-                            [{mode, state_based},
-                             {client_number, N},
-                             {simulation, throughput},
-                             {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
-                             {set, orset},
-                             {throughput_type, twopset},
-                             {broadcast, false},
-                             {blocking_sync, true},
-                             {evaluation_identifier, client_server_state_based_twopset}])
-                  end, ?RUNS),
-    ok.
+% client_server_state_based_twopset(Config) ->
+%     lists:foreach(fun(N) ->
+%                         lasp_simulation_support:run(client_server_state_based_twopset,
+%                             Config,
+%                             [{mode, state_based},
+%                              {client_number, N},
+%                              {simulation, throughput},
+%                              {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
+%                              {set, orset},
+%                              {throughput_type, twopset},
+%                              {broadcast, false},
+%                              {blocking_sync, true},
+%                              {evaluation_identifier, client_server_state_based_twopset}])
+%                   end, ?RUNS),
+%     ok.

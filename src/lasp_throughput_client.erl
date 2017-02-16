@@ -122,7 +122,6 @@ handle_info(event, #state{actor=Actor,
 
             lager:info("Issuing bag update."),
             perform_update(Element, Actor),
-            lasp:update(?SIMPLE_BAG, {add, Element}, Actor),
             lager:info("Update bag completed."),
 
             lager:info("Events done: ~p, Batch events done: ~p, Events seen: ~p. Node: ~p", [Events1, BatchEvents1, TotalEvents + 1, Actor]),

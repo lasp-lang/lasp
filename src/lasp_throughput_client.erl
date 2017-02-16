@@ -126,7 +126,7 @@ handle_info(event, #state{actor=Actor,
 
             lager:info("Events done: ~p, Batch events done: ~p, Events seen: ~p. Node: ~p", [Events1, BatchEvents1, TotalEvents + 1, Actor]),
 
-            case Events1 == max_events() * client_number() of
+            case Events1 == max_events() of
                 true ->
                     lager:info("All events done. Node: ~p", [Actor]),
 

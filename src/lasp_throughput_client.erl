@@ -97,10 +97,7 @@ handle_info(event, #state{actor=Actor,
                         BatchStart0
                  end,
 
-    {ok, Value} = lasp:query(?SIMPLE_BAG),
-    TotalEvents = sets:size(Value),
-
-    {LocalEvents, BatchStart, BatchEvents} = case TotalEvents > 0 of
+    {LocalEvents, BatchStart, BatchEvents} = case lasp_workflow:task_complete(convergence, 1) of
         true ->
             %% The server, once it detects connectedness,
             %% will add one element to the bag.
@@ -124,7 +121,7 @@ handle_info(event, #state{actor=Actor,
             perform_update(Element, Actor),
             lager:info("Update bag completed."),
 
-            lager:info("Events done: ~p, Batch events done: ~p, Events seen: ~p. Node: ~p", [Events1, BatchEvents1, TotalEvents + 1, Actor]),
+            lager:info("Events done: ~p, Batch events done: ~p, Node: ~p", [Events1, BatchEvents1, Actor]),
 
             case Events1 == max_events() of
                 true ->

@@ -1,9 +1,11 @@
 %% Throughput simulation.
+-define(SIMPLE_BOOLEAN, {<<"boolean">>, ?BOOLEAN_TYPE}).
 -define(SIMPLE_BAG, {<<"bag">>, ?GSET_TYPE}).
 -define(SIMPLE_COUNTER, {<<"counter">>, ?GCOUNTER_TYPE}).
 -define(EVENT_INTERVAL, 0). %% seconds
 -define(MAX_EVENTS_DEFAULT, 1000).
 -define(BATCH_EVENTS, 100).
+-define(BOOLEAN_TYPE, boolean).
 
 %% Intermediary node modification.
 -define(INTERMEDIARY_NODE_MODIFICATION, false).
@@ -144,7 +146,6 @@
 -define(ENROLLABLE_GAMES, {<<"enrollable_games">>, ?SET_TYPE}).
 -define(ENROLLMENT_INTERVAL, 500).
 
--define(BOOLEAN_TYPE, boolean).
 -define(COUNTER_TYPE, gcounter).
 -define(GMAP_TYPE, gmap).
 -define(GSET_TYPE, gset).

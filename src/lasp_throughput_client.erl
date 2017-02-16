@@ -210,6 +210,8 @@ max_events() ->
 %% @private
 perform_update(Element, Actor) ->
     case lasp_config:get(throughput_type, gset) of
+        boolean ->
+            lasp:update(?SIMPLE_BOOLEAN, true, Actor);
         gset ->
             lasp:update(?SIMPLE_BAG, {add, Element}, Actor);
         gcounter ->

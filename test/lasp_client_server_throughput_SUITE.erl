@@ -62,6 +62,7 @@ end_per_testcase(Case, _Config) ->
 all() ->
     [
      client_server_state_based_gcounter,
+     client_server_state_based_boolean,
      client_server_state_based_gset
     ].
 
@@ -100,4 +101,17 @@ client_server_state_based_gset(Config) ->
          {broadcast, false},
          {blocking_sync, true},
          {evaluation_identifier, client_server_state_based_gset}]),
+    ok.
+
+client_server_state_based_boolean(Config) ->
+    lasp_simulation_support:run(client_server_state_based_boolean,
+        Config,
+        [{mode, state_based},
+         {simulation, throughput},
+         {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
+         {set, orset},
+         {throughput_type, boolean},
+         {broadcast, false},
+         {blocking_sync, true},
+         {evaluation_identifier, client_server_state_based_boolean}]),
     ok.

@@ -39,6 +39,8 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/inet.hrl").
 
+-define(RUNS, [2,4,6]).
+
 %% ===================================================================
 %% common_test callbacks
 %% ===================================================================
@@ -78,40 +80,49 @@ default_test(_Config) ->
 %% ===================================================================
 
 client_server_state_based_gcounter(Config) ->
-    lasp_simulation_support:run(client_server_state_based_gcounter,
-        Config,
-        [{mode, state_based},
-         {simulation, throughput},
-         {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
-         {set, orset},
-         {throughput_type, gcounter},
-         {broadcast, false},
-         {blocking_sync, true},
-         {evaluation_identifier, client_server_state_based_gcounter}]),
+    lists:foreach(fun(N) ->
+                        lasp_simulation_support:run(client_server_state_based_gcounter,
+                            Config,
+                            [{mode, state_based},
+                             {client_number, N},
+                             {simulation, throughput},
+                             {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
+                             {set, orset},
+                             {throughput_type, gcounter},
+                             {broadcast, false},
+                             {blocking_sync, true},
+                             {evaluation_identifier, client_server_state_based_gcounter}])
+                  end, ?RUNS),
     ok.
 
 client_server_state_based_gset(Config) ->
-    lasp_simulation_support:run(client_server_state_based_gset,
-        Config,
-        [{mode, state_based},
-         {simulation, throughput},
-         {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
-         {set, orset},
-         {throughput_type, gset},
-         {broadcast, false},
-         {blocking_sync, true},
-         {evaluation_identifier, client_server_state_based_gset}]),
+    lists:foreach(fun(N) ->
+                        lasp_simulation_support:run(client_server_state_based_gset,
+                            Config,
+                            [{mode, state_based},
+                             {client_number, N},
+                             {simulation, throughput},
+                             {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
+                             {set, orset},
+                             {throughput_type, gset},
+                             {broadcast, false},
+                             {blocking_sync, true},
+                             {evaluation_identifier, client_server_state_based_gset}])
+                  end, ?RUNS),
     ok.
 
 client_server_state_based_boolean(Config) ->
-    lasp_simulation_support:run(client_server_state_based_boolean,
-        Config,
-        [{mode, state_based},
-         {simulation, throughput},
-         {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
-         {set, orset},
-         {throughput_type, boolean},
-         {broadcast, false},
-         {blocking_sync, true},
-         {evaluation_identifier, client_server_state_based_boolean}]),
+    lists:foreach(fun(N) ->
+                        lasp_simulation_support:run(client_server_state_based_boolean,
+                            Config,
+                            [{mode, state_based},
+                             {client_number, N},
+                             {simulation, throughput},
+                             {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
+                             {set, orset},
+                             {throughput_type, boolean},
+                             {broadcast, false},
+                             {blocking_sync, true},
+                             {evaluation_identifier, client_server_state_based_boolean}])
+                  end, ?RUNS),
     ok.

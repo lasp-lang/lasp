@@ -187,6 +187,10 @@ start(_Case, _Config, Options) ->
                                 end
                         end,
 
+                        %% Configure throughput simulation data type.
+                        ThroughputType = proplists:get_value(throughput_type, Options, gset),
+                        ok = rpc:call(Node, lasp_config, set, [throughput_type, ThroughputType]),
+
                         %% Configure the peer service.
                         PeerService = proplists:get_value(partisan_peer_service_manager, Options),
                         ok = rpc:call(Node, partisan_config, set,

@@ -332,15 +332,10 @@ get_line(Type, Timestamp, Size) ->
 
 %% @private
 get_batch(Start, End, Events, MsDiff) ->
-    io_lib:format(
-        "~w,~w,~w,~w",
-        [
-         timestamp_to_milliseconds(Start),
-         timestamp_to_milliseconds(End),
-         Events,
-         MsDiff
-        ]
-    ).
+    integer_to_list(timestamp_to_milliseconds(Start)) ++ "," ++
+    integer_to_list(timestamp_to_milliseconds(End)) ++ "," ++
+    integer_to_list(Events) ++ "," ++
+    integer_to_list(MsDiff).
 
 %% @private
 timestamp_to_milliseconds(TS) ->

@@ -1,11 +1,13 @@
 %% Throughput simulation.
 -define(SIMPLE_BOOLEAN, {<<"boolean">>, ?BOOLEAN_TYPE}).
 -define(SIMPLE_BAG, {<<"bag">>, ?GSET_TYPE}).
+-define(SIMPLE_TWOPSET, {<<"twopset">>, ?TWOPSET_TYPE}).
 -define(SIMPLE_COUNTER, {<<"counter">>, ?GCOUNTER_TYPE}).
 -define(EVENT_INTERVAL, 0). %% seconds
 -define(MAX_EVENTS_DEFAULT, 5000).
 -define(BATCH_EVENTS, 100).
 -define(BOOLEAN_TYPE, boolean).
+-define(TWOPSET_TYPE, twopset).
 
 %% Intermediary node modification.
 -define(INTERMEDIARY_NODE_MODIFICATION, false).

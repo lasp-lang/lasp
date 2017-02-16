@@ -117,7 +117,7 @@ handle_info(event, #state{actor=Actor,
 
             Element = atom_to_list(Actor),
 
-            perform_update(Element, Actor),
+            perform_update(Element, Actor, Events1),
 
             % lager:info("Events done: ~p, Batch events done: ~p, Node: ~p", [Events1, BatchEvents1, Actor]),
 
@@ -206,8 +206,10 @@ max_events() ->
     lasp_config:get(max_events, ?MAX_EVENTS_DEFAULT).
 
 %% @private
-perform_update(Element, Actor) ->
+perform_update(Element, Actor, Events1) ->
     case lasp_config:get(throughput_type, gset) of
+        twopset ->
+            lasp:update(?SIMPLE_TWOPSET, {add, Element ++ integer_to_list(Events1)}, Actor);
         boolean ->
             lasp:update(?SIMPLE_BOOLEAN, true, Actor);
         gset ->

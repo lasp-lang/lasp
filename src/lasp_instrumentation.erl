@@ -336,7 +336,7 @@ get_batch_line(Start, End, Events, MsDiff, Timestamp) ->
          ++ integer_to_list(timestamp_to_milliseconds(End)) ++ ","
          ++ integer_to_list(Events) ++ ","
          ++ integer_to_list(MsDiff),
-    "batch;" ++ Batch ++ ";" ++ Timestamp.
+    "batch;" ++ Batch ++ ";" ++ integer_to_list(Timestamp).
 
 %% @private
 timestamp_to_milliseconds(TS) ->

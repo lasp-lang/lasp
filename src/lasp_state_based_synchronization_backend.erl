@@ -210,10 +210,9 @@ handle_info({state_sync, ObjectFilterFun},
             #state{store=Store, gossip_peers=GossipPeers} = State) ->
     lasp_marathon_simulations:log_message_queue_size("state_sync"),
 
-    PeerServiceManager = lasp_config:peer_service_manager(),
-
-    lasp_logger:extended("Beginning state synchronization: ~p",
-                         [PeerServiceManager]),
+    % PeerServiceManager = lasp_config:peer_service_manager(),
+    % lasp_logger:extended("Beginning state synchronization: ~p",
+    %                      [PeerServiceManager]),
 
     Members = case ?SYNC_BACKEND:broadcast_tree_mode() of
         true ->
@@ -226,7 +225,7 @@ handle_info({state_sync, ObjectFilterFun},
     %% Remove ourself and compute exchange peers.
     Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
 
-    lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
+    % lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
     SyncFun = fun(Peer) ->
@@ -328,7 +327,7 @@ schedule_plumtree_peer_refresh() ->
 
 %% @private
 init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
-    lasp_logger:extended("Initializing reverse toplogical state synchronization with peer: ~p", [Peer]),
+    % lasp_logger:extended("Initializing reverse toplogical state synchronization with peer: ~p", [Peer]),
 
     SendFun = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}) ->
                     case orddict:find(dynamic, Metadata) of
@@ -363,13 +362,13 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
 
     lists:map(SyncFun, SortedVertices),
 
-    lasp_logger:extended("Completed back propagation state synchronization with peer: ~p", [Peer]),
+    % lasp_logger:extended("Completed back propagation state synchronization with peer: ~p", [Peer]),
 
     ok.
 
 %% @private
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
-    lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
+    % lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
@@ -387,7 +386,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                end,
     %% TODO: Should this be parallel?
     {ok, Objects} = lasp_storage_backend:do(fold, [Store, Function, []]),
-    lasp_logger:extended("Completed state propagation with peer: ~p", [Peer]),
+    % lasp_logger:extended("Completed state propagation with peer: ~p", [Peer]),
     {ok, Objects}.
 
 %% @private

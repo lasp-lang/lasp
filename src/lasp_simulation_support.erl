@@ -27,7 +27,10 @@
 -export([run/3]).
 
 run(Case, Config, Options) ->
-    ClientNumber = lasp_config:get(client_number, 3),
+    ClientNumberDefault = lasp_config:get(client_number, 3),
+    ClientNumber = proplists:get_value(client_number,
+                                       Options,
+                                       ClientNumberDefault),
     NodeNames = node_list(ClientNumber),
 
     ct:pal("Running ~p with nodes ~p", [Case, NodeNames]),

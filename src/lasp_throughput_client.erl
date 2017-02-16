@@ -117,11 +117,9 @@ handle_info(event, #state{actor=Actor,
 
             Element = atom_to_list(Actor),
 
-            lager:info("Issuing bag update."),
             perform_update(Element, Actor),
-            lager:info("Update bag completed."),
 
-            lager:info("Events done: ~p, Batch events done: ~p, Node: ~p", [Events1, BatchEvents1, Actor]),
+            % lager:info("Events done: ~p, Batch events done: ~p, Node: ~p", [Events1, BatchEvents1, Actor]),
 
             case Events1 == max_events() of
                 true ->

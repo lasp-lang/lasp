@@ -24,7 +24,8 @@
 %% API
 -export([start_link/0,
          start_link/1,
-         task_completed/2]).
+         task_completed/2,
+         is_task_completed/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -56,6 +57,12 @@ start_link(Opts) ->
 task_completed(Task, Node) ->
     gen_server:call(?MODULE, {task_completed, Task, Node}, infinity).
 
+%% @doc Determine if a task is completed.
+-spec is_task_completed(atom()) -> ok.
+is_task_completed(Task) ->
+    gen_server:call(?MODULE, {is_task_completed, Task}, infinity).
+
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -81,6 +88,18 @@ init([]) ->
     {reply, term(), #state{}}.
 
 %% @private
+handle_call({is_task_completed, Task}, _From, #state{eredis=Eredis}=State) ->
+    {ok, Objects} = eredis:q(Eredis, ["KEYS", prefix(Task, "*")]),
+    ClientNumber = lasp_config:get(client_number, 0),
+    Result = case length(Objects) of
+        ClientNumber ->
+            lager:info("Task ~p completed on all nodes.", [Task]),
+            true;
+        Other ->
+            lager:info("Task ~p incomplete: only on ~p nodes.", [Task, Other]),
+            false
+    end,
+    {reply, Result, State};
 handle_call({task_completed, Task, Node}, _From, #state{eredis=Eredis}=State) ->
     Path = prefix(Task, Node),
     lager:info("Setting ~p to true.", [Path]),

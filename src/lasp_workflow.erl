@@ -85,15 +85,14 @@ init([]) ->
     RedisHost = os:getenv("REDIS_SERVICE_HOST", "127.0.0.1"),
     RedisPort = os:getenv("REDIS_SERVICE_PORT", "6379"),
     Result = eredis:start_link(RedisHost, list_to_integer(RedisPort)),
-    Eredis = case Result of
+    case Result of
         {ok, C} ->
-            C ;
+            {ok, #state{eredis=C}};
         Error ->
             lager:error("Error connecting to redis for workflow management: ~p",
                         [Error]),
-            undefined
-    end,
-    {ok, #state{eredis=Eredis}}.
+            {stop, Error}
+    end.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->

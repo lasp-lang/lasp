@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
+LASP_BRANCH=workflow-v2
+
 # Configure experiment.
 SERVER_REPLICAS=1
-LASP_BRANCH=blocking-sync
 PEER_SERVICE=partisan_client_server_peer_service_manager
 MODE=state_based
 HEAVY_CLIENTS=false
@@ -39,6 +40,7 @@ ENV_VARS=(
   MAILBOX_LOGGING
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
+  THROUGHPUT_TYPE
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -51,7 +53,7 @@ done
 
 # Configure evaluation timestamp and identifier.
 EVAL_TIMESTAMP=$(date +%s)
-EVAL_ID="client-server/blocking/true/clients/${CLIENT_NUMBER}"
+EVAL_ID="throughput/kubernetes/client_server_state_based_${THROUGHPUT_TYPE}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
 echo "Evaluation identifier is:" ${EVAL_ID}
 echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
 

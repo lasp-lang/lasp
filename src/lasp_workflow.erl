@@ -152,7 +152,11 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
+prefix(Task, Node) when is_atom(Task) ->
+    prefix(atom_to_list(Task), Node);
+prefix(Task, Node) when is_atom(Node) ->
+    prefix(Task, atom_to_list(Node));
 prefix(Task, Node) ->
     EvalId = lasp_config:get(evaluation_identifier, undefined),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
-    "workflow" ++ "/" ++ EvalId ++ "/" ++ integer_to_list(EvalTimestamp) ++ "/" ++ Task ++ "/" ++ Node.
+    "workflow" ++ "/" ++ atom_to_list(EvalId) ++ "/" ++ integer_to_list(EvalTimestamp) ++ "/" ++ Task ++ "/" ++ Node.

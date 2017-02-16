@@ -102,23 +102,23 @@ init([]) ->
 handle_call({task_progress, Task}, _From, #state{eredis=Eredis}=State) ->
     {ok, Objects} = eredis:q(Eredis, ["KEYS", prefix(Task, "*")]),
     NumObjects = length(Objects),
-    lager:info("Task ~p progress: ~p", [Task, NumObjects]),
+    % lager:info("Task ~p progress: ~p", [Task, NumObjects]),
     {reply, {ok, NumObjects}, State};
 handle_call({is_task_completed, Task, NumNodes}, _From, #state{eredis=Eredis}=State) ->
     {ok, Objects} = eredis:q(Eredis, ["KEYS", prefix(Task, "*")]),
     Result = case length(Objects) of
         NumNodes ->
-            lager:info("Task ~p completed on all nodes.", [Task]),
+            % lager:info("Task ~p completed on all nodes.", [Task]),
             true;
-        Other ->
-            lager:info("Task ~p incomplete: only on ~p/~p nodes.",
-                       [Task, Other, NumNodes]),
+        _Other ->
+            % lager:info("Task ~p incomplete: only on ~p/~p nodes.",
+            %            [Task, Other, NumNodes]),
             false
     end,
     {reply, Result, State};
 handle_call({task_completed, Task, Node}, _From, #state{eredis=Eredis}=State) ->
     Path = prefix(Task, Node),
-    lager:info("Setting ~p to true.", [Path]),
+    % lager:info("Setting ~p to true.", [Path]),
     {ok, <<"OK">>} = eredis:q(Eredis, ["SET", Path, true]),
     {reply, ok, State};
 

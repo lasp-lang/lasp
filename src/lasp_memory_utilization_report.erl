@@ -67,7 +67,7 @@ init([]) ->
                      erlang:unique_integer()),
 
     %% Schedule reports.
-    schedule_memory_utilization_report(),
+    %% schedule_memory_utilization_report(),
 
     {ok, #state{}}.
 
@@ -179,7 +179,9 @@ memory_utilization_report() ->
         "",
         MQSorted
     ),
-    lasp_logger:extended("\nMQ PROCESSES INFO\n" ++ MQLog).
+    lasp_logger:extended("\nMQ PROCESSES INFO\n" ++ MQLog),
+
+    ok.
 
 %% @private
 get_name([]) -> undefined;

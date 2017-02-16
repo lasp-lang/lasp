@@ -135,10 +135,10 @@ handle_call({blocking_sync, ObjectFilterFun}, From,
             %% Mark response as waiting.
             BlockingSyncs = dict:store(From, Objects, BlockingSyncs0),
 
-            lager:info("Blocking sync initialized for ~p ~p", [From, Objects]),
+            % lager:info("Blocking sync initialized for ~p ~p", [From, Objects]),
             {noreply, State#state{blocking_syncs=BlockingSyncs}};
         false ->
-            lager:info("No peers, not blocking.", []),
+            % lager:info("No peers, not blocking.", []),
             {reply, ok, State}
     end;
 
@@ -150,12 +150,12 @@ handle_call(Msg, _From, State) ->
 
 handle_cast({state_ack, From, Id},
             #state{blocking_syncs=BlockingSyncs0}=State) ->
-    lager:info("Received ack from ~p for ~p", [From, Id]),
+    % lager:info("Received ack from ~p for ~p", [From, Id]),
 
     BlockingSyncs = dict:fold(fun(Key, Value, Acc) ->
-                lager:info("Was waiting ~p ~p", [Key, Value]),
+                % lager:info("Was waiting ~p ~p", [Key, Value]),
                 StillWaiting = lists:delete({From, Id}, Value),
-                lager:info("Now waiting ~p ~p", [Key, StillWaiting]),
+                % lager:info("Now waiting ~p ~p", [Key, StillWaiting]),
                 case length(StillWaiting) == 0 of
                     true ->
                         gen_server:reply(Key, ok),

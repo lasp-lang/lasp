@@ -115,7 +115,7 @@ handle_info(event, #state{actor=Actor,
                                                   {BatchStart1, BatchEvents0 + 1}
                                           end,
 
-            Element = atom_to_list(Actor) ++ "###" ++ integer_to_list(Events1),
+            Element = atom_to_list(Actor),
 
             lager:info("Issuing bag update."),
             perform_update(Element, Actor),

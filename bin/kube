@@ -304,8 +304,12 @@ export SERVER_POD_NAME=$(kubectl get pods | grep server | awk '{print $1}')
 kubectl logs --tail=-1 -f $SERVER_POD_NAME
 
 if [ "$GCE" ]; then
-  export REDIS_SERVICE_HOST=$(gcloud compute forwarding-rules list | grep TCP | awk '{print $3}' | tail -1)
+  echo "Running in Google Container Engine."
+  export REDIS_SERVICE_HOST=$(kubectl get services | grep redis | awk '{print $3}' | head -1)
+  # export REDIS_SERVICE_HOST=$(gcloud compute forwarding-rules list | grep TCP | awk '{print $3}' | tail -1)
   export REDIS_SERVICE_PORT=6379
+  echo "REDIS_SERVICE_HOST: ${REDIS_SERVICE_HOST}"
+  echo "REDIS_SERVICE_PORT: ${REDIS_SERVICE_PORT}"
 else
   export REDIS_SERVICE_HOST=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1 | cut -f 2-2 -d ":" | sed -e 's/\/\///g')
   export REDIS_SERVICE_PORT=$(kubectl get service redis -o jsonpath="{.spec.ports[*].nodePort}")

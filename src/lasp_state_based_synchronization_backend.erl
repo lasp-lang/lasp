@@ -148,20 +148,27 @@ handle_call(Msg, _From, State) ->
 
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 
-handle_cast({state_ack, From, Id},
-            #state{blocking_syncs=BlockingSyncs0}=State) ->
+handle_cast({state_ack, From, Id, {Id, _Type, _Metadata, Value}},
+            #state{store=Store,
+                   blocking_syncs=BlockingSyncs0}=State) ->
     % lager:info("Received ack from ~p for ~p", [From, Id]),
 
-    BlockingSyncs = dict:fold(fun(Key, Value, Acc) ->
+    BlockingSyncs = dict:fold(fun(K, V, Acc) ->
                 % lager:info("Was waiting ~p ~p", [Key, Value]),
-                StillWaiting = lists:delete({From, Id}, Value),
+                StillWaiting = lists:delete({From, Id}, V),
                 % lager:info("Now waiting ~p ~p", [Key, StillWaiting]),
                 case length(StillWaiting) == 0 of
                     true ->
-                        gen_server:reply(Key, ok),
+                        %% Bind value locally from server response.
+                        %% TODO: Do we have to merge metadata here?
+                        {ok, _} = ?CORE:bind_var(Id, Value, Store),
+
+                        %% Reply to return from the blocking operation.
+                        gen_server:reply(K, ok),
+
                         Acc;
                     false ->
-                        dict:store(Key, StillWaiting, Acc)
+                        dict:store(K, StillWaiting, Acc)
                 end
               end, dict:new(), BlockingSyncs0),
     {noreply, State#state{blocking_syncs=BlockingSyncs}};
@@ -170,15 +177,15 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
             #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("state_send"),
 
-    ?CORE:receive_value(Store, {state_send,
-                                From,
-                               {Id, Type, _Metadata, Value},
-                               ?CLOCK_INCR(Actor),
-                               ?CLOCK_INIT(Actor)}),
+    {ok, Object} = ?CORE:receive_value(Store, {state_send,
+                                       From,
+                                       {Id, Type, _Metadata, Value},
+                                       ?CLOCK_INCR(Actor),
+                                       ?CLOCK_INIT(Actor)}),
 
     case AckRequired of
         true ->
-            ?SYNC_BACKEND:send(?MODULE, {state_ack, node(), Id}, From);
+            ?SYNC_BACKEND:send(?MODULE, {state_ack, node(), Id, Object}, From);
         false ->
             ok
     end,

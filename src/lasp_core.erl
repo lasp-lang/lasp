@@ -939,7 +939,7 @@ reply_to_all([], StillWaiting, _Result) ->
     {ok, StillWaiting}.
 
 -spec receive_value(store(), {state_send, node(), value(), function(),
-                              function()}) -> ok | error.
+                              function()}) -> {ok, crdt()}.
 receive_value(Store, {state_send, Origin, {Id, Type, Metadata, Value},
                       MetadataFunBind, MetadataFunDeclare}) ->
     case do(get, [Store, Id]) of
@@ -949,8 +949,7 @@ receive_value(Store, {state_send, Origin, {Id, Type, Metadata, Value},
             {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
             receive_value(Store, {state_send, Origin, {Id, Type, Metadata, Value},
                                   MetadataFunBind, MetadataFunDeclare})
-    end,
-    ok.
+    end.
 
 %% @doc When the delta interval is arrived, bind it with the existing object.
 %%      If the object does not exist, declare it.

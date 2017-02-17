@@ -166,15 +166,16 @@ handle_cast({state_ack, From, Id},
               end, dict:new(), BlockingSyncs0),
     {noreply, State#state{blocking_syncs=BlockingSyncs}};
 
-handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
-            #state{store=Store, actor=Actor}=State) ->
+handle_cast({state_send, From, {Id, _Type, _Metadata, _Value}, AckRequired},
+            #state{store=Store, actor=_Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("state_send"),
 
-    ?CORE:receive_value(Store, {state_send,
-                                From,
-                               {Id, Type, _Metadata, Value},
-                               ?CLOCK_INCR(Actor),
-                               ?CLOCK_INIT(Actor)}),
+    %% TODO: FIX ME.
+    % ?CORE:receive_value(Store, {state_send,
+    %                             From,
+    %                            {Id, Type, _Metadata, Value},
+    %                            ?CLOCK_INCR(Actor),
+    %                            ?CLOCK_INIT(Actor)}),
 
     case AckRequired of
         true ->

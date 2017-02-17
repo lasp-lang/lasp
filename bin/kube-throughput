@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
-# gcloud beta container clusters create lasp --machine-type=n1-standard-16 --num-nodes=1
-# gcloud beta container clusters get-credentials lasp
+rm -rf /tmp/logs ~/Documents/lasp/priv/evaluation/logs
+
+gcloud beta container clusters create lasp --machine-type=n1-standard-16 --num-nodes=1
+gcloud beta container clusters get-credentials lasp
 
 GCE=true THROUGHPUT_TYPE=boolean CLIENT_NUMBER=1 bin/kube
 GCE=true THROUGHPUT_TYPE=boolean CLIENT_NUMBER=2 bin/kube
@@ -17,3 +19,5 @@ GCE=true THROUGHPUT_TYPE=gcounter CLIENT_NUMBER=1 bin/kube
 GCE=true THROUGHPUT_TYPE=gcounter CLIENT_NUMBER=2 bin/kube
 GCE=true THROUGHPUT_TYPE=gcounter CLIENT_NUMBER=4 bin/kube
 GCE=true THROUGHPUT_TYPE=gcounter CLIENT_NUMBER=8 bin/kube
+
+gcloud beta container clusters delete lasp

@@ -53,7 +53,7 @@ done
 
 # Configure evaluation timestamp and identifier.
 EVAL_TIMESTAMP=$(date +%s)
-EVAL_ID="throughput/kubernetes/client_server_state_based_${THROUGHPUT_TYPE}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
+EVAL_ID="client_server_state_based_${THROUGHPUT_TYPE}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
 echo "Evaluation identifier is:" ${EVAL_ID}
 echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
 
@@ -304,7 +304,7 @@ export SERVER_POD_NAME=$(kubectl get pods | grep server | awk '{print $1}')
 kubectl logs --tail=-1 -f $SERVER_POD_NAME
 
 if [ "$GCE" ]; then
-  export REDIS_SERVICE_HOST=$(gcloud compute forwarding-rules list | grep TCP | awk '{print $3}')
+  export REDIS_SERVICE_HOST=$(gcloud compute forwarding-rules list | grep TCP | awk '{print $3}' | tail -1)
   export REDIS_SERVICE_PORT=6379
 else
   export REDIS_SERVICE_HOST=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1 | cut -f 2-2 -d ":" | sed -e 's/\/\///g')
@@ -313,6 +313,7 @@ fi
 
 echo "Downloading data from Redis."
 ./sync-redis.erl
+cp -Rpv /tmp/logs/* priv/evaluation/logs
 
 echo "Deleting lasp deployments and servies."
 kubectl delete -f /tmp/lasp.yaml

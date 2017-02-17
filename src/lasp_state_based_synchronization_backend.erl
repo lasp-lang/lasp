@@ -53,8 +53,8 @@
 %%%===================================================================
 
 %% state_based messages:
-extract_log_type_and_payload({state_ack, _From, Id}) ->
-    [{state_ack, Id}];
+extract_log_type_and_payload({state_ack, _From, _Id, {_Id, _Type, _Metadata, State}}) ->
+    [{state_ack, State}];
 extract_log_type_and_payload({state_send, _Node, {Id, Type, _Metadata, State}, _AckRequired}) ->
     [{Id, State}, {Type, State}, {state_send, State}, {state_send_protocol, Id}].
 

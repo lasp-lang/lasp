@@ -317,6 +317,7 @@ fi
 
 echo "Downloading data from Redis."
 ./sync-redis.erl
+mkdir -p ~/Documents/lasp/priv/evaluation/logs
 cp -Rpv /tmp/logs/* ~/Documents/lasp/priv/evaluation/logs
 
 echo "Deleting lasp deployments and servies."

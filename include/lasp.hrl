@@ -4,7 +4,7 @@
 -define(SIMPLE_TWOPSET, {<<"twopset">>, ?TWOPSET_TYPE}).
 -define(SIMPLE_COUNTER, {<<"counter">>, ?GCOUNTER_TYPE}).
 -define(EVENT_INTERVAL, 0). %% milliseconds [timer:send_after]
--define(MAX_EVENTS_DEFAULT, 10000).
+-define(MAX_EVENTS_DEFAULT, 20000).
 -define(BATCH_EVENTS, 100).
 -define(BOOLEAN_TYPE, boolean).
 -define(TWOPSET_TYPE, twopset).

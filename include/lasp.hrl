@@ -3,8 +3,9 @@
 -define(SIMPLE_BAG, {<<"bag">>, ?GSET_TYPE}).
 -define(SIMPLE_TWOPSET, {<<"twopset">>, ?TWOPSET_TYPE}).
 -define(SIMPLE_COUNTER, {<<"counter">>, ?GCOUNTER_TYPE}).
+-define(PROVENANCE_SET, {<<"awset_ps">>, awset_ps}).
 -define(EVENT_INTERVAL, 0). %% milliseconds [timer:send_after]
--define(MAX_EVENTS_DEFAULT, 20000).
+-define(MAX_EVENTS_DEFAULT, 1000).
 -define(BATCH_EVENTS, 100).
 -define(BOOLEAN_TYPE, boolean).
 -define(TWOPSET_TYPE, twopset).
@@ -173,7 +174,7 @@
 -define(STATE_INTERVAL, 10000).
 -define(IMPRESSION_INTERVAL, 10000). %% 10 seconds
 -define(STATUS_INTERVAL, 10000).
--define(EVAL_NUMBER, 1).
+-define(EVAL_NUMBER, 10).
 -define(LOG_INTERVAL, 10000).
 -define(ADS_NUMBER, 1).
 

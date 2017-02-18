@@ -207,13 +207,17 @@ max_events() ->
 
 %% @private
 perform_update(Element, Actor, Events1) ->
+    UniqueElement = Element ++ integer_to_list(Events1),
+
     case lasp_config:get(throughput_type, gset) of
         twopset ->
-            lasp:update(?SIMPLE_TWOPSET, {add, Element ++ integer_to_list(Events1)}, Actor);
+            lasp:update(?SIMPLE_TWOPSET, {add, UniqueElement}, Actor);
         boolean ->
             lasp:update(?SIMPLE_BOOLEAN, true, Actor);
         gset ->
             lasp:update(?SIMPLE_BAG, {add, Element}, Actor);
+        awset_ps ->
+            lasp:update(?PROVENANCE_SET, {add, UniqueElement}, Actor);
         gcounter ->
             lasp:update(?SIMPLE_COUNTER, increment, Actor)
     end.

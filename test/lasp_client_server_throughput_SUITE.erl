@@ -23,7 +23,7 @@
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 %% common_test callbacks
--export([%% suite/0,
+-export([suite/0,
          init_per_suite/1,
          end_per_suite/1,
          init_per_testcase/2,
@@ -44,6 +44,9 @@
 %% ===================================================================
 %% common_test callbacks
 %% ===================================================================
+
+suite() ->
+    [{timetrap, {hours, 1}}].
 
 init_per_suite(_Config) ->
     _Config.

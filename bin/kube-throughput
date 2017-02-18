@@ -2,8 +2,8 @@
 
 rm -rf /tmp/logs ~/Documents/lasp/priv/evaluation/logs
 
-gcloud beta container clusters create lasp --machine-type=n1-standard-16 --num-nodes=1
-gcloud beta container clusters get-credentials lasp
+# gcloud beta container clusters create lasp --machine-type=n1-standard-16 --num-nodes=1
+# gcloud beta container clusters get-credentials lasp
 
 #!/bin/bash
 for i in `seq 1 10`;

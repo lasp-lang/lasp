@@ -68,9 +68,9 @@ all() ->
     [
      % client_server_state_based_awset_ps,
      % client_server_state_based_twopset,
-     client_server_state_based_gcounter,
-     client_server_state_based_boolean,
-     client_server_state_based_gset
+     % client_server_state_based_gcounter,
+     client_server_state_based_boolean %,
+     % client_server_state_based_gset
     ].
 
 %% ===================================================================

@@ -39,7 +39,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/inet.hrl").
 
--define(RUNS, [1,2]).
+-define(RUNS, [1]).
 
 %% ===================================================================
 %% common_test callbacks

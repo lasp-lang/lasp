@@ -9,7 +9,7 @@
 -define(BATCH_EVENTS, 100).
 -define(BOOLEAN_TYPE, boolean).
 -define(TWOPSET_TYPE, twopset).
--define(EVAL_NUMBER, 1).
+-define(EVAL_NUMBER, 100).
 
 %% Intermediary node modification.
 -define(INTERMEDIARY_NODE_MODIFICATION, false).

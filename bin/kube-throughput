@@ -8,16 +8,16 @@ gcloud beta container clusters get-credentials lasp
 GCE=true THROUGHPUT_TYPE=boolean CLIENT_NUMBER=1 bin/kube
 GCE=true THROUGHPUT_TYPE=boolean CLIENT_NUMBER=2 bin/kube
 GCE=true THROUGHPUT_TYPE=boolean CLIENT_NUMBER=4 bin/kube
-GCE=true THROUGHPUT_TYPE=boolean CLIENT_NUMBER=8 bin/kube
+# GCE=true THROUGHPUT_TYPE=boolean CLIENT_NUMBER=8 bin/kube
 
 GCE=true THROUGHPUT_TYPE=gset CLIENT_NUMBER=1 bin/kube
 GCE=true THROUGHPUT_TYPE=gset CLIENT_NUMBER=2 bin/kube
 GCE=true THROUGHPUT_TYPE=gset CLIENT_NUMBER=4 bin/kube
-GCE=true THROUGHPUT_TYPE=gset CLIENT_NUMBER=8 bin/kube
+# GCE=true THROUGHPUT_TYPE=gset CLIENT_NUMBER=8 bin/kube
 
 GCE=true THROUGHPUT_TYPE=gcounter CLIENT_NUMBER=1 bin/kube
 GCE=true THROUGHPUT_TYPE=gcounter CLIENT_NUMBER=2 bin/kube
 GCE=true THROUGHPUT_TYPE=gcounter CLIENT_NUMBER=4 bin/kube
-GCE=true THROUGHPUT_TYPE=gcounter CLIENT_NUMBER=8 bin/kube
+# GCE=true THROUGHPUT_TYPE=gcounter CLIENT_NUMBER=8 bin/kube
 
 gcloud beta container clusters delete lasp

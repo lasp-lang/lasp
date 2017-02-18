@@ -39,7 +39,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/inet.hrl").
 
--define(RUNS, [1]).
+-define(RUNS, [1,2]).
 
 %% ===================================================================
 %% common_test callbacks
@@ -63,8 +63,8 @@ end_per_testcase(Case, _Config) ->
 
 all() ->
     [
-     client_server_state_based_awset_ps,
-     client_server_state_based_twopset,
+     % client_server_state_based_awset_ps,
+     % client_server_state_based_twopset,
      client_server_state_based_gcounter,
      client_server_state_based_boolean,
      client_server_state_based_gset

@@ -117,7 +117,10 @@ handle_info(event, #state{actor=Actor,
 
             Element = atom_to_list(Actor),
 
-            perform_update(Element, Actor, Events1),
+            {Duration, _} = timer:tc(fun() ->
+                                            perform_update(Element, Actor, Events1)
+                                     end),
+            log_event(Duration),
 
             % lager:info("Events done: ~p, Batch events done: ~p, Node: ~p", [Events1, BatchEvents1, Actor]),
 
@@ -197,6 +200,15 @@ log_batch(Start, End, Events) ->
     case lasp_config:get(instrumentation, false) of
         true ->
             lasp_instrumentation:batch(Start, End, Events);
+        false ->
+            ok
+    end.
+
+%% @private
+log_event(Duration) ->
+    case lasp_config:get(instrumentation, false) of
+        true ->
+            lasp_instrumentation:event(Duration);
         false ->
             ok
     end.

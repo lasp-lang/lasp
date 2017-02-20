@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+IMAGE=lasp-gce-workflow-v2
+
+docker build -f Dockerfiles/lasp-gce-workflow-v2 -t cmeiklejohn/${IMAGE} .
+docker push cmeiklejohn/${IMAGE}
+
 rm -rf /tmp/logs ~/Documents/lasp/priv/evaluation/logs
 
 gcloud beta container clusters create lasp \
@@ -9,7 +14,7 @@ gcloud beta container clusters get-credentials lasp
 
 for i in `seq 1 100`;
   do
-    GCE=true THROUGHPUT_TYPE=gcounter CLIENT_NUMBER=1 bin/kube
+    IMAGE=${IMAGE} GCE=true THROUGHPUT_TYPE=gcounter CLIENT_NUMBER=1 bin/kube
   done
 
 gcloud beta container clusters delete lasp

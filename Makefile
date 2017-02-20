@@ -35,37 +35,37 @@ lint:
 	${REBAR} as lint lint
 
 eunit:
-	${REBAR} as test eunit
+	${REBAR} eunit
 
 ct:
-	${REBAR} as test ct --suite=lasp_SUITE
+	${REBAR} ct --suite=lasp_SUITE
 
 ad-counter-simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation ad-counter-overcounting ad-counter-partition-overcounting
 game-tournament-simulations: client-server-game-tournament-simulation peer-to-peer-game-tournament-simulation
 
 peer-to-peer-ad-counter-simulation:
-	${REBAR} as test ct --suite=lasp_peer_to_peer_advertisement_counter_SUITE
+	${REBAR} ct --suite=lasp_peer_to_peer_advertisement_counter_SUITE
 
 client-server-ad-counter-simulation:
-	${REBAR} as test ct --suite=lasp_client_server_advertisement_counter_SUITE
+	${REBAR} ct --suite=lasp_client_server_advertisement_counter_SUITE
 
 ad-counter-overcounting:
-	${REBAR} as test ct --suite=lasp_advertisement_counter_overcounting_SUITE
+	${REBAR} ct --suite=lasp_advertisement_counter_overcounting_SUITE
 
 ad-counter-partition-overcounting:
-	${REBAR} as test ct --suite=lasp_advertisement_counter_partition_overcounting_SUITE
+	${REBAR} ct --suite=lasp_advertisement_counter_partition_overcounting_SUITE
 
 peer-to-peer-game-tournament-simulation:
-	${REBAR} as test ct --suite=lasp_peer_to_peer_game_tournament_SUITE
+	${REBAR} ct --suite=lasp_peer_to_peer_game_tournament_SUITE
 
 client-server-game-tournament-simulation:
-	${REBAR} as test ct --suite=lasp_client_server_game_tournament_SUITE
+	${REBAR} ct --suite=lasp_client_server_game_tournament_SUITE
 
 peer-to-peer-throughput-simulation:
-	${REBAR} as test ct --suite=lasp_peer_to_peer_throughput_SUITE
+	${REBAR} ct --suite=lasp_peer_to_peer_throughput_SUITE
 
 client-server-throughput-simulation:
-	${REBAR} as test ct --suite=lasp_client_server_throughput_SUITE
+	${REBAR} ct --suite=lasp_client_server_throughput_SUITE
 
 client-server-divergence-simulation:
 	${REBAR} as test ct --suite=lasp_client_server_divergence_SUITE
@@ -75,10 +75,10 @@ client-server-divergence-simulation:
 ##
 
 rel:
-	${REBAR} release
+	${REBAR} as exp release
 
 stage:
-	${REBAR} release -d
+	${REBAR} as exp release -d
 
 ##
 ## Packaging targets
@@ -86,15 +86,15 @@ stage:
 
 package: rel
 	fpm -s dir -t deb -n $(PACKAGE) -v $(VERSION) \
-	    --deb-user $(PACKAGE) \
-	    --deb-group $(PACKAGE) \
-	    --before-install=rel/before-install \
-	    _build/default/rel/$(PACKAGE)=/opt/ \
-	    rel/init=/etc/init.d/$(PACKAGE) \
-	    rel/var/lib/$(PACKAGE)/=/var/lib/$(PACKAGE)/ \
-	    rel/var/log/$(PACKAGE)/=/var/log/$(PACKAGE)/ \
-	    rel/etc/$(PACKAGE)/$(PACKAGE).config=/etc/$(PACKAGE)/$(PACKAGE).config \
-	    rel/etc/default/$(PACKAGE)=/etc/default/$(PACKAGE)
+		--deb-user $(PACKAGE) \
+		--deb-group $(PACKAGE) \
+		--before-install=rel/before-install \
+		_build/exp/rel/$(PACKAGE)=/opt/ \
+		rel/init=/etc/init.d/$(PACKAGE) \
+		rel/var/lib/$(PACKAGE)/=/var/lib/$(PACKAGE)/ \
+		rel/var/log/$(PACKAGE)/=/var/log/$(PACKAGE)/ \
+		rel/etc/$(PACKAGE)/$(PACKAGE).config=/etc/$(PACKAGE)/$(PACKAGE).config \
+		rel/etc/default/$(PACKAGE)=/etc/default/$(PACKAGE)
 
 package_cloud:
 	docker build -f Dockerfiles/packager -t cmeiklejohn/packager .

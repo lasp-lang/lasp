@@ -26,7 +26,8 @@
 -include("lasp.hrl").
 
 %% API
--export([start_link/0]).
+-export([start_link/0,
+         random_port/0]).
 
 %% Supervisor callbacks
 -export([init/1]).
@@ -182,6 +183,7 @@ init(_Args) ->
 %%%===================================================================
 
 %% @private
+-ifdef(experiments).
 web_specs() ->
     %% Before initializing the web backend, configure it using the
     %% proper ports.
@@ -205,6 +207,10 @@ web_specs() ->
             [mochiweb_socket_server]},
 
     [Web].
+-else.
+web_specs() ->
+    [].
+-endif.
 
 %% @private
 configure_defaults() ->

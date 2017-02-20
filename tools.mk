@@ -25,7 +25,7 @@
 #  -------------------------------------------------------------------
 
 REBAR            = $(shell pwd)/rebar3
-REVISION 		    ?= $(shell git rev-parse --short HEAD)
+REVISION			?= $(shell git rev-parse --short HEAD)
 PROJECT         ?= $(shell basename `find src -name "*.app.src"` .app.src)
 DEP_DIR         ?= "deps"
 EBIN_DIR        ?= "ebin"
@@ -34,13 +34,13 @@ EBIN_DIR        ?= "ebin"
 		cleanplt upload-docs
 
 compile-no-deps:
-	${REBAR} compile skip_deps=true
+	${REBAR} compile
 
 docs:
-	${REBAR} doc skip_deps=true
+	${REBAR} doc
 
 xref: compile
-	${REBAR} xref skip_deps=true
+	${REBAR} xref
 
 dialyzer: compile
 	${REBAR} dialyzer

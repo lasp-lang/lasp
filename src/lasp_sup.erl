@@ -131,7 +131,11 @@ init(_Args) ->
     %% Setup the throughput example, if necessary.
     ThroughputSpecs = throughput_child_specs(),
 
-    Children = Children0 ++ AdSpecs ++ TournamentSpecs ++ ThroughputSpecs,
+    %% Assemble specs.
+    Children = lists:flatten([Children0,
+                              AdSpecs,
+                              TournamentSpecs,
+                              ThroughputSpecs]),
 
     {ok, {{one_for_one, 5, 10}, Children}}.
 

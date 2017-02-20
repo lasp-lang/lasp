@@ -45,6 +45,7 @@ types() ->
         {gmap, {state_gmap, undefined}},
         {gset, {state_gset, undefined}},
         {ivar, {state_ivar, undefined}},
+        {lwwregister, {state_lwwregister, undefined}},
         {orset, {state_orset, undefined}},
         {pair, {state_pair, undefined}},
         {pncounter, {state_pncounter, undefined}},

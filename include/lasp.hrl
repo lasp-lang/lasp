@@ -1,3 +1,7 @@
+%% Membership.
+-define(MEMBERSHIP_ID, {<<"_membership">>, lwwregister}).
+-define(MEMBERSHIP_TYPE, lwwregister).
+
 %% Throughput simulation.
 -define(SIMPLE_BOOLEAN, {<<"boolean">>, ?BOOLEAN_TYPE}).
 -define(SIMPLE_BAG, {<<"bag">>, ?GSET_TYPE}).
@@ -9,7 +13,7 @@
 -define(BATCH_EVENTS, 100).
 -define(BOOLEAN_TYPE, boolean).
 -define(TWOPSET_TYPE, twopset).
--define(EVAL_NUMBER, 100).
+-define(EVAL_NUMBER, 20).
 
 %% Intermediary node modification.
 -define(INTERMEDIARY_NODE_MODIFICATION, false).

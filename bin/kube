@@ -41,6 +41,7 @@ ENV_VARS=(
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
   THROUGHPUT_TYPE
+  IMAGE
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -116,7 +117,7 @@ cat <<EOF > lasp.yaml
       spec:
         containers:
         - name: lasp-server
-          image: cmeiklejohn/lasp-dev
+          image: cmeiklejohn/${IMAGE}
           env:
           - name: TAG
             value: "server"
@@ -202,7 +203,7 @@ cat <<EOF > lasp.yaml
       spec:
         containers:
         - name: lasp-client
-          image: cmeiklejohn/lasp-dev
+          image: cmeiklejohn/${IMAGE}
           env:
           - name: TAG
             value: "client"

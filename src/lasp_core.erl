@@ -478,7 +478,6 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                 %% Merge may throw for invalid types.
                 try
                     Merged = lasp_type:merge(Type, Value0, Value),
-                    lager:info("Merged: ~p; waiting threads: ~p", [Merged, WT]),
                     case lasp_type:is_strict_inflation(Type, Value0, Merged) of
                         true ->
                             %% Object inflation.
@@ -908,7 +907,6 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              {ok, {Id, Type, Metadata, Value}}=Result) ->
     SW = case lasp_type:threshold_met(Type, Value, Threshold) of
         true ->
-            lager:info("Threshold met: ~p", [Threshold]),
             case From of
                 {server, undefined, {Address, Ref}} ->
                     gen_server:reply({Address, Ref},
@@ -925,7 +923,6 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
             end,
             StillWaiting0;
         false ->
-            lager:info("Threshold not met: ~p", [Threshold]),
             StillWaiting0 ++ [H]
     end,
     reply_to_all(T, SW, Result);

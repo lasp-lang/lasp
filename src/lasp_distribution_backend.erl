@@ -261,6 +261,7 @@ init([]) ->
     ?SYNC_BACKEND:seed(),
 
     {ok, Actor} = lasp_unique:unique(),
+    lasp_config:set(actor, Actor),
 
     Identifier = node(),
 

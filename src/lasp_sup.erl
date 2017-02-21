@@ -79,6 +79,11 @@ init(_Args) ->
                         permanent, 5000, worker,
                         [lasp_plumtree_backend]},
 
+    Membership = {lasp_membership,
+                  {lasp_membership, start_link, []},
+                   permanent, 5000, worker,
+                   [lasp_membership]},
+
     Workflow = {lasp_workflow,
                 {lasp_workflow, start_link, []},
                  permanent, 5000, worker,
@@ -92,7 +97,8 @@ init(_Args) ->
                   PlumtreeMemoryReport,
                   MemoryUtilizationReport,
                   DistributionBackend,
-                  Process] ++ WebSpecs,
+                  Process,
+                  Membership] ++ WebSpecs,
 
     DagEnabled = application:get_env(?APP, dag_enabled, ?DAG_ENABLED),
     lasp_config:set(dag_enabled, DagEnabled),

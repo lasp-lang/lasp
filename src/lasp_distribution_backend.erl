@@ -264,13 +264,6 @@ init([]) ->
     lasp_config:set(actor, Actor),
 
     Identifier = node(),
-
-    %% Configure a membership callback to the peer service.
-    MembershipFun = fun(S) ->
-                            update_membership(S, Actor)
-                    end,
-    partisan_peer_service:add_sup_callback(MembershipFun),
-
     %% Start the storage backend.
     {ok, Store} = case ?CORE:start_link(Identifier) of
         {ok, Pid} ->
@@ -625,23 +618,3 @@ blocking_sync(Id) ->
         delta_based ->
             {error, not_implemented}
     end.
-
-%% @private
-timestamp() ->
-    {Mega, Sec, _Micro} = erlang:timestamp(),
-    Mega * 1000000 + Sec.
-
-%% @private
-update_membership(State, Actor) ->
-    %% Declare variable if necessary, ensure variable is dynamic and not
-    %% synchronized: use a LWW-register.
-    {ok, _} = lasp:declare_dynamic(?MEMBERSHIP_ID, ?MEMBERSHIP_TYPE),
-
-    %% Decode the membership.
-    Membership = partisan_peer_service:decode(State),
-    lager:info("New membership: ~p", [Membership]),
-
-    %% Bind the new membership to the register.
-    {ok, _} = lasp:update(?MEMBERSHIP_ID, {set, timestamp(), Membership}, Actor),
-
-    ok.

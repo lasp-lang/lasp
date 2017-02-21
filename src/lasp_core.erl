@@ -75,6 +75,9 @@
 %% Administrative controls.
 -export([storage_backend_reset/1]).
 
+%% Prototype features.
+-export([enforce_once/4]).
+
 %% Definitions for the bind/read fun abstraction.
 -define(BACKEND_BIND, fun(_AccId, AccValue, _Store) ->
                 ?MODULE:bind_var(_AccId, AccValue, _Store)
@@ -89,6 +92,19 @@
 -define(BACKEND_READ, fun(_Id, _Threshold) ->
                 ?MODULE:read_var(_Id, _Threshold, Store)
               end).
+
+%% @private
+enforce_once(Id, Threshold, EnforceFun, Store) ->
+    TransFun = fun({_, Type, _, Value}) ->
+                   case lasp_type:threshold_met(Type, Value, Threshold) of
+                       true ->
+                           EnforceFun(Value);
+                       false ->
+                           ok
+                   end,
+                   Value
+               end,
+    lasp_process:start_dag_link([[{Id, ?BACKEND_READ}], TransFun, undefined]).
 
 %% @doc Initialize the storage backend.
 -spec start_link(atom()) -> {ok, store()} | {error, term()}.
@@ -454,6 +470,7 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                 %% Merge may throw for invalid types.
                 try
                     Merged = lasp_type:merge(Type, Value0, Value),
+                    lager:info("Merged: ~p; waiting threads: ~p", [Merged, WT]),
                     case lasp_type:is_strict_inflation(Type, Value0, Merged) of
                         true ->
                             %% Object inflation.
@@ -883,6 +900,7 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              {ok, {Id, Type, Metadata, Value}}=Result) ->
     SW = case lasp_type:threshold_met(Type, Value, Threshold) of
         true ->
+            lager:info("Threshold met: ~p", [Threshold]),
             case From of
                 {server, undefined, {Address, Ref}} ->
                     gen_server:reply({Address, Ref},
@@ -899,6 +917,7 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
             end,
             StillWaiting0;
         false ->
+            lager:info("Threshold not met: ~p", [Threshold]),
             StillWaiting0 ++ [H]
     end,
     reply_to_all(T, SW, Result);

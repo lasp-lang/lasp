@@ -98,8 +98,9 @@ enforce_once(Id, Threshold, EnforceFun, Store) ->
     TransFun = fun({_, Type, _, Value}) ->
                    case lasp_type:threshold_met(Type, Value, Threshold) of
                        true ->
-                           Membership = lists:usort(lasp:query(?MEMBERSHIP_ID)),
-                           EnforcementNode = hd(Membership),
+                           {ok, Membership} = lasp:query(?MEMBERSHIP_ID),
+                           SortedMembership = lists:usort(Membership),
+                           EnforcementNode = hd(SortedMembership),
 
                            case node() of
                                EnforcementNode ->

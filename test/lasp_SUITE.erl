@@ -783,25 +783,25 @@ enforce_once_test(Config) ->
 
     Nodes = proplists:get_value(nodes, Config),
     lager:info("Nodes: ~p", [Nodes]),
-    Node = hd(Nodes),
+    Node = hd(lists:usort(Nodes)),
 
     lager:info("Waiting for cluster to stabilize."),
     timer:sleep(10000),
 
     %% Declare the object first: if not, invariant can't be registered.
     Id = {<<"object">>, ?COUNTER_TYPE},
-    {ok, _} = lasp:declare(Id, ?COUNTER_TYPE),
+    {ok, _} = rpc:call(Node, lasp, declare, [Id, ?COUNTER_TYPE]),
 
     %% Define an enforce-once invariant.
-    Threshold = {value, 1},
     Self = self(),
+    Threshold = {value, 1},
+
     EnforceFun = fun(X) ->
-                         lager:info("Enforce function fired with: ~p",
-                                    [X]),
+                         lager:info("Enforce function fired with: ~p", [X]),
                          Self ! {ok, Threshold}
                  end,
 
-    lager:info("Adding invariant!"),
+    lager:info("Adding invariant on node: ~p!", [Node]),
 
     case rpc:call(Node, lasp, enforce_once, [Id, Threshold, EnforceFun]) of
         ok ->
@@ -812,8 +812,8 @@ enforce_once_test(Config) ->
     end,
 
     %% Increment counter twice to get trigger to fire.
-    {ok, _} = lasp:update(Id, increment, self()),
-    {ok, _} = lasp:update(Id, increment, self()),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
 
     lager:info("Waiting for response..."),
     receive
@@ -821,7 +821,8 @@ enforce_once_test(Config) ->
             ok
     after
         10000 ->
-          ct:fail(failed)
+            lager:info("Did not receive response!"),
+            ct:fail(failed)
     end,
 
     lager:info("Finished enforce_once test."),

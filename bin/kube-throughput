@@ -1,20 +1,38 @@
 #!/usr/bin/env bash
 
 IMAGE=lasp-gce-workflow-v2
+REPS=20
 
+# Delete image
+IMAGE_IDS=$(docker images | grep cmeiklejohn/${IMAGE} | awk '{print $3}')
+echo "Images matching for deletion: ${IMAGE_IDS}"
+
+if [ ! -z "$KUBERNETES_PORT" ]; then
+  docker rmi ${IMAGE_IDS}
+fi
+
+# Rebuild image fresh, to ensure no stale dependencies
 docker build -f Dockerfiles/lasp-gce-workflow-v2 -t cmeiklejohn/${IMAGE} .
+
+# Push image to hub
 docker push cmeiklejohn/${IMAGE}
 
+# Remove existing logs
 rm -rf /tmp/logs ~/Documents/lasp/priv/evaluation/logs
 
+# Bootstrap cluster
 gcloud beta container clusters create lasp \
   --machine-type=n1-standard-4 \
   --num-nodes=1
+
+# Get container credential
 gcloud beta container clusters get-credentials lasp
 
-for i in `seq 1 100`;
+# Run test X times using the right image for the structure
+for i in `seq 1 ${REPS}`;
   do
-    IMAGE=${IMAGE} GCE=true THROUGHPUT_TYPE=gcounter CLIENT_NUMBER=1 bin/kube
+    IMAGE=${IMAGE} GCE=true THROUGHPUT_TYPE=boolean CLIENT_NUMBER=1 bin/kube
   done
 
-gcloud beta container clusters delete lasp
+# Terminate the cluster
+yes | gcloud beta container clusters delete lasp

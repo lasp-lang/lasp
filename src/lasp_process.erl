@@ -84,23 +84,26 @@ start_single_fire_process(Args) ->
 %%
 start_tracked_process(EventCount, [ReadFuns, TransFun, WriteFun]) ->
     From = [Id || {Id, _} <- ReadFuns],
+
     case lasp_config:get(dag_enabled, ?DAG_ENABLED) of
         false ->
-            lasp_process_sup:start_child(EventCount, [ReadFuns, TransFun, WriteFun]);
+            lasp_process_sup:start_child(EventCount,
+                                         [ReadFuns, TransFun, WriteFun]);
         true ->
             case WriteFun of
                 {To, _} ->
                     case lasp_dependence_dag:will_form_cycle(From, To) of
                         false ->
-                            lasp_process_sup:start_child(EventCount, [ReadFuns, TransFun, WriteFun]);
+                            lasp_process_sup:start_child(EventCount,
+                                                         [ReadFuns, TransFun, WriteFun]);
                         true ->
                             lager:warning("dependence dag edge from ~w to ~w would form a cycle~n", [From, To]),
                             %% @todo propagate errors
                             {ok, ignore}
                     end;
-                _ ->
-                    %% @todo propagate errors
-                    {ok, ignore}
+                undefined ->
+                    lasp_process_sup:start_child(EventCount,
+                                                 [ReadFuns, TransFun, WriteFun])
             end
     end.
 

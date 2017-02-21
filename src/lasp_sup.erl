@@ -181,6 +181,11 @@ configure_defaults() ->
     lager:info("Setting tutorial: ~p", [Tutorial]),
     lasp_config:set(tutorial, Tutorial),
 
+    MaxEventsDefault = list_to_integer(os:getenv("MAX_EVENTS", "1000")),
+    MaxEvents = application:get_env(?APP, max_events, MaxEventsDefault),
+    lager:info("Setting max events: ~p", [MaxEvents]),
+    lasp_config:set(max_events, MaxEvents),
+
     ExtendedLoggingDefault = list_to_atom(os:getenv("EXTENDED_LOGGING", "false")),
     ExtendedLogging = application:get_env(?APP, extended_logging, ExtendedLoggingDefault),
     lager:info("Setting extended logging: ~p", [ExtendedLogging]),

@@ -42,6 +42,7 @@ ENV_VARS=(
   AWS_SECRET_ACCESS_KEY
   THROUGHPUT_TYPE
   IMAGE
+  MAX_EVENTS
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -175,6 +176,8 @@ cat <<EOF > lasp.yaml
             value: "${EXTENDED_LOGGING}"
           - name: MAILBOX_LOGGING
             value: "${MAILBOX_LOGGING}"
+          - name: MAX_EVENTS
+            value: "${MAX_EVENTS}"
           - name: MY_POD_NAME
             valueFrom:
               fieldRef:
@@ -261,6 +264,8 @@ cat <<EOF > lasp.yaml
             value: "${EXTENDED_LOGGING}"
           - name: MAILBOX_LOGGING
             value: "${MAILBOX_LOGGING}"
+          - name: MAX_EVENTS
+            value: "${MAX_EVENTS}"
           - name: MY_POD_NAME
             valueFrom:
               fieldRef:

@@ -81,7 +81,7 @@ init([]) ->
 
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled call: ~p", [Msg]),
-    {reply, ok, State}.
+    {noreply, State}.
 
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 

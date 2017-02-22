@@ -99,7 +99,7 @@ kubectl create -f /tmp/redis.yaml
 echo
 
 echo "Sleeping for redis deployment..."
-sleep 60
+sleep 10
 
 # Start the executions in parallel.
 for k in ${CLIENTS[@]}; do

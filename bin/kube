@@ -111,6 +111,7 @@ cat <<EOF > lasp.yaml
     template:
       metadata:
         labels:
+          evaluation-identifier: ${EVAL_ID}
           evaluation-timestamp: "${EVAL_TIMESTAMP}"
           tag: server
           run: lasp-server
@@ -197,6 +198,7 @@ cat <<EOF > lasp.yaml
     template:
       metadata:
         labels:
+          evaluation-identifier: ${EVAL_ID}
           evaluation-timestamp: "${EVAL_TIMESTAMP}"
           tag: client
           run: lasp-client

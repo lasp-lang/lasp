@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 IMAGE=lasp-gce-workflow-v2
-REPS=10
+REPS=1
 
 # Delete image
 IMAGE_IDS=$(docker images | grep cmeiklejohn/${IMAGE} | awk '{print $3}')

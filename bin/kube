@@ -3,6 +3,7 @@
 LASP_BRANCH=workflow-v2
 
 # Configure experiment.
+WORKFLOW=true
 SERVER_REPLICAS=1
 PEER_SERVICE=partisan_client_server_peer_service_manager
 MODE=state_based
@@ -22,6 +23,7 @@ MAILBOX_LOGGING=false
 
 # Environment variables.
 ENV_VARS=(
+  WORKFLOW
   LASP_BRANCH
   PEER_SERVICE
   MODE

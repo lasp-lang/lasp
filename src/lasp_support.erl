@@ -262,6 +262,7 @@ start_runner() ->
     ok = application:set_env(plumtree,
                              broadcast_mods,
                              [lasp_plumtree_backend]),
+    ok = lasp_config:set(workflow, true),
     ok = partisan_config:set(partisan_peer_service_manager,
                              partisan_default_peer_service_manager),
     lager:info("Configured peer_service_manager ~p on node ~p",
@@ -324,7 +325,7 @@ load_lasp(Node, Config, Case) ->
     ok = rpc:call(Node, application, set_env, [plumtree,
                                                broadcast_mods,
                                                [lasp_plumtree_backend]]),
-
+    ok = rpc:call(Node, lasp_config, set, [workflow, true]),
     ok = rpc:call(Node, partisan_config, set, [partisan_peer_service_manager,
                                                partisan_default_peer_service_manager]),
     lager:info("Configured peer_service_manager ~p on node ~p",

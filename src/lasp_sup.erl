@@ -79,20 +79,38 @@ init(_Args) ->
                         permanent, 5000, worker,
                         [lasp_plumtree_backend]},
 
-    Workflow = {lasp_workflow,
-                {lasp_workflow, start_link, []},
-                 permanent, 5000, worker,
-                 [lasp_workflow]},
+    Membership = {lasp_membership,
+                  {lasp_membership, start_link, []},
+                   permanent, 5000, worker,
+                   [lasp_membership]},
+
+    WorkflowDefault = list_to_atom(os:getenv("WORKFLOW", "false")),
+    WorkflowEnabled = application:get_env(?APP,
+                                          workflow,
+                                          WorkflowDefault),
+    lasp_config:set(workflow, WorkflowEnabled),
+    lager:info("Workflow: ~p", [WorkflowEnabled]),
+
+    WorkflowSpecs = case WorkflowEnabled of
+        true ->
+            Workflow = {lasp_workflow,
+                        {lasp_workflow, start_link, []},
+                         permanent, 5000, worker,
+                         [lasp_workflow]},
+            [Workflow];
+        false ->
+            []
+    end,
 
     WebSpecs = web_specs(),
 
     BaseSpecs0 = [Unique,
                   PlumtreeBackend,
-                  Workflow,
                   PlumtreeMemoryReport,
                   MemoryUtilizationReport,
                   DistributionBackend,
-                  Process] ++ WebSpecs,
+                  Process,
+                  Membership] ++ WorkflowSpecs ++ WebSpecs,
 
     DagEnabled = application:get_env(?APP, dag_enabled, ?DAG_ENABLED),
     lasp_config:set(dag_enabled, DagEnabled),
@@ -131,7 +149,11 @@ init(_Args) ->
     %% Setup the throughput example, if necessary.
     ThroughputSpecs = throughput_child_specs(),
 
-    Children = Children0 ++ AdSpecs ++ TournamentSpecs ++ ThroughputSpecs,
+    %% Assemble specs.
+    Children = lists:flatten([Children0,
+                              AdSpecs,
+                              TournamentSpecs,
+                              ThroughputSpecs]),
 
     {ok, {{one_for_one, 5, 10}, Children}}.
 
@@ -170,6 +192,11 @@ configure_defaults() ->
     Tutorial = application:get_env(?APP, tutorial, TutorialDefault),
     lager:info("Setting tutorial: ~p", [Tutorial]),
     lasp_config:set(tutorial, Tutorial),
+
+    MaxEventsDefault = list_to_integer(os:getenv("MAX_EVENTS", "1000")),
+    MaxEvents = application:get_env(?APP, max_events, MaxEventsDefault),
+    lager:info("Setting max events: ~p", [MaxEvents]),
+    lasp_config:set(max_events, MaxEvents),
 
     ExtendedLoggingDefault = list_to_atom(os:getenv("EXTENDED_LOGGING", "false")),
     ExtendedLogging = application:get_env(?APP, extended_logging, ExtendedLoggingDefault),

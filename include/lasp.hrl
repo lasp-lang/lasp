@@ -1,3 +1,7 @@
+%% Membership.
+-define(MEMBERSHIP_ID, {<<"_membership">>, lwwregister}).
+-define(MEMBERSHIP_TYPE, lwwregister).
+
 %% Throughput simulation.
 -define(SIMPLE_BOOLEAN, {<<"boolean">>, ?BOOLEAN_TYPE}).
 -define(SIMPLE_BAG, {<<"bag">>, ?GSET_TYPE}).

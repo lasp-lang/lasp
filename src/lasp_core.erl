@@ -75,6 +75,9 @@
 %% Administrative controls.
 -export([storage_backend_reset/1]).
 
+%% Prototype features.
+-export([enforce_once/4]).
+
 %% Definitions for the bind/read fun abstraction.
 -define(BACKEND_BIND, fun(_AccId, AccValue, _Store) ->
                 ?MODULE:bind_var(_AccId, AccValue, _Store)
@@ -89,6 +92,28 @@
 -define(BACKEND_READ, fun(_Id, _Threshold) ->
                 ?MODULE:read_var(_Id, _Threshold, Store)
               end).
+
+%% @private
+enforce_once(Id, Threshold, EnforceFun, Store) ->
+    TransFun = fun({_, Type, _, Value}) ->
+                   case lasp_type:threshold_met(Type, Value, Threshold) of
+                       true ->
+                           {ok, Membership} = lasp:query(?MEMBERSHIP_ID),
+                           SortedMembership = lists:usort(Membership),
+                           EnforcementNode = hd(SortedMembership),
+
+                           case node() of
+                               EnforcementNode ->
+                                   EnforceFun(Value);
+                               _ ->
+                                   ok
+                           end;
+                       false ->
+                           ok
+                   end,
+                   Value
+               end,
+    lasp_process:start_dag_link([[{Id, ?BACKEND_READ}], TransFun, undefined]).
 
 %% @doc Initialize the storage backend.
 -spec start_link(atom()) -> {ok, store()} | {error, term()}.

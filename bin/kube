@@ -20,6 +20,7 @@ MAILBOX_LOGGING=false
 
 # Environment variables.
 ENV_VARS=(
+  REPS
   LASP_BRANCH
   PEER_SERVICE
   MODE
@@ -50,21 +51,22 @@ do
   fi
 done
 
-# Configure evaluation timestamp and identifier.
-EVAL_TIMESTAMP=$(date +%s)
-EVAL_ID="client_server_state_based_${THROUGHPUT_TYPE}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
-echo "Evaluation identifier is:" ${EVAL_ID}
-echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
+for i in `seq 1 ${REPS}`; do
+  # Configure evaluation timestamp and identifier.
+  EVAL_TIMESTAMP=$(date +%s)
+  EVAL_ID="client_server_state_based_${THROUGHPUT_TYPE}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
+  echo "Evaluation identifier is:" ${EVAL_ID}
+  echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
 
-# Get Kubernetes API server.
-export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)
+  # Get Kubernetes API server.
+  export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)
 
-# Get Kubernetes access token.
-export TOKEN=$(kubectl describe secret $(kubectl get secrets | grep default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d '\t')
+  # Get Kubernetes access token.
+  export TOKEN=$(kubectl describe secret $(kubectl get secrets | grep default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d '\t')
 
-cd /tmp
+  cd /tmp
 
-cat <<EOF > lasp.yaml
+  cat <<EOF > lasp.yaml
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
@@ -79,6 +81,8 @@ cat <<EOF > lasp.yaml
           tag: server
           run: lasp-server
       spec:
+        nodeSelector:
+          client_number: "${CLIENT_NUMBER}"
         containers:
         - name: lasp-server
           image: cmeiklejohn/${IMAGE}
@@ -166,6 +170,8 @@ cat <<EOF > lasp.yaml
           tag: client
           run: lasp-client
       spec:
+        nodeSelector:
+          client_number: "${CLIENT_NUMBER}"
         containers:
         - name: lasp-client
           image: cmeiklejohn/${IMAGE}
@@ -240,12 +246,13 @@ cat <<EOF > lasp.yaml
                 fieldPath: status.podIP
 EOF
 
-echo "Creating deployment."
-kubectl create -f /tmp/lasp.yaml
-echo
+  echo "Creating deployment."
+  kubectl create -f /tmp/lasp.yaml
+  echo
 
-sleep 60
+  sleep 60
 
-echo "Tailing logs."
-export SERVER_POD_NAME=$(kubectl get pods | grep server | awk '{print $1}')
-kubectl logs --tail=-1 -f $SERVER_POD_NAME
+  echo "Tailing logs."
+  export SERVER_POD_NAME=$(kubectl get pods | grep server | awk '{print $1}')
+  kubectl logs --tail=-1 -f $SERVER_POD_NAME
+done

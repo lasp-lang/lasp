@@ -70,7 +70,7 @@ for i in `seq 1 ${REPS}`; do
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
-    name: lasp-server
+    name: "lasp-server-${EVAL_TIMESTAMP}"
   spec:
     replicas: ${SERVER_REPLICAS}
     template:
@@ -84,7 +84,7 @@ for i in `seq 1 ${REPS}`; do
         nodeSelector:
           client_number: "${CLIENT_NUMBER}"
         containers:
-        - name: lasp-server
+        - name: "lasp-server-${EVAL_TIMESTAMP}"
           image: cmeiklejohn/${IMAGE}
           imagePullPolicy: IfNotPresent
           env:
@@ -160,7 +160,7 @@ for i in `seq 1 ${REPS}`; do
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
-    name: lasp-client
+    name: "lasp-client-${EVAL_TIMESTAMP}"
   spec:
     replicas: ${CLIENT_REPLICAS}
     template:
@@ -174,7 +174,7 @@ for i in `seq 1 ${REPS}`; do
         nodeSelector:
           client_number: "${CLIENT_NUMBER}"
         containers:
-        - name: lasp-client
+        - name: "lasp-client-${EVAL_TIMESTAMP}"
           image: cmeiklejohn/${IMAGE}
           imagePullPolicy: IfNotPresent
           env:

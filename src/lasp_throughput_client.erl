@@ -206,7 +206,7 @@ log_batch(Start, End, Events) ->
 
 %% @private
 log_event(Duration) ->
-    case lasp_config:get(instrumentation, false) of
+    case lasp_config:get(event_logging, false) of
         true ->
             lasp_instrumentation:event(Duration);
         false ->

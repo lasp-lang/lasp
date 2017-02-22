@@ -257,8 +257,9 @@ EOF
   echo "Tailing logs."
   export SERVER_POD_NAME=$(kubectl get pods | grep server | awk '{print $1}')
   kubectl logs --tail=-1 -f $SERVER_POD_NAME
-
-  NODE=$(echo "client_number=${CLIENT_NUMBER}" | xargs kubectl get nodes -l | grep Ready | head -1 | awk '{print $1}')
-  echo "Removing label for node ${NODE}"
-  kubectl label node ${NODE} client_number-
 done
+
+# Only remove after *all* repetitions are completed.
+NODE=$(echo "client_number=${CLIENT_NUMBER}" | xargs kubectl get nodes -l | grep Ready | head -1 | awk '{print $1}')
+echo "Removing label for node ${NODE}"
+kubectl label node ${NODE} client_number-

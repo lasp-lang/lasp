@@ -84,21 +84,33 @@ init(_Args) ->
                    permanent, 5000, worker,
                    [lasp_membership]},
 
-    Workflow = {lasp_workflow,
-                {lasp_workflow, start_link, []},
-                 permanent, 5000, worker,
-                 [lasp_workflow]},
+    WorkflowDefault = list_to_atom(os:getenv("WORKFLOW", "false")),
+    WorkflowEnabled = application:get_env(?APP,
+                                          workflow,
+                                          WorkflowDefault),
+    lasp_config:set(workflow, WorkflowEnabled),
+    lager:info("Workflow: ~p", [WorkflowEnabled]),
+
+    WorkflowSpecs = case WorkflowEnabled of
+        true ->
+            Workflow = {lasp_workflow,
+                        {lasp_workflow, start_link, []},
+                         permanent, 5000, worker,
+                         [lasp_workflow]},
+            [Workflow];
+        false ->
+            []
+    end,
 
     WebSpecs = web_specs(),
 
     BaseSpecs0 = [Unique,
                   PlumtreeBackend,
-                  Workflow,
                   PlumtreeMemoryReport,
                   MemoryUtilizationReport,
                   DistributionBackend,
                   Process,
-                  Membership] ++ WebSpecs,
+                  Membership] ++ WorkflowSpecs ++ WebSpecs,
 
     DagEnabled = application:get_env(?APP, dag_enabled, ?DAG_ENABLED),
     lasp_config:set(dag_enabled, DagEnabled),

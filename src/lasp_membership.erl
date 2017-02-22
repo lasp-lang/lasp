@@ -80,19 +80,19 @@ init([]) ->
     {reply, term(), #state{}}.
 
 handle_call(Msg, _From, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
-    {reply, ok, State}.
+    _ = lager:warning("Unhandled call: ~p", [Msg]),
+    {noreply, State}.
 
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 
 %% @private
 handle_cast(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled cast: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
 handle_info(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled info: ~p", [Msg]),
     {noreply, State}.
 
 %% @private
@@ -112,17 +112,12 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 update_membership(State, Actor) ->
-    lager:info("State: ~p", [State]),
-
     %% Declare variable if necessary, ensure variable is dynamic and not
     %% synchronized: use a LWW-register.
-    lager:info("Declaring dynamic variable: ~p", [?MEMBERSHIP_ID]),
     {ok, _} = lasp:declare_dynamic(?MEMBERSHIP_ID, ?MEMBERSHIP_TYPE),
-    lager:info("Finished declaring dynamic variable: ~p", [?MEMBERSHIP_ID]),
 
     %% Decode the membership.
     Membership = partisan_peer_service:decode(State),
-    lager:info("New membership: ~p", [Membership]),
 
     %% Bind the new membership to the register.
     {ok, _} = lasp:update(?MEMBERSHIP_ID, {set, timestamp(), Membership}, Actor),

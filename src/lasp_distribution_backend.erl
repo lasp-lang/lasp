@@ -47,7 +47,8 @@
          intersection/3,
          fold/3,
          wait_needed/2,
-         thread/3]).
+         thread/3,
+         enforce_once/3]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -230,6 +231,12 @@ filter(Id, Function, AccId) ->
 -spec thread(module(), func(), args()) -> ok | error().
 thread(Module, Function, Args) ->
     gen_server:call(?MODULE, {thread, Module, Function, Args}, infinity).
+
+%% @doc Enforce a invariant once over a monotonic condition.
+%%
+-spec enforce_once(id(), threshold(), function()) -> ok.
+enforce_once(Id, Threshold, EnforceFun) ->
+    gen_server:call(?MODULE, {enforce_once, Id, Threshold, EnforceFun}, infinity).
 
 %% @doc Pause execution until value requested with given threshold.
 %%
@@ -457,6 +464,15 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
     end,
 
     {reply, Result, State};
+
+handle_call({enforce_once, Id, Threshold, EnforceFun},
+            _From,
+            #state{store=Store}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("enforce_once"),
+
+    {ok, _Pid} = ?CORE:enforce_once(Id, Threshold, EnforceFun, Store),
+
+    {reply, ok, State};
 
 %% Spawn a function.
 handle_call({thread, Module, Function, Args},

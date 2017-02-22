@@ -100,6 +100,17 @@ echo
 
 for k in ${CLIENTS[@]}; do
   REPS=${REPS} LASP_BRANCH=${LASP_BRANCH} IMAGE=${IMAGE} GCE=${GCE} THROUGHPUT_TYPE=boolean CLIENT_NUMBER=${k} ./kube
+
+# Wait for all of the tests to finish;
+RUNNING=$(kubectl get pods | wc -l)
+
+# redis will always be running, so wait until there are no more lasp pods
+# and a title line -- HACK.
+while [ $RUNNING -ne 2 ]; do
+  echo "Sleeping until pods are destroyed."
+  sleep 2
+
+  RUNNING=$(kubectl get pods | wc -l)
 done
 
 # Download data from Redis at the end of the execution.

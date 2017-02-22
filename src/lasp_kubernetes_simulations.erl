@@ -89,8 +89,11 @@ delete_pod(#{<<"metadata">> := Metadata}) ->
 delete_replicasets(Run) ->
     DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
 
+    EvaluationIdentifier = lasp_config:get(evaluation_identifier, undefined),
+    EvaluationTimestamp = lasp_config:get(evaluation_timestamp, 0),
+
     APIServer = os:getenv("APISERVER"),
-    PodsUrl = APIServer ++ "/apis/extensions/v1beta1/namespaces/default/replicasets?labelSelector=run%3D" ++ Run,
+    PodsUrl = APIServer ++ "/apis/extensions/v1beta1/namespaces/default/replicasets?labelSelector=run%3D" ++ Run ++ "&evaluation_identifer%3D" ++ atom_to_list(EvaluationIdentifier) ++ "&evaluation_timestamp%3D" ++ integer_to_list(EvaluationTimestamp),
 
     case get_request(PodsUrl, DecodeFun) of
         {ok, #{<<"items">> := Items}} ->
@@ -105,8 +108,11 @@ delete_replicasets(Run) ->
 delete_pods(Run) ->
     DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
 
+    EvaluationIdentifier = lasp_config:get(evaluation_identifier, undefined),
+    EvaluationTimestamp = lasp_config:get(evaluation_timestamp, 0),
+
     APIServer = os:getenv("APISERVER"),
-    PodsUrl = APIServer ++ "/api/v1/pods?labelSelector=run%3D" ++ Run,
+    PodsUrl = APIServer ++ "/api/v1/pods?labelSelector=run%3D" ++ Run ++ "&evaluation_identifer%3D" ++ atom_to_list(EvaluationIdentifier) ++ "&evaluation_timestamp%3D" ++ integer_to_list(EvaluationTimestamp),
 
     case get_request(PodsUrl, DecodeFun) of
         {ok, #{<<"items">> := Items}} ->

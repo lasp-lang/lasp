@@ -3,30 +3,30 @@
 IMAGE=lasp-gce-workflow-v2
 REPS=1
 
-# # Delete image
-# IMAGE_IDS=$(docker images | grep cmeiklejohn/${IMAGE} | awk '{print $3}')
-# echo "Images matching for deletion: ${IMAGE_IDS}"
+# Delete image
+IMAGE_IDS=$(docker images | grep cmeiklejohn/${IMAGE} | awk '{print $3}')
+echo "Images matching for deletion: ${IMAGE_IDS}"
 
-# if [ ! -z "$KUBERNETES_PORT" ]; then
-#   docker rmi ${IMAGE_IDS}
-# fi
+if [ ! -z "$IMAGE_IDS" ]; then
+  docker rmi ${IMAGE_IDS}
+fi
 
-# # Rebuild image fresh, to ensure no stale dependencies
-# docker build -f Dockerfiles/lasp-gce-workflow-v2 -t cmeiklejohn/${IMAGE} .
+# Rebuild image fresh, to ensure no stale dependencies
+docker build -f Dockerfiles/lasp-gce-workflow-v2 -t cmeiklejohn/${IMAGE} .
 
-# # Push image to hub
-# docker push cmeiklejohn/${IMAGE}
+# Push image to hub
+docker push cmeiklejohn/${IMAGE}
 
 # Remove existing logs
-# rm -rf /tmp/logs ~/Documents/lasp/priv/evaluation/logs
+rm -rf /tmp/logs ~/Documents/lasp/priv/evaluation/logs
 
-# # Bootstrap cluster
-# gcloud beta container clusters create lasp \
-#   --machine-type=n1-standard-16 \
-#   --num-nodes=1
+# Bootstrap cluster
+gcloud beta container clusters create lasp \
+  --machine-type=n1-standard-16 \
+  --num-nodes=1
 
-# # Get container credential
-# gcloud beta container clusters get-credentials lasp
+# Get container credential
+gcloud beta container clusters get-credentials lasp
 
 # Print start time.
 date

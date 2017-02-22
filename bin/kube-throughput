@@ -4,7 +4,7 @@ CLIENTS=(1)
 NODES=2
 LASP_BRANCH=workflow-v2
 IMAGE=lasp-dev
-REPS=2
+REPS=1
 GCE=true
 MACHINE="n1-standard-8"
 
@@ -98,8 +98,16 @@ echo "Creating redis deployment."
 kubectl create -f /tmp/redis.yaml
 echo
 
+echo "Sleeping for redis deployment..."
+sleep 60
+
+# Start the executions in parallel.
 for k in ${CLIENTS[@]}; do
-  REPS=${REPS} LASP_BRANCH=${LASP_BRANCH} IMAGE=${IMAGE} GCE=${GCE} THROUGHPUT_TYPE=boolean CLIENT_NUMBER=${k} ./kube
+  REPS=${REPS} LASP_BRANCH=${LASP_BRANCH} IMAGE=${IMAGE} GCE=${GCE} THROUGHPUT_TYPE=boolean CLIENT_NUMBER=${k} ./kube &
+done
+
+echo "Sleeping waiting for any late starting pods..."
+sleep 60
 
 # Wait for all of the tests to finish;
 RUNNING=$(kubectl get pods | wc -l)
@@ -108,10 +116,13 @@ RUNNING=$(kubectl get pods | wc -l)
 # and a title line -- HACK.
 while [ $RUNNING -ne 2 ]; do
   echo "Sleeping until pods are destroyed."
+  echo "Running pods: "
+  kubectl get pods
   sleep 2
-
   RUNNING=$(kubectl get pods | wc -l)
 done
+
+echo "All tasks are finished."
 
 # Download data from Redis at the end of the execution.
 if [ "$GCE" ]; then

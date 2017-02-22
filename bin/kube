@@ -66,7 +66,7 @@ for i in `seq 1 ${REPS}`; do
 
   cd /tmp
 
-  cat <<EOF > lasp.yaml
+  cat <<EOF > lasp-${EVAL_TIMESTAMP}.yaml
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
@@ -249,7 +249,7 @@ for i in `seq 1 ${REPS}`; do
 EOF
 
   echo "Creating deployment."
-  kubectl create -f /tmp/lasp.yaml
+  kubectl create -f /tmp/lasp-${EVAL_TIMESTAMP}.yaml
   echo
 
   sleep 60

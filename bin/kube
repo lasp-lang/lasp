@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-LASP_BRANCH=workflow-v2
-
 # Configure experiment.
 SERVER_REPLICAS=1
 PEER_SERVICE=partisan_client_server_peer_service_manager
@@ -64,44 +62,9 @@ export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d 
 # Get Kubernetes access token.
 export TOKEN=$(kubectl describe secret $(kubectl get secrets | grep default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d '\t')
 
-echo "Copying dependencies for Redis synchronization code to /tmp"
-cp bin/sync-redis.erl /tmp
-mkdir -p /tmp/_build/default/lib/eredis/ebin
-cp -Rpv _build/default/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/ebin
-
 cd /tmp
 
 cat <<EOF > lasp.yaml
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: redis
-    labels:
-      run: redis
-  spec:
-    type: LoadBalancer
-    ports:
-    - port: 6379
-      protocol: TCP
-      name: tcp
-    selector:
-      run: redis
----
-  apiVersion: extensions/v1beta1
-  kind: Deployment
-  metadata:
-    name: redis
-  spec:
-    replicas: 1
-    template:
-      metadata:
-        labels:
-          run: redis
-      spec:
-        containers:
-        - name: redis
-          image: redis
----
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
@@ -277,25 +240,6 @@ cat <<EOF > lasp.yaml
                 fieldPath: status.podIP
 EOF
 
-echo "Deleting deployments."
-kubectl delete deployments --all
-echo
-
-echo "Deleting replicasets."
-kubectl delete replicasets --all
-echo
-
-echo "Deleting pods."
-kubectl delete pods --all
-echo
-
-echo "Deleting lasp deployments and servies."
-kubectl delete -f /tmp/lasp.yaml
-echo
-
-echo "Sleeping until deployment terminates."
-sleep 30
-
 echo "Creating deployment."
 kubectl create -f /tmp/lasp.yaml
 echo
@@ -305,24 +249,3 @@ sleep 60
 echo "Tailing logs."
 export SERVER_POD_NAME=$(kubectl get pods | grep server | awk '{print $1}')
 kubectl logs --tail=-1 -f $SERVER_POD_NAME
-
-if [ "$GCE" ]; then
-  echo "Running in Google Container Engine."
-  export REDIS_SERVICE_HOST=$(kubectl get services | grep redis | awk '{print $3}' | head -1)
-  # export REDIS_SERVICE_HOST=$(gcloud compute forwarding-rules list | grep TCP | awk '{print $3}' | tail -1)
-  export REDIS_SERVICE_PORT=6379
-  echo "REDIS_SERVICE_HOST: ${REDIS_SERVICE_HOST}"
-  echo "REDIS_SERVICE_PORT: ${REDIS_SERVICE_PORT}"
-else
-  export REDIS_SERVICE_HOST=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1 | cut -f 2-2 -d ":" | sed -e 's/\/\///g')
-  export REDIS_SERVICE_PORT=$(kubectl get service redis -o jsonpath="{.spec.ports[*].nodePort}")
-fi
-
-echo "Downloading data from Redis."
-./sync-redis.erl
-mkdir -p ~/Documents/lasp/priv/evaluation/logs
-cp -Rpv /tmp/logs/* ~/Documents/lasp/priv/evaluation/logs
-
-echo "Deleting lasp deployments and servies."
-kubectl delete -f /tmp/lasp.yaml
-echo

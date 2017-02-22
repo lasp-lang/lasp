@@ -8,8 +8,11 @@ REPS=2
 GCE=true
 MACHINE="n1-standard-8"
 
-# Remove any initial labeling.
+echo "Removing initial labeling."
 kubectl label nodes --all client_number-
+
+echo "Removing deployments."
+kubectl delete deployments --all
 
 # Rebuild image if desired.
 if [ ! -z "$REBUILD_IMAGE" ]; then

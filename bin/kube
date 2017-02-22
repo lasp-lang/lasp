@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-LASP_BRANCH=workflow-v2
-
 # Configure experiment.
 WORKFLOW=true
 SERVER_REPLICAS=1
@@ -24,6 +22,7 @@ MAILBOX_LOGGING=false
 # Environment variables.
 ENV_VARS=(
   WORKFLOW
+  REPS
   LASP_BRANCH
   PEER_SERVICE
   MODE
@@ -55,72 +54,42 @@ do
   fi
 done
 
-# Configure evaluation timestamp and identifier.
-EVAL_TIMESTAMP=$(date +%s)
-EVAL_ID="client_server_state_based_${THROUGHPUT_TYPE}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
-echo "Evaluation identifier is:" ${EVAL_ID}
-echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
+for i in `seq 1 ${REPS}`; do
+  # Configure evaluation timestamp and identifier.
+  EVAL_TIMESTAMP=$(date +%s)
+  EVAL_ID="client_server_state_based_${THROUGHPUT_TYPE}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
+  echo "Evaluation identifier is:" ${EVAL_ID}
+  echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
 
-# Get Kubernetes API server.
-export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)
+  # Get Kubernetes API server.
+  export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)
 
-# Get Kubernetes access token.
-export TOKEN=$(kubectl describe secret $(kubectl get secrets | grep default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d '\t')
+  # Get Kubernetes access token.
+  export TOKEN=$(kubectl describe secret $(kubectl get secrets | grep default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d '\t')
 
-echo "Copying dependencies for Redis synchronization code to /tmp"
-cp bin/sync-redis.erl /tmp
-mkdir -p /tmp/_build/default/lib/eredis/ebin
-cp -Rpv _build/default/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/ebin
+  cd /tmp
 
-cd /tmp
-
-cat <<EOF > lasp.yaml
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: redis
-    labels:
-      run: redis
-  spec:
-    type: LoadBalancer
-    ports:
-    - port: 6379
-      protocol: TCP
-      name: tcp
-    selector:
-      run: redis
----
+  cat <<EOF > lasp-${EVAL_TIMESTAMP}.yaml
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
-    name: redis
-  spec:
-    replicas: 1
-    template:
-      metadata:
-        labels:
-          run: redis
-      spec:
-        containers:
-        - name: redis
-          image: redis
----
-  apiVersion: extensions/v1beta1
-  kind: Deployment
-  metadata:
-    name: lasp-server
+    name: "lasp-server-${EVAL_TIMESTAMP}"
   spec:
     replicas: ${SERVER_REPLICAS}
     template:
       metadata:
         labels:
+          evaluation-identifier: ${EVAL_ID}
           evaluation-timestamp: "${EVAL_TIMESTAMP}"
           tag: server
           run: lasp-server
       spec:
+        nodeSelector:
+          client_number: "${CLIENT_NUMBER}"
         containers:
-        - name: lasp-server
+        - name: "lasp-server-${EVAL_TIMESTAMP}"
           image: cmeiklejohn/${IMAGE}
+          imagePullPolicy: IfNotPresent
           env:
           - name: TAG
             value: "server"
@@ -196,19 +165,23 @@ cat <<EOF > lasp.yaml
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
-    name: lasp-client
+    name: "lasp-client-${EVAL_TIMESTAMP}"
   spec:
     replicas: ${CLIENT_REPLICAS}
     template:
       metadata:
         labels:
+          evaluation-identifier: ${EVAL_ID}
           evaluation-timestamp: "${EVAL_TIMESTAMP}"
           tag: client
           run: lasp-client
       spec:
+        nodeSelector:
+          client_number: "${CLIENT_NUMBER}"
         containers:
-        - name: lasp-client
+        - name: "lasp-client-${EVAL_TIMESTAMP}"
           image: cmeiklejohn/${IMAGE}
+          imagePullPolicy: IfNotPresent
           env:
           - name: TAG
             value: "client"
@@ -282,52 +255,18 @@ cat <<EOF > lasp.yaml
                 fieldPath: status.podIP
 EOF
 
-echo "Deleting deployments."
-kubectl delete deployments --all
-echo
+  echo "Creating deployment."
+  kubectl create -f /tmp/lasp-${EVAL_TIMESTAMP}.yaml
+  echo
 
-echo "Deleting replicasets."
-kubectl delete replicasets --all
-echo
+  sleep 60
 
-echo "Deleting pods."
-kubectl delete pods --all
-echo
+  echo "Tailing logs."
+  export SERVER_POD_NAME=$(kubectl get pods | grep lasp-server-${EVAL_TIMESTAMP} | awk '{print $1}')
+  kubectl logs --tail=-1 -f $SERVER_POD_NAME
+done
 
-echo "Deleting lasp deployments and servies."
-kubectl delete -f /tmp/lasp.yaml
-echo
-
-echo "Sleeping until deployment terminates."
-sleep 30
-
-echo "Creating deployment."
-kubectl create -f /tmp/lasp.yaml
-echo
-
-sleep 60
-
-echo "Tailing logs."
-export SERVER_POD_NAME=$(kubectl get pods | grep server | awk '{print $1}')
-kubectl logs --tail=-1 -f $SERVER_POD_NAME
-
-if [ "$GCE" ]; then
-  echo "Running in Google Container Engine."
-  export REDIS_SERVICE_HOST=$(kubectl get services | grep redis | awk '{print $3}' | head -1)
-  # export REDIS_SERVICE_HOST=$(gcloud compute forwarding-rules list | grep TCP | awk '{print $3}' | tail -1)
-  export REDIS_SERVICE_PORT=6379
-  echo "REDIS_SERVICE_HOST: ${REDIS_SERVICE_HOST}"
-  echo "REDIS_SERVICE_PORT: ${REDIS_SERVICE_PORT}"
-else
-  export REDIS_SERVICE_HOST=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1 | cut -f 2-2 -d ":" | sed -e 's/\/\///g')
-  export REDIS_SERVICE_PORT=$(kubectl get service redis -o jsonpath="{.spec.ports[*].nodePort}")
-fi
-
-echo "Downloading data from Redis."
-./sync-redis.erl
-mkdir -p ~/Documents/lasp/priv/evaluation/logs
-cp -Rpv /tmp/logs/* ~/Documents/lasp/priv/evaluation/logs
-
-echo "Deleting lasp deployments and servies."
-kubectl delete -f /tmp/lasp.yaml
-echo
+# Only remove after *all* repetitions are completed.
+NODE=$(echo "client_number=${CLIENT_NUMBER}" | xargs kubectl get nodes -l | grep Ready | head -1 | awk '{print $1}')
+echo "Removing label for node ${NODE}"
+kubectl label node ${NODE} client_number-

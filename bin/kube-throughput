@@ -1,38 +1,152 @@
 #!/usr/bin/env bash
 
-IMAGE=lasp-gce-workflow-v2
-REPS=20
+CLIENTS=(1 2)
+NODES=2
+LASP_BRANCH=workflow-v2
+IMAGE=lasp-dev
+REPS=2
+GCE=true
+MACHINE="n1-standard-8"
 
-# Delete image
-IMAGE_IDS=$(docker images | grep cmeiklejohn/${IMAGE} | awk '{print $3}')
-echo "Images matching for deletion: ${IMAGE_IDS}"
+echo "Removing initial labeling."
+kubectl label nodes --all client_number-
 
-if [ ! -z "$KUBERNETES_PORT" ]; then
-  docker rmi ${IMAGE_IDS}
+echo "Removing deployments."
+kubectl delete deployments --all
+
+# Rebuild image if desired.
+if [ ! -z "$REBUILD_IMAGE" ]; then
+    # Delete image
+    IMAGE_IDS=$(docker images | grep cmeiklejohn/${IMAGE} | awk '{print $3}')
+    echo "Images matching for deletion: ${IMAGE_IDS}"
+
+    if [ ! -z "$IMAGE_IDS" ]; then
+      docker rmi ${IMAGE_IDS}
+    fi
+
+    # Rebuild image fresh, to ensure no stale dependencies
+    docker build -f Dockerfiles/$IMAGE -t cmeiklejohn/${IMAGE} .
+
+    # Push image to hub
+    docker push cmeiklejohn/${IMAGE}
 fi
 
-# Rebuild image fresh, to ensure no stale dependencies
-docker build -f Dockerfiles/lasp-gce-workflow-v2 -t cmeiklejohn/${IMAGE} .
+# Perform cluster operations if necessary.
+if [ ! -z "$CLUSTER_OPS" ]; then
+  # Bootstrap cluster
+  gcloud beta container clusters create lasp \
+    --machine-type=${MACHINE}
+    --num-nodes=${NODES}
 
-# Push image to hub
-docker push cmeiklejohn/${IMAGE}
+  # Get container credential
+  gcloud beta container clusters get-credentials lasp
+fi
 
-# Remove existing logs
-rm -rf /tmp/logs ~/Documents/lasp/priv/evaluation/logs
+# Allocate machines accordingly.
+for i in ${CLIENTS[@]}; do
+  # Find a machine we can allocate these to.
+  AVAILABLE=$(kubectl get nodes -l '!client_number' | grep Ready | head -1 | awk '{print $1}')
 
-# Bootstrap cluster
-gcloud beta container clusters create lasp \
-  --machine-type=n1-standard-4 \
-  --num-nodes=1
+  # Label the node.
+  kubectl label node ${AVAILABLE} client_number=${i}
 
-# Get container credential
-gcloud beta container clusters get-credentials lasp
+  echo "Labeled node ${AVAILABLE} for runs of ${i} clients."
+done
 
-# Run test X times using the right image for the structure
-for i in `seq 1 ${REPS}`;
-  do
-    IMAGE=${IMAGE} GCE=true THROUGHPUT_TYPE=boolean CLIENT_NUMBER=1 bin/kube
-  done
+# Deploy a single redis instance.
+echo "Copying code to /tmp"
+cp bin/sync-redis.erl /tmp
+cp bin/kube /tmp
+mkdir -p /tmp/_build/default/lib/eredis/ebin
+cp -Rp _build/default/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/ebin
 
-# Terminate the cluster
-yes | gcloud beta container clusters delete lasp
+cd /tmp
+
+cat <<EOF > redis.yaml
+  apiVersion: v1
+  kind: Service
+  metadata:
+    name: redis
+    labels:
+      run: redis
+  spec:
+    type: LoadBalancer
+    ports:
+    - port: 6379
+      protocol: TCP
+      name: tcp
+    selector:
+      run: redis
+---
+  apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    name: redis
+  spec:
+    replicas: 1
+    template:
+      metadata:
+        labels:
+          run: redis
+      spec:
+        containers:
+        - name: redis
+          image: redis
+EOF
+
+echo "Creating redis deployment."
+kubectl create -f /tmp/redis.yaml
+echo
+
+echo "Sleeping for redis deployment..."
+sleep 10
+
+# Start the executions in parallel.
+for k in ${CLIENTS[@]}; do
+  echo "Launching client simulation: ${k}"
+  REPS=${REPS} LASP_BRANCH=${LASP_BRANCH} IMAGE=${IMAGE} GCE=${GCE} THROUGHPUT_TYPE=boolean CLIENT_NUMBER=${k} ./kube &
+  sleep 10
+done
+
+# Wait for all of the tests to finish;
+RUNNING=$(kubectl get pods | wc -l)
+
+# redis will always be running, so wait until there are no more lasp pods
+# and a title line -- HACK.
+while [ $RUNNING -ne 2 ]; do
+  echo "Sleeping until pods are destroyed."
+  echo "Running pods: "
+  kubectl get pods
+  sleep 2
+  RUNNING=$(kubectl get pods | wc -l)
+done
+
+echo "All tasks are finished."
+
+# Download data from Redis at the end of the execution.
+if [ "$GCE" ]; then
+  echo "Running in Google Container Engine."
+  export REDIS_SERVICE_HOST=$(kubectl get services | grep redis | awk '{print $3}' | head -1)
+  # export REDIS_SERVICE_HOST=$(gcloud compute forwarding-rules list | grep TCP | awk '{print $3}' | tail -1)
+  export REDIS_SERVICE_PORT=6379
+  echo "REDIS_SERVICE_HOST: ${REDIS_SERVICE_HOST}"
+  echo "REDIS_SERVICE_PORT: ${REDIS_SERVICE_PORT}"
+else
+  export REDIS_SERVICE_HOST=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1 | cut -f 2-2 -d ":" | sed -e 's/\/\///g')
+  export REDIS_SERVICE_PORT=$(kubectl get service redis -o jsonpath="{.spec.ports[*].nodePort}")
+fi
+
+echo "Downloading data from Redis."
+./sync-redis.erl
+mkdir -p ~/Documents/lasp/priv/evaluation/logs
+cp -Rp /tmp/logs/* ~/Documents/lasp/priv/evaluation/logs
+
+echo "Deleting redis deployments and servies."
+kubectl delete -f /tmp/redis.yaml
+echo
+
+# Perform cluster operations if necessary.
+if [ ! -z "$CLUSTER_OPS" ]; then
+  # Terminate the cluster
+  yes | gcloud beta container clusters delete lasp
+fi

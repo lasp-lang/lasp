@@ -5,11 +5,11 @@
 -define(SIMPLE_COUNTER, {<<"counter">>, ?GCOUNTER_TYPE}).
 -define(PROVENANCE_SET, {<<"awset_ps">>, awset_ps}).
 -define(EVENT_INTERVAL, 0). %% milliseconds [timer:send_after]
--define(MAX_EVENTS_DEFAULT, 50000).
+-define(MAX_EVENTS_DEFAULT, 1000).
 -define(BATCH_EVENTS, 100).
 -define(BOOLEAN_TYPE, boolean).
 -define(TWOPSET_TYPE, twopset).
--define(EVAL_NUMBER, 20).
+-define(EVAL_NUMBER, 1).
 
 %% Intermediary node modification.
 -define(INTERMEDIARY_NODE_MODIFICATION, false).

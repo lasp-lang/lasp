@@ -10,9 +10,7 @@ REACTIVE_SERVER=false
 CLIENT_REPLICAS=${CLIENT_NUMBER}
 BROADCAST=false
 SIMULATION=throughput
-BLOCKING_SYNC=true
 PARTITION_PROBABILITY=0
-STATE_INTERVAL=10000
 DELTA_INTERVAL=10000
 INSTRUMENTATION=true
 LOGS=redis
@@ -57,7 +55,7 @@ done
 for i in `seq 1 ${REPS}`; do
   # Configure evaluation timestamp and identifier.
   EVAL_TIMESTAMP=$(date +%s)
-  EVAL_ID="client_server_state_based_${THROUGHPUT_TYPE}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
+  EVAL_ID="client_server_state_based_${THROUGHPUT_TYPE}_${BLOCKING_SYNC}_${STATE_INTERVAL}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
   echo "Evaluation identifier is:" ${EVAL_ID}
   echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
 

@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 
-CLIENTS=(2 4 6)
+CLIENTS=(1 2 4)
 NODES=3
 LASP_BRANCH=workflow-v2
 IMAGE=lasp-dev
 REPS=1
 GCE=true
 MACHINE="n1-standard-8"
-MAX_EVENTS=50000
+MAX_EVENTS=100000
+STATE_INTERVAL=10000
+BLOCKING_SYNC=false
 
 # Rebuild image if desired.
 if [ ! -z "$REBUILD_IMAGE" ]; then
@@ -114,7 +116,16 @@ sleep 10
 # Start the executions in parallel.
 for k in ${CLIENTS[@]}; do
   echo "Launching client simulation: ${k}"
-  MAX_EVENTS=${MAX_EVENTS} REPS=${REPS} LASP_BRANCH=${LASP_BRANCH} IMAGE=${IMAGE} GCE=${GCE} THROUGHPUT_TYPE=boolean CLIENT_NUMBER=${k} ./kube &
+  BLOCKING_SYNC=${BLOCKING_SYNC} \
+    STATE_INTERVAL=${STATE_INTERVAL} \
+    MAX_EVENTS=${MAX_EVENTS} \
+    REPS=${REPS} \
+    LASP_BRANCH=${LASP_BRANCH} \
+    IMAGE=${IMAGE} \
+    GCE=${GCE} \
+    THROUGHPUT_TYPE=boolean \
+    CLIENT_NUMBER=${k} \
+    ./kube &
   sleep 10
 done
 

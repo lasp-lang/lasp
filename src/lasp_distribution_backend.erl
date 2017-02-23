@@ -429,11 +429,11 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
         true ->
             Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
                                    ?CLOCK_INIT(Actor), Store),
-            Final = declare_if_not_found(Result0, Id, State, ?CORE, update,
+            Final = {ok, {_, _, Metadata, _}} = declare_if_not_found(Result0, Id, State, ?CORE, update,
                                  [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
             case lasp_config:get(blocking_sync, false) of
                 true ->
-                    ok = blocking_sync(Id);
+                    ok = blocking_sync(Id, Metadata);
                 false ->
                     ok
             end,
@@ -451,11 +451,11 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
                 true ->
                     Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
                                            ?CLOCK_INIT(Actor), Store),
-                    Final = declare_if_not_found(Result0, Id, State, ?CORE, update,
+                    Final = {ok, {_, _, Metadata, _}} = declare_if_not_found(Result0, Id, State, ?CORE, update,
                                          [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
                     case lasp_config:get(blocking_sync, false) of
                         true ->
-                            ok = blocking_sync(Id);
+                            ok = blocking_sync(Id, Metadata);
                         false ->
                             ok
                     end,
@@ -625,10 +625,10 @@ declare_if_not_found(Result, _Id, _State, _Module, _Function, _Args) ->
     Result.
 
 %% @private
-blocking_sync(Id) ->
-    %% Don't perform blocking sync on the membership object.
-    case ?MEMBERSHIP_ID == Id of
-        true ->
+blocking_sync(Id, Metadata) ->
+    case orddict:find(dynamic, Metadata) of
+        {ok, true} ->
+            %% Ignore: this is a dynamic variable.
             ok;
         _ ->
             ObjectFilterFun = fun(I) -> Id == I end,

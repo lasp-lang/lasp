@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-CLIENTS=(1 2 4)
+CLIENTS=(2 4 6)
 NODES=3
 LASP_BRANCH=workflow-v2
 IMAGE=lasp-dev
-REPS=5
+REPS=1
 GCE=true
 MACHINE="n1-standard-8"
 MAX_EVENTS=50000
@@ -46,9 +46,11 @@ kubectl delete replicasets --all
 kubectl delete services --all
 kubectl delete pods --all
 
-echo "Removing older logs."
-rm -rf /tmp/logs
-rm -rf priv/evaluation/logs
+if [ ! -z "$DELETE_LOGS" ]; then
+  echo "Removing older logs."
+  rm -rf /tmp/logs
+  rm -rf priv/evaluation/logs
+fi
 
 # Allocate machines accordingly.
 for i in ${CLIENTS[@]}; do

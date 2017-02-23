@@ -10,7 +10,7 @@
 -define(PROVENANCE_SET, {<<"awset_ps">>, awset_ps}).
 -define(EVENT_INTERVAL, 0). %% milliseconds [timer:send_after]
 -define(MAX_EVENTS_DEFAULT, 1000).
--define(BATCH_EVENTS, 100).
+-define(BATCH_EVENTS, 1000).
 -define(BOOLEAN_TYPE, boolean).
 -define(TWOPSET_TYPE, twopset).
 -define(EVAL_NUMBER, 1).

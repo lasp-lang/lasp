@@ -627,18 +627,23 @@ declare_if_not_found(Result, _Id, _State, _Module, _Function, _Args) ->
 %% @private
 blocking_sync(Id) ->
     %% Don't perform blocking sync on the membership object.
-    ObjectFilterFun = fun(I) ->
-                              case ?MEMBERSHIP_ID == I of
-                                  true ->
-                                      false;
-                                  _ ->
-                                      Id == I
-                              end
-                      end,
+    case ?MEMBERSHIP_ID == Id of
+        true ->
+            ok;
+        _ ->
+            ObjectFilterFun = fun(I) ->
+                                      case ?MEMBERSHIP_ID == I of
+                                          true ->
+                                              false;
+                                          _ ->
+                                              Id == I
+                                      end
+                              end,
 
-    case lasp_config:get(mode, ?DEFAULT_MODE) of
-        state_based ->
-            lasp_state_based_synchronization_backend:blocking_sync(ObjectFilterFun);
-        delta_based ->
-            {error, not_implemented}
+            case lasp_config:get(mode, ?DEFAULT_MODE) of
+                state_based ->
+                    lasp_state_based_synchronization_backend:blocking_sync(ObjectFilterFun);
+                delta_based ->
+                    {error, not_implemented}
+            end
     end.

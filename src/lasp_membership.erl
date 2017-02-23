@@ -34,7 +34,7 @@
          code_change/3]).
 
 %% State record.
--record(state, {}).
+-record(state, {actor, membership_fun}).
 
 -include("lasp.hrl").
 
@@ -60,20 +60,20 @@ start_link(Opts) ->
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
     %% Distribution backend needs to assign actor identifier first.
-    % Actor = case lasp_config:get(actor, undefined) of
-    %     undefined ->
-    %         {stop, no_actor_identifier};
-    %     A ->
-    %         A
-    % end,
+    Actor = case lasp_config:get(actor, undefined) of
+        undefined ->
+            {stop, no_actor_identifier};
+        A ->
+            A
+    end,
 
     %% Configure a membership callback to the peer service.
-    % MembershipFun = fun(S) ->
-    %                         update_membership(S, Actor)
-    %                 end,
+    MembershipFun = fun(S) ->
+                            update_membership(S, Actor)
+                    end,
     % partisan_peer_service:add_sup_callback(MembershipFun),
 
-    {ok, #state{}}.
+    {ok, #state{actor=Actor, membership_fun=MembershipFun}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->

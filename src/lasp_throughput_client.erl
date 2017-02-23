@@ -109,6 +109,10 @@ handle_info(event, #state{actor=Actor,
             {BatchStart2, BatchEvents1} = case BatchEvents0 + 1 == ?BATCH_EVENTS of
                                               true ->
                                                   BatchEnd = erlang:timestamp(),
+
+                                                  lager:info("Events done: ~p, Batch finished!  ~p, Node: ~p",
+                                                             [Events1, ?BATCH_EVENTS, Actor]),
+
                                                   log_batch(BatchStart1, BatchEnd, ?BATCH_EVENTS),
                                                   {undefined, 0};
                                               false ->
@@ -121,8 +125,6 @@ handle_info(event, #state{actor=Actor,
                                             perform_update(Element, Actor, Events1)
                                      end),
             log_event(Duration),
-
-            % lager:info("Events done: ~p, Batch events done: ~p, Node: ~p", [Events1, BatchEvents1, Actor]),
 
             case Events1 == max_events() of
                 true ->

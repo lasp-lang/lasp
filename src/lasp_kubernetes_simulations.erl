@@ -52,7 +52,7 @@ delete_deployment(Deployment) ->
 deployment_url(Deployment) ->
     EvaluationTimestamp = lasp_config:get(evaluation_timestamp, 0),
     APIServer = os:getenv("APISERVER"),
-    APIServer ++ "/apis/extensions/v1beta1/namespaces/default/deployments/" ++ Deployment ++ integer_to_list(EvaluationTimestamp).
+    APIServer ++ "/apis/extensions/v1beta1/namespaces/default/deployments/" ++ Deployment ++ "-" ++ integer_to_list(EvaluationTimestamp).
 
 %% @private
 delete_replicaset(#{<<"metadata">> := Metadata}) ->

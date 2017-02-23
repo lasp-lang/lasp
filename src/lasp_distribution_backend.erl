@@ -631,14 +631,7 @@ blocking_sync(Id) ->
         true ->
             ok;
         _ ->
-            ObjectFilterFun = fun(I) ->
-                                      case ?MEMBERSHIP_ID == I of
-                                          true ->
-                                              false;
-                                          _ ->
-                                              Id == I
-                                      end
-                              end,
+            ObjectFilterFun = fun(I) -> Id == I end,
 
             case lasp_config:get(mode, ?DEFAULT_MODE) of
                 state_based ->

@@ -141,6 +141,10 @@ start(_Case, _Config, Options) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [extended_logging, true]),
 
+                        %% Configure workflow.
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [workflow, true]),
+
                         %% Configure timers.
                         ok = rpc:call(Node, lasp_config, set,
                                       [state_interval, SimulationsSyncInterval]),

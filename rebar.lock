@@ -29,7 +29,7 @@
   0},
  {<<"plumtree">>,
   {git,"https://github.com/lasp-lang/plumtree",
-       {ref,"3be6a4828947951f80c810c5fcfb1dad12126fd2"}},
+       {ref,"87eb5d7b4b0b4457129fbb7485b2a5fdb0ee836f"}},
   0},
  {<<"ranch">>,{pkg,<<"ranch">>,<<"1.2.1">>},0},
  {<<"rand_compat">>,

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-CLIENTS=(1 2)
+CLIENTS=(1)
 NODES=2
 LASP_BRANCH=workflow-v2
 IMAGE=lasp-dev

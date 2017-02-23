@@ -35,7 +35,7 @@ fi
 if [ ! -z "$CLUSTER_OPS" ]; then
   # Bootstrap cluster
   gcloud beta container clusters create lasp \
-    --machine-type=${MACHINE}
+    --machine-type=${MACHINE} \
     --num-nodes=${NODES}
 
   # Get container credential

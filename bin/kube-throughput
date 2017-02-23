@@ -8,12 +8,6 @@ REPS=2
 GCE=true
 MACHINE="n1-standard-8"
 
-echo "Removing initial labeling."
-kubectl label nodes --all client_number-
-
-echo "Removing deployments."
-kubectl delete deployments --all
-
 # Rebuild image if desired.
 if [ ! -z "$REBUILD_IMAGE" ]; then
     # Delete image
@@ -41,6 +35,12 @@ if [ ! -z "$CLUSTER_START" ]; then
   # Get container credential
   gcloud beta container clusters get-credentials lasp
 fi
+
+echo "Removing initial labeling."
+kubectl label nodes --all client_number-
+
+echo "Removing deployments."
+kubectl delete deployments --all
 
 # Allocate machines accordingly.
 for i in ${CLIENTS[@]}; do

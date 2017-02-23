@@ -46,6 +46,10 @@ kubectl delete replicasets --all
 kubectl delete services --all
 kubectl delete pods --all
 
+echo "Removing older logs."
+rm -rf /tmp/logs
+rm -rf priv/evaluation/logs
+
 # Allocate machines accordingly.
 for i in ${CLIENTS[@]}; do
   # Find a machine we can allocate these to.

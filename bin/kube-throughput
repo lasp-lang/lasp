@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-CLIENTS=(1)
+CLIENTS=(1 2)
 NODES=2
 LASP_BRANCH=workflow-v2
 IMAGE=lasp-dev
@@ -105,7 +105,7 @@ sleep 10
 # Start the executions in parallel.
 for k in ${CLIENTS[@]}; do
   echo "Launching client simulation: ${k}"
-  MAX_EVENTS=${MAX_EVENTS} REPS=${REPS} LASP_BRANCH=${LASP_BRANCH} IMAGE=${IMAGE} GCE=${GCE} THROUGHPUT_TYPE=boolean CLIENT_NUMBER=${k} ./kube
+  MAX_EVENTS=${MAX_EVENTS} REPS=${REPS} LASP_BRANCH=${LASP_BRANCH} IMAGE=${IMAGE} GCE=${GCE} THROUGHPUT_TYPE=boolean CLIENT_NUMBER=${k} ./kube &
   sleep 10
 done
 

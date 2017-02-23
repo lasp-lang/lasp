@@ -40,9 +40,10 @@ fi
 echo "Removing initial labeling."
 kubectl label nodes --all client_number-
 
-echo "Removing deployments, pods, and replicasets."
+echo "Removing deployments, services, pods, and replicasets."
 kubectl delete deployments --all
 kubectl delete replicasets --all
+kubectl delete services --all
 kubectl delete pods --all
 
 # Allocate machines accordingly.

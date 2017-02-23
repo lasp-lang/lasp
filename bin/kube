@@ -149,6 +149,8 @@ for i in `seq 1 ${REPS}`; do
             value: "${MAILBOX_LOGGING}"
           - name: MAX_EVENTS
             value: "${MAX_EVENTS}"
+          - name: WORKFLOW
+            value: "${WORKFLOW}"
           - name: MY_POD_NAME
             valueFrom:
               fieldRef:
@@ -241,6 +243,8 @@ for i in `seq 1 ${REPS}`; do
             value: "${MAILBOX_LOGGING}"
           - name: MAX_EVENTS
             value: "${MAX_EVENTS}"
+          - name: WORKFLOW
+            value: "${WORKFLOW}"
           - name: MY_POD_NAME
             valueFrom:
               fieldRef:

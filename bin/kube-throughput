@@ -32,7 +32,7 @@ if [ ! -z "$REBUILD_IMAGE" ]; then
 fi
 
 # Perform cluster operations if necessary.
-if [ ! -z "$CLUSTER_OPS" ]; then
+if [ ! -z "$CLUSTER_START" ]; then
   # Bootstrap cluster
   gcloud beta container clusters create lasp \
     --machine-type=${MACHINE} \
@@ -146,7 +146,7 @@ kubectl delete -f /tmp/redis.yaml
 echo
 
 # Perform cluster operations if necessary.
-if [ ! -z "$CLUSTER_OPS" ]; then
+if [ ! -z "$CLUSTER_STOP" ]; then
   # Terminate the cluster
   yes | gcloud beta container clusters delete lasp
 fi

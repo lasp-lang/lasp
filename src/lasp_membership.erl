@@ -113,13 +113,17 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 %% @private
-update_membership(Membership, Actor) ->
+update_membership(State, Actor) ->
     lager:info("Attempting to update membership; state: ~p", [State]),
 
     %% Declare variable if necessary, ensure variable is dynamic and not
     %% synchronized: use a LWW-register.
     {ok, _} = lasp:declare_dynamic(?MEMBERSHIP_ID, ?MEMBERSHIP_TYPE),
     lager:info("Declared dynamic membership: ~p", [?MEMBERSHIP_ID]),
+
+    %% Decode the membership.
+    Membership = partisan_peer_service:decode(State),
+    lager:info("Decoded membership: ~p", [Membership]),
 
     %% Bind the new membership to the register.
     {ok, _} = lasp:update(?MEMBERSHIP_ID, {set, timestamp(), Membership}, Actor),

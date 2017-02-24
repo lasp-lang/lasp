@@ -90,33 +90,33 @@ intersect({state_ps_orset_naive, {ProvenanceStoreL,
           {state_ps_orset_naive, {ProvenanceStoreR,
                                   SubsetEventsSurvivedR,
                                   {ev_set, AllEventsEVR}}=_ORSetR}) ->
-    InterserctAllEventsEV = {ev_set, ordsets:union(AllEventsEVL, AllEventsEVR)},
-    InterserctSubsetEventsSurvived =
+    IntersectAllEventsEV = {ev_set, ordsets:union(AllEventsEVL, AllEventsEVR)},
+    IntersectSubsetEventsSurvived =
         ordsets:union(
             [ordsets:intersection(
                 SubsetEventsSurvivedL, SubsetEventsSurvivedR)] ++
             [ordsets:subtract(SubsetEventsSurvivedL, AllEventsEVR)] ++
             [ordsets:subtract(SubsetEventsSurvivedR, AllEventsEVL)]),
-    InterserctProvenanceStore =
+    IntersectProvenanceStore =
         orddict:fold(
-            fun(ElemL, ProvenanceL, AccInInterserctProvenanceStoreL) ->
+            fun(ElemL, ProvenanceL, AccInIntersectProvenanceStoreL) ->
                 case ordsets:is_subset(
                     state_ps_type:get_events_from_provenance(ProvenanceL),
-                    InterserctSubsetEventsSurvived) of
+                    IntersectSubsetEventsSurvived) of
                     false ->
-                        AccInInterserctProvenanceStoreL;
+                        AccInIntersectProvenanceStoreL;
                     true ->
                         orddict:fold(
                             fun(
                                 ElemR,
                                 ProvenanceR,
-                                AccInInterserctProvenanceStoreR) ->
+                                AccInIntersectProvenanceStoreR) ->
                                 case ordsets:is_subset(
                                     state_ps_type:get_events_from_provenance(
                                         ProvenanceR),
-                                    InterserctSubsetEventsSurvived) of
+                                    IntersectSubsetEventsSurvived) of
                                     false ->
-                                        AccInInterserctProvenanceStoreR;
+                                        AccInIntersectProvenanceStoreR;
                                     true ->
                                         case ElemL == ElemR of
                                             true ->
@@ -126,21 +126,21 @@ intersect({state_ps_orset_naive, {ProvenanceStoreL,
                                                 orddict:store(
                                                     ElemL,
                                                     ProductProvenance,
-                                                    AccInInterserctProvenanceStoreR);
+                                                    AccInIntersectProvenanceStoreR);
                                             false ->
-                                                AccInInterserctProvenanceStoreR
+                                                AccInIntersectProvenanceStoreR
                                         end
                                 end
                             end,
-                            AccInInterserctProvenanceStoreL,
+                            AccInIntersectProvenanceStoreL,
                             ProvenanceStoreR)
                 end
             end,
             orddict:new(),
             ProvenanceStoreL),
-    {state_ps_orset_naive, {InterserctProvenanceStore,
-                            InterserctSubsetEventsSurvived,
-                            InterserctAllEventsEV}}.
+    {state_ps_orset_naive, {IntersectProvenanceStore,
+                            IntersectSubsetEventsSurvived,
+                            IntersectAllEventsEV}}.
 
 map(Function, {state_ps_orset_naive, {ProvenanceStore,
                                       SubsetEventsSurvived,

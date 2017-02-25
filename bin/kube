@@ -40,6 +40,7 @@ ENV_VARS=(
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
   THROUGHPUT_TYPE
+  DIVERGENCE_TYPE
   IMAGE
   MAX_EVENTS
 )
@@ -112,6 +113,10 @@ for i in `seq 1 ${REPS}`; do
           - name: THROUGHPUT_SIM_CLIENT
             value: "false"
           - name: THROUGHPUT_SIM_SERVER
+            value: "true"
+          - name: DIVERGENCE_SIM_CLIENT
+            value: "false"
+          - name: DIVERGENCE_SIM_SERVER
             value: "true"
           - name: MODE
             value: "${MODE}"
@@ -206,6 +211,10 @@ for i in `seq 1 ${REPS}`; do
           - name: THROUGHPUT_SIM_CLIENT
             value: "true"
           - name: THROUGHPUT_SIM_SERVER
+            value: "false"
+          - name: DIVERGENCE_SIM_CLIENT
+            value: "true"
+          - name: DIVERGENCE_SIM_SERVER
             value: "false"
           - name: MODE
             value: "${MODE}"

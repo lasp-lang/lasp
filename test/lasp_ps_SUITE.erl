@@ -85,8 +85,10 @@ all() ->
         product_test,
         intersection_test,
         ps_ormap_test,
-        apply_test,
-        nested_map_test
+        ps_ormap_apply_test,
+        ps_ormap_nested_map_test,
+        ps_ormap_map_test,
+        ps_ormap_filter_test
     ].
 
 -include("lasp.hrl").
@@ -465,7 +467,7 @@ ps_ormap_test(_Config) ->
     end.
 
 %% @doc Apply test for the ormap with ps.
-apply_test(_Config) ->
+ps_ormap_apply_test(_Config) ->
     %% Declare a variable.
     {ok, {MapId, _, _, _}} = lasp:declare(ps_ormap),
 
@@ -498,8 +500,8 @@ apply_test(_Config) ->
 
     ok.
 
-%% @doc Nested map test.
-nested_map_test(_Config) ->
+%% @doc Nested map test for the ormap with ps.
+ps_ormap_nested_map_test(_Config) ->
     %% Declare a variable.
     {ok, {MapId, _, _, _}} =
         lasp:declare({ps_ormap, [{ps_ormap, [{ps_orset, []}]}]}),
@@ -560,5 +562,115 @@ nested_map_test(_Config) ->
     ?assertEqual(
         orddict:from_list(
             [{"b", [{"b1", sets:from_list([17])}]}]), Map2),
+
+    ok.
+
+%% @doc Map operation test for the ormap with ps.
+ps_ormap_map_test(_Config) ->
+    %% Create initial map.
+    {ok, {MapM1, _, _, _}} = lasp:declare(ps_ormap),
+
+    %% Add elements to initial set and update.
+    ?assertMatch({ok, _}, lasp:update(MapM1, {apply, "a", {add, 1}}, actor)),
+    ?assertMatch({ok, _}, lasp:update(MapM1, {apply, "b", {add, 3}}, actor)),
+    ?assertMatch({ok, _}, lasp:update(MapM1, {apply, "a", {add, 5}}, actor)),
+
+    %% Create second map.
+    {ok, {MapM2, _, _, _}} = lasp:declare(ps_ormap),
+
+    %% Apply a map operation.
+    ?assertMatch(
+        ok,
+        lasp:map(
+            MapM1,
+            fun(ValueSet) ->
+                state_ps_orset_naive_ext:map(
+                    fun(X) -> X * 2 end,
+                    ValueSet)
+            end,
+            MapM2)),
+
+    %% Wait.
+    timer:sleep(4000),
+
+    %% Bind again.
+    ?assertMatch({ok, _}, lasp:update(MapM1, {apply, "b", {add, 7}}, actor)),
+    ?assertMatch({ok, _}, lasp:update(MapM1, {apply, "a", {add, 9}}, actor)),
+    ?assertMatch({ok, _}, lasp:update(MapM1, {apply, "b", {add, 11}}, actor)),
+
+    %% Wait.
+    timer:sleep(4000),
+
+    %% Read resulting value.
+    {ok, {_, _, _, MapM1V}} = lasp:read(MapM1, {strict, undefined}),
+
+    %% Read resulting value.
+    {ok, {_, _, _, MapM2V}} = lasp:read(MapM2, {strict, undefined}),
+
+    ?assertEqual(
+        {ok,
+            orddict:from_list(
+                [{"a", sets:from_list([1,5,9])},
+                    {"b", sets:from_list([3,7,11])}]),
+            orddict:from_list(
+                [{"a", sets:from_list([2,10,18])},
+                    {"b", sets:from_list([6,14,22])}])},
+        {ok,
+            lasp_type:query(ps_ormap, MapM1V),
+            lasp_type:query(ps_ormap, MapM2V)}),
+
+    ok.
+
+%% @doc Filter operation test for the ormap with ps.
+ps_ormap_filter_test(_Config) ->
+    %% Create initial map.
+    {ok, {MapF1, _, _, _}} = lasp:declare(ps_ormap),
+
+    %% Add elements to initial set and update.
+    ?assertMatch({ok, _}, lasp:update(MapF1, {apply, "a", {add, 1}}, actor)),
+    ?assertMatch({ok, _}, lasp:update(MapF1, {apply, "b", {add, 4}}, actor)),
+    ?assertMatch({ok, _}, lasp:update(MapF1, {apply, "a", {add, 2}}, actor)),
+
+    %% Create second map.
+    {ok, {MapF2, _, _, _}} = lasp:declare(ps_ormap),
+
+    %% Apply a filter operation.
+    ?assertMatch(
+        ok,
+        lasp:filter(
+            MapF1,
+            fun(ValueSet) ->
+                Set1 = lasp_type:query(ps_orset, ValueSet),
+                sets:is_element(5, Set1)
+            end,
+            MapF2)),
+
+    %% Wait.
+    timer:sleep(4000),
+
+    %% Bind again.
+    ?assertMatch({ok, _}, lasp:update(MapF1, {apply, "b", {add, 5}}, actor)),
+    ?assertMatch({ok, _}, lasp:update(MapF1, {apply, "a", {add, 3}}, actor)),
+    ?assertMatch({ok, _}, lasp:update(MapF1, {apply, "b", {add, 6}}, actor)),
+
+    %% Wait.
+    timer:sleep(4000),
+
+    %% Read resulting value.
+    {ok, {_, _, _, MapF1V}} = lasp:read(MapF1, {strict, undefined}),
+
+    %% Read resulting value.
+    {ok, {_, _, _, MapF2V}} = lasp:read(MapF2, {strict, undefined}),
+
+    ?assertEqual(
+        {ok,
+            orddict:from_list(
+                [{"a", sets:from_list([1,2,3])},
+                    {"b", sets:from_list([4,5,6])}]),
+            orddict:from_list(
+                [{"b", sets:from_list([4,5,6])}])},
+        {ok,
+            lasp_type:query(ps_ormap, MapF1V),
+            lasp_type:query(ps_ormap, MapF2V)}),
 
     ok.

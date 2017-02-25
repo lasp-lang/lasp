@@ -780,7 +780,9 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
                 state_awset_ps ->
                     state_awset_ps_ext:map(Function, V);
                 state_ps_orset_naive ->
-                    state_ps_orset_naive_ext:map(Function, V)
+                    state_ps_orset_naive_ext:map(Function, V);
+                state_ps_ormap_naive ->
+                    state_ps_ormap_naive_ext:map(Function, V)
             end
     end,
     lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
@@ -805,7 +807,9 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
             state_awset_ps ->
                 state_awset_ps_ext:filter(Function, V);
             state_ps_orset_naive ->
-                state_ps_orset_naive_ext:filter(Function, V)
+                state_ps_orset_naive_ext:filter(Function, V);
+            state_ps_ormap_naive ->
+                state_ps_ormap_naive_ext:filter(Function, V)
         end
     end,
     lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).

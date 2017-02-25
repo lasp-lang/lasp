@@ -79,10 +79,23 @@ init(_Args) ->
                         permanent, 5000, worker,
                         [lasp_plumtree_backend]},
 
-    Membership = {lasp_membership,
-                  {lasp_membership, start_link, []},
-                   permanent, 5000, worker,
-                   [lasp_membership]},
+    MembershipDefault = list_to_atom(os:getenv("MEMBERSHIP", "false")),
+    MembershipEnabled = application:get_env(?APP,
+                                            membership,
+                                            MembershipDefault),
+    lasp_config:set(membership, MembershipEnabled),
+    lager:info("Membership: ~p", [MembershipEnabled]),
+
+    MembershipSpecs = case MembershipEnabled of
+        true ->
+            Membership = {lasp_membership,
+                          {lasp_membership, start_link, []},
+                           permanent, 5000, worker,
+                           [lasp_membership]},
+            [Membership];
+        false ->
+            []
+    end,
 
     WorkflowDefault = list_to_atom(os:getenv("WORKFLOW", "false")),
     WorkflowEnabled = application:get_env(?APP,
@@ -104,13 +117,15 @@ init(_Args) ->
 
     WebSpecs = web_specs(),
 
-    BaseSpecs0 = [Unique,
-                  PlumtreeBackend,
-                  PlumtreeMemoryReport,
-                  MemoryUtilizationReport,
-                  DistributionBackend,
-                  Process,
-                  Membership] ++ WorkflowSpecs ++ WebSpecs,
+    BaseSpecs0 = lists:flatten([Unique,
+                                PlumtreeBackend,
+                                PlumtreeMemoryReport,
+                                MemoryUtilizationReport,
+                                DistributionBackend,
+                                Process,
+                                MembershipSpecs,
+                                WorkflowSpecs,
+                                WebSpecs]),
 
     DagEnabled = application:get_env(?APP, dag_enabled, ?DAG_ENABLED),
     lasp_config:set(dag_enabled, DagEnabled),

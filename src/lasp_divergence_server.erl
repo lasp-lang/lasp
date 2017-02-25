@@ -97,6 +97,7 @@ handle_info(check_simulation_end, State) ->
     case lasp_workflow:is_task_completed(logs) of
         true ->
             log_convergence(),
+            log_divergence(),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(),
             lasp_config:set(simulation_end, true),
@@ -134,6 +135,24 @@ log_convergence() ->
     case lasp_config:get(instrumentation, false) of
         true ->
             lasp_instrumentation:convergence();
+        false ->
+            ok
+    end.
+
+%% @private
+max_events() ->
+    lasp_config:get(max_events, ?MAX_EVENTS_DEFAULT).
+
+%% @private
+log_divergence() ->
+    {ok, Value} = lasp:query(?SIMPLE_COUNTER),
+    MaxEvents = max_events(),
+    Overcounting = Value - MaxEvents,
+    OvercountingPercentage = (Overcounting * 100) / MaxEvents,
+
+    case lasp_config:get(instrumentation, false) of
+        true ->
+            lasp_instrumentation:overcounting(OvercountingPercentage);
         false ->
             ok
     end.

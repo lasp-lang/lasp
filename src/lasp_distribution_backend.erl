@@ -271,6 +271,7 @@ init([]) ->
     lasp_config:set(actor, Actor),
 
     Identifier = node(),
+
     %% Start the storage backend.
     {ok, Store} = case ?CORE:start_link(Identifier) of
         {ok, Pid} ->

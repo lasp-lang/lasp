@@ -55,7 +55,7 @@ start_link() ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([]) ->
-    lager:info("Simple server initialized."),
+    lager:info("Divergence server initialized."),
 
     %% Delay for graph connectedness.
     wait_for_connectedness(),

@@ -61,6 +61,20 @@ init([]) ->
     wait_for_connectedness(),
     lasp_instrumentation:experiment_started(),
 
+    %% Configure invariant.
+    Threshold = {value, max_events()},
+
+    EnforceFun = fun() ->
+                         lager:info("Threshold exceeded!"),
+                         lasp_config:set(events_generated, true)
+                 end,
+
+    lager:info("Configuring invariant for threshold: ~p", [Threshold]),
+    spawn_link(fun() ->
+                       lasp:invariant(?SIMPLE_COUNTER, Threshold, EnforceFun)
+               end),
+    lager:info("Configured."),
+
     %% Track whether simulation has ended or not.
     lasp_config:set(simulation_end, false),
 

@@ -99,10 +99,6 @@ handle_info(event, #state{actor=Actor,
 
     {LocalEvents, BatchStart, BatchEvents} = case lasp_workflow:is_task_completed(convergence, 1) of
         true ->
-            %% The server, once it detects connectedness,
-            %% will add one element to the bag.
-            %% Until then, clients are not allowed
-            %% to add elements to the bag.
             Events1 = Events0 + 1,
 
             %% If we hit the batch size, restart the batch.

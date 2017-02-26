@@ -24,9 +24,8 @@
 -export([map/2,
          filter/2]).
 
-map(
-    Function,
-    {state_ps_ormap_naive, {{{ValueType, []}, ValueProvenanceStore},
+map(Function,
+    {state_ps_ormap_naive, {{{ValueType, SubValueType}, ValueProvenanceStore},
                             SubsetEventsSurvived,
                             {ev_set, AllEventsEV}}}) ->
     {NewValueProvenanceStore, NewSubsetEventsSurvived, {ev_set, NewAllEventsEV}} =
@@ -59,13 +58,13 @@ map(
             end,
             {orddict:new(), SubsetEventsSurvived, {ev_set, AllEventsEV}},
             ValueProvenanceStore),
-    {state_ps_ormap_naive, {{{ValueType, []}, NewValueProvenanceStore},
+    {state_ps_ormap_naive, {{{ValueType, SubValueType}, NewValueProvenanceStore},
                             NewSubsetEventsSurvived,
                             {ev_set, NewAllEventsEV}}}.
 
 filter(
     Function,
-    {state_ps_ormap_naive, {{{ValueType, []}, ValueProvenanceStore},
+    {state_ps_ormap_naive, {{{ValueType, SubValueType}, ValueProvenanceStore},
                             SubsetEventsSurvived,
                             {ev_set, AllEventsEV}}}) ->
     NewValueProvenanceStore =
@@ -95,6 +94,6 @@ filter(
             end,
             orddict:new(),
             ValueProvenanceStore),
-    {state_ps_ormap_naive, {{{ValueType, []}, NewValueProvenanceStore},
+    {state_ps_ormap_naive, {{{ValueType, SubValueType}, NewValueProvenanceStore},
                             SubsetEventsSurvived,
                             {ev_set, AllEventsEV}}}.

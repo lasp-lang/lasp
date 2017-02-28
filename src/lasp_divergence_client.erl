@@ -196,7 +196,7 @@ max_events_reached(Events) ->
 perform_update(Element, Actor, Events1) ->
     UniqueElement = Element ++ integer_to_list(Events1),
 
-    case lasp_config:get(throughput_type, gset) of
+    case lasp_config:get(divergence_type, gset) of
         twopset ->
             lasp:update(?SIMPLE_TWOPSET, {add, UniqueElement}, Actor);
         boolean ->

@@ -164,6 +164,12 @@ log_divergence() ->
     Overcounting = Value - MaxEvents,
     OvercountingPercentage = (Overcounting * 100) / MaxEvents,
 
+    lager:info("**** Divergence information."),
+    lager:info("**** Value: ~p", [Value]),
+    lager:info("**** MaxEvents: ~p", [MaxEvents]),
+    lager:info("**** Overcounting: ~p", [Overcounting]),
+    lager:info("**** OvercountingPercentage: ~p", [OvercountingPercentage]),
+
     case lasp_config:get(instrumentation, false) of
         true ->
             lasp_instrumentation:overcounting(OvercountingPercentage);

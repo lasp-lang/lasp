@@ -110,7 +110,9 @@ handle_info(event, #state{actor=Actor, events=Events0}=State) ->
 
             case max_events_reached(Events1) of
                 true ->
-                    lager:info("All events done. Node: ~p", [Actor]),
+                    Value = lasp:query(?SIMPLE_COUNTER),
+                    lager:info("All events done, counter is now: ~p.
+                               Node: ~p", [Value, Actor]),
 
                     %% Update Simulation Status Instance
                     lasp_workflow:task_completed(events, node()),

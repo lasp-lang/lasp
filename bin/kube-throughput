@@ -162,9 +162,13 @@ echo "Downloading data from Redis."
 mkdir -p ~/Documents/lasp/priv/evaluation/logs
 cp -Rp /tmp/logs/* ~/Documents/lasp/priv/evaluation/logs
 
-echo "Deleting redis deployments and servies."
-kubectl delete -f /tmp/redis.yaml
-echo
+# Terminate redis only if we explicitly say so, given sometimes we have
+# to aggregate the logs later if for some instance we are being port
+# filtered.
+if [ ! -z "$REDIS_STOP" ]; then
+  echo "Deleting redis deployments and servies."
+  kubectl delete -f /tmp/redis.yaml
+  echo
 
 # Perform cluster operations if necessary.
 if [ ! -z "$CLUSTER_STOP" ]; then

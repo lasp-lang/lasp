@@ -145,6 +145,10 @@ start(_Case, _Config, Options) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [workflow, true]),
 
+                        %% Configure membership.
+                        Membership = proplists:get_value(membership, Options, false),
+                        ok = rpc:call(Node, lasp_config, set, [membership, Membership]),
+
                         %% Configure timers.
                         ok = rpc:call(Node, lasp_config, set,
                                       [state_interval, SimulationsSyncInterval]),

@@ -12,7 +12,7 @@
   0},
  {<<"gen_flow">>,
   {git,"https://github.com/lasp-lang/gen_flow",
-       {ref,"9a4d374e8083e9881a50b0d1f5d5497f7b8c6987"}},
+       {ref,"e7614cf516f98386a8505bf37eee0434110e3582"}},
   0},
  {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.8">>},1},
  {<<"jsx">>,{pkg,<<"jsx">>,<<"2.8.0">>},0},

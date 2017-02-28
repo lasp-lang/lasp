@@ -108,8 +108,6 @@ log_files() ->
     OtherLogs = case partisan_config:get(tag, undefined) of
         server ->
             case lasp_config:get(simulation, undefined) of
-                divergence ->
-                    [];
                 throughput ->
                     [];
                 _ ->

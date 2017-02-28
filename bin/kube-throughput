@@ -7,8 +7,8 @@ IMAGE=lasp-dev
 REPS=1
 GCE=true
 MACHINE="n1-standard-8"
-MAX_EVENTS=100000
-STATE_INTERVAL=10000
+MAX_EVENTS=50000
+STATE_INTERVAL=2000
 BLOCKING_SYNC=false
 
 # Rebuild image if desired.
@@ -48,9 +48,11 @@ kubectl delete replicasets --all
 kubectl delete services --all
 kubectl delete pods --all
 
+echo "Removing /tmp logs."
+rm -rf /tmp/logs
+
 if [ ! -z "$DELETE_LOGS" ]; then
   echo "Removing older logs."
-  rm -rf /tmp/logs
   rm -rf priv/evaluation/logs
 fi
 
@@ -162,9 +164,14 @@ echo "Downloading data from Redis."
 mkdir -p ~/Documents/lasp/priv/evaluation/logs
 cp -Rp /tmp/logs/* ~/Documents/lasp/priv/evaluation/logs
 
-echo "Deleting redis deployments and servies."
-kubectl delete -f /tmp/redis.yaml
-echo
+# Terminate redis only if we explicitly say so, given sometimes we have
+# to aggregate the logs later if for some instance we are being port
+# filtered.
+if [ ! -z "$REDIS_STOP" ]; then
+  echo "Deleting redis deployments and servies."
+  kubectl delete -f /tmp/redis.yaml
+  echo
+fi
 
 # Perform cluster operations if necessary.
 if [ ! -z "$CLUSTER_STOP" ]; then

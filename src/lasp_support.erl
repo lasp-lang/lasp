@@ -326,6 +326,13 @@ load_lasp(Node, Config, Case) ->
                                                broadcast_mods,
                                                [lasp_plumtree_backend]]),
     ok = rpc:call(Node, lasp_config, set, [workflow, true]),
+
+    lager:info("Enabling membership..."),
+    ok = rpc:call(Node, lasp_config, set, [membership, true]),
+
+    lager:info("Disabling blocking sync..."),
+    ok = rpc:call(Node, lasp_config, set, [blocking_sync, false]),
+
     ok = rpc:call(Node, partisan_config, set, [partisan_peer_service_manager,
                                                partisan_default_peer_service_manager]),
     lager:info("Configured peer_service_manager ~p on node ~p",

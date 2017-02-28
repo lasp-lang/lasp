@@ -117,7 +117,7 @@ for i in `seq 1 ${REPS}`; do
           - name: DIVERGENCE_SIM_CLIENT
             value: "false"
           - name: DIVERGENCE_SIM_SERVER
-            value: "true"
+            value: "false"
           - name: MODE
             value: "${MODE}"
           - name: BROADCAST
@@ -213,7 +213,7 @@ for i in `seq 1 ${REPS}`; do
           - name: THROUGHPUT_SIM_SERVER
             value: "false"
           - name: DIVERGENCE_SIM_CLIENT
-            value: "true"
+            value: "false"
           - name: DIVERGENCE_SIM_SERVER
             value: "false"
           - name: MODE

@@ -37,7 +37,7 @@
 -include("lasp.hrl").
 
 %% State record.
--record(state, {actor, events}).
+-record(state, {actor, events, batch_start, batch_events}).
 
 %%%===================================================================
 %%% API
@@ -80,7 +80,10 @@ init([]) ->
                end),
     lager:info("Configured."),
 
-    {ok, #state{actor=Actor, events=0}}.
+    {ok, #state{actor=Actor,
+                events=0,
+                batch_start=undefined,
+                batch_events=0}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -97,16 +100,44 @@ handle_cast(Msg, State) ->
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
-handle_info(event, #state{actor=Actor, events=Events0}=State) ->
+handle_info(event, #state{actor=Actor,
+                          batch_start=BatchStart0,
+                          batch_events=BatchEvents0,
+                          events=Events0}=State) ->
     lasp_marathon_simulations:log_message_queue_size("event"),
 
-    LocalEvents = case lasp_workflow:is_task_completed(convergence, 1) of
+    %% Start the batch for every event, if it isn't started yet.
+    BatchStart1 = case BatchStart0 of
+                    undefined ->
+                        erlang:timestamp();
+                     _ ->
+                        BatchStart0
+                 end,
+
+    {LocalEvents, BatchStart, BatchEvents} = case lasp_workflow:is_task_completed(convergence, 1) of
         true ->
             Events1 = Events0 + 1,
 
+            %% If we hit the batch size, restart the batch.
+            {BatchStart2, BatchEvents1} = case BatchEvents0 + 1 == ?BATCH_EVENTS of
+                                              true ->
+                                                  BatchEnd = erlang:timestamp(),
+
+                                                  lager:info("Events done: ~p, Batch finished!  ~p, Node: ~p",
+                                                             [Events1, ?BATCH_EVENTS, Actor]),
+
+                                                  log_batch(BatchStart1, BatchEnd, ?BATCH_EVENTS),
+                                                  {undefined, 0};
+                                              false ->
+                                                  {BatchStart1, BatchEvents0 + 1}
+                                          end,
+
             Element = atom_to_list(Actor),
 
-            perform_update(Element, Actor, Events1),
+            {Duration, _} = timer:tc(fun() ->
+                                            perform_update(Element, Actor, Events1)
+                                     end),
+            log_event(Duration),
 
             case max_events_reached(Events1) of
                 true ->
@@ -121,13 +152,15 @@ handle_info(event, #state{actor=Actor, events=Events0}=State) ->
                 false ->
                     schedule_event()
             end,
-            Events1;
+            {Events1, BatchStart2, BatchEvents1};
         false ->
             schedule_event(),
-            Events0
+            {Events0, undefined, 0}
     end,
 
-    {noreply, State#state{events=LocalEvents}};
+    {noreply, State#state{batch_events=BatchEvents,
+                          batch_start=BatchStart,
+                          events=LocalEvents}};
 
 handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("check_simulation_end"),
@@ -180,6 +213,24 @@ log_convergence() ->
     case lasp_config:get(instrumentation, false) of
         true ->
             lasp_instrumentation:convergence();
+        false ->
+            ok
+    end.
+
+%% @private
+log_batch(Start, End, Events) ->
+    case lasp_config:get(instrumentation, false) of
+        true ->
+            lasp_instrumentation:batch(Start, End, Events);
+        false ->
+            ok
+    end.
+
+%% @private
+log_event(Duration) ->
+    case lasp_config:get(event_logging, false) of
+        true ->
+            lasp_instrumentation:event(Duration);
         false ->
             ok
     end.

@@ -110,9 +110,10 @@ handle_info(check_simulation_end, State) ->
 
     case lasp_workflow:is_task_completed(events) of
         true ->
-            lager:info("Performing final anti-entropy pass with all clients."),
+            lager:info("Performing anti-entropy pass with all clients."),
             ObjectFilterFun = fun(_) -> true end,
-            ok = lasp_distribution_backend:blocking_sync(ObjectFilterFun);
+            ok = lasp_distribution_backend:blocking_sync(ObjectFilterFun),
+            lasp_workflow:task_completed(anti_entropy, node());
         false ->
             schedule_check_simulation_end()
     end,

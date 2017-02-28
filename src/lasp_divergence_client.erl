@@ -133,9 +133,14 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     case lasp_workflow:is_task_completed(events) of
         true ->
             lager:info("All nodes did all events. Node ~p", [Actor]),
-            lasp_instrumentation:stop(),
-            lasp_support:push_logs(),
-            lasp_workflow:task_completed(logs, node());
+            case lasp_workflow:is_task_completed(anti_entropy, 1) of
+                true ->
+                    lasp_instrumentation:stop(),
+                    lasp_support:push_logs(),
+                    lasp_workflow:task_completed(logs, node());
+                false ->
+                    schedule_check_simulation_end()
+            end;
         false ->
             schedule_check_simulation_end()
     end,

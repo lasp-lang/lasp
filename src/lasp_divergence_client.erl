@@ -132,10 +132,6 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
 
     case lasp_workflow:is_task_completed(events) of
         true ->
-            lager:info("Performing final anti-entropy pass."),
-            ObjectFilterFun = fun(_) -> true end,
-            lasp_distribution_backend:blocking_sync(ObjectFilterFun),
-
             lager:info("All nodes did all events. Node ~p", [Actor]),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(),

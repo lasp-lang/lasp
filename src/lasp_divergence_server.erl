@@ -108,6 +108,15 @@ handle_info(check_simulation_end, State) ->
     lager:info("Checking for simulation end: ~p nodes with all events and ~p nodes with logs pushed.",
                [NodesWithAllEvents, NodesWithLogsPushed]),
 
+    case lasp_workflow:is_task_completed(events) of
+        true ->
+            lager:info("Performing final anti-entropy pass with all clients."),
+            ObjectFilterFun = fun(_) -> true end,
+            ok = lasp_distribution_backend:blocking_sync(ObjectFilterFun);
+        false ->
+            schedule_check_simulation_end()
+    end,
+
     case lasp_workflow:is_task_completed(logs) of
         true ->
             log_convergence(),

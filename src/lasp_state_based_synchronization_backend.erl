@@ -185,6 +185,7 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
 
     case AckRequired of
         true ->
+            lager:info("Ack required, sending back: ~p", [Object]),
             ?SYNC_BACKEND:send(?MODULE, {state_ack, node(), Id, Object}, From);
         false ->
             ok

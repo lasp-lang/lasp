@@ -90,7 +90,8 @@ all() ->
         ps_ormap_map_test,
         ps_ormap_filter_test,
         ps_gcounter_test,
-        ps_ormap_with_ps_gcounter_test
+        ps_ormap_with_ps_gcounter_test,
+        improper_fake_query_test
     ].
 
 -include("lasp.hrl").
@@ -800,5 +801,194 @@ ps_ormap_with_ps_gcounter_test(_Config) ->
            end,
 
     ?assertEqual(orddict:from_list([{"b", 1}]), Map2),
+
+    ok.
+
+read_loop(Input, Threshold, Output) ->
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% USER-LEVEL COMPUTATION
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    {ok, {_, _, _, NewValue}} = lasp:read(Input, {strict, Threshold}),
+    InputSet = lasp_type:query(ps_orset, NewValue),
+    AggDict =
+        sets:fold(
+            fun({Card, Time, SellerID}, AccIn) ->
+                lists:foldl(
+                    fun(KeyTime, AccInLists) ->
+                        orddict:update(
+                            KeyTime,
+                            fun(InnerDict) ->
+                                orddict:update_counter(
+                                    {Card, SellerID}, 1, InnerDict)
+                            end,
+                            orddict:update_counter(
+                                {Card, SellerID}, 1, orddict:new()),
+                            AccInLists)
+                    end,
+                    AccIn,
+                    lists:seq(max(((Time - 3001) div 600) * 600, 0), Time, 600))
+            end,
+            orddict:new(),
+            InputSet),
+    {ok, {_, _, _, OutputV}} = lasp:read(Output, undefined),
+    OldOutputSet = lasp_type:query(ps_orset, OutputV),
+    NewOutputSet =
+        orddict:fold(
+            fun(Time, InnerDict, AccIn) ->
+                orddict:fold(
+                    fun({Card, SellerID}, Transactions, AccInInner) ->
+                        sets:add_element(
+                            {Card, SellerID, Time, Transactions}, AccInInner)
+                    end,
+                    AccIn,
+                    InnerDict)
+            end,
+            sets:new(),
+            AggDict),
+    WillBeRemovedSet = sets:subtract(OldOutputSet, NewOutputSet),
+    WillBeAddedSet = sets:subtract(NewOutputSet, OldOutputSet),
+    {ok, _} =
+        sets:fold(
+            fun(Elem, _AccIn) ->
+                lasp:update(Output, {rmv, Elem}, actor)
+            end,
+            {ok, Output},
+            WillBeRemovedSet),
+    {ok, _} =
+        sets:fold(
+            fun(Elem, _AccIn) ->
+                lasp:update(Output, {add, Elem}, actor)
+            end,
+            {ok, Output},
+            WillBeAddedSet),
+    read_loop(Input, NewValue, Output).
+
+improper_fake_query_test(_Config) ->
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% LASP DATAFLOW
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% InputTuple = {Card, Time, Price, SellerID}
+    {ok, {SetInputTuple, _, _, _}} = lasp:declare(ps_orset),
+
+    %% M{Card ← Card, Time ← Time, SellerID ← SellerID}(I, OM)
+    %%
+    %% OutputMapTuple = {Card, Time, SellerID}
+    {ok, {SetOutputMap, _, _, _}} = lasp:declare(ps_orset),
+    ok =
+        lasp:map(
+            SetInputTuple,
+            fun({Card, Time, _Price, SellerID}) ->
+                {Card, Time, SellerID}
+            end,
+            SetOutputMap),
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% USER-LEVEL DATAFLOW
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% A{time, Time, 3600, 600, Transactions ← count(),
+    %% Group−by = Card, SellerID}(OM , OA)
+    %%
+    %% OutputAggTuple = {Card, SellerID, Time, Transactions}
+    {ok, {SetOutputAgg, _, _, _}} = lasp:declare(ps_orset),
+    spawn(?MODULE, read_loop, [SetOutputMap, undefined, SetOutputAgg]),
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% LASP DATAFLOW
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% J{left.SellerID = right.SellerID ∧ left.Card /= right.Card,
+    %% time, Time, 3600}(OA , OA , OJ)
+    %%
+    %% OutputJoinTuple =
+    %%     {LeftCard, LeftSellerID, LeftTime, LeftTransactions,
+    %%      RightCard, RightSellerID, RightTime, RightTransactions}
+    {ok, {SetOutputJoin, _, _, _}} = lasp:declare(ps_orset),
+    {ok, {SetTempProduct, _, _, _}} = lasp:declare(ps_orset),
+    {ok, {SetTempFilter, _, _, _}} = lasp:declare(ps_orset),
+    ok = lasp:product(SetOutputAgg, SetOutputAgg, SetTempProduct),
+    ok =
+        lasp:filter(
+            SetTempProduct,
+            fun(
+                {{LeftCard, LeftSellerID, _, _},
+                    {RightCard, RightSellerID, _, _}}) ->
+                LeftSellerID == RightSellerID andalso LeftCard /= RightCard
+            end,
+            SetTempFilter),
+    ok =
+        lasp:map(
+            SetTempFilter,
+            fun(
+                {{LeftCard, LeftSellerID, LeftTime, LeftTransactions},
+                    {RightCard, RightSellerID, RightTime, RightTransactions}}) ->
+                {LeftCard, LeftSellerID, LeftTime, LeftTransactions,
+                    RightCard, RightSellerID, RightTime, RightTransactions}
+            end,
+            SetOutputJoin),
+
+    %% F{LeftTransactions ≥ 2 ∧ RightTransactions ≥ 2}(OJ , OF)
+    %%
+    %% OutputFilterTuple =
+    %%     {LeftCard, LeftSellerID, LeftTime, LeftTransactions,
+    %%      RightCard, RightSellerID, RightTime, RightTransactions}
+    {ok, {SetOutputFilter, _, _, _}} = lasp:declare(ps_orset),
+    ok =
+        lasp:filter(
+            SetOutputJoin,
+            fun({_, _, _, LeftTransactions, _, _, _, RightTransactions}) ->
+                LeftTransactions >= 2 andalso RightTransactions >= 2
+            end,
+            SetOutputFilter),
+
+    %% M{SellerID ← SellerID}(OF, OM)
+    %%
+    %% OutputResultTuple = {SellerID}
+    {ok, {SetOutputResult, _, _, _}} = lasp:declare(ps_orset),
+    ok =
+        lasp:map(
+            SetOutputFilter,
+            fun({_LeftCard, LeftSellerID, _LeftTime, _LeftTransactions,
+                _RightCard, _RightSellerID, _RightTime, _RightTransactions}) ->
+                {LeftSellerID}
+            end,
+            SetOutputResult),
+
+    timer:sleep(4000),
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% INSERT DATA
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% Add elements to initial set and update.
+    %%
+    %% InputTuple = {Card, Time, Price, SellerID}
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetInputTuple, {add, {1, 100, 123, 101}}, actor)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetInputTuple, {add, {2, 200, 234, 101}}, actor)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetInputTuple, {add, {1, 300, 345, 101}}, actor)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetInputTuple, {add, {2, 400, 456, 101}}, actor)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetInputTuple, {add, {3, 500, 567, 102}}, actor)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetInputTuple, {add, {3, 600, 678, 102}}, actor)),
+
+    timer:sleep(4000),
+
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% CHECK RESULTS
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %% Read resulting value.
+    {ok, {_, _, _, SetOutputResultV}} = lasp:read(SetOutputResult, undefined),
+
+    ?assertEqual(
+        {ok, sets:from_list([{101}])},
+        {ok, lasp_type:query(ps_orset, SetOutputResultV)}),
 
     ok.

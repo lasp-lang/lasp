@@ -110,7 +110,7 @@ handle_info(check_simulation_end, State) ->
 
     case lasp_workflow:is_task_completed(events) of
         true ->
-            case lasp_workflow:is_task_complete(anti_entropy, 1) of
+            case lasp_workflow:is_task_completed(anti_entropy, 1) of
                 true ->
                     lager:info("Performing anti-entropy pass with all clients."),
                     ObjectFilterFun = fun(_) -> true end,
@@ -175,6 +175,7 @@ max_events() ->
 %% @private
 log_divergence() ->
     {ok, Value} = lasp:query(?SIMPLE_COUNTER),
+
     MaxEvents = max_events(),
     Overcounting = Value - MaxEvents,
     OvercountingPercentage = (Overcounting * 100) / MaxEvents,

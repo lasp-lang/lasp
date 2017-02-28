@@ -171,6 +171,7 @@ if [ ! -z "$REDIS_STOP" ]; then
   echo "Deleting redis deployments and servies."
   kubectl delete -f /tmp/redis.yaml
   echo
+fi
 
 # Perform cluster operations if necessary.
 if [ ! -z "$CLUSTER_STOP" ]; then

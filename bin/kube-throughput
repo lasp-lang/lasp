@@ -1,180 +1,283 @@
 #!/usr/bin/env bash
 
-CLIENTS=(1 2 4)
-NODES=3
-LASP_BRANCH=workflow-v2
-IMAGE=lasp-dev
-REPS=1
-GCE=true
-MACHINE="n1-standard-8"
-MAX_EVENTS=50000
-STATE_INTERVAL=2000
-BLOCKING_SYNC=false
+# Configure experiment.
+WORKFLOW=true
+SERVER_REPLICAS=1
+PEER_SERVICE=partisan_client_server_peer_service_manager
+MODE=state_based
+HEAVY_CLIENTS=false
+REACTIVE_SERVER=false
+CLIENT_REPLICAS=${CLIENT_NUMBER}
+BROADCAST=false
+SIMULATION=throughput
+PARTITION_PROBABILITY=0
+DELTA_INTERVAL=10000
+INSTRUMENTATION=true
+LOGS=redis
+EXTENDED_LOGGING=false
+MAILBOX_LOGGING=false
 
-# Rebuild image if desired.
-if [ ! -z "$REBUILD_IMAGE" ]; then
-    # Delete image
-    IMAGE_IDS=$(docker images | grep cmeiklejohn/${IMAGE} | awk '{print $3}')
-    echo "Images matching for deletion: ${IMAGE_IDS}"
+# Environment variables.
+ENV_VARS=(
+  WORKFLOW
+  REPS
+  LASP_BRANCH
+  PEER_SERVICE
+  MODE
+  BROADCAST
+  SIMULATION
+  BLOCKING_SYNC
+  CLIENT_NUMBER
+  HEAVY_CLIENTS
+  REACTIVE_SERVER
+  PARTITION_PROBABILITY
+  STATE_INTERVAL
+  DELTA_INTERVAL
+  INSTRUMENTATION
+  LOGS
+  EXTENDED_LOGGING
+  MAILBOX_LOGGING
+  AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY
+  SIMULATION
+  THROUGHPUT_TYPE
+  IMAGE
+  MAX_EVENTS
+)
 
-    if [ ! -z "$IMAGE_IDS" ]; then
-      docker rmi ${IMAGE_IDS}
-    fi
-
-    # Rebuild image fresh, to ensure no stale dependencies
-    docker build -f Dockerfiles/$IMAGE -t cmeiklejohn/${IMAGE} .
-
-    # Push image to hub
-    docker push cmeiklejohn/${IMAGE}
-fi
-
-# Perform cluster operations if necessary.
-if [ ! -z "$CLUSTER_START" ]; then
-  # Bootstrap cluster
-  gcloud beta container clusters create lasp \
-    --machine-type=${MACHINE} \
-    --num-nodes=${NODES}
-
-  # Get container credential
-  gcloud beta container clusters get-credentials lasp
-fi
-
-echo "Removing initial labeling."
-kubectl label nodes --all client_number-
-
-echo "Removing deployments, services, pods, and replicasets."
-kubectl delete deployments --all
-kubectl delete replicasets --all
-kubectl delete services --all
-kubectl delete pods --all
-
-echo "Removing /tmp logs."
-rm -rf /tmp/logs
-
-if [ ! -z "$DELETE_LOGS" ]; then
-  echo "Removing older logs."
-  rm -rf priv/evaluation/logs
-fi
-
-# Allocate machines accordingly.
-for i in ${CLIENTS[@]}; do
-  # Find a machine we can allocate these to.
-  AVAILABLE=$(kubectl get nodes -l '!client_number' | grep Ready | head -1 | awk '{print $1}')
-
-  # Label the node.
-  kubectl label node ${AVAILABLE} client_number=${i}
-
-  echo "Labeled node ${AVAILABLE} for runs of ${i} clients."
+for ENV_VAR in "${ENV_VARS[@]}"
+do
+  if [ -z "${!ENV_VAR}" ]; then
+    echo ">>> ${ENV_VAR} is not configured; please export it."
+    exit 1
+  fi
 done
 
-# Deploy a single redis instance.
-echo "Copying code to /tmp"
-cp bin/sync-redis.erl /tmp
-cp bin/kube /tmp
-mkdir -p /tmp/_build/default/lib/eredis/ebin
-cp -Rp _build/default/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/ebin
+for i in `seq 1 ${REPS}`; do
+  # Configure evaluation timestamp and identifier.
+  EVAL_TIMESTAMP=$(date +%s)
+  EVAL_ID="client_server_state_based_${THROUGHPUT_TYPE}_${MAX_EVENTS}_${BLOCKING_SYNC}_${STATE_INTERVAL}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
+  echo "Evaluation identifier is:" ${EVAL_ID}
+  echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
 
-cd /tmp
+  # Get Kubernetes API server.
+  export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)
 
-cat <<EOF > redis.yaml
-  apiVersion: v1
-  kind: Service
+  # Get Kubernetes access token.
+  export TOKEN=$(kubectl describe secret $(kubectl get secrets | grep default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d '\t')
+
+  cd /tmp
+
+  cat <<EOF > lasp-${EVAL_TIMESTAMP}.yaml
+  apiVersion: extensions/v1beta1
+  kind: Deployment
   metadata:
-    name: redis
-    labels:
-      run: redis
+    name: "lasp-server-${EVAL_TIMESTAMP}"
   spec:
-    type: LoadBalancer
-    ports:
-    - port: 6379
-      protocol: TCP
-      name: tcp
-    selector:
-      run: redis
+    replicas: ${SERVER_REPLICAS}
+    template:
+      metadata:
+        labels:
+          evaluation-identifier: ${EVAL_ID}
+          evaluation-timestamp: "${EVAL_TIMESTAMP}"
+          tag: server
+          run: lasp-server
+      spec:
+        nodeSelector:
+          client_number: "${CLIENT_NUMBER}"
+        containers:
+        - name: "lasp-server-${EVAL_TIMESTAMP}"
+          image: cmeiklejohn/${IMAGE}
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: TAG
+            value: "server"
+          - name: WEB_PORT
+            value: "8080"
+          - name: PEER_PORT
+            value: "9090"
+          - name: LASP_BRANCH
+            value: "${LASP_BRANCH}"
+          - name: APISERVER
+            value: "${APISERVER}"
+          - name: TOKEN
+            value: "${TOKEN}"
+          - name: AWS_ACCESS_KEY_ID
+            value: "${AWS_ACCESS_KEY_ID}"
+          - name: AWS_SECRET_ACCESS_KEY
+            value: "${AWS_SECRET_ACCESS_KEY}"
+          - name: EVALUATION_TIMESTAMP
+            value: "${EVALUATION_TIMESTAMP}"
+          - name: PEER_SERVICE
+            value: "${PEER_SERVICE}"
+          - name: THROUGHPUT_SIM_CLIENT
+            value: "false"
+          - name: THROUGHPUT_SIM_SERVER
+            value: "true"
+          - name: DIVERGENCE_SIM_CLIENT
+            value: "false"
+          - name: DIVERGENCE_SIM_SERVER
+            value: "true"
+          - name: MODE
+            value: "${MODE}"
+          - name: BROADCAST
+            value: "${BROADCAST}"
+          - name: SIMULATION
+            value: "${SIMULATION}"
+          - name: BLOCKING_SYNC
+            value: "${BLOCKING_SYNC}"
+          - name: EVAL_ID
+            value: "${EVAL_ID}"
+          - name: EVAL_TIMESTAMP
+            value: "${EVAL_TIMESTAMP}"
+          - name: CLIENT_NUMBER
+            value: "${CLIENT_NUMBER}"
+          - name: HEAVY_CLIENTS
+            value: "${HEAVY_CLIENTS}"
+          - name: REACTIVE_SERVER
+            value: "${REACTIVE_SERVER}"
+          - name: PARTITION_PROBABILITY
+            value: "${PARTITION_PROBABILITY}"
+          - name: STATE_INTERVAL
+            value: "${STATE_INTERVAL}"
+          - name: DELTA_INTERVAL
+            value: "${DELTA_INTERVAL}"
+          - name: INSTRUMENTATION
+            value: "${INSTRUMENTATION}"
+          - name: LOGS
+            value: "${LOGS}"
+          - name: EXTENDED_LOGGING
+            value: "${EXTENDED_LOGGING}"
+          - name: MAILBOX_LOGGING
+            value: "${MAILBOX_LOGGING}"
+          - name: MAX_EVENTS
+            value: "${MAX_EVENTS}"
+          - name: WORKFLOW
+            value: "${WORKFLOW}"
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
 ---
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
-    name: redis
+    name: "lasp-client-${EVAL_TIMESTAMP}"
   spec:
-    replicas: 1
+    replicas: ${CLIENT_REPLICAS}
     template:
       metadata:
         labels:
-          run: redis
+          evaluation-identifier: ${EVAL_ID}
+          evaluation-timestamp: "${EVAL_TIMESTAMP}"
+          tag: client
+          run: lasp-client
       spec:
+        nodeSelector:
+          client_number: "${CLIENT_NUMBER}"
         containers:
-        - name: redis
-          image: redis
+        - name: "lasp-client-${EVAL_TIMESTAMP}"
+          image: cmeiklejohn/${IMAGE}
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: TAG
+            value: "client"
+          - name: WEB_PORT
+            value: "8080"
+          - name: PEER_PORT
+            value: "9090"
+          - name: LASP_BRANCH
+            value: "${LASP_BRANCH}"
+          - name: APISERVER
+            value: "${APISERVER}"
+          - name: TOKEN
+            value: "${TOKEN}"
+          - name: AWS_ACCESS_KEY_ID
+            value: "${AWS_ACCESS_KEY_ID}"
+          - name: AWS_SECRET_ACCESS_KEY
+            value: "${AWS_SECRET_ACCESS_KEY}"
+          - name: EVALUATION_TIMESTAMP
+            value: "${EVALUATION_TIMESTAMP}"
+          - name: PEER_SERVICE
+            value: "${PEER_SERVICE}"
+          - name: THROUGHPUT_SIM_CLIENT
+            value: "true"
+          - name: THROUGHPUT_SIM_SERVER
+            value: "false"
+          - name: DIVERGENCE_SIM_CLIENT
+            value: "true"
+          - name: DIVERGENCE_SIM_SERVER
+            value: "false"
+          - name: MODE
+            value: "${MODE}"
+          - name: BROADCAST
+            value: "${BROADCAST}"
+          - name: SIMULATION
+            value: "${SIMULATION}"
+          - name: BLOCKING_SYNC
+            value: "${BLOCKING_SYNC}"
+          - name: EVAL_ID
+            value: "${EVAL_ID}"
+          - name: EVAL_TIMESTAMP
+            value: "${EVAL_TIMESTAMP}"
+          - name: CLIENT_NUMBER
+            value: "${CLIENT_NUMBER}"
+          - name: HEAVY_CLIENTS
+            value: "${HEAVY_CLIENTS}"
+          - name: REACTIVE_SERVER
+            value: "${REACTIVE_SERVER}"
+          - name: PARTITION_PROBABILITY
+            value: "${PARTITION_PROBABILITY}"
+          - name: STATE_INTERVAL
+            value: "${STATE_INTERVAL}"
+          - name: DELTA_INTERVAL
+            value: "${DELTA_INTERVAL}"
+          - name: INSTRUMENTATION
+            value: "${INSTRUMENTATION}"
+          - name: LOGS
+            value: "${LOGS}"
+          - name: EXTENDED_LOGGING
+            value: "${EXTENDED_LOGGING}"
+          - name: MAILBOX_LOGGING
+            value: "${MAILBOX_LOGGING}"
+          - name: MAX_EVENTS
+            value: "${MAX_EVENTS}"
+          - name: WORKFLOW
+            value: "${WORKFLOW}"
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
 EOF
 
-echo "Creating redis deployment."
-kubectl create -f /tmp/redis.yaml
-echo
-
-echo "Sleeping for redis deployment..."
-sleep 10
-
-# Start the executions in parallel.
-for k in ${CLIENTS[@]}; do
-  echo "Launching client simulation: ${k}"
-  BLOCKING_SYNC=${BLOCKING_SYNC} \
-    STATE_INTERVAL=${STATE_INTERVAL} \
-    MAX_EVENTS=${MAX_EVENTS} \
-    REPS=${REPS} \
-    LASP_BRANCH=${LASP_BRANCH} \
-    IMAGE=${IMAGE} \
-    GCE=${GCE} \
-    THROUGHPUT_TYPE=boolean \
-    CLIENT_NUMBER=${k} \
-    ./kube &
-  sleep 10
-done
-
-# Wait for all of the tests to finish;
-RUNNING=$(kubectl get pods | wc -l)
-
-# redis will always be running, so wait until there are no more lasp pods
-# and a title line -- HACK.
-while [ $RUNNING -ne 2 ]; do
-  echo "Sleeping until pods are destroyed."
-  echo "Running pods: "
-  kubectl get pods
-  sleep 2
-  RUNNING=$(kubectl get pods | wc -l)
-done
-
-echo "All tasks are finished."
-
-# Download data from Redis at the end of the execution.
-if [ "$GCE" ]; then
-  echo "Running in Google Container Engine."
-  export REDIS_SERVICE_HOST=$(kubectl get services | grep redis | awk '{print $3}' | head -1)
-  # export REDIS_SERVICE_HOST=$(gcloud compute forwarding-rules list | grep TCP | awk '{print $3}' | tail -1)
-  export REDIS_SERVICE_PORT=6379
-  echo "REDIS_SERVICE_HOST: ${REDIS_SERVICE_HOST}"
-  echo "REDIS_SERVICE_PORT: ${REDIS_SERVICE_PORT}"
-else
-  export REDIS_SERVICE_HOST=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1 | cut -f 2-2 -d ":" | sed -e 's/\/\///g')
-  export REDIS_SERVICE_PORT=$(kubectl get service redis -o jsonpath="{.spec.ports[*].nodePort}")
-fi
-
-echo "Downloading data from Redis."
-./sync-redis.erl
-mkdir -p ~/Documents/lasp/priv/evaluation/logs
-cp -Rp /tmp/logs/* ~/Documents/lasp/priv/evaluation/logs
-
-# Terminate redis only if we explicitly say so, given sometimes we have
-# to aggregate the logs later if for some instance we are being port
-# filtered.
-if [ ! -z "$REDIS_STOP" ]; then
-  echo "Deleting redis deployments and servies."
-  kubectl delete -f /tmp/redis.yaml
+  echo "Creating deployment."
+  kubectl create -f /tmp/lasp-${EVAL_TIMESTAMP}.yaml
   echo
-fi
 
-# Perform cluster operations if necessary.
-if [ ! -z "$CLUSTER_STOP" ]; then
-  # Terminate the cluster
-  yes | gcloud beta container clusters delete lasp
-fi
+  sleep 60
+
+  echo "Tailing logs."
+  export SERVER_POD_NAME=$(kubectl get pods | grep lasp-server-${EVAL_TIMESTAMP} | awk '{print $1}')
+  kubectl logs --tail=-1 -f $SERVER_POD_NAME
+done
+
+# Only remove after *all* repetitions are completed.
+NODE=$(echo "client_number=${CLIENT_NUMBER}" | xargs kubectl get nodes -l | grep Ready | head -1 | awk '{print $1}')
+echo "Removing label for node ${NODE}"
+kubectl label node ${NODE} client_number-

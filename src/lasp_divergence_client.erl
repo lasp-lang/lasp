@@ -139,7 +139,7 @@ handle_info(event, #state{actor=Actor,
                                      end),
             log_event(Duration),
 
-            case max_events_reached(Events1) of
+            case max_events_reached() of
                 true ->
                     Value = lasp:query(?SIMPLE_COUNTER),
                     lager:info("All events done, counter is now: ~p.
@@ -148,6 +148,7 @@ handle_info(event, #state{actor=Actor,
                     %% Update Simulation Status Instance
                     lasp_workflow:task_completed(events, node()),
                     log_convergence(),
+                    log_event_number(Events1),
                     schedule_check_simulation_end();
                 false ->
                     schedule_event()
@@ -227,6 +228,15 @@ log_batch(Start, End, Events) ->
     end.
 
 %% @private
+log_event_number(Events) ->
+    case lasp_config:get(instrumentation, false) of
+        true ->
+            lasp_instrumentation:event_number(Events);
+        false ->
+            ok
+    end.
+
+%% @private
 log_event(Duration) ->
     case lasp_config:get(event_logging, false) of
         true ->
@@ -244,8 +254,8 @@ client_number() ->
     lasp_config:get(client_number, 0).
 
 %% @private
-max_events_reached(Events) ->
-    max_events() == Events orelse lasp_config:get(events_generated, false).
+max_events_reached() ->
+    lasp_config:get(events_generated, false).
 
 %% @private
 perform_update(Element, Actor, Events1) ->

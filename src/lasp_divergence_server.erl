@@ -180,7 +180,7 @@ client_number() ->
 log_divergence() ->
     {ok, Value} = lasp:query(?SIMPLE_COUNTER),
 
-    MaxEvents = max_events(),
+    MaxEvents = max_events() * client_number(),
     Overcounting = Value - MaxEvents,
     OvercountingPercentage = (Overcounting * 100) / MaxEvents,
 

@@ -62,7 +62,7 @@ init([]) ->
     lasp_instrumentation:experiment_started(),
 
     %% Configure invariant.
-    Threshold = {value, max_events()},
+    Threshold = {value, max_events() * client_number()},
 
     EnforceFun = fun() ->
                          lager:info("Threshold exceeded!"),
@@ -171,6 +171,10 @@ log_convergence() ->
 %% @private
 max_events() ->
     lasp_config:get(max_events, ?MAX_EVENTS_DEFAULT).
+
+%% @private
+client_number() ->
+    lasp_config:get(client_number, 0).
 
 %% @private
 log_divergence() ->

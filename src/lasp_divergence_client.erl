@@ -67,7 +67,7 @@ init([]) ->
     {ok, _} = lasp:declare(?SIMPLE_COUNTER, ?GCOUNTER_TYPE),
 
     %% Configure invariant.
-    Threshold = {value, max_events()},
+    Threshold = {value, max_events() * client_number()},
 
     EnforceFun = fun() ->
                          lager:info("Threshold exceeded!"),
@@ -238,6 +238,10 @@ log_event(Duration) ->
 %% @private
 max_events() ->
     lasp_config:get(max_events, ?MAX_EVENTS_DEFAULT).
+
+%% @private
+client_number() ->
+    lasp_config:get(client_number, 0).
 
 %% @private
 max_events_reached(Events) ->

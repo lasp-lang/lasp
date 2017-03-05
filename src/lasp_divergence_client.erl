@@ -145,6 +145,15 @@ handle_info(event, #state{actor=Actor,
                     lager:info("All events done, counter is now: ~p.
                                Node: ~p", [Value, Actor]),
 
+                    case BatchStart2 of
+                        undefined ->
+                            lager:info("Simulation finished at batch."),
+                            ok;
+                        _ ->
+                            lager:info("Batch in progress: ~p", [BatchEvents1]),
+                            ok
+                    end,
+
                     %% Update Simulation Status Instance
                     lasp_workflow:task_completed(events, node()),
                     log_convergence(),

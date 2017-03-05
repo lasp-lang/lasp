@@ -150,7 +150,10 @@ handle_info(event, #state{actor=Actor,
                             lager:info("Simulation finished at batch."),
                             ok;
                         _ ->
+                            FinalBatchEnd = erlang:timestamp(),
                             lager:info("Batch in progress: ~p", [BatchEvents1]),
+                            log_batch(BatchStart2, FinalBatchEnd, BatchEvents1),
+                            lager:info("Logging final batch: ~p", [BatchEvents1]),
                             ok
                     end,
 

@@ -130,18 +130,15 @@ for k in ${CLIENTS[@]}; do
   sleep 10
 done
 
-# Wait for all of the tests to finish;
-RUNNING=$(kubectl get pods | wc -l)
-
-# redis will always be running, so wait until there are no more lasp pods
-# and a title line -- HACK.
-while [ $RUNNING -ne 2 ]; do
-  # echo "Sleeping until pods are destroyed."
-  # echo "Running pods: "
-  # kubectl get pods
-  sleep 2
-  RUNNING=$(kubectl get pods | wc -l)
+# wait for all jobs to finish.
+for job in `jobs -p`
+do
+  echo "Waiting on: $job"
+  wait $job || let "FAIL+=1"
 done
+
+echo "Loop finished; tasks remain:"
+kubectl get pods
 
 echo "All tasks are finished."
 

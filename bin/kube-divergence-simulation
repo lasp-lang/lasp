@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-CLIENTS=(1 2 4)
-NODES=3
+CLIENTS=(1 2 4 6 8)
+NODES=5
 LASP_BRANCH=divergence
 IMAGE=lasp-dev
 REPS=10
@@ -9,6 +9,7 @@ GCE=true
 MACHINE="n1-standard-8"
 MAX_EVENTS=50000
 BLOCKING_SYNC=false
+EVENT_INTERVAL=0
 
 # Rebuild image if desired.
 if [ ! -z "$REBUILD_IMAGE" ]; then
@@ -116,8 +117,16 @@ sleep 10
 
 # Start the executions in parallel.
 for k in ${CLIENTS[@]}; do
-  echo "Launching client simulation: ${k}"
+  A=1200
+  EVENT_INTERVAL=$(expr $(expr ${k} - 1) \* ${A})
+  echo "EVENT_INTERVAL: ${EVENT_INTERVAL}"
+  STATE_INTERVAL=$(expr ${k} \* ${STATE_INTERVAL})
+  echo "STATE_INTERVAL: ${STATE_INTERVAL}"
+
+  echo "Launching client simulation: ${k} clients; state interval: ${STATE_INTERVAL} event interval: ${EVENT_INTERVAL}"
+
   BLOCKING_SYNC=${BLOCKING_SYNC} \
+    EVENT_INTERVAL=${EVENT_INTERVAL} \
     STATE_INTERVAL=${STATE_INTERVAL} \
     MAX_EVENTS=${MAX_EVENTS} \
     REPS=${REPS} \

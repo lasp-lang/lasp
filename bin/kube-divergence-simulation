@@ -118,9 +118,10 @@ sleep 10
 # Start the executions in parallel.
 for k in ${CLIENTS[@]}; do
   A=1200
-  EVENT_INTERVAL=$(expr $(expr ${k} - 1) \* ${A})
+  N=10
+  EVENT_INTERVAL=$(expr $(expr ${N} - 1) \* ${A})
   echo "EVENT_INTERVAL: ${EVENT_INTERVAL}"
-  STATE_INTERVAL=$(expr ${k} \* ${STATE_INTERVAL})
+  STATE_INTERVAL=$(expr ${N} \* ${STATE_INTERVAL})
   echo "STATE_INTERVAL: ${STATE_INTERVAL}"
 
   echo "Launching client simulation: ${k} clients; state interval: ${STATE_INTERVAL} event interval: ${EVENT_INTERVAL}"

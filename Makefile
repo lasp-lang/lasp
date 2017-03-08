@@ -5,7 +5,7 @@ ERLANG_BIN       = $(shell dirname $(shell which erl))
 REBAR            = $(shell pwd)/rebar3
 MAKE						 = make
 
-.PHONY: rel deps test plots dcos
+.PHONY: rel deps test plots dcos logs
 
 all: compile
 
@@ -60,6 +60,15 @@ peer-to-peer-game-tournament-simulation:
 
 client-server-game-tournament-simulation:
 	${REBAR} as test ct --suite=lasp_client_server_game_tournament_SUITE
+
+peer-to-peer-throughput-simulation:
+	${REBAR} as test ct --suite=lasp_peer_to_peer_throughput_SUITE
+
+client-server-throughput-simulation:
+	${REBAR} as test ct --suite=lasp_client_server_throughput_SUITE
+
+client-server-divergence-simulation:
+	${REBAR} as test ct --suite=lasp_client_server_divergence_SUITE
 
 ##
 ## Release targets

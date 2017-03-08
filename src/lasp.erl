@@ -47,7 +47,8 @@
          wait_needed/2,
          thread/3]).
 
--export([invariant/3]).
+-export([invariant/3,
+         enforce_once/3]).
 
 %% Public Helpers
 
@@ -57,6 +58,17 @@
 invariant(Id, Threshold, EnforceFun) ->
     {ok, _Value} = lasp:read(Id, Threshold),
     EnforceFun().
+
+%% @doc Enforce an invariant once, by selecting the lowest node in the
+%%      membership list.
+%%
+enforce_once(Id, Threshold, EnforceFun) ->
+    case lasp_config:peer_service_manager() of
+        partisan_default_peer_service_manager ->
+            do(enforce_once, [Id, Threshold, EnforceFun]);
+        Manager ->
+            {error, {incompatible_manager, Manager}}
+    end.
 
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.

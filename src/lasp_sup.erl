@@ -1,6 +1,6 @@
+%% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2014 SyncFree Consortium.  All Rights Reserved.
-%% Copyright (c) 2016 Christopher Meiklejohn.  All Rights Reserved.
+%% Copyright (c) 2017 Christopher S. Meiklejohn.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -59,36 +59,6 @@ init(_Args) ->
                permanent, 5000, worker,
                [lasp_unique]},
 
-    %% Before initializing the partisan backend, be sure to configure it
-    %% to use the proper ip and ports.
-    case os:getenv("IP", "false") of
-        "false" ->
-            ok;
-        IP ->
-            {ok, IPAddress} = inet_parse:address(IP),
-            partisan_config:set(peer_ip, IPAddress),
-            ok
-    end,
-    case os:getenv("PEER_PORT", "false") of
-        "false" ->
-            partisan_config:set(peer_port, random_port()),
-            ok;
-        PeerPort ->
-            partisan_config:set(peer_port, list_to_integer(PeerPort)),
-            ok
-    end,
-
-    %% Configure the peer service.
-    PeerServiceDefault = list_to_atom(os:getenv("PEER_SERVICE", "partisan_client_server_peer_service_manager")),
-    PeerService = application:get_env(partisan,
-                                      partisan_peer_service_manager,
-                                      PeerServiceDefault),
-    partisan_config:set(partisan_peer_service_manager, PeerService),
-
-    Partisan = {partisan_sup,
-                {partisan_sup, start_link, []},
-                 permanent, infinity, supervisor, [partisan_sup]},
-
     DistributionBackend = {lasp_distribution_backend,
                            {lasp_distribution_backend, start_link, []},
                             permanent, 5000, worker,
@@ -109,28 +79,55 @@ init(_Args) ->
                         permanent, 5000, worker,
                         [lasp_plumtree_backend]},
 
-    Plumtree = {plumtree_sup,
-                {plumtree_sup, start_link, []},
-                 permanent, infinity, supervisor, [plumtree_sup]},
+    MembershipDefault = list_to_atom(os:getenv("MEMBERSHIP", "false")),
+    MembershipEnabled = application:get_env(?APP,
+                                            membership,
+                                            MembershipDefault),
+    lasp_config:set(membership, MembershipEnabled),
+    lager:info("Membership: ~p", [MembershipEnabled]),
 
-    Sprinter = {sprinter,
-                {sprinter, start_link, []},
-                 permanent, 5000, worker,
-                 [sprinter]},
+    MembershipSpecs = case MembershipEnabled of
+        true ->
+            Membership = {lasp_membership,
+                          {lasp_membership, start_link, []},
+                           permanent, 5000, worker,
+                           [lasp_membership]},
+            [Membership];
+        false ->
+            []
+    end,
+
+    WorkflowDefault = list_to_atom(os:getenv("WORKFLOW", "false")),
+    WorkflowEnabled = application:get_env(?APP,
+                                          workflow,
+                                          WorkflowDefault),
+    lasp_config:set(workflow, WorkflowEnabled),
+    lager:info("Workflow: ~p", [WorkflowEnabled]),
+
+    WorkflowSpecs = case WorkflowEnabled of
+        true ->
+            Workflow = {lasp_workflow,
+                        {lasp_workflow, start_link, []},
+                         permanent, 5000, worker,
+                         [lasp_workflow]},
+            [Workflow];
+        false ->
+            []
+    end,
 
     WebSpecs = web_specs(),
 
-    BaseSpecs0 = [Unique,
-                  Partisan,
-                  Sprinter,
-                  PlumtreeBackend,
-                  PlumtreeMemoryReport,
-                  MemoryUtilizationReport,
-                  DistributionBackend,
-                  Plumtree,
-                  Process] ++ WebSpecs,
+    BaseSpecs0 = lists:flatten([Unique,
+                                PlumtreeBackend,
+                                PlumtreeMemoryReport,
+                                MemoryUtilizationReport,
+                                DistributionBackend,
+                                Process,
+                                MembershipSpecs,
+                                WorkflowSpecs,
+                                WebSpecs]),
 
-    DagEnabled = application:get_env(?APP, dag_enabled, false),
+    DagEnabled = application:get_env(?APP, dag_enabled, ?DAG_ENABLED),
     lasp_config:set(dag_enabled, DagEnabled),
     BaseSpecs = case DagEnabled of
         true -> [DepDag | BaseSpecs0];
@@ -164,7 +161,19 @@ init(_Args) ->
     %% Setup the game tournament example, if necessary.
     TournamentSpecs = game_tournament_child_specs(),
 
-    Children = Children0 ++ AdSpecs ++ TournamentSpecs,
+    %% Setup the throughput example, if necessary.
+    ThroughputSpecs = throughput_child_specs(),
+
+    %% Setup the divergence example, if necessary.
+    DivergenceSpecs = divergence_child_specs(),
+
+    %% Assemble specs.
+    Children = lists:flatten([Children0,
+                              AdSpecs,
+                              TournamentSpecs,
+                              ThroughputSpecs,
+                              DivergenceSpecs
+                             ]),
 
     {ok, {{one_for_one, 5, 10}, Children}}.
 
@@ -203,6 +212,16 @@ configure_defaults() ->
     Tutorial = application:get_env(?APP, tutorial, TutorialDefault),
     lager:info("Setting tutorial: ~p", [Tutorial]),
     lasp_config:set(tutorial, Tutorial),
+
+    EventIntervalDefault = list_to_integer(os:getenv("EVENT_INTERVAL", "0")),
+    EventInterval = application:get_env(?APP, event_interval, EventIntervalDefault),
+    lager:info("Setting event interval: ~p", [EventInterval]),
+    lasp_config:set(event_interval, EventInterval),
+
+    MaxEventsDefault = list_to_integer(os:getenv("MAX_EVENTS", "1000")),
+    MaxEvents = application:get_env(?APP, max_events, MaxEventsDefault),
+    lager:info("Setting max events: ~p", [MaxEvents]),
+    lasp_config:set(max_events, MaxEvents),
 
     ExtendedLoggingDefault = list_to_atom(os:getenv("EXTENDED_LOGGING", "false")),
     ExtendedLogging = application:get_env(?APP, extended_logging, ExtendedLoggingDefault),
@@ -243,6 +262,12 @@ configure_defaults() ->
                                        SimulationDefault),
     lasp_config:set(simulation, Simulation),
 
+    BlockingSyncDefault = list_to_atom(os:getenv("BLOCKING_SYNC", "false")),
+    BlockingSync = application:get_env(?APP,
+                                       blocking_sync,
+                                       BlockingSyncDefault),
+    lasp_config:set(blocking_sync, BlockingSync),
+
     EvaluationIdDefault = list_to_atom(os:getenv("EVAL_ID", "undefined")),
     EvaluationId = application:get_env(?APP,
                                        evaluation_identifier,
@@ -261,11 +286,11 @@ configure_defaults() ->
                                        ClientNumberDefault),
     lasp_config:set(client_number, ClientNumber),
 
-    HeavyClientsDefault = list_to_atom(os:getenv("HEAVY_CLIENTS", "false")),
-    HeavyClients = application:get_env(?APP,
-                                       heavy_clients,
-                                       HeavyClientsDefault),
-    lasp_config:set(heavy_clients, HeavyClients),
+    HeavyClientDefault = list_to_atom(os:getenv("HEAVY_CLIENT", "false")),
+    HeavyClient = application:get_env(?APP,
+                                       heavy_client,
+                                       HeavyClientDefault),
+    lasp_config:set(heavy_client, HeavyClient),
 
     ReactiveServerDefault = list_to_atom(os:getenv("REACTIVE_SERVER", "false")),
     ReactiveServer = application:get_env(?APP,
@@ -330,7 +355,7 @@ configure_defaults() ->
     %% Automatic contraction configuration.
     %% Only makes sense if the dag is enabled.
     lasp_config:set(incremental_computation_mode, IncrementalComputation),
-    case lasp_config:get(dag_enabled, false) of
+    case lasp_config:get(dag_enabled, ?DAG_ENABLED) of
         true ->
             AutomaticContraction = application:get_env(?APP, automatic_contraction, false),
             lasp_config:set(automatic_contraction, AutomaticContraction);
@@ -367,10 +392,6 @@ advertisement_counter_child_specs() ->
                                {lasp_advertisement_counter_client, start_link, []},
                                 permanent, 5000, worker,
                                 [lasp_advertisement_counter_client]},
-
-            %% Configure proper partisan tag.
-            partisan_config:set(tag, client),
-
             [AdCounterClient];
         false ->
             []
@@ -390,10 +411,6 @@ advertisement_counter_child_specs() ->
                                {lasp_advertisement_counter_server, start_link, []},
                                 permanent, 5000, worker,
                                 [lasp_advertisement_counter_server]},
-
-            %% Configure proper partisan tag.
-            partisan_config:set(tag, server),
-
             [AdCounterServer];
         false ->
             []
@@ -424,10 +441,6 @@ game_tournament_child_specs() ->
                                   {lasp_game_tournament_client, start_link, []},
                                    permanent, 5000, worker,
                                    [lasp_game_tournament_client]},
-
-            %% Configure proper partisan tag.
-            partisan_config:set(tag, client),
-
             [TournCounterClient];
         false ->
             []
@@ -447,10 +460,6 @@ game_tournament_child_specs() ->
                            {lasp_game_tournament_server, start_link, []},
                             permanent, 5000, worker,
                             [lasp_game_tournament_server]},
-
-            %% Configure proper partisan tag.
-            partisan_config:set(tag, server),
-
             [TournServer];
         false ->
             []
@@ -458,3 +467,102 @@ game_tournament_child_specs() ->
 
     ClientSpecs ++ ServerSpecs.
 
+%% @private
+throughput_child_specs() ->
+    %% Throughput type.
+    ThroughputTypeDefault = list_to_atom(os:getenv("THROUGHPUT_TYPE", "gset")),
+    ThroughputType = application:get_env(?APP,
+                                         throughput_type,
+                                         ThroughputTypeDefault),
+    lasp_config:set(throughput_type, ThroughputType),
+    lager:info("ThroughputType: ~p", [ThroughputType]),
+
+    %% Figure out who is acting as the client.
+    ClientDefault = list_to_atom(os:getenv("THROUGHPUT_SIM_CLIENT", "false")),
+    ClientEnabled = application:get_env(?APP,
+                                        throughput_simulation_client,
+                                        ClientDefault),
+    lasp_config:set(throughput_simulation_client, ClientEnabled),
+    lager:info("ThroughputClientEnabled: ~p", [ClientEnabled]),
+
+    ClientSpecs = case ClientEnabled of
+        true ->
+            Client = {lasp_throughput_client,
+                      {lasp_throughput_client, start_link, []},
+                       permanent, 5000, worker,
+                       [lasp_throughput_client]},
+            [Client];
+        false ->
+            []
+    end,
+
+    %% Figure out who is acting as the server.
+    ServerDefault = list_to_atom(os:getenv("THROUGHPUT_SIM_SERVER", "false")),
+    ServerEnabled = application:get_env(?APP,
+                                        throughput_simulation_server,
+                                        ServerDefault),
+    lasp_config:set(throughput_simulation_server, ServerEnabled),
+    lager:info("ThroughputServerEnabled: ~p", [ServerEnabled]),
+
+    ServerSpecs = case ServerEnabled of
+        true ->
+            Server = {lasp_throughput_server,
+                      {lasp_throughput_server, start_link, []},
+                       permanent, 5000, worker,
+                       [lasp_throughput_server]},
+            [Server];
+        false ->
+            []
+    end,
+
+    ClientSpecs ++ ServerSpecs.
+
+%% @private
+divergence_child_specs() ->
+    %% Throughput type.
+    DivergenceTypeDefault = list_to_atom(os:getenv("DIVERGENCE_TYPE", "gcounter")),
+    DivergenceType = application:get_env(?APP,
+                                         divergence_type,
+                                         DivergenceTypeDefault),
+    lasp_config:set(divergence_type, DivergenceType),
+    lager:info("DivergenceType: ~p", [DivergenceType]),
+
+    %% Figure out who is acting as the client.
+    ClientDefault = list_to_atom(os:getenv("DIVERGENCE_SIM_CLIENT", "false")),
+    ClientEnabled = application:get_env(?APP,
+                                        divergence_simulation_client,
+                                        ClientDefault),
+    lasp_config:set(divergence_simulation_client, ClientEnabled),
+    lager:info("DivergenceClientEnabled: ~p", [ClientEnabled]),
+
+    ClientSpecs = case ClientEnabled of
+        true ->
+            Client = {lasp_divergence_client,
+                      {lasp_divergence_client, start_link, []},
+                       permanent, 5000, worker,
+                       [lasp_divergence_client]},
+            [Client];
+        false ->
+            []
+    end,
+
+    %% Figure out who is acting as the server.
+    ServerDefault = list_to_atom(os:getenv("DIVERGENCE_SIM_SERVER", "false")),
+    ServerEnabled = application:get_env(?APP,
+                                        divergence_simulation_server,
+                                        ServerDefault),
+    lasp_config:set(divergence_simulation_server, ServerEnabled),
+    lager:info("DivergenceServerEnabled: ~p", [ServerEnabled]),
+
+    ServerSpecs = case ServerEnabled of
+        true ->
+            Server = {lasp_divergence_server,
+                      {lasp_divergence_server, start_link, []},
+                       permanent, 5000, worker,
+                       [lasp_divergence_server]},
+            [Server];
+        false ->
+            []
+    end,
+
+    ClientSpecs ++ ServerSpecs.

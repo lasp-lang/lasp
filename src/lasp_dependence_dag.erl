@@ -1,4 +1,25 @@
+%% -------------------------------------------------------------------
+%%
+%% Copyright (c) 2016 Christopher S. Meiklejohn.  All Rights Reserved.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
+
 -module(lasp_dependence_dag).
+-author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -include("lasp.hrl").
 -behaviour(gen_server).
@@ -6,6 +27,8 @@
 %% API
 -export([start_link/0,
          will_form_cycle/2,
+         is_root/1,
+         vertices/0,
          add_edges/6,
          add_vertex/1,
          add_vertices/1]).
@@ -40,6 +63,9 @@
 
 %% Defines how often an optimization pass happens.
 -define(CONTRACTION_INTERVAL, 1000).
+
+%% Initial depth of all nodes.
+-define(BASE_DEPTH, 0).
 
 %%%===================================================================
 %%% Type definitions
@@ -152,6 +178,12 @@ add_vertices([]) ->
 
 add_vertices(Vs) ->
     gen_server:call(?MODULE, {add_vertices, Vs}, infinity).
+
+is_root(V) ->
+    gen_server:call(?MODULE, {is_root, V}, infinity).
+
+vertices() ->
+    gen_server:call(?MODULE, vertices, infinity).
 
 %% @doc Check if linking the given vertices will form a loop.
 %%
@@ -273,6 +305,30 @@ init([]) ->
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
+handle_call({is_root, V}, _From, #state{dag=Dag}=State) ->
+    InNeighbours = digraph:in_neighbours(Dag, V),
+
+    %% Filter out single-fire processes and only look at nodes that
+    %% directly modify it from other data nodes in the system.
+    FilterVs = lists:filter(fun({_, _}) ->
+                                    true;
+                               (_) ->
+                                    false
+                            end, InNeighbours),
+
+    IsRoot = not (length(FilterVs) > 0),
+
+    {reply, {ok, IsRoot}, State};
+
+handle_call(vertices, _From, #state{dag=Dag}=State) ->
+    %% Retrieve vertices from the graph.
+    Vertices = digraph:vertices(Dag),
+
+    %% Annotate vertices with their label.
+    Annotated = lists:map(fun(V) -> digraph:vertex(Dag, V) end, Vertices),
+
+    {reply, {ok, Annotated}, State};
+
 handle_call(n_vertices, _From, #state{dag=Dag}=State) ->
     {reply, {ok, digraph:no_vertices(Dag)}, State};
 
@@ -294,7 +350,7 @@ handle_call({in_edges, V}, _From, #state{dag=Dag}=State) ->
     {reply, {ok, Edges}, State};
 
 handle_call({add_vertices, Vs}, _From, #state{dag=Dag}=State) ->
-    [digraph:add_vertex(Dag, V) || V <- Vs],
+    [digraph:add_vertex(Dag, V, ?BASE_DEPTH) || V <- Vs],
     {reply, ok, State};
 
 handle_call(to_dot, _From, #state{dag=Dag}=State) ->
@@ -458,17 +514,50 @@ add_edges(Src, Dst, Pid, ReadFuns, TransFun, {Dst, WriteFun}, State) ->
     %% (where {Id, Read} = ReadFuns s.t. Id = V)
     Status = lists:map(fun(V) ->
         Read = lists:nth(1, [ReadF || {Id, ReadF} <- ReadFuns, Id =:= V]),
-        digraph:add_edge(Dag, V, Dst, #edge_label{pid=Pid,
-                                                  read=Read,
-                                                  transform=TransFun,
-                                                  write=WriteFun})
+        EdgeResult = digraph:add_edge(Dag, V, Dst, #edge_label{pid=Pid,
+                                                               read=Read,
+                                                               transform=TransFun,
+                                                               write=WriteFun}),
+
+        %% Determine depth; but ignore nodes that are transient,
+        %% single-fire processes.
+        case Dst of
+            {_Id, _Type} ->
+                Depth = depth(Dag, Dst, ?BASE_DEPTH),
+
+                %% Re-create destination vertex with new depth.
+                case digraph:vertex(Dag, Dst) of
+                    {_, Label} ->
+                        case Label of
+                            Depth ->
+                                %% Already correct depth; ignore.
+                                ok;
+                            Depth0 ->
+                                VertexResult = digraph:add_vertex(Dag, Dst, Depth),
+                                lager:info("Vertex: ~p re-created with depth ~p => ~p; result: ~p",
+                                           [Dst, Depth0, Depth, VertexResult]),
+                                lager:info("Vertex: ~p edges: ~p",
+                                           [Dst, digraph:edges(Dag, Dst)])
+                        end;
+                    _ ->
+                        ok
+                end;
+            _ ->
+                ok
+        end,
+
+        EdgeResult
     end, Src),
 
     {R, St} = case lists:any(fun is_graph_error/1, Status) of
-        true -> {error, State};
+        true ->
+            %% Sometimes if someone tries to read an object
+            %% that's not there, we'll try to make an edge to a
+            %% non-existent vertex and will trigger this
+            %% error.  Ignore.
+            {ok, State};
         false ->
             erlang:monitor(process, Pid),
-
 
             %% For all V in Src, append Pid -> {V, Dst}
             %% in the process map.
@@ -525,8 +614,10 @@ get_direct_edges(G, V1, V2) ->
 -spec add_if_pid(digraph:graph(), lasp_vertex()) -> ok.
 add_if_pid(Dag, Pid) when is_pid(Pid) ->
    case digraph:vertex(Dag, Pid) of
-      false -> digraph:add_vertex(Dag, Pid);
-      _ -> ok
+      false ->
+           digraph:add_vertex(Dag, Pid);
+      _ ->
+           ok
    end;
 
 add_if_pid(_, _) ->
@@ -1079,3 +1170,25 @@ v_str({Id, _}) ->
 
 v_str(V) when is_pid(V)->
     pid_to_list(V).
+
+%% @private
+depth(G, V, Max) ->
+    InNeighbors = digraph:in_neighbours(G, V),
+
+    %% Filter out single-fire nodes that are identified by process
+    %% identifier only.
+    FilterFun = fun({_Id, _Type}) ->
+                        true;
+                   (_) ->
+                        false
+                end,
+    Neighbors = lists:filter(FilterFun, InNeighbors),
+
+    case Neighbors of
+        [] ->
+            Max;
+        _ ->
+            lists:foldl(fun(V1, MaxAcc) ->
+                                max(MaxAcc, depth(G, V1, Max + 1)) end, 
+                        ?BASE_DEPTH, Neighbors)
+    end.

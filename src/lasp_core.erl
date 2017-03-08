@@ -61,7 +61,6 @@
          bind_to/5,
          wait_needed/6,
          read/6,
-         write/4,
          filter/6,
          map/6,
          product/7,
@@ -75,6 +74,9 @@
 
 %% Administrative controls.
 -export([storage_backend_reset/1]).
+
+%% Prototype features.
+-export([enforce_once/4]).
 
 %% Definitions for the bind/read fun abstraction.
 -define(BACKEND_BIND, fun(_AccId, AccValue, _Store) ->
@@ -90,6 +92,28 @@
 -define(BACKEND_READ, fun(_Id, _Threshold) ->
                 ?MODULE:read_var(_Id, _Threshold, Store)
               end).
+
+%% @private
+enforce_once(Id, Threshold, EnforceFun, Store) ->
+    TransFun = fun({_, Type, _, Value}) ->
+                   case lasp_type:threshold_met(Type, Value, Threshold) of
+                       true ->
+                           {ok, Membership} = lasp:query(?MEMBERSHIP_ID),
+                           SortedMembership = lists:usort(Membership),
+                           EnforcementNode = hd(SortedMembership),
+
+                           case node() of
+                               EnforcementNode ->
+                                   EnforceFun(Value);
+                               _ ->
+                                   ok
+                           end;
+                       false ->
+                           ok
+                   end,
+                   Value
+               end,
+    lasp_process:start_dag_link([[{Id, ?BACKEND_READ}], TransFun, undefined]).
 
 %% @doc Initialize the storage backend.
 -spec start_link(atom()) -> {ok, store()} | {error, term()}.
@@ -275,10 +299,6 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
             %% Do nothing; make declare idempotent at each replica.
             {ok, {Id, Type, Metadata, Value}};
         _ ->
-            case lasp_config:get(dag_enabled, false) of
-                true -> lasp_dependence_dag:add_vertex({Id, Type});
-                false -> ok
-            end,
             Value = lasp_type:new(Type),
             Metadata = MetadataFun(MetadataNew),
             Counter = 0,
@@ -290,6 +310,12 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
                         _ ->
                             {Id, Type}
                     end,
+            case lasp_config:get(dag_enabled, ?DAG_ENABLED) of
+                true ->
+                    lasp_dependence_dag:add_vertex(NewId);
+                false ->
+                    ok
+            end,
             ok = do(put, [Store, NewId, #dv{value=Value,
                                             type=Type,
                                             metadata=Metadata,
@@ -938,7 +964,7 @@ reply_to_all([], StillWaiting, _Result) ->
     {ok, StillWaiting}.
 
 -spec receive_value(store(), {state_send, node(), value(), function(),
-                              function()}) -> ok | error.
+                              function()}) -> {ok, crdt()}.
 receive_value(Store, {state_send, Origin, {Id, Type, Metadata, Value},
                       MetadataFunBind, MetadataFunDeclare}) ->
     case do(get, [Store, Id]) of
@@ -948,8 +974,7 @@ receive_value(Store, {state_send, Origin, {Id, Type, Metadata, Value},
             {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
             receive_value(Store, {state_send, Origin, {Id, Type, Metadata, Value},
                                   MetadataFunBind, MetadataFunDeclare})
-    end,
-    ok.
+    end.
 
 %% @doc When the delta interval is arrived, bind it with the existing object.
 %%      If the object does not exist, declare it.
@@ -1003,25 +1028,7 @@ receive_delta(Store, {delta_ack, Id, From, Counter}) ->
 
 %% Internal functions.
 
-%% @private
-%% @doc Send responses to waiting threads, via messages.
-%%
-%%      Perform the following operations:
-%%
-%%      * Reply to all waiting threads via message.
-%%      * Perform binding of any variables which are partially bound.
-%%      * Mark variable as bound.
-%%      * Check thresholds and send notifications, if required.
-%%
--spec write(type(), value(), id(), store()) -> ok.
-write(Type, Value, Key, Store) ->
-    {ok, #dv{metadata=Metadata, waiting_threads=WT}} = do(get, [Store, Key]),
-    {ok, StillWaiting} = reply_to_all(WT, [], {ok, {Key, Type, Metadata, Value}}),
-    V1 = #dv{type=Type, value=Value, waiting_threads=StillWaiting},
-    ok = do(put, [Store, Key, V1]),
-    ok.
-
-%% @private
+% @private
 storage_backend_reset(Store) ->
     do(reset, [Store]).
 

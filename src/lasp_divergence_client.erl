@@ -215,7 +215,8 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 schedule_event() ->
-    timer:send_after(?EVENT_INTERVAL, event).
+    Interval = lasp_config:get(event_interval, 0),
+    timer:send_after(Interval, event).
 
 %% @private
 schedule_check_simulation_end() ->

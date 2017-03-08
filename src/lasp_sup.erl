@@ -213,6 +213,11 @@ configure_defaults() ->
     lager:info("Setting tutorial: ~p", [Tutorial]),
     lasp_config:set(tutorial, Tutorial),
 
+    EventIntervalDefault = list_to_integer(os:getenv("EVENT_INTERVAL", "0")),
+    EventInterval = application:get_env(?APP, event_interval, EventIntervalDefault),
+    lager:info("Setting event interval: ~p", [EventInterval]),
+    lasp_config:set(event_interval, EventInterval),
+
     MaxEventsDefault = list_to_integer(os:getenv("MAX_EVENTS", "1000")),
     MaxEvents = application:get_env(?APP, max_events, MaxEventsDefault),
     lager:info("Setting max events: ~p", [MaxEvents]),

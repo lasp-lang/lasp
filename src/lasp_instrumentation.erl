@@ -31,6 +31,9 @@
          overcounting/1,
          experiment_started/0,
          convergence/0,
+         batch/3,
+         event_number/1,
+         event/1,
          stop/0,
          log_files/0]).
 
@@ -80,6 +83,18 @@ overcounting(Value) ->
 convergence() ->
     gen_server:call(?MODULE, convergence, infinity).
 
+-spec batch(term(), term(), number()) -> ok | error().
+batch(Start, End, Events) ->
+    gen_server:call(?MODULE, {batch, Start, End, Events}, infinity).
+
+-spec event_number(non_neg_integer()) -> ok | error().
+event_number(EventNumber) ->
+    gen_server:call(?MODULE, {event_number, EventNumber}, infinity).
+
+-spec event(term()) -> ok | error().
+event(Duration) ->
+    gen_server:call(?MODULE, {event, Duration}, infinity).
+
 -spec experiment_started() -> ok | error().
 experiment_started() ->
     gen_server:call(?MODULE, experiment_started, infinity).
@@ -97,9 +112,14 @@ log_files() ->
 
     OtherLogs = case partisan_config:get(tag, undefined) of
         server ->
-            OvercountingLog = overcounting_log(),
-            OvercountingLogS3 = SimulationId ++ "/" ++ overcounting_log_suffix(),
-            [{OvercountingLog, OvercountingLogS3}];
+            case lasp_config:get(simulation, undefined) of
+                throughput ->
+                    [];
+                _ ->
+                    OvercountingLog = overcounting_log(),
+                    OvercountingLogS3 = SimulationId ++ "/" ++ overcounting_log_suffix(),
+                    [{OvercountingLog, OvercountingLogS3}]
+            end;
         _ ->
             []
     end,
@@ -154,6 +174,18 @@ handle_call(convergence, _From, #state{}=State) ->
     record_convergence(),
     {reply, ok, State};
 
+handle_call({batch, Start, End, Events}, _From, #state{}=State) ->
+    record_batch(Start, End, Events),
+    {reply, ok, State};
+
+handle_call({event_number, EventNumber}, _From, #state{}=State) ->
+    record_event_number(EventNumber),
+    {reply, ok, State};
+
+handle_call({event, Duration}, _From, #state{}=State) ->
+    record_event(Duration),
+    {reply, ok, State};
+
 handle_call(experiment_started, _From, #state{}=State) ->
     record_experiment_started(),
     {reply, ok, State};
@@ -202,7 +234,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 termsize(Term) ->
     byte_size(term_to_binary(Term)).
-    %%erts_debug:flat_size(Term) * erlang:system_info(wordsize).
 
 %% @private
 start_transmission_timer() ->
@@ -223,17 +254,18 @@ log_dir() ->
 %% @private
 simulation_id() ->
     Simulation = lasp_config:get(simulation, undefined),
-    LocalOrDCOS = case os:getenv("DCOS", "false") of
-        "false" ->
+    Orchestration = case sprinter:orchestrated() of
+        false ->
             "local";
         _ ->
-            "dcos"
+            {ok, O} = sprinter:orchestration(),
+            atom_to_list(O)
     end,
     EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
 
     Id = atom_to_list(Simulation) ++ "/"
-      ++ LocalOrDCOS ++ "/"
+      ++ Orchestration ++ "/"
       ++ atom_to_list(EvalIdentifier) ++ "/"
       ++ integer_to_list(EvalTimestamp),
     Id.
@@ -288,6 +320,29 @@ record_convergence() ->
     append_to_file(Filename, Line).
 
 %% @private
+record_event(Duration) ->
+    Filename = main_log(),
+    Timestamp = timestamp(),
+    Line = get_line(event, Timestamp, Duration),
+    append_to_file(Filename, Line).
+
+%% @private
+record_batch(Start, End, Events) ->
+    Filename = main_log(),
+    Timestamp = timestamp(),
+    MsDiff = round(timer:now_diff(End, Start) / 1000),
+    DiffNoLatency = MsDiff - (?EVENT_INTERVAL * Events),
+    Line = get_batch_line(Timestamp, Start, End, Events, DiffNoLatency),
+    append_to_file(Filename, Line).
+
+%% @private
+record_event_number(EventNumber) ->
+    Filename = main_log(),
+    Timestamp = timestamp(),
+    Line = get_line(event_number, Timestamp, EventNumber),
+    append_to_file(Filename, Line).
+
+%% @private
 record_experiment_started() ->
     Filename = main_log(),
     Timestamp = timestamp(),
@@ -304,9 +359,22 @@ record_overcounting(Value) ->
 %% @private
 get_line(Type, Timestamp, Size) ->
     io_lib:format(
-        "~w,~w,~w\n",
+        "~w;~w;~w\n",
         [Type, Timestamp, megasize(Size)]
     ).
+
+%% @private
+get_batch_line(Timestamp, Start, End, Events, MsDiff) ->
+    Batch = integer_to_list(timestamp_to_milliseconds(Start)) ++ ","
+         ++ integer_to_list(timestamp_to_milliseconds(End)) ++ ","
+         ++ integer_to_list(Events) ++ ","
+         ++ integer_to_list(MsDiff),
+    "batch;" ++ integer_to_list(Timestamp) ++ ";" ++ Batch ++ "\n".
+
+%% @private
+timestamp_to_milliseconds(TS) ->
+    {Mega, Sec, Micro} = TS,
+    (Mega * 1000000 + Sec) * 1000 + round(Micro / 1000).
 
 %% @private
 write_to_file(Filename, Line) ->

@@ -93,6 +93,7 @@ wait_until_left(Nodes, LeavingNode) ->
 
 wait_until_joined(Nodes, ExpectedCluster) ->
     Manager = lasp_peer_service:manager(),
+    ct:pal("Waiting for join to complete with manager: ~p", [Manager]),
     case Manager of
         %% Naively wait until the active views across all nodes sum to
         %% the complete set of nodes; note: this is *good enough* for
@@ -115,6 +116,7 @@ wait_until_joined(Nodes, ExpectedCluster) ->
                                 end, Nodes))
                 end, 60*2, 500)
     end,
+    ct:pal("Finished."),
     ok.
 
 wait_until_offline(Node) ->
@@ -138,7 +140,7 @@ start_and_join_node(Name, Config, Case) ->
     {ok, Members} = lasp_peer_service:members(),
     join_to(Node, RunnerNode),
     Nodes = Members ++ [Node],
-    wait_until_joined(Nodes, Nodes),
+    ok = wait_until_joined(Nodes, Nodes),
     Node.
 
 start_node(Name, Config, Case) ->
@@ -260,13 +262,19 @@ start_runner() ->
     ok = application:set_env(plumtree,
                              broadcast_mods,
                              [lasp_plumtree_backend]),
+    ok = lasp_config:set(workflow, true),
+    ok = partisan_config:set(partisan_peer_service_manager,
+                             partisan_default_peer_service_manager),
+    lager:info("Configured peer_service_manager ~p on node ~p",
+               [partisan_default_peer_service_manager, node()]),
 
     {ok, _} = application:ensure_all_started(lasp),
 
     ok.
 
 stop_runner() ->
-    application:stop(lasp).
+    application:stop(lasp),
+    application:stop(partisan).
 
 join_to(N, RunnerNode) ->
     PeerPort = rpc:call(N,
@@ -278,7 +286,9 @@ join_to(N, RunnerNode) ->
     ok = rpc:call(RunnerNode,
                   lasp_peer_service,
                   join,
-                  [{N, {127, 0, 0, 1}, PeerPort}]).
+                  [{N, {127, 0, 0, 1}, PeerPort}]),
+    ct:pal("Joining issued: ~p to ~p at port ~p",
+           [N, RunnerNode, PeerPort]).
 
 load_lasp(Node, Config, Case) ->
     PrivDir = proplists:get_value(priv_dir, Config),
@@ -315,6 +325,19 @@ load_lasp(Node, Config, Case) ->
     ok = rpc:call(Node, application, set_env, [plumtree,
                                                broadcast_mods,
                                                [lasp_plumtree_backend]]),
+    ok = rpc:call(Node, lasp_config, set, [workflow, true]),
+
+    lager:info("Enabling membership..."),
+    ok = rpc:call(Node, lasp_config, set, [membership, true]),
+
+    lager:info("Disabling blocking sync..."),
+    ok = rpc:call(Node, lasp_config, set, [blocking_sync, false]),
+
+    ok = rpc:call(Node, partisan_config, set, [partisan_peer_service_manager,
+                                               partisan_default_peer_service_manager]),
+    lager:info("Configured peer_service_manager ~p on node ~p",
+               [partisan_default_peer_service_manager, Node]),
+
     ok = rpc:call(Node, application, set_env, [lasp,
                                                data_root,
                                                NodeDir]).
@@ -365,14 +388,13 @@ start_slave(Name, NodeConfig, _Case) ->
     end.
 
 push_logs() ->
-    DCOS = os:getenv("DCOS", "false"),
     LOGS = os:getenv("LOGS", "s3"),
 
-    case DCOS of
-        "false" ->
+    case sprinter:orchestrated() of
+        false ->
             ok;
         _ ->
-            lager:info("Will push logs"),
+            lager:info("Will push logs."),
             case LOGS of
                 "s3" ->
                     %% Configure erlcloud.
@@ -396,8 +418,25 @@ push_logs() ->
                     lists:foreach(
                         fun({FilePath, S3Id}) ->
                             {ok, Binary} = file:read_file(FilePath),
-                            lager:info("Pushing log ~p.", [S3Id]),
+                            lager:info("Pushing log to S3 ~p.", [S3Id]),
                             erlcloud_s3:put_object(BucketName, S3Id, Binary)
+                        end,
+                        lasp_instrumentation:log_files()
+                    ),
+
+                    lager:info("Pushing logs completed.");
+                "redis" ->
+                    RedisHost = os:getenv("REDIS_SERVICE_HOST", "127.0.0.1"),
+                    RedisPort = os:getenv("REDIS_SERVICE_PORT", "6379"),
+                    {ok, C} = eredis:start_link(RedisHost, list_to_integer(RedisPort)),
+
+                    %% Store logs in Redis.
+                    lists:foreach(
+                        fun({FilePath, S3Id}) ->
+                            {ok, Binary} = file:read_file(FilePath),
+
+                            lager:info("Pushing log to Redis ~p.", [S3Id]),
+                            {ok, <<"OK">>} = eredis:q(C, ["SET", S3Id, Binary])
                         end,
                         lasp_instrumentation:log_files()
                     ),

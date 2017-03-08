@@ -47,7 +47,8 @@
          intersection/3,
          fold/3,
          wait_needed/2,
-         thread/3]).
+         thread/3,
+         enforce_once/3]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -59,6 +60,9 @@
 
 %% debug callbacks
 -export([local_bind/4]).
+
+%% blocking sync helper.
+-export([blocking_sync/1]).
 
 -include("lasp.hrl").
 
@@ -231,6 +235,12 @@ filter(Id, Function, AccId) ->
 thread(Module, Function, Args) ->
     gen_server:call(?MODULE, {thread, Module, Function, Args}, infinity).
 
+%% @doc Enforce a invariant once over a monotonic condition.
+%%
+-spec enforce_once(id(), threshold(), function()) -> ok.
+enforce_once(Id, Threshold, EnforceFun) ->
+    gen_server:call(?MODULE, {enforce_once, Id, Threshold, EnforceFun}, infinity).
+
 %% @doc Pause execution until value requested with given threshold.
 %%
 %%      Pause execution of calling thread until a read operation is
@@ -261,6 +271,7 @@ init([]) ->
     ?SYNC_BACKEND:seed(),
 
     {ok, Actor} = lasp_unique:unique(),
+    lasp_config:set(actor, Actor),
 
     Identifier = node(),
 
@@ -360,9 +371,29 @@ handle_call({bind, Id, Value}, _From,
             #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("bind/2"),
 
-    Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
-    Result = declare_if_not_found(Result0, Id, State, ?CORE, bind,
-                                  [Id, Value, ?CLOCK_INCR(Actor), Store]),
+    Result = case lasp_config:get(intermediary_node_modification,
+                                  ?INTERMEDIARY_NODE_MODIFICATION) of
+        true ->
+            Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
+            declare_if_not_found(Result0, Id, State, ?CORE, bind,
+                                 [Id, Value, ?CLOCK_INCR(Actor), Store]);
+        false ->
+            {ok, IsRoot} = case ?DAG_ENABLED of
+                               true ->
+                                   lasp_dependence_dag:is_root(Id);
+                               false ->
+                                   {ok, true}
+                           end,
+            case IsRoot of
+                false ->
+                    {error, {intermediary_not_modification_prohibited, Id}};
+                true ->
+                    Result0 = ?CORE:bind(Id, Value, ?CLOCK_INCR(Actor), Store),
+                    declare_if_not_found(Result0, Id, State, ?CORE, bind,
+                                         [Id, Value, ?CLOCK_INCR(Actor), Store])
+            end
+    end,
+
     {reply, Result, State};
 
 %% Incoming bind operation; merge incoming clock with the remote clock.
@@ -397,11 +428,55 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
             #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("update"),
 
-    Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
-                           ?CLOCK_INIT(Actor), Store),
-    {ok, Result} = declare_if_not_found(Result0, Id, State, ?CORE, update,
-                                        [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
-    {reply, {ok, Result}, State};
+    Result = case lasp_config:get(intermediary_node_modification,
+                                  ?INTERMEDIARY_NODE_MODIFICATION) of
+        true ->
+            Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
+                                   ?CLOCK_INIT(Actor), Store),
+            Final = {ok, {_, _, Metadata, _}} = declare_if_not_found(Result0, Id, State, ?CORE, update,
+                                 [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
+            case lasp_config:get(blocking_sync, false) of
+                true ->
+                    ok = blocking_sync(Id, Metadata);
+                false ->
+                    ok
+            end,
+            Final;
+        false ->
+            {ok, IsRoot} = case ?DAG_ENABLED of
+                               true ->
+                                   lasp_dependence_dag:is_root(Id);
+                               false ->
+                                   {ok, true}
+                           end,
+            case IsRoot of
+                false ->
+                    {error, {intermediary_not_modification_prohibited, Id}};
+                true ->
+                    Result0 = ?CORE:update(Id, Operation, CRDTActor, ?CLOCK_INCR(Actor),
+                                           ?CLOCK_INIT(Actor), Store),
+                    Final = {ok, {_, _, Metadata, _}} = declare_if_not_found(Result0, Id, State, ?CORE, update,
+                                         [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
+                    case lasp_config:get(blocking_sync, false) of
+                        true ->
+                            ok = blocking_sync(Id, Metadata);
+                        false ->
+                            ok
+                    end,
+                    Final
+            end
+    end,
+
+    {reply, Result, State};
+
+handle_call({enforce_once, Id, Threshold, EnforceFun},
+            _From,
+            #state{store=Store}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("enforce_once"),
+
+    {ok, _Pid} = ?CORE:enforce_once(Id, Threshold, EnforceFun, Store),
+
+    {reply, ok, State};
 
 %% Spawn a function.
 handle_call({thread, Module, Function, Args},
@@ -552,3 +627,29 @@ declare_if_not_found({error, not_found}, {StorageId, TypeId},
     erlang:apply(Module, Function, Args);
 declare_if_not_found(Result, _Id, _State, _Module, _Function, _Args) ->
     Result.
+
+%% @private
+blocking_sync(Id, Metadata) ->
+    case orddict:find(dynamic, Metadata) of
+        {ok, true} ->
+            %% Ignore: this is a dynamic variable.
+            ok;
+        _ ->
+            ObjectFilterFun = fun(I) -> Id == I end,
+
+            case lasp_config:get(mode, ?DEFAULT_MODE) of
+                state_based ->
+                    lasp_state_based_synchronization_backend:blocking_sync(ObjectFilterFun);
+                delta_based ->
+                    {error, not_implemented}
+            end
+    end.
+
+%% @private
+blocking_sync(ObjectFilterFun) ->
+    case lasp_config:get(mode, ?DEFAULT_MODE) of
+        state_based ->
+            lasp_state_based_synchronization_backend:blocking_sync(ObjectFilterFun);
+        delta_based ->
+            {error, not_implemented}
+    end.

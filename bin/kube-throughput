@@ -1,0 +1,283 @@
+#!/usr/bin/env bash
+
+# Configure experiment.
+WORKFLOW=true
+SERVER_REPLICAS=1
+PEER_SERVICE=partisan_client_server_peer_service_manager
+MODE=state_based
+HEAVY_CLIENTS=false
+REACTIVE_SERVER=false
+CLIENT_REPLICAS=${CLIENT_NUMBER}
+BROADCAST=false
+SIMULATION=throughput
+PARTITION_PROBABILITY=0
+DELTA_INTERVAL=10000
+INSTRUMENTATION=true
+LOGS=redis
+EXTENDED_LOGGING=false
+MAILBOX_LOGGING=false
+
+# Environment variables.
+ENV_VARS=(
+  WORKFLOW
+  REPS
+  LASP_BRANCH
+  PEER_SERVICE
+  MODE
+  BROADCAST
+  SIMULATION
+  BLOCKING_SYNC
+  CLIENT_NUMBER
+  HEAVY_CLIENTS
+  REACTIVE_SERVER
+  PARTITION_PROBABILITY
+  STATE_INTERVAL
+  DELTA_INTERVAL
+  INSTRUMENTATION
+  LOGS
+  EXTENDED_LOGGING
+  MAILBOX_LOGGING
+  AWS_ACCESS_KEY_ID
+  AWS_SECRET_ACCESS_KEY
+  SIMULATION
+  THROUGHPUT_TYPE
+  IMAGE
+  MAX_EVENTS
+)
+
+for ENV_VAR in "${ENV_VARS[@]}"
+do
+  if [ -z "${!ENV_VAR}" ]; then
+    echo ">>> ${ENV_VAR} is not configured; please export it."
+    exit 1
+  fi
+done
+
+for i in `seq 1 ${REPS}`; do
+  # Configure evaluation timestamp and identifier.
+  EVAL_TIMESTAMP=$(date +%s)$(head -200 /dev/urandom | cksum | cut -f1 -d " ")
+  EVAL_ID="client_server_state_based_${THROUGHPUT_TYPE}_${MAX_EVENTS}_${BLOCKING_SYNC}_${STATE_INTERVAL}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
+  echo "Evaluation identifier is:" ${EVAL_ID}
+  echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
+
+  # Get Kubernetes API server.
+  export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)
+
+  # Get Kubernetes access token.
+  export TOKEN=$(kubectl describe secret $(kubectl get secrets | grep default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d '\t')
+
+  cd /tmp
+
+  cat <<EOF > lasp-${EVAL_TIMESTAMP}.yaml
+  apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    name: "lasp-server-${EVAL_TIMESTAMP}"
+  spec:
+    replicas: ${SERVER_REPLICAS}
+    template:
+      metadata:
+        labels:
+          evaluation-identifier: ${EVAL_ID}
+          evaluation-timestamp: "${EVAL_TIMESTAMP}"
+          tag: server
+          run: lasp-server
+      spec:
+        nodeSelector:
+          client_number: "${CLIENT_NUMBER}"
+        containers:
+        - name: "lasp-server-${EVAL_TIMESTAMP}"
+          image: cmeiklejohn/${IMAGE}
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: TAG
+            value: "server"
+          - name: WEB_PORT
+            value: "8080"
+          - name: PEER_PORT
+            value: "9090"
+          - name: LASP_BRANCH
+            value: "${LASP_BRANCH}"
+          - name: APISERVER
+            value: "${APISERVER}"
+          - name: TOKEN
+            value: "${TOKEN}"
+          - name: AWS_ACCESS_KEY_ID
+            value: "${AWS_ACCESS_KEY_ID}"
+          - name: AWS_SECRET_ACCESS_KEY
+            value: "${AWS_SECRET_ACCESS_KEY}"
+          - name: EVALUATION_TIMESTAMP
+            value: "${EVALUATION_TIMESTAMP}"
+          - name: PEER_SERVICE
+            value: "${PEER_SERVICE}"
+          - name: THROUGHPUT_SIM_CLIENT
+            value: "false"
+          - name: THROUGHPUT_SIM_SERVER
+            value: "true"
+          - name: DIVERGENCE_SIM_CLIENT
+            value: "false"
+          - name: DIVERGENCE_SIM_SERVER
+            value: "false"
+          - name: MODE
+            value: "${MODE}"
+          - name: BROADCAST
+            value: "${BROADCAST}"
+          - name: SIMULATION
+            value: "${SIMULATION}"
+          - name: BLOCKING_SYNC
+            value: "${BLOCKING_SYNC}"
+          - name: EVAL_ID
+            value: "${EVAL_ID}"
+          - name: EVAL_TIMESTAMP
+            value: "${EVAL_TIMESTAMP}"
+          - name: CLIENT_NUMBER
+            value: "${CLIENT_NUMBER}"
+          - name: HEAVY_CLIENTS
+            value: "${HEAVY_CLIENTS}"
+          - name: REACTIVE_SERVER
+            value: "${REACTIVE_SERVER}"
+          - name: PARTITION_PROBABILITY
+            value: "${PARTITION_PROBABILITY}"
+          - name: STATE_INTERVAL
+            value: "${STATE_INTERVAL}"
+          - name: DELTA_INTERVAL
+            value: "${DELTA_INTERVAL}"
+          - name: INSTRUMENTATION
+            value: "${INSTRUMENTATION}"
+          - name: LOGS
+            value: "${LOGS}"
+          - name: EXTENDED_LOGGING
+            value: "${EXTENDED_LOGGING}"
+          - name: MAILBOX_LOGGING
+            value: "${MAILBOX_LOGGING}"
+          - name: MAX_EVENTS
+            value: "${MAX_EVENTS}"
+          - name: WORKFLOW
+            value: "${WORKFLOW}"
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+---
+  apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    name: "lasp-client-${EVAL_TIMESTAMP}"
+  spec:
+    replicas: ${CLIENT_REPLICAS}
+    template:
+      metadata:
+        labels:
+          evaluation-identifier: ${EVAL_ID}
+          evaluation-timestamp: "${EVAL_TIMESTAMP}"
+          tag: client
+          run: lasp-client
+      spec:
+        nodeSelector:
+          client_number: "${CLIENT_NUMBER}"
+        containers:
+        - name: "lasp-client-${EVAL_TIMESTAMP}"
+          image: cmeiklejohn/${IMAGE}
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: TAG
+            value: "client"
+          - name: WEB_PORT
+            value: "8080"
+          - name: PEER_PORT
+            value: "9090"
+          - name: LASP_BRANCH
+            value: "${LASP_BRANCH}"
+          - name: APISERVER
+            value: "${APISERVER}"
+          - name: TOKEN
+            value: "${TOKEN}"
+          - name: AWS_ACCESS_KEY_ID
+            value: "${AWS_ACCESS_KEY_ID}"
+          - name: AWS_SECRET_ACCESS_KEY
+            value: "${AWS_SECRET_ACCESS_KEY}"
+          - name: EVALUATION_TIMESTAMP
+            value: "${EVALUATION_TIMESTAMP}"
+          - name: PEER_SERVICE
+            value: "${PEER_SERVICE}"
+          - name: THROUGHPUT_SIM_CLIENT
+            value: "true"
+          - name: THROUGHPUT_SIM_SERVER
+            value: "false"
+          - name: DIVERGENCE_SIM_CLIENT
+            value: "false"
+          - name: DIVERGENCE_SIM_SERVER
+            value: "false"
+          - name: MODE
+            value: "${MODE}"
+          - name: BROADCAST
+            value: "${BROADCAST}"
+          - name: SIMULATION
+            value: "${SIMULATION}"
+          - name: BLOCKING_SYNC
+            value: "${BLOCKING_SYNC}"
+          - name: EVAL_ID
+            value: "${EVAL_ID}"
+          - name: EVAL_TIMESTAMP
+            value: "${EVAL_TIMESTAMP}"
+          - name: CLIENT_NUMBER
+            value: "${CLIENT_NUMBER}"
+          - name: HEAVY_CLIENTS
+            value: "${HEAVY_CLIENTS}"
+          - name: REACTIVE_SERVER
+            value: "${REACTIVE_SERVER}"
+          - name: PARTITION_PROBABILITY
+            value: "${PARTITION_PROBABILITY}"
+          - name: STATE_INTERVAL
+            value: "${STATE_INTERVAL}"
+          - name: DELTA_INTERVAL
+            value: "${DELTA_INTERVAL}"
+          - name: INSTRUMENTATION
+            value: "${INSTRUMENTATION}"
+          - name: LOGS
+            value: "${LOGS}"
+          - name: EXTENDED_LOGGING
+            value: "${EXTENDED_LOGGING}"
+          - name: MAILBOX_LOGGING
+            value: "${MAILBOX_LOGGING}"
+          - name: MAX_EVENTS
+            value: "${MAX_EVENTS}"
+          - name: WORKFLOW
+            value: "${WORKFLOW}"
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: MY_POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: MY_POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+EOF
+
+  echo "Creating deployment."
+  kubectl create -f /tmp/lasp-${EVAL_TIMESTAMP}.yaml
+  echo
+
+  sleep 60
+
+  echo "Tailing logs."
+  export SERVER_POD_NAME=$(kubectl get pods | grep lasp-server-${EVAL_TIMESTAMP} | awk '{print $1}')
+  kubectl logs --tail=-1 -f $SERVER_POD_NAME
+done
+
+# Only remove after *all* repetitions are completed.
+NODE=$(echo "client_number=${CLIENT_NUMBER}" | xargs kubectl get nodes -l | grep Ready | head -1 | awk '{print $1}')
+echo "Removing label for node ${NODE}"
+kubectl label node ${NODE} client_number-

@@ -67,7 +67,7 @@ init([]) ->
                      erlang:unique_integer()),
 
     %% Schedule reports.
-    schedule_memory_utilization_report(),
+    %% schedule_memory_utilization_report(),
 
     {ok, #state{}}.
 
@@ -133,7 +133,7 @@ memory_utilization_report() ->
     TotalBytes = erlang:memory(total),
     TotalKBytes = TotalBytes / 1024,
     TotalMBytes = TotalKBytes / 1024,
-    lager:info("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]),
+    lasp_logger:extended("\nTOTAL MEMORY ~p bytes, ~p megabytes\n", [TotalBytes, round(TotalMBytes)]),
 
     ProcessesInfo = [process_info(PID, [current_function, initial_call, memory, registered_name, message_queue_len]) || PID <- processes()],
     Top = 5,
@@ -166,7 +166,7 @@ memory_utilization_report() ->
         "",
         MemorySorted
     ),
-    lager:info("\nMEMORY PROCESSES INFO\n" ++ MemoryLog),
+    lasp_logger:extended("\nMEMORY PROCESSES INFO\n" ++ MemoryLog),
 
     MQLog = lists:foldl(
         fun({MQ, {I, {CFM, CFF, CFA}, {ICM, ICF, ICA}}}, Acc) ->
@@ -179,7 +179,9 @@ memory_utilization_report() ->
         "",
         MQSorted
     ),
-    lager:info("\nMQ PROCESSES INFO\n" ++ MQLog).
+    lasp_logger:extended("\nMQ PROCESSES INFO\n" ++ MQLog),
+
+    ok.
 
 %% @private
 get_name([]) -> undefined;

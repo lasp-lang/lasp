@@ -6,6 +6,8 @@ install:
   - ./rebar3 update
 before_script:
   - epmd -daemon
+services:
+  - redis-server
 script:
   - make eunit
   - make xref

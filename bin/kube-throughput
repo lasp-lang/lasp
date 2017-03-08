@@ -1,50 +1,32 @@
 #!/usr/bin/env bash
 
-# Configure evaluation timestamp.
-# TODO: Fix me.
-EVAL_TIMESTAMP=0
-
 # Configure experiment.
+WORKFLOW=true
+SERVER_REPLICAS=1
 PEER_SERVICE=partisan_client_server_peer_service_manager
 MODE=state_based
 HEAVY_CLIENTS=false
 REACTIVE_SERVER=false
-CLIENT_NUMBER=1
+CLIENT_REPLICAS=${CLIENT_NUMBER}
 BROADCAST=false
 SIMULATION=throughput
-EVAL_ID=undefined
 PARTITION_PROBABILITY=0
-STATE_INTERVAL=10000
 DELTA_INTERVAL=10000
 INSTRUMENTATION=true
 LOGS=redis
 EXTENDED_LOGGING=false
 MAILBOX_LOGGING=false
 
-# Configure client replicas.
-CLIENT_REPLICAS=$CLIENT_NUMBER
-
-# Configure server replicas.
-SERVER_REPLICAS=1
-
-# Configure branch.
-LASP_BRANCH=back-propagation
-
-# Get Kubernetes API server.
-export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)
-
-# Get Kubernetes access token.
-export TOKEN=$(kubectl describe secret $(kubectl get secrets | grep default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d '\t')
-
 # Environment variables.
 ENV_VARS=(
+  WORKFLOW
+  REPS
   LASP_BRANCH
   PEER_SERVICE
   MODE
   BROADCAST
   SIMULATION
-  EVAL_ID
-  EVAL_TIMESTAMP
+  BLOCKING_SYNC
   CLIENT_NUMBER
   HEAVY_CLIENTS
   REACTIVE_SERVER
@@ -57,6 +39,10 @@ ENV_VARS=(
   MAILBOX_LOGGING
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
+  SIMULATION
+  THROUGHPUT_TYPE
+  IMAGE
+  MAX_EVENTS
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -67,60 +53,42 @@ do
   fi
 done
 
-echo "Copying dependencies for Redis synchronization code to /tmp"
-cp bin/sync-redis.erl /tmp
-mkdir -p /tmp/_build/default/lib/eredis/ebin
-cp -Rpv _build/default/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/ebin
+for i in `seq 1 ${REPS}`; do
+  # Configure evaluation timestamp and identifier.
+  EVAL_TIMESTAMP=$(date +%s)$(head -200 /dev/urandom | cksum | cut -f1 -d " ")
+  EVAL_ID="client_server_state_based_${THROUGHPUT_TYPE}_${MAX_EVENTS}_${BLOCKING_SYNC}_${STATE_INTERVAL}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
+  echo "Evaluation identifier is:" ${EVAL_ID}
+  echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
 
-cd /tmp
+  # Get Kubernetes API server.
+  export APISERVER=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1)
 
-cat <<EOF > lasp.yaml
-  apiVersion: v1
-  kind: Service
-  metadata:
-    name: redis
-    labels:
-      run: redis
-  spec:
-    type: LoadBalancer
-    ports:
-    - port: 6379
-      protocol: TCP
-      name: tcp
-    selector:
-      run: redis
----
+  # Get Kubernetes access token.
+  export TOKEN=$(kubectl describe secret $(kubectl get secrets | grep default | cut -f1 -d ' ') | grep -E '^token' | cut -f2 -d':' | tr -d '\t')
+
+  cd /tmp
+
+  cat <<EOF > lasp-${EVAL_TIMESTAMP}.yaml
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
-    name: redis
-  spec:
-    replicas: 1
-    template:
-      metadata:
-        labels:
-          run: redis
-      spec:
-        containers:
-        - name: redis
-          image: redis
----
-  apiVersion: extensions/v1beta1
-  kind: Deployment
-  metadata:
-    name: lasp-server
+    name: "lasp-server-${EVAL_TIMESTAMP}"
   spec:
     replicas: ${SERVER_REPLICAS}
     template:
       metadata:
         labels:
+          evaluation-identifier: ${EVAL_ID}
           evaluation-timestamp: "${EVAL_TIMESTAMP}"
           tag: server
           run: lasp-server
       spec:
+        nodeSelector:
+          client_number: "${CLIENT_NUMBER}"
         containers:
-        - name: lasp-server
-          image: cmeiklejohn/lasp-dev
+        - name: "lasp-server-${EVAL_TIMESTAMP}"
+          image: cmeiklejohn/${IMAGE}
+          imagePullPolicy: IfNotPresent
           env:
           - name: TAG
             value: "server"
@@ -146,12 +114,18 @@ cat <<EOF > lasp.yaml
             value: "false"
           - name: THROUGHPUT_SIM_SERVER
             value: "true"
+          - name: DIVERGENCE_SIM_CLIENT
+            value: "false"
+          - name: DIVERGENCE_SIM_SERVER
+            value: "false"
           - name: MODE
             value: "${MODE}"
           - name: BROADCAST
             value: "${BROADCAST}"
           - name: SIMULATION
             value: "${SIMULATION}"
+          - name: BLOCKING_SYNC
+            value: "${BLOCKING_SYNC}"
           - name: EVAL_ID
             value: "${EVAL_ID}"
           - name: EVAL_TIMESTAMP
@@ -176,6 +150,10 @@ cat <<EOF > lasp.yaml
             value: "${EXTENDED_LOGGING}"
           - name: MAILBOX_LOGGING
             value: "${MAILBOX_LOGGING}"
+          - name: MAX_EVENTS
+            value: "${MAX_EVENTS}"
+          - name: WORKFLOW
+            value: "${WORKFLOW}"
           - name: MY_POD_NAME
             valueFrom:
               fieldRef:
@@ -192,19 +170,23 @@ cat <<EOF > lasp.yaml
   apiVersion: extensions/v1beta1
   kind: Deployment
   metadata:
-    name: lasp-client
+    name: "lasp-client-${EVAL_TIMESTAMP}"
   spec:
     replicas: ${CLIENT_REPLICAS}
     template:
       metadata:
         labels:
+          evaluation-identifier: ${EVAL_ID}
           evaluation-timestamp: "${EVAL_TIMESTAMP}"
           tag: client
           run: lasp-client
       spec:
+        nodeSelector:
+          client_number: "${CLIENT_NUMBER}"
         containers:
-        - name: lasp-client
-          image: cmeiklejohn/lasp-dev
+        - name: "lasp-client-${EVAL_TIMESTAMP}"
+          image: cmeiklejohn/${IMAGE}
+          imagePullPolicy: IfNotPresent
           env:
           - name: TAG
             value: "client"
@@ -230,12 +212,18 @@ cat <<EOF > lasp.yaml
             value: "true"
           - name: THROUGHPUT_SIM_SERVER
             value: "false"
+          - name: DIVERGENCE_SIM_CLIENT
+            value: "false"
+          - name: DIVERGENCE_SIM_SERVER
+            value: "false"
           - name: MODE
             value: "${MODE}"
           - name: BROADCAST
             value: "${BROADCAST}"
           - name: SIMULATION
             value: "${SIMULATION}"
+          - name: BLOCKING_SYNC
+            value: "${BLOCKING_SYNC}"
           - name: EVAL_ID
             value: "${EVAL_ID}"
           - name: EVAL_TIMESTAMP
@@ -260,6 +248,10 @@ cat <<EOF > lasp.yaml
             value: "${EXTENDED_LOGGING}"
           - name: MAILBOX_LOGGING
             value: "${MAILBOX_LOGGING}"
+          - name: MAX_EVENTS
+            value: "${MAX_EVENTS}"
+          - name: WORKFLOW
+            value: "${WORKFLOW}"
           - name: MY_POD_NAME
             valueFrom:
               fieldRef:
@@ -274,46 +266,18 @@ cat <<EOF > lasp.yaml
                 fieldPath: status.podIP
 EOF
 
-echo "Deleting deployments."
-kubectl delete deployments --all
-echo
+  echo "Creating deployment."
+  kubectl create -f /tmp/lasp-${EVAL_TIMESTAMP}.yaml
+  echo
 
-echo "Deleting replicasets."
-kubectl delete replicasets --all
-echo
+  sleep 60
 
-echo "Deleting pods."
-kubectl delete pods --all
-echo
+  echo "Tailing logs."
+  export SERVER_POD_NAME=$(kubectl get pods | grep lasp-server-${EVAL_TIMESTAMP} | awk '{print $1}')
+  kubectl logs --tail=-1 -f $SERVER_POD_NAME
+done
 
-echo "Deleting lasp deployments and servies."
-kubectl delete -f /tmp/lasp.yaml
-echo
-
-echo "Sleeping until deployment terminates."
-sleep 30
-
-echo "Creating deployment."
-kubectl create -f /tmp/lasp.yaml
-echo
-
-sleep 60
-
-echo "Tailing logs."
-export SERVER_POD_NAME=$(kubectl get pods | grep server | awk '{print $1}')
-kubectl logs --tail=-1 -f $SERVER_POD_NAME
-
-if [ "$GCE" ]; then
-  export REDIS_SERVICE_HOST=$(gcloud compute forwarding-rules list | grep TCP | awk '{print $3}')
-  export REDIS_SERVICE_PORT=6379
-else
-  export REDIS_SERVICE_HOST=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1 | cut -f 2-2 -d ":" | sed -e 's/\/\///g')
-  export REDIS_SERVICE_PORT=$(kubectl get service redis -o jsonpath="{.spec.ports[*].nodePort}")
-fi
-
-echo "Downloading data from Redis."
-./sync-redis.erl
-
-echo "Deleting lasp deployments and servies."
-kubectl delete -f /tmp/lasp.yaml
-echo
+# Only remove after *all* repetitions are completed.
+NODE=$(echo "client_number=${CLIENT_NUMBER}" | xargs kubectl get nodes -l | grep Ready | head -1 | awk '{print $1}')
+echo "Removing label for node ${NODE}"
+kubectl label node ${NODE} client_number-

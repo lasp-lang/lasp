@@ -64,6 +64,12 @@ client-server-game-tournament-simulation:
 peer-to-peer-throughput-simulation:
 	${REBAR} as test ct --suite=lasp_peer_to_peer_throughput_SUITE
 
+client-server-throughput-simulation:
+	${REBAR} as test ct --suite=lasp_client_server_throughput_SUITE
+
+client-server-divergence-simulation:
+	${REBAR} as test ct --suite=lasp_client_server_divergence_SUITE
+
 ##
 ## Release targets
 ##

@@ -50,8 +50,9 @@ delete_deployment(Deployment) ->
 
 %% @private
 deployment_url(Deployment) ->
+    EvaluationTimestamp = lasp_config:get(evaluation_timestamp, 0),
     APIServer = os:getenv("APISERVER"),
-    APIServer ++ "/apis/extensions/v1beta1/namespaces/default/deployments/" ++ Deployment.
+    APIServer ++ "/apis/extensions/v1beta1/namespaces/default/deployments/" ++ Deployment ++ "-" ++ integer_to_list(EvaluationTimestamp).
 
 %% @private
 delete_replicaset(#{<<"metadata">> := Metadata}) ->
@@ -89,8 +90,10 @@ delete_pod(#{<<"metadata">> := Metadata}) ->
 delete_replicasets(Run) ->
     DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
 
+    EvaluationTimestamp = lasp_config:get(evaluation_timestamp, 0),
+
     APIServer = os:getenv("APISERVER"),
-    PodsUrl = APIServer ++ "/apis/extensions/v1beta1/namespaces/default/replicasets?labelSelector=run%3D" ++ Run,
+    PodsUrl = APIServer ++ "/apis/extensions/v1beta1/namespaces/default/replicasets?labelSelector=run%3D" ++ Run ++ ",evaluation-timestamp%3D" ++ integer_to_list(EvaluationTimestamp),
 
     case get_request(PodsUrl, DecodeFun) of
         {ok, #{<<"items">> := Items}} ->
@@ -105,8 +108,10 @@ delete_replicasets(Run) ->
 delete_pods(Run) ->
     DecodeFun = fun(Body) -> jsx:decode(Body, [return_maps]) end,
 
+    EvaluationTimestamp = lasp_config:get(evaluation_timestamp, 0),
+
     APIServer = os:getenv("APISERVER"),
-    PodsUrl = APIServer ++ "/api/v1/pods?labelSelector=run%3D" ++ Run,
+    PodsUrl = APIServer ++ "/api/v1/pods?labelSelector=run%3D" ++ Run ++ ",evaluation-timestamp%3D" ++ integer_to_list(EvaluationTimestamp),
 
     case get_request(PodsUrl, DecodeFun) of
         {ok, #{<<"items">> := Items}} ->

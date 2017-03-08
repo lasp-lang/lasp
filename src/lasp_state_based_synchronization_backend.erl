@@ -35,20 +35,27 @@
          terminate/2,
          code_change/3]).
 
+-export([blocking_sync/1]).
+
 %% lasp_synchronization_backend callbacks
 -export([extract_log_type_and_payload/1]).
 
 -include("lasp.hrl").
 
 %% State record.
--record(state, {store :: store(), gossip_peers :: [], actor :: binary()}).
+-record(state, {store :: store(),
+                gossip_peers :: [],
+                actor :: binary(),
+                blocking_syncs :: dict:dict()}).
 
 %%%===================================================================
 %%% lasp_synchronization_backend callbacks
 %%%===================================================================
 
 %% state_based messages:
-extract_log_type_and_payload({state_send, _Node, {Id, Type, _Metadata, State}}) ->
+extract_log_type_and_payload({state_ack, _From, _Id, {_Id, _Type, _Metadata, State}}) ->
+    [{state_ack, State}];
+extract_log_type_and_payload({state_send, _Node, {Id, Type, _Metadata, State}, _AckRequired}) ->
     [{Id, State}, {Type, State}, {state_send, State}, {state_send_protocol, Id}].
 
 %%%===================================================================
@@ -59,6 +66,9 @@ extract_log_type_and_payload({state_send, _Node, {Id, Type, _Metadata, State}}) 
 -spec start_link(list())-> {ok, pid()} | ignore | {error, term()}.
 start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
+
+blocking_sync(ObjectFilterFun) ->
+    gen_server:call(?MODULE, {blocking_sync, ObjectFilterFun}, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -71,16 +81,66 @@ init([Store, Actor]) ->
     ?SYNC_BACKEND:seed(),
 
     %% Schedule periodic state synchronization.
-    schedule_state_synchronization(),
+    case lasp_config:get(blocking_sync, false) of
+        true ->
+            case partisan_config:get(tag, undefined) of
+                server ->
+                    schedule_state_synchronization();
+                _ ->
+                    ok
+            end;
+        false ->
+            schedule_state_synchronization()
+    end,
 
     %% Schedule periodic plumtree refresh.
     schedule_plumtree_peer_refresh(),
 
-    {ok, #state{gossip_peers=[], store=Store, actor=Actor}}.
+    BlockingSyncs = dict:new(),
+
+    {ok, #state{gossip_peers=[],
+                blocking_syncs=BlockingSyncs,
+                store=Store,
+                actor=Actor}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
+
+handle_call({blocking_sync, ObjectFilterFun}, From,
+            #state{gossip_peers=GossipPeers,
+                   store=Store,
+                   blocking_syncs=BlockingSyncs0}=State) ->
+    %% Get the peers to synchronize with.
+    Members = case ?SYNC_BACKEND:broadcast_tree_mode() of
+        true ->
+            GossipPeers;
+        false ->
+            {ok, Members1} = ?SYNC_BACKEND:membership(),
+            Members1
+    end,
+
+    %% Remove ourself and compute exchange peers.
+    Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
+
+    case length(Peers) > 0 of
+         true ->
+            %% Send the object.
+            SyncFun = fun(Peer) ->
+                            {ok, Os} = init_state_sync(Peer, ObjectFilterFun, true, Store),
+                            [{Peer, O} || O <- Os]
+                      end,
+            Objects = lists:flatmap(SyncFun, Peers),
+
+            %% Mark response as waiting.
+            BlockingSyncs = dict:store(From, Objects, BlockingSyncs0),
+
+            % lager:info("Blocking sync initialized for ~p ~p", [From, Objects]),
+            {noreply, State#state{blocking_syncs=BlockingSyncs}};
+        false ->
+            % lager:info("No peers, not blocking.", []),
+            {reply, ok, State}
+    end;
 
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),
@@ -88,15 +148,47 @@ handle_call(Msg, _From, State) ->
 
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 
-handle_cast({state_send, From, {Id, Type, _Metadata, Value}},
+handle_cast({state_ack, From, Id, {Id, _Type, _Metadata, Value}},
+            #state{store=Store,
+                   blocking_syncs=BlockingSyncs0}=State) ->
+    % lager:info("Received ack from ~p for ~p with value ~p", [From, Id, Value]),
+
+    BlockingSyncs = dict:fold(fun(K, V, Acc) ->
+                % lager:info("Was waiting ~p ~p", [Key, Value]),
+                StillWaiting = lists:delete({From, Id}, V),
+                % lager:info("Now waiting ~p ~p", [Key, StillWaiting]),
+                case length(StillWaiting) == 0 of
+                    true ->
+                        %% Bind value locally from server response.
+                        %% TODO: Do we have to merge metadata here?
+                        {ok, _} = ?CORE:bind_var(Id, Value, Store),
+
+                        %% Reply to return from the blocking operation.
+                        gen_server:reply(K, ok),
+
+                        Acc;
+                    false ->
+                        dict:store(K, StillWaiting, Acc)
+                end
+              end, dict:new(), BlockingSyncs0),
+    {noreply, State#state{blocking_syncs=BlockingSyncs}};
+
+handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
             #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("state_send"),
 
-    ?CORE:receive_value(Store, {state_send,
-                                From,
-                               {Id, Type, _Metadata, Value},
-                               ?CLOCK_INCR(Actor),
-                               ?CLOCK_INIT(Actor)}),
+    {ok, Object} = ?CORE:receive_value(Store, {state_send,
+                                       From,
+                                       {Id, Type, _Metadata, Value},
+                                       ?CLOCK_INCR(Actor),
+                                       ?CLOCK_INIT(Actor)}),
+
+    case AckRequired of
+        true ->
+            ?SYNC_BACKEND:send(?MODULE, {state_ack, node(), Id, Object}, From);
+        false ->
+            ok
+    end,
 
     %% Send back just the updated state for the object received.
     case ?SYNC_BACKEND:client_server_mode() andalso
@@ -106,7 +198,8 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}},
             ObjectFilterFun = fun(Id1) ->
                                       Id =:= Id1
                               end,
-            init_state_sync(From, ObjectFilterFun, Store);
+            init_state_sync(From, ObjectFilterFun, false, Store),
+            ok;
         false ->
             ok
     end,
@@ -124,10 +217,9 @@ handle_info({state_sync, ObjectFilterFun},
             #state{store=Store, gossip_peers=GossipPeers} = State) ->
     lasp_marathon_simulations:log_message_queue_size("state_sync"),
 
-    PeerServiceManager = lasp_config:peer_service_manager(),
-
-    lasp_logger:extended("Beginning state synchronization: ~p",
-                         [PeerServiceManager]),
+    % PeerServiceManager = lasp_config:peer_service_manager(),
+    % lasp_logger:extended("Beginning state synchronization: ~p",
+    %                      [PeerServiceManager]),
 
     Members = case ?SYNC_BACKEND:broadcast_tree_mode() of
         true ->
@@ -140,7 +232,7 @@ handle_info({state_sync, ObjectFilterFun},
     %% Remove ourself and compute exchange peers.
     Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
 
-    lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
+    % lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
     SyncFun = fun(Peer) ->
@@ -149,7 +241,7 @@ handle_info({state_sync, ObjectFilterFun},
                           true ->
                               init_reverse_topological_sync(Peer, ObjectFilterFun, Store);
                           false ->
-                              init_state_sync(Peer, ObjectFilterFun, Store)
+                              init_state_sync(Peer, ObjectFilterFun, false, Store)
                       end
               end,
     lists:foreach(SyncFun, Peers),
@@ -242,7 +334,7 @@ schedule_plumtree_peer_refresh() ->
 
 %% @private
 init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
-    lasp_logger:extended("Initializing reverse toplogical state synchronization with peer: ~p", [Peer]),
+    % lasp_logger:extended("Initializing reverse toplogical state synchronization with peer: ~p", [Peer]),
 
     SendFun = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}) ->
                     case orddict:find(dynamic, Metadata) of
@@ -252,9 +344,7 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
                         _ ->
                             case ObjectFilterFun(Id) of
                                 true ->
-                                    ?SYNC_BACKEND:send(?MODULE,
-                                                       {state_send, node(), {Id, Type, Metadata, Value}},
-                                                       Peer);
+                                    ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, false}, Peer);
                                 false ->
                                     ok
                             end
@@ -279,13 +369,13 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
 
     lists:map(SyncFun, SortedVertices),
 
-    lasp_logger:extended("Completed back propagation state synchronization with peer: ~p", [Peer]),
+    % lasp_logger:extended("Completed back propagation state synchronization with peer: ~p", [Peer]),
 
     ok.
 
 %% @private
-init_state_sync(Peer, ObjectFilterFun, Store) ->
-    lasp_logger:extended("Initializing state synchronization with peer: ~p", [Peer]),
+init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
+    % lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
@@ -294,17 +384,17 @@ init_state_sync(Peer, ObjectFilterFun, Store) ->
                         _ ->
                             case ObjectFilterFun(Id) of
                                 true ->
-                                    ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}}, Peer),
-                                    [{ok, {Id, Type, Metadata, Value}}|Acc0];
+                                    ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, Blocking}, Peer),
+                                    [Id|Acc0];
                                 false ->
                                     Acc0
                             end
                     end
                end,
     %% TODO: Should this be parallel?
-    {ok, _} = lasp_storage_backend:do(fold, [Store, Function, []]),
-    lasp_logger:extended("Completed state synchronization with peer: ~p", [Peer]),
-    ok.
+    {ok, Objects} = lasp_storage_backend:do(fold, [Store, Function, []]),
+    % lasp_logger:extended("Completed state propagation with peer: ~p", [Peer]),
+    {ok, Objects}.
 
 %% @private
 plumtree_gossip_peers(Root) ->

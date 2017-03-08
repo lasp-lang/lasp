@@ -1,8 +1,19 @@
-%% Throughput simulation.
+%% Membership.
+-define(MEMBERSHIP_ID, {<<"_membership">>, lwwregister}).
+-define(MEMBERSHIP_TYPE, lwwregister).
+
+%% Simulations.
+-define(SIMPLE_BOOLEAN, {<<"boolean">>, ?BOOLEAN_TYPE}).
 -define(SIMPLE_BAG, {<<"bag">>, ?GSET_TYPE}).
--define(EVENT_INTERVAL, 0). %% 10 seconds
+-define(SIMPLE_TWOPSET, {<<"twopset">>, ?TWOPSET_TYPE}).
+-define(SIMPLE_COUNTER, {<<"counter">>, ?GCOUNTER_TYPE}).
+-define(PROVENANCE_SET, {<<"awset_ps">>, awset_ps}).
+-define(EVENT_INTERVAL, 0). %% milliseconds [timer:send_after]
 -define(MAX_EVENTS_DEFAULT, 1000).
--define(BATCH_EVENTS, 100).
+-define(BATCH_EVENTS, 1000).
+-define(BOOLEAN_TYPE, boolean).
+-define(TWOPSET_TYPE, twopset).
+-define(EVAL_NUMBER, 1).
 
 %% Intermediary node modification.
 -define(INTERMEDIARY_NODE_MODIFICATION, false).
@@ -143,10 +154,10 @@
 -define(ENROLLABLE_GAMES, {<<"enrollable_games">>, ?SET_TYPE}).
 -define(ENROLLMENT_INTERVAL, 500).
 
--define(BOOLEAN_TYPE, boolean).
 -define(COUNTER_TYPE, gcounter).
 -define(GMAP_TYPE, gmap).
 -define(GSET_TYPE, gset).
+-define(GCOUNTER_TYPE, gcounter).
 -define(SET_TYPE, lasp_config:get(set, orset)).
 -define(PAIR_TYPE, pair).
 
@@ -168,7 +179,6 @@
 -define(STATE_INTERVAL, 10000).
 -define(IMPRESSION_INTERVAL, 10000). %% 10 seconds
 -define(STATUS_INTERVAL, 10000).
--define(EVAL_NUMBER, 1).
 -define(LOG_INTERVAL, 10000).
 -define(ADS_NUMBER, 1).
 

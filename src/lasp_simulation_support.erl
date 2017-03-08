@@ -27,7 +27,10 @@
 -export([run/3]).
 
 run(Case, Config, Options) ->
-    ClientNumber = lasp_config:get(client_number, 3),
+    ClientNumberDefault = lasp_config:get(client_number, 3),
+    ClientNumber = proplists:get_value(client_number,
+                                       Options,
+                                       ClientNumberDefault),
     NodeNames = node_list(ClientNumber),
 
     ct:pal("Running ~p with nodes ~p", [Case, NodeNames]),
@@ -138,6 +141,14 @@ start(_Case, _Config, Options) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [extended_logging, true]),
 
+                        %% Configure workflow.
+                        ok = rpc:call(Node, lasp_config, set,
+                                      [workflow, true]),
+
+                        %% Configure membership.
+                        Membership = proplists:get_value(membership, Options, false),
+                        ok = rpc:call(Node, lasp_config, set, [membership, Membership]),
+
                         %% Configure timers.
                         ok = rpc:call(Node, lasp_config, set,
                                       [state_interval, SimulationsSyncInterval]),
@@ -158,6 +169,15 @@ start(_Case, _Config, Options) ->
                         %% the client.
                         Simulation = proplists:get_value(simulation, Options, undefined),
                         case Simulation of
+                            divergence ->
+                                case Node of
+                                    Server ->
+                                        ok = rpc:call(Node, lasp_config, set, [divergence_simulation_server, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, server]);
+                                    _ ->
+                                        ok = rpc:call(Node, lasp_config, set, [divergence_simulation_client, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, client])
+                                end;
                             throughput ->
                                 case Node of
                                     Server ->
@@ -187,6 +207,14 @@ start(_Case, _Config, Options) ->
                                 end
                         end,
 
+                        %% Configure throughput simulation data type.
+                        ThroughputType = proplists:get_value(throughput_type, Options, gset),
+                        ok = rpc:call(Node, lasp_config, set, [throughput_type, ThroughputType]),
+
+                        %% Configure divergence simulation data type.
+                        DivergenceType = proplists:get_value(divergence_type, Options, gset),
+                        ok = rpc:call(Node, lasp_config, set, [divergence_type, DivergenceType]),
+
                         %% Configure the peer service.
                         PeerService = proplists:get_value(partisan_peer_service_manager, Options),
                         ok = rpc:call(Node, partisan_config, set,
@@ -195,6 +223,10 @@ start(_Case, _Config, Options) ->
                         %% Configure the operational mode.
                         Mode = proplists:get_value(mode, Options),
                         ok = rpc:call(Node, lasp_config, set, [mode, Mode]),
+
+                        %% Configure the blocking sync mode.
+                        BlockingSync = proplists:get_value(blocking_sync, Options, false),
+                        ok = rpc:call(Node, lasp_config, set, [blocking_sync, BlockingSync]),
 
                         %% Configure where code should run.
                         HeavyClient = proplists:get_value(heavy_client, Options, false),

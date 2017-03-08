@@ -82,19 +82,28 @@ start_single_fire_process(Args) ->
 %%      EventCount specifies the maximum number of iterations
 %%      that it will perform.
 %%
-start_tracked_process(EventCount, [ReadFuns, TransFun, {To, _}=WriteFun]) ->
+start_tracked_process(EventCount, [ReadFuns, TransFun, WriteFun]) ->
     From = [Id || {Id, _} <- ReadFuns],
+
     case lasp_config:get(dag_enabled, ?DAG_ENABLED) of
         false ->
-            lasp_process_sup:start_child(EventCount, [ReadFuns, TransFun, WriteFun]);
+            lasp_process_sup:start_child(EventCount,
+                                         [ReadFuns, TransFun, WriteFun]);
         true ->
-            case lasp_dependence_dag:will_form_cycle(From, To) of
-                false ->
-                    lasp_process_sup:start_child(EventCount, [ReadFuns, TransFun, WriteFun]);
-                true ->
-                    lager:warning("dependence dag edge from ~w to ~w would form a cycle~n", [From, To]),
-                    %% @todo propagate errors
-                    {ok, ignore}
+            case WriteFun of
+                {To, _} ->
+                    case lasp_dependence_dag:will_form_cycle(From, To) of
+                        false ->
+                            lasp_process_sup:start_child(EventCount,
+                                                         [ReadFuns, TransFun, WriteFun]);
+                        true ->
+                            lager:warning("dependence dag edge from ~w to ~w would form a cycle~n", [From, To]),
+                            %% @todo propagate errors
+                            {ok, ignore}
+                    end;
+                undefined ->
+                    lasp_process_sup:start_child(EventCount,
+                                                 [ReadFuns, TransFun, WriteFun])
             end
     end.
 
@@ -140,16 +149,21 @@ init([nodag, ReadFuns, Function, WriteFun]) ->
                 trans_fun=Function,
                 write_fun=WriteFun}};
 
-init([ReadFuns, TransFun, {To, _}=WriteFun]) ->
+init([ReadFuns, TransFun, WriteFun]) ->
     From = [Id || {Id, _} <- ReadFuns],
     case lasp_config:get(dag_enabled, ?DAG_ENABLED) of
         false ->
             ok;
         true ->
-            ok = lasp_dependence_dag:add_edges(From, To, self(),
-                                               ReadFuns,
-                                               TransFun,
-                                               WriteFun)
+            case WriteFun of
+                {To, _} ->
+                    ok = lasp_dependence_dag:add_edges(From, To, self(),
+                                                       ReadFuns,
+                                                       TransFun,
+                                                       WriteFun);
+                _ ->
+                    ok
+            end
     end,
     {ok, #state{read_funs=ReadFuns,
                 trans_fun=TransFun,
@@ -161,17 +175,18 @@ read(#state{read_funs=ReadFuns0}=State) ->
     {ok, ReadFuns, State}.
 
 %% @doc Computation to execute when inputs change.
-process(Args, #state{trans_fun=Function, write_fun=WriteFunction}=State) ->
+process(Args, #state{trans_fun=Function, write_fun=WriteFun}=State) ->
     Processed = case lists:any(fun(X) -> X =:= undefined end, Args) of
         true ->
             false;
         false ->
-            case WriteFunction of
+            case WriteFun of
                 undefined ->
                     erlang:apply(Function, Args);
                 {AccId, WFun} ->
                     WFun(AccId, erlang:apply(Function, Args))
             end,
+
             true
     end,
     {ok, {Processed, State}}.
@@ -189,6 +204,7 @@ gen_read_fun(Id, ReadFun) ->
                     {_, _, _, V} ->
                         V
                 end,
+
                 case ReadFun(Id, {strict, Value}) of
                     {ok, NewValue} ->
                         NewValue;

@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% Copyright (c) 2016 Christopher S. Meiklejohn.  All Rights Reserved.
+%% Copyright (c) 2017 Christopher S. Meiklejohn.  All Rights Reserved.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -18,8 +18,8 @@
 %%
 %% -------------------------------------------------------------------
 
--module(lasp_throughput_client).
--author("Vitor Enes Duarte <vitorenesduarte@gmail.com").
+-module(lasp_divergence_client).
+-author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -behaviour(gen_server).
 
@@ -55,13 +55,30 @@ start_link() ->
 %% @private
 -spec init([term()]) -> {ok, #state{}}.
 init([]) ->
-    lager:info("Throughput client initialized."),
+    lager:info("Divergence client initialized."),
 
     %% Generate actor identifier.
     Actor = node(),
 
     %% Schedule event.
     schedule_event(),
+
+    %% Create variable.
+    {ok, _} = lasp:declare(?SIMPLE_COUNTER, ?GCOUNTER_TYPE),
+
+    %% Configure invariant.
+    Threshold = {value, max_events() * client_number()},
+
+    EnforceFun = fun() ->
+                         lager:info("Threshold exceeded!"),
+                         lasp_config:set(events_generated, true)
+                 end,
+
+    lager:info("Configuring invariant for threshold: ~p", [Threshold]),
+    spawn_link(fun() ->
+                       lasp:invariant(?SIMPLE_COUNTER, Threshold, EnforceFun)
+               end),
+    lager:info("Configured."),
 
     {ok, #state{actor=Actor,
                 events=0,
@@ -122,13 +139,28 @@ handle_info(event, #state{actor=Actor,
                                      end),
             log_event(Duration),
 
-            case Events1 == max_events() of
+            case max_events_reached() of
                 true ->
-                    lager:info("All events done. Node: ~p", [Actor]),
+                    Value = lasp:query(?SIMPLE_COUNTER),
+                    lager:info("All events done, counter is now: ~p.
+                               Node: ~p", [Value, Actor]),
+
+                    case BatchStart2 of
+                        undefined ->
+                            lager:info("Simulation finished at batch."),
+                            ok;
+                        _ ->
+                            FinalBatchEnd = erlang:timestamp(),
+                            lager:info("Batch in progress: ~p", [BatchEvents1]),
+                            log_batch(BatchStart2, FinalBatchEnd, BatchEvents1),
+                            lager:info("Logging final batch: ~p", [BatchEvents1]),
+                            ok
+                    end,
 
                     %% Update Simulation Status Instance
                     lasp_workflow:task_completed(events, node()),
                     log_convergence(),
+                    log_event_number(Events1),
                     schedule_check_simulation_end();
                 false ->
                     schedule_event()
@@ -149,9 +181,14 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     case lasp_workflow:is_task_completed(events) of
         true ->
             lager:info("All nodes did all events. Node ~p", [Actor]),
-            lasp_instrumentation:stop(),
-            lasp_support:push_logs(),
-            lasp_workflow:task_completed(logs, node());
+            case lasp_workflow:is_task_completed(anti_entropy, 1) of
+                true ->
+                    lasp_instrumentation:stop(),
+                    lasp_support:push_logs(),
+                    lasp_workflow:task_completed(logs, node());
+                false ->
+                    schedule_check_simulation_end()
+            end;
         false ->
             schedule_check_simulation_end()
     end,
@@ -178,7 +215,8 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 schedule_event() ->
-    timer:send_after(?EVENT_INTERVAL, event).
+    Interval = lasp_config:get(event_interval, 0),
+    timer:send_after(Interval, event).
 
 %% @private
 schedule_check_simulation_end() ->
@@ -203,6 +241,15 @@ log_batch(Start, End, Events) ->
     end.
 
 %% @private
+log_event_number(Events) ->
+    case lasp_config:get(instrumentation, false) of
+        true ->
+            lasp_instrumentation:event_number(Events);
+        false ->
+            ok
+    end.
+
+%% @private
 log_event(Duration) ->
     case lasp_config:get(event_logging, false) of
         true ->
@@ -216,10 +263,18 @@ max_events() ->
     lasp_config:get(max_events, ?MAX_EVENTS_DEFAULT).
 
 %% @private
+client_number() ->
+    lasp_config:get(client_number, 0).
+
+%% @private
+max_events_reached() ->
+    lasp_config:get(events_generated, false).
+
+%% @private
 perform_update(Element, Actor, Events1) ->
     UniqueElement = Element ++ integer_to_list(Events1),
 
-    case lasp_config:get(throughput_type, gset) of
+    case lasp_config:get(divergence_type, gset) of
         twopset ->
             lasp:update(?SIMPLE_TWOPSET, {add, UniqueElement}, Actor);
         boolean ->

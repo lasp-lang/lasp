@@ -53,7 +53,6 @@ compute_exchange(Peers) ->
     PeerServiceManager = lasp_config:peer_service_manager(),
 
     Probability = lasp_config:get(partition_probability, 0),
-    lasp_logger:extended("Probability of partition: ~p", [Probability]),
     Percent = lasp_support:puniform(100),
 
     case Percent =< Probability of

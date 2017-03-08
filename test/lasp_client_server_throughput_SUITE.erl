@@ -23,7 +23,7 @@
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 %% common_test callbacks
--export([%% suite/0,
+-export([suite/0,
          init_per_suite/1,
          end_per_suite/1,
          init_per_testcase/2,
@@ -39,9 +39,14 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("kernel/include/inet.hrl").
 
+-define(RUNS, [1]).
+
 %% ===================================================================
 %% common_test callbacks
 %% ===================================================================
+
+suite() ->
+    [{timetrap, {hours, 1}}].
 
 init_per_suite(_Config) ->
     _Config.
@@ -61,7 +66,11 @@ end_per_testcase(Case, _Config) ->
 
 all() ->
     [
-     peer_to_peer_state_based
+     % client_server_state_based_awset_ps,
+     % client_server_state_based_twopset,
+     % client_server_state_based_gcounter,
+     client_server_state_based_boolean %,
+     % client_server_state_based_gset
     ].
 
 %% ===================================================================
@@ -75,14 +84,82 @@ default_test(_Config) ->
 %% peer-to-peer
 %% ===================================================================
 
-peer_to_peer_state_based(Config) ->
-    lasp_simulation_support:run(peer_to_peer_throughput_state_based,
-        Config,
-        [{mode, state_based},
-         {simulation, throughput},
-         {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
-         {set, orset},
-         {broadcast, false},
-         {blocking_sync, true},
-         {evaluation_identifier, peer_to_peer_throughput_state_based}]),
+client_server_state_based_gcounter(Config) ->
+    lists:foreach(fun(N) ->
+                        lasp_simulation_support:run(client_server_state_based_gcounter,
+                            Config,
+                            [{mode, state_based},
+                             {client_number, N},
+                             {simulation, throughput},
+                             {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
+                             {set, orset},
+                             {throughput_type, gcounter},
+                             {broadcast, false},
+                             {blocking_sync, true},
+                             {evaluation_identifier, client_server_state_based_gcounter}])
+                  end, ?RUNS),
+    ok.
+
+client_server_state_based_gset(Config) ->
+    lists:foreach(fun(N) ->
+                        lasp_simulation_support:run(client_server_state_based_gset,
+                            Config,
+                            [{mode, state_based},
+                             {client_number, N},
+                             {simulation, throughput},
+                             {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
+                             {set, orset},
+                             {throughput_type, gset},
+                             {broadcast, false},
+                             {blocking_sync, true},
+                             {evaluation_identifier, client_server_state_based_gset}])
+                  end, ?RUNS),
+    ok.
+
+client_server_state_based_boolean(Config) ->
+    lists:foreach(fun(N) ->
+                        lasp_simulation_support:run(client_server_state_based_boolean,
+                            Config,
+                            [{mode, state_based},
+                             {client_number, N},
+                             {simulation, throughput},
+                             {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
+                             {set, orset},
+                             {throughput_type, boolean},
+                             {broadcast, false},
+                             {blocking_sync, true},
+                             {evaluation_identifier, client_server_state_based_boolean}])
+                  end, ?RUNS),
+    ok.
+
+client_server_state_based_awset_ps(Config) ->
+    lists:foreach(fun(N) ->
+                        lasp_simulation_support:run(client_server_state_based_awset_ps,
+                            Config,
+                            [{mode, state_based},
+                             {client_number, N},
+                             {simulation, throughput},
+                             {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
+                             {set, orset},
+                             {throughput_type, awset_ps},
+                             {broadcast, false},
+                             {blocking_sync, true},
+                             {evaluation_identifier, client_server_state_based_awset_ps}])
+                  end, ?RUNS),
+    ok.
+
+client_server_state_based_twopset(Config) ->
+    lists:foreach(fun(N) ->
+                        lasp_simulation_support:run(client_server_state_based_twopset,
+                            Config,
+                            [{mode, state_based},
+                             {client_number, N},
+                             {simulation, throughput},
+                             {partisan_peer_service_manager, partisan_client_server_peer_service_manager},
+                             {set, orset},
+                             {throughput_type, twopset},
+                             {broadcast, false},
+                             {blocking_sync, true},
+                             {evaluation_identifier, client_server_state_based_twopset}])
+                  end, ?RUNS),
     ok.

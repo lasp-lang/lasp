@@ -32,6 +32,7 @@
          experiment_started/0,
          convergence/0,
          batch/3,
+         event_number/1,
          event/1,
          stop/0,
          log_files/0]).
@@ -85,6 +86,10 @@ convergence() ->
 -spec batch(term(), term(), number()) -> ok | error().
 batch(Start, End, Events) ->
     gen_server:call(?MODULE, {batch, Start, End, Events}, infinity).
+
+-spec event_number(non_neg_integer()) -> ok | error().
+event_number(EventNumber) ->
+    gen_server:call(?MODULE, {event_number, EventNumber}, infinity).
 
 -spec event(term()) -> ok | error().
 event(Duration) ->
@@ -171,6 +176,10 @@ handle_call(convergence, _From, #state{}=State) ->
 
 handle_call({batch, Start, End, Events}, _From, #state{}=State) ->
     record_batch(Start, End, Events),
+    {reply, ok, State};
+
+handle_call({event_number, EventNumber}, _From, #state{}=State) ->
+    record_event_number(EventNumber),
     {reply, ok, State};
 
 handle_call({event, Duration}, _From, #state{}=State) ->
@@ -324,6 +333,13 @@ record_batch(Start, End, Events) ->
     MsDiff = round(timer:now_diff(End, Start) / 1000),
     DiffNoLatency = MsDiff - (?EVENT_INTERVAL * Events),
     Line = get_batch_line(Timestamp, Start, End, Events, DiffNoLatency),
+    append_to_file(Filename, Line).
+
+%% @private
+record_event_number(EventNumber) ->
+    Filename = main_log(),
+    Timestamp = timestamp(),
+    Line = get_line(event_number, Timestamp, EventNumber),
     append_to_file(Filename, Line).
 
 %% @private

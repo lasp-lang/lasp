@@ -9,7 +9,7 @@ HEAVY_CLIENTS=false
 REACTIVE_SERVER=false
 CLIENT_REPLICAS=${CLIENT_NUMBER}
 BROADCAST=false
-SIMULATION=throughput
+SIMULATION=divergence
 PARTITION_PROBABILITY=0
 DELTA_INTERVAL=10000
 INSTRUMENTATION=true
@@ -39,9 +39,11 @@ ENV_VARS=(
   MAILBOX_LOGGING
   AWS_ACCESS_KEY_ID
   AWS_SECRET_ACCESS_KEY
-  THROUGHPUT_TYPE
+  SIMULATION
+  DIVERGENCE_TYPE
   IMAGE
   MAX_EVENTS
+  EVENT_INTERVAL
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -54,8 +56,8 @@ done
 
 for i in `seq 1 ${REPS}`; do
   # Configure evaluation timestamp and identifier.
-  EVAL_TIMESTAMP=$(date +%s)
-  EVAL_ID="client_server_state_based_${THROUGHPUT_TYPE}_${MAX_EVENTS}_${BLOCKING_SYNC}_${STATE_INTERVAL}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
+  EVAL_TIMESTAMP=$(date +%s)$(head -200 /dev/urandom | cksum | cut -f1 -d " ")
+  EVAL_ID="client_server_state_based_${DIVERGENCE_TYPE}_${EVENT_INTERVAL}_${MAX_EVENTS}_${BLOCKING_SYNC}_${STATE_INTERVAL}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
   echo "Evaluation identifier is:" ${EVAL_ID}
   echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
 
@@ -112,6 +114,10 @@ for i in `seq 1 ${REPS}`; do
           - name: THROUGHPUT_SIM_CLIENT
             value: "false"
           - name: THROUGHPUT_SIM_SERVER
+            value: "false"
+          - name: DIVERGENCE_SIM_CLIENT
+            value: "false"
+          - name: DIVERGENCE_SIM_SERVER
             value: "true"
           - name: MODE
             value: "${MODE}"
@@ -204,8 +210,12 @@ for i in `seq 1 ${REPS}`; do
           - name: PEER_SERVICE
             value: "${PEER_SERVICE}"
           - name: THROUGHPUT_SIM_CLIENT
-            value: "true"
+            value: "false"
           - name: THROUGHPUT_SIM_SERVER
+            value: "false"
+          - name: DIVERGENCE_SIM_CLIENT
+            value: "true"
+          - name: DIVERGENCE_SIM_SERVER
             value: "false"
           - name: MODE
             value: "${MODE}"
@@ -264,7 +274,7 @@ EOF
   sleep 60
 
   echo "Tailing logs."
-  export SERVER_POD_NAME=$(kubectl get pods | grep lasp-server-${EVAL_TIMESTAMP} | awk '{print $1}')
+  export SERVER_POD_NAME=$(kubectl get pods | grep lasp-server-${EVAL_TIMESTAMP} | head -1 | awk '{print $1}')
   kubectl logs --tail=-1 -f $SERVER_POD_NAME
 done
 

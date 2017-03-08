@@ -61,6 +61,9 @@
 %% debug callbacks
 -export([local_bind/4]).
 
+%% blocking sync helper.
+-export([blocking_sync/1]).
+
 -include("lasp.hrl").
 
 %% State record.
@@ -271,6 +274,7 @@ init([]) ->
     lasp_config:set(actor, Actor),
 
     Identifier = node(),
+
     %% Start the storage backend.
     {ok, Store} = case ?CORE:start_link(Identifier) of
         {ok, Pid} ->
@@ -639,4 +643,13 @@ blocking_sync(Id, Metadata) ->
                 delta_based ->
                     {error, not_implemented}
             end
+    end.
+
+%% @private
+blocking_sync(ObjectFilterFun) ->
+    case lasp_config:get(mode, ?DEFAULT_MODE) of
+        state_based ->
+            lasp_state_based_synchronization_backend:blocking_sync(ObjectFilterFun);
+        delta_based ->
+            {error, not_implemented}
     end.

@@ -79,10 +79,23 @@ init(_Args) ->
                         permanent, 5000, worker,
                         [lasp_plumtree_backend]},
 
-    Membership = {lasp_membership,
-                  {lasp_membership, start_link, []},
-                   permanent, 5000, worker,
-                   [lasp_membership]},
+    MembershipDefault = list_to_atom(os:getenv("MEMBERSHIP", "false")),
+    MembershipEnabled = application:get_env(?APP,
+                                            membership,
+                                            MembershipDefault),
+    lasp_config:set(membership, MembershipEnabled),
+    lager:info("Membership: ~p", [MembershipEnabled]),
+
+    MembershipSpecs = case MembershipEnabled of
+        true ->
+            Membership = {lasp_membership,
+                          {lasp_membership, start_link, []},
+                           permanent, 5000, worker,
+                           [lasp_membership]},
+            [Membership];
+        false ->
+            []
+    end,
 
     WorkflowDefault = list_to_atom(os:getenv("WORKFLOW", "false")),
     WorkflowEnabled = application:get_env(?APP,
@@ -104,13 +117,15 @@ init(_Args) ->
 
     WebSpecs = web_specs(),
 
-    BaseSpecs0 = [Unique,
-                  PlumtreeBackend,
-                  PlumtreeMemoryReport,
-                  MemoryUtilizationReport,
-                  DistributionBackend,
-                  Process,
-                  Membership] ++ WorkflowSpecs ++ WebSpecs,
+    BaseSpecs0 = lists:flatten([Unique,
+                                PlumtreeBackend,
+                                PlumtreeMemoryReport,
+                                MemoryUtilizationReport,
+                                DistributionBackend,
+                                Process,
+                                MembershipSpecs,
+                                WorkflowSpecs,
+                                WebSpecs]),
 
     DagEnabled = application:get_env(?APP, dag_enabled, ?DAG_ENABLED),
     lasp_config:set(dag_enabled, DagEnabled),
@@ -149,11 +164,16 @@ init(_Args) ->
     %% Setup the throughput example, if necessary.
     ThroughputSpecs = throughput_child_specs(),
 
+    %% Setup the divergence example, if necessary.
+    DivergenceSpecs = divergence_child_specs(),
+
     %% Assemble specs.
     Children = lists:flatten([Children0,
                               AdSpecs,
                               TournamentSpecs,
-                              ThroughputSpecs]),
+                              ThroughputSpecs,
+                              DivergenceSpecs
+                             ]),
 
     {ok, {{one_for_one, 5, 10}, Children}}.
 
@@ -192,6 +212,11 @@ configure_defaults() ->
     Tutorial = application:get_env(?APP, tutorial, TutorialDefault),
     lager:info("Setting tutorial: ~p", [Tutorial]),
     lasp_config:set(tutorial, Tutorial),
+
+    EventIntervalDefault = list_to_integer(os:getenv("EVENT_INTERVAL", "0")),
+    EventInterval = application:get_env(?APP, event_interval, EventIntervalDefault),
+    lager:info("Setting event interval: ~p", [EventInterval]),
+    lasp_config:set(event_interval, EventInterval),
 
     MaxEventsDefault = list_to_integer(os:getenv("MAX_EVENTS", "1000")),
     MaxEvents = application:get_env(?APP, max_events, MaxEventsDefault),
@@ -485,6 +510,56 @@ throughput_child_specs() ->
                       {lasp_throughput_server, start_link, []},
                        permanent, 5000, worker,
                        [lasp_throughput_server]},
+            [Server];
+        false ->
+            []
+    end,
+
+    ClientSpecs ++ ServerSpecs.
+
+%% @private
+divergence_child_specs() ->
+    %% Throughput type.
+    DivergenceTypeDefault = list_to_atom(os:getenv("DIVERGENCE_TYPE", "gcounter")),
+    DivergenceType = application:get_env(?APP,
+                                         divergence_type,
+                                         DivergenceTypeDefault),
+    lasp_config:set(divergence_type, DivergenceType),
+    lager:info("DivergenceType: ~p", [DivergenceType]),
+
+    %% Figure out who is acting as the client.
+    ClientDefault = list_to_atom(os:getenv("DIVERGENCE_SIM_CLIENT", "false")),
+    ClientEnabled = application:get_env(?APP,
+                                        divergence_simulation_client,
+                                        ClientDefault),
+    lasp_config:set(divergence_simulation_client, ClientEnabled),
+    lager:info("DivergenceClientEnabled: ~p", [ClientEnabled]),
+
+    ClientSpecs = case ClientEnabled of
+        true ->
+            Client = {lasp_divergence_client,
+                      {lasp_divergence_client, start_link, []},
+                       permanent, 5000, worker,
+                       [lasp_divergence_client]},
+            [Client];
+        false ->
+            []
+    end,
+
+    %% Figure out who is acting as the server.
+    ServerDefault = list_to_atom(os:getenv("DIVERGENCE_SIM_SERVER", "false")),
+    ServerEnabled = application:get_env(?APP,
+                                        divergence_simulation_server,
+                                        ServerDefault),
+    lasp_config:set(divergence_simulation_server, ServerEnabled),
+    lager:info("DivergenceServerEnabled: ~p", [ServerEnabled]),
+
+    ServerSpecs = case ServerEnabled of
+        true ->
+            Server = {lasp_divergence_server,
+                      {lasp_divergence_server, start_link, []},
+                       permanent, 5000, worker,
+                       [lasp_divergence_server]},
             [Server];
         false ->
             []

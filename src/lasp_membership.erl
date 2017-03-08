@@ -71,9 +71,7 @@ init([]) ->
     MembershipFun = fun(S) ->
                             update_membership(S, Actor)
                     end,
-    lager:info("Registering callback: ~p", [MembershipFun]),
     partisan_peer_service:add_sup_callback(MembershipFun),
-    lager:info("Finished.", []),
 
     {ok, #state{actor=Actor, membership_fun=MembershipFun}}.
 

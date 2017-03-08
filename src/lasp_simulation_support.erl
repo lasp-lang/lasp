@@ -145,6 +145,10 @@ start(_Case, _Config, Options) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [workflow, true]),
 
+                        %% Configure membership.
+                        Membership = proplists:get_value(membership, Options, false),
+                        ok = rpc:call(Node, lasp_config, set, [membership, Membership]),
+
                         %% Configure timers.
                         ok = rpc:call(Node, lasp_config, set,
                                       [state_interval, SimulationsSyncInterval]),
@@ -165,6 +169,15 @@ start(_Case, _Config, Options) ->
                         %% the client.
                         Simulation = proplists:get_value(simulation, Options, undefined),
                         case Simulation of
+                            divergence ->
+                                case Node of
+                                    Server ->
+                                        ok = rpc:call(Node, lasp_config, set, [divergence_simulation_server, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, server]);
+                                    _ ->
+                                        ok = rpc:call(Node, lasp_config, set, [divergence_simulation_client, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, client])
+                                end;
                             throughput ->
                                 case Node of
                                     Server ->
@@ -197,6 +210,10 @@ start(_Case, _Config, Options) ->
                         %% Configure throughput simulation data type.
                         ThroughputType = proplists:get_value(throughput_type, Options, gset),
                         ok = rpc:call(Node, lasp_config, set, [throughput_type, ThroughputType]),
+
+                        %% Configure divergence simulation data type.
+                        DivergenceType = proplists:get_value(divergence_type, Options, gset),
+                        ok = rpc:call(Node, lasp_config, set, [divergence_type, DivergenceType]),
 
                         %% Configure the peer service.
                         PeerService = proplists:get_value(partisan_peer_service_manager, Options),

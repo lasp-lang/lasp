@@ -151,6 +151,8 @@ for i in `seq 1 ${REPS}`; do
             value: "${EXTENDED_LOGGING}"
           - name: MAILBOX_LOGGING
             value: "${MAILBOX_LOGGING}"
+          - name: EVENT_INTERVAL
+            value: "${EVENT_INTERVAL}"
           - name: MAX_EVENTS
             value: "${MAX_EVENTS}"
           - name: WORKFLOW
@@ -249,6 +251,8 @@ for i in `seq 1 ${REPS}`; do
             value: "${EXTENDED_LOGGING}"
           - name: MAILBOX_LOGGING
             value: "${MAILBOX_LOGGING}"
+          - name: EVENT_INTERVAL
+            value: "${EVENT_INTERVAL}"
           - name: MAX_EVENTS
             value: "${MAX_EVENTS}"
           - name: WORKFLOW

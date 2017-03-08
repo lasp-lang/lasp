@@ -43,6 +43,7 @@ ENV_VARS=(
   THROUGHPUT_TYPE
   IMAGE
   MAX_EVENTS
+  EVENT_INTERVAL
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -150,6 +151,8 @@ for i in `seq 1 ${REPS}`; do
             value: "${EXTENDED_LOGGING}"
           - name: MAILBOX_LOGGING
             value: "${MAILBOX_LOGGING}"
+          - name: EVENT_INTERVAL
+            value: "${EVENT_INTERVAL}"
           - name: MAX_EVENTS
             value: "${MAX_EVENTS}"
           - name: WORKFLOW
@@ -250,6 +253,8 @@ for i in `seq 1 ${REPS}`; do
             value: "${MAILBOX_LOGGING}"
           - name: MAX_EVENTS
             value: "${MAX_EVENTS}"
+          - name: EVENT_INTERVAL
+            value: "${EVENT_INTERVAL}"
           - name: WORKFLOW
             value: "${WORKFLOW}"
           - name: MY_POD_NAME

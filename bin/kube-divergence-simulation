@@ -119,16 +119,18 @@ sleep 10
 for k in ${CLIENTS[@]}; do
   A=1200
   N=10
+  echo "N: ${N}"
+  echo "STATE_INTERVAL: ${STATE_INTERVAL}"
   EVENT_INTERVAL=$(expr $(expr ${N} - 1) \* ${A})
   echo "EVENT_INTERVAL: ${EVENT_INTERVAL}"
-  STATE_INTERVAL=$(expr ${N} \* ${STATE_INTERVAL})
-  echo "STATE_INTERVAL: ${STATE_INTERVAL}"
+  MODIFIED_STATE_INTERVAL=$(expr ${N} \* ${STATE_INTERVAL})
+  echo "MODIFIED_STATE_INTERVAL: ${MODIFIED_STATE_INTERVAL}"
 
   echo "Launching client simulation: ${k} clients; state interval: ${STATE_INTERVAL} event interval: ${EVENT_INTERVAL}"
 
   BLOCKING_SYNC=${BLOCKING_SYNC} \
     EVENT_INTERVAL=${EVENT_INTERVAL} \
-    STATE_INTERVAL=${STATE_INTERVAL} \
+    STATE_INTERVAL=${MODIFIED_STATE_INTERVAL} \
     MAX_EVENTS=${MAX_EVENTS} \
     REPS=${REPS} \
     LASP_BRANCH=${LASP_BRANCH} \

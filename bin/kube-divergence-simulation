@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-CLIENTS=(1 2 4 6 8)
-NODES=5
-LASP_BRANCH=divergence
+CLIENTS=(40)
+NODES=7
+LASP_BRANCH=unstable
 IMAGE=lasp-dev
-REPS=10
+REPS=1
 GCE=true
 MACHINE="n1-standard-8"
 MAX_EVENTS=50000

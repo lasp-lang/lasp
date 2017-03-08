@@ -57,7 +57,7 @@ done
 for i in `seq 1 ${REPS}`; do
   # Configure evaluation timestamp and identifier.
   EVAL_TIMESTAMP=$(date +%s)$(head -200 /dev/urandom | cksum | cut -f1 -d " ")
-  EVAL_ID="client_server_state_based_${EVENT_INTERVAL}_${DIVERGENCE_TYPE}_${MAX_EVENTS}_${BLOCKING_SYNC}_${STATE_INTERVAL}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
+  EVAL_ID="client_server_state_based_${DIVERGENCE_TYPE}_${EVENT_INTERVAL}_${MAX_EVENTS}_${BLOCKING_SYNC}_${STATE_INTERVAL}_${CLIENT_NUMBER}_${PARTITION_PROBABILITY}"
   echo "Evaluation identifier is:" ${EVAL_ID}
   echo "Evaluation timestamp is:" ${EVAL_TIMESTAMP}
 

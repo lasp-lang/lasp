@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-CLIENTS=(1 2 4)
+CLIENTS=(1 2 4 6 8)
 NODES=5
 LASP_BRANCH=unstable
 IMAGE=lasp-dev
@@ -138,7 +138,7 @@ for k in ${CLIENTS[@]}; do
     EVENT_INTERVAL=$(N=${N} ./event-interval)
     MODIFIED_STATE_INTERVAL=$(expr ${N} \* ${STATE_INTERVAL})
   else
-    N=0
+    N=1
     EVENT_INTERVAL=0
     MODIFIED_STATE_INTERVAL=${STATE_INTERVAL}
   fi

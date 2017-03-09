@@ -44,6 +44,7 @@ ENV_VARS=(
   IMAGE
   MAX_EVENTS
   EVENT_INTERVAL
+  JITTER
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -155,6 +156,8 @@ for i in `seq 1 ${REPS}`; do
             value: "${EVENT_INTERVAL}"
           - name: MAX_EVENTS
             value: "${MAX_EVENTS}"
+          - name: JITTER
+            value: "${JITTER}"
           - name: WORKFLOW
             value: "${WORKFLOW}"
           - name: MY_POD_NAME
@@ -255,6 +258,8 @@ for i in `seq 1 ${REPS}`; do
             value: "${EVENT_INTERVAL}"
           - name: MAX_EVENTS
             value: "${MAX_EVENTS}"
+          - name: JITTER
+            value: "${JITTER}"
           - name: WORKFLOW
             value: "${WORKFLOW}"
           - name: MY_POD_NAME

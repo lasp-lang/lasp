@@ -91,6 +91,8 @@ all() ->
         ps_ormap_filter_test,
         ps_gcounter_test,
         ps_ormap_with_ps_gcounter_test,
+        ps_lwwregister_test,
+        ps_ormap_with_ps_lwwregister_test,
         improper_fake_query_test
     ].
 
@@ -801,6 +803,132 @@ ps_ormap_with_ps_gcounter_test(_Config) ->
            end,
 
     ?assertEqual(orddict:from_list([{"b", 1}]), Map2),
+
+    ok.
+
+%% @doc Test of the lwwregister with ps.
+ps_lwwregister_test(_Config) ->
+    {ok, {L1, _, _, _}} = lasp:declare(ps_lwwregister),
+    {ok, {L2, _, _, _}} = lasp:declare(ps_lwwregister),
+    {ok, {L3, _, _, _}} = lasp:declare(ps_lwwregister),
+
+    %% Attempt pre, and post- dataflow variable bind operations.
+    ?assertMatch(ok, lasp:bind_to(L2, L1)),
+    {ok, {_, _, _, C2}} = lasp:update(L1, {set, 4}, a),
+    ?assertMatch(ok, lasp:bind_to(L3, L1)),
+
+    timer:sleep(4000),
+
+    %% Verify the same value is contained by all.
+    {ok, {_, _, _, C1}} = lasp:read(L3, {strict, undefined}),
+    {ok, {_, _, _, C1}} = lasp:read(L2, {strict, undefined}),
+    {ok, {_, _, _, C1}} = lasp:read(L1, {strict, undefined}),
+
+    Self = self(),
+
+    spawn_link(
+        fun() ->
+            {ok, _} = lasp:wait_needed(L1, {strict, C1}),
+            Self ! threshold_met
+        end),
+
+    ?assertMatch({ok, _}, lasp:bind(L1, C2)),
+
+    timer:sleep(4000),
+
+    %% Verify the same value is contained by all.
+    {ok, {_, _, _, C2L3}} = lasp:read(L3, {strict, undefined}),
+    ?assertEqual(C2L3, lasp_type:merge(ps_lwwregister, C2, C2L3)),
+    {ok, {_, _, _, C2L2}} = lasp:read(L2, {strict, undefined}),
+    ?assertEqual(C2L2, lasp_type:merge(ps_lwwregister, C2, C2L2)),
+    {ok, {_, _, _, C2L1}} = lasp:read(L1, {strict, undefined}),
+    ?assertEqual(C2L1, lasp_type:merge(ps_lwwregister, C2, C2L1)),
+
+    %% Read at the S2 threshold level.
+    {ok, {_, _, _, _}} = lasp:read(L1, C2),
+
+    %% Wait for wait_needed to unblock.
+    receive
+        threshold_met ->
+            ok
+    end,
+
+    {ok, {L5, _, _, _}} = lasp:declare(ps_lwwregister),
+    {ok, {L6, _, _, _}} = lasp:declare(ps_lwwregister),
+
+    spawn_link(
+        fun() ->
+            {ok, _} =
+                lasp:read_any(
+                    [{L5, {strict, undefined}}, {L6, {strict, undefined}}]),
+            Self ! read_any
+        end),
+
+    {ok, _} = lasp:update(L5, {set, 8}, a),
+
+    receive
+        read_any ->
+            ok
+    end.
+
+%% @doc Map with the ps_lwwregister test for the ormap with ps.
+ps_ormap_with_ps_lwwregister_test(_Config) ->
+    %% Declare a variable.
+    {ok, {MapId, _, _, _}} =
+        lasp:declare({ps_ormap, [{ps_lwwregister, []}]}),
+
+    %% Determine my pid.
+    Me = self(),
+
+    %% Change it's value.
+    ?assertMatch(
+        {ok, _},
+        lasp:update(MapId, {apply, "a", {set, 4}}, actor)),
+    {ok, {_, _, _, V0}} =
+        lasp:update(MapId, {apply, "a", {set, 8}}, actor),
+    ?assertMatch(
+        {ok, {_, _, _, _}},
+        lasp:update(MapId, {apply, "a", {set, 15}}, actor)),
+
+    %% Threshold read just to create a synchronization point for the
+    %% value to change.
+    {ok, _} = lasp:read(MapId, {strict, V0}),
+
+    %% Spawn fun which should block until lattice is strict inflation of V0.
+    I1 = first_read,
+    spawn(fun() -> Me ! {I1, lasp:read(MapId, {strict, V0})} end),
+
+    %% Ensure we receive [{"a", 15}].
+    Map1 = receive
+               {I1, {ok, {_, _, _, X}}} ->
+                   lasp_type:query(ps_ormap, X)
+           end,
+
+    ?assertEqual(orddict:from_list([{"a", 15}]), Map1),
+
+    %% Change it's value again.
+    ?assertMatch(
+        {ok, _},
+        lasp:update(MapId, {apply, "b", {set, 16}}, actor)),
+    {ok, {_, _, _, V1}} =
+        lasp:update(MapId, {apply, "a", {set, 23}}, actor),
+    ?assertMatch({ok, {_, _, _, _}}, lasp:update(MapId, {rmv, "a"}, actor)),
+
+    %% Threshold read just to create a synchronization point for the
+    %% value to change.
+    {ok, _} = lasp:read(MapId, {strict, V1}),
+
+    %% Spawn fun which should block until lattice is strict inflation of V0.
+    I2 = second_read,
+    spawn(fun() -> Me ! {I2, lasp:read(MapId, {strict, V1})} end),
+
+    %% Ensure we receive [{"b", 16}].
+    Map2 = receive
+               {I2, {ok, {_, _, _, Y}}} ->
+                   lasp_type:query(ps_ormap, Y)
+           end,
+
+    ?assertEqual(orddict:from_list([{"b", 16}]), Map2),
 
     ok.
 

@@ -331,8 +331,7 @@ record_batch(Start, End, Events) ->
     Filename = main_log(),
     Timestamp = timestamp(),
     MsDiff = round(timer:now_diff(End, Start) / 1000),
-    DiffNoLatency = MsDiff - (?EVENT_INTERVAL * Events),
-    Line = get_batch_line(Timestamp, Start, End, Events, DiffNoLatency),
+    Line = get_batch_line(Timestamp, Start, End, Events, MsDiff),
     append_to_file(Filename, Line).
 
 %% @private

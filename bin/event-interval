@@ -1,0 +1,3 @@
+#!/usr/bin/env perl
+
+print int((1000/1200 * ($ENV{'N'} - 1))) + 1;

@@ -1,15 +1,29 @@
 #!/usr/bin/env bash
 
-CLIENTS=(40)
-NODES=7
-LASP_BRANCH=unstable
+CLIENTS=(1 2 4 6 8)
+NODES=5
+LASP_BRANCH=jitter
 IMAGE=lasp-dev
-REPS=1
+REPS=10
 GCE=true
 MACHINE="n1-standard-8"
 MAX_EVENTS=50000
 BLOCKING_SYNC=false
 EVENT_INTERVAL=0
+JITTER=true
+
+# Environment variables.
+ENV_VARS=(
+  SLOWDOWN
+)
+
+for ENV_VAR in "${ENV_VARS[@]}"
+do
+  if [ -z "${!ENV_VAR}" ]; then
+    echo ">>> ${ENV_VAR} is not configured; please export it."
+    exit 1
+  fi
+done
 
 # Rebuild image if desired.
 if [ ! -z "$REBUILD_IMAGE" ]; then
@@ -71,6 +85,7 @@ done
 echo "Copying code to /tmp"
 cp bin/sync-redis.erl /tmp
 cp bin/kube-divergence /tmp
+cp bin/event-interval /tmp
 mkdir -p /tmp/_build/default/lib/eredis/ebin
 cp -Rp _build/default/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/ebin
 
@@ -117,18 +132,26 @@ sleep 10
 
 # Start the executions in parallel.
 for k in ${CLIENTS[@]}; do
-  A=1200
-  N=10
+
+  if [ "$SLOWDOWN" = true ] ; then
+    N=10
+    EVENT_INTERVAL=$(N=${N} ./event-interval)
+    MODIFIED_STATE_INTERVAL=$(expr ${N} \* ${STATE_INTERVAL})
+  else
+    N=1
+    EVENT_INTERVAL=0
+    MODIFIED_STATE_INTERVAL=${STATE_INTERVAL}
+  fi
+
   echo "N: ${N}"
   echo "STATE_INTERVAL: ${STATE_INTERVAL}"
-  EVENT_INTERVAL=$(expr $(expr ${N} - 1) \* ${A})
   echo "EVENT_INTERVAL: ${EVENT_INTERVAL}"
-  MODIFIED_STATE_INTERVAL=$(expr ${N} \* ${STATE_INTERVAL})
   echo "MODIFIED_STATE_INTERVAL: ${MODIFIED_STATE_INTERVAL}"
 
-  echo "Launching client simulation: ${k} clients; state interval: ${STATE_INTERVAL} event interval: ${EVENT_INTERVAL}"
+  echo "Launching client simulation: ${k} clients; state interval: ${MODIFIED_STATE_INTERVAL} event interval: ${EVENT_INTERVAL}"
 
   BLOCKING_SYNC=${BLOCKING_SYNC} \
+    JITTER=${JITTER} \
     EVENT_INTERVAL=${EVENT_INTERVAL} \
     STATE_INTERVAL=${MODIFIED_STATE_INTERVAL} \
     MAX_EVENTS=${MAX_EVENTS} \

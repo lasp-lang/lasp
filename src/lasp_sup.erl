@@ -208,6 +208,11 @@ web_specs() ->
 
 %% @private
 configure_defaults() ->
+    JitterDefault = list_to_atom(os:getenv("JITTER", "false")),
+    Jitter = application:get_env(?APP, jitter, JitterDefault),
+    lager:info("Setting jitter: ~p", [Jitter]),
+    lasp_config:set(jitter, Jitter),
+
     TutorialDefault = list_to_atom(os:getenv("TUTORIAL", "false")),
     Tutorial = application:get_env(?APP, tutorial, TutorialDefault),
     lager:info("Setting tutorial: ~p", [Tutorial]),

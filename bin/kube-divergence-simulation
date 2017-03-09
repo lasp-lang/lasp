@@ -10,6 +10,7 @@ MACHINE="n1-standard-8"
 MAX_EVENTS=50000
 BLOCKING_SYNC=false
 EVENT_INTERVAL=0
+JITTER=true
 
 # Rebuild image if desired.
 if [ ! -z "$REBUILD_IMAGE" ]; then
@@ -118,7 +119,7 @@ sleep 10
 
 # Start the executions in parallel.
 for k in ${CLIENTS[@]}; do
-  N=10
+  N=0
   EVENT_INTERVAL=$(N=${N} ./event-interval)
   MODIFIED_STATE_INTERVAL=$(expr ${N} \* ${STATE_INTERVAL})
   echo "N: ${N}"
@@ -126,9 +127,10 @@ for k in ${CLIENTS[@]}; do
   echo "EVENT_INTERVAL: ${EVENT_INTERVAL}"
   echo "MODIFIED_STATE_INTERVAL: ${MODIFIED_STATE_INTERVAL}"
 
-  echo "Launching client simulation: ${k} clients; state interval: ${STATE_INTERVAL} event interval: ${EVENT_INTERVAL}"
+  echo "Launching client simulation: ${k} clients; state interval: ${MODIFIED_STATE_INTERVAL} event interval: ${EVENT_INTERVAL}"
 
   BLOCKING_SYNC=${BLOCKING_SYNC} \
+    JITTER=${JITTER} \
     EVENT_INTERVAL=${EVENT_INTERVAL} \
     STATE_INTERVAL=${MODIFIED_STATE_INTERVAL} \
     MAX_EVENTS=${MAX_EVENTS} \

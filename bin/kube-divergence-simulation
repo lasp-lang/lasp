@@ -2,7 +2,7 @@
 
 CLIENTS=(1 2 4 6 8)
 NODES=5
-LASP_BRANCH=unstable
+LASP_BRANCH=jitter
 IMAGE=lasp-dev
 REPS=10
 GCE=true

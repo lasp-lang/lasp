@@ -305,13 +305,19 @@ schedule_state_synchronization() ->
 
     case ShouldSync of
         true ->
-            Interval = round(lasp_config:get(state_interval, 10000) * 0.10),
+            Interval = lasp_config:get(state_interval, 10000),
             ObjectFilterFun = fun(_) -> true end,
             case lasp_config:get(jitter, false) of
                 true ->
                     %% Add random jitter.
-                    Jitter = rand_compat:uniform(Interval * 2) - Interval,
-                    timer:send_after(Interval + Jitter, {state_sync, ObjectFilterFun});
+                    case round(Interval * 0.10) of
+                        0 ->
+                            %% No jitter.
+                            timer:send_after(Interval, {state_sync, ObjectFilterFun});
+                        JitterInterval ->
+                            Jitter = rand_compat:uniform(JitterInterval * 2) - JitterInterval,
+                            timer:send_after(Interval + Jitter, {state_sync, ObjectFilterFun})
+                    end;
                 false ->
                     timer:send_after(Interval, {state_sync, ObjectFilterFun})
             end;

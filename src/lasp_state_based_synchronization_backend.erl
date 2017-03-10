@@ -311,11 +311,12 @@ schedule_state_synchronization() ->
                 true ->
                     %% Add random jitter.
                     MinimalInterval = round(Interval * 0.10),
+                    lager:info("MinimalInterval: ~p", [MinimalInterval]),
 
                     case MinimalInterval of
                         0 ->
                             %% No jitter.
-                            lager:info("Jitter is 0, scheduling at ~p.", [MinimalInterval, Interval]),
+                            lager:info("Jitter is 0, scheduling at ~p.", [Interval]),
                             timer:send_after(Interval, {state_sync, ObjectFilterFun});
                         JitterInterval ->
                             Jitter = rand_compat:uniform(JitterInterval * 2) - JitterInterval,

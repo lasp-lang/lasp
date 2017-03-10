@@ -305,7 +305,7 @@ schedule_state_synchronization() ->
 
     case ShouldSync of
         true ->
-            Interval = lasp_config:get(state_interval, 10000),
+            Interval = round(lasp_config:get(state_interval, 10000) * 0.10),
             ObjectFilterFun = fun(_) -> true end,
             case lasp_config:get(jitter, false) of
                 true ->

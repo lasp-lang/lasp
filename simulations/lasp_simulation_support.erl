@@ -361,4 +361,3 @@ node_list(ClientNumber) ->
 %% @private
 client_list(0) -> [];
 client_list(N) -> lists:append(client_list(N - 1), [list_to_atom("client_" ++ integer_to_list(N))]).
-

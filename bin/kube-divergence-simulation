@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-CLIENTS=(1)
+CLIENTS=(1 2 4 6 8 10)
 NODES=6
 LASP_BRANCH=unstable
 IMAGE=lasp-exp
-REPS=1
+REPS=10
 GCE=true
 MACHINE="n1-standard-8"
 MAX_EVENTS=50000

@@ -4,7 +4,7 @@
      {vsn,"0.0.5"},
      {maintainers,["Christopher S. Meiklejohn"]},
      {links,[{"Github","https://github.com/lasp-lang/lasp"}]},
-     {licenses,["Apache"]},
+     {licenses,["Apache 2"]},
      {registered,[]},
      {applications,
          [kernel,stdlib,types,gen_flow,lager,sasl,time_compat,

@@ -89,7 +89,7 @@ cp bin/sync-redis.erl /tmp
 cp bin/kube-divergence /tmp
 cp bin/event-interval /tmp
 mkdir -p /tmp/_build/exp/lib/eredis/ebin
-cp -Rp _build/exp/lib/eredis/ebin/ /tmp/_build/exp/lib/eredis/ebin
+cp -Rp _build/exp/lib/eredis/ebin/* /tmp/_build/exp/lib/eredis/ebin
 
 cd /tmp
 

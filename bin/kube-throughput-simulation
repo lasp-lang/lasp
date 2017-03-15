@@ -71,8 +71,8 @@ done
 echo "Copying code to /tmp"
 cp bin/sync-redis.erl /tmp
 cp bin/kube-throughput /tmp
-mkdir -p /tmp/_build/default/lib/eredis/ebin
-cp -Rp _build/default/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/ebin
+mkdir -p /tmp/_build/exp/lib/eredis/ebin
+cp -Rp _build/exp/lib/eredis/ebin/ /tmp/_build/exp/lib/eredis/ebin
 
 cd /tmp
 

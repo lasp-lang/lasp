@@ -5,7 +5,7 @@ ERLANG_BIN       = $(shell dirname $(shell which erl))
 REBAR            = $(shell pwd)/rebar3
 MAKE						 = make
 
-.PHONY: rel deps test plots dcos logs
+.PHONY: rel deps test plots dcos logs fpm
 
 all: compile
 
@@ -84,7 +84,10 @@ stage:
 ## Packaging targets
 ##
 
-package: rel
+fpm:
+	gem install --no-ri --no-rdoc fpm
+
+package: rel fpm
 	fpm -s dir -t deb -n $(PACKAGE) -v $(VERSION) \
 		--deb-user $(PACKAGE) \
 		--deb-group $(PACKAGE) \

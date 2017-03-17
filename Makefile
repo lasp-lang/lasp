@@ -96,7 +96,7 @@ package: rel
 		rel/etc/$(PACKAGE)/$(PACKAGE).config=/etc/$(PACKAGE)/$(PACKAGE).config \
 		rel/etc/default/$(PACKAGE)=/etc/default/$(PACKAGE)
 
-package_cloud:
+package_cloud: package
 	docker build -f Dockerfiles/packager -t cmeiklejohn/packager .
 	docker run -i -t -v ~/.packagecloud:/root/.packagecloud cmeiklejohn/packager
 

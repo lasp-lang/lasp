@@ -14,7 +14,7 @@ BLOCKING_SYNC=false
 # Rebuild image if desired.
 if [ ! -z "$REBUILD_IMAGE" ]; then
     # Delete image
-    IMAGE_IDS=$(docker images | grep cmeiklejohn/${IMAGE} | awk '{print $3}')
+    IMAGE_IDS=$(docker images | grep lasplang/${IMAGE} | awk '{print $3}')
     echo "Images matching for deletion: ${IMAGE_IDS}"
 
     if [ ! -z "$IMAGE_IDS" ]; then
@@ -22,10 +22,10 @@ if [ ! -z "$REBUILD_IMAGE" ]; then
     fi
 
     # Rebuild image fresh, to ensure no stale dependencies
-    docker build -f Dockerfiles/$IMAGE -t cmeiklejohn/${IMAGE} .
+    docker build -f Dockerfiles/$IMAGE -t lasplang/${IMAGE} --no-cache=t .
 
     # Push image to hub
-    docker push cmeiklejohn/${IMAGE}
+    docker push lasplang/${IMAGE}
 fi
 
 # Perform cluster operations if necessary.

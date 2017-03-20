@@ -392,6 +392,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                         _ ->
                             case ObjectFilterFun(Id) of
                                 true ->
+                                    lager:info("Sending object: ~p", [Id]),
                                     ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, Blocking}, Peer),
                                     [Id|Acc0];
                                 false ->

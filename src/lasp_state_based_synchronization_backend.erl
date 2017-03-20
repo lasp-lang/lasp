@@ -217,8 +217,6 @@ handle_info({state_sync, ObjectFilterFun},
             #state{store=Store, gossip_peers=GossipPeers} = State) ->
     lasp_marathon_simulations:log_message_queue_size("state_sync"),
 
-    lager:info("Received synchronization request."),
-
     % PeerServiceManager = lasp_config:peer_service_manager(),
     % lasp_logger:extended("Beginning state synchronization: ~p",
     %                      [PeerServiceManager]),
@@ -317,7 +315,6 @@ schedule_state_synchronization() ->
                             timer:send_after(Interval, {state_sync, ObjectFilterFun});
                         JitterInterval ->
                             Jitter = rand_compat:uniform(JitterInterval * 2) - JitterInterval,
-                            lager:info("Scheduling synchronization for ~p", [Interval + Jitter]),
                             timer:send_after(Interval + Jitter, {state_sync, ObjectFilterFun})
                     end;
                 false ->

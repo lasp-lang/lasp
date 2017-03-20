@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
 
-CLIENTS=(1 2 4 6 8 10)
-NODES=6
+# CLIENTS=(1 2 4 6 8 10)
+CLIENTS=(1)
+NODES=1
 LASP_BRANCH=unstable
 IMAGE=lasp-exp
-REPS=10
+REPS=5
 GCE=true
 MACHINE="n1-standard-8"
 MAX_EVENTS=50000
 BLOCKING_SYNC=false
 EVENT_INTERVAL=0
 JITTER=true
+SLOWDOWN=false
 
 # Environment variables.
 ENV_VARS=(
+  JITTER
   SLOWDOWN
 )
 

@@ -384,7 +384,7 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
 %% @private
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
     Trace = try throw(42) catch 42 -> erlang:get_stacktrace() end,
-    lager:info(Trace),
+    lager:info("~p", [Trace]),
     % lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     case orddict:find(dynamic, Metadata) of

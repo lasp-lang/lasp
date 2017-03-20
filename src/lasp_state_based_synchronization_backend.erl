@@ -310,7 +310,7 @@ schedule_state_synchronization() ->
             case lasp_config:get(jitter, false) of
                 true ->
                     %% Add random jitter.
-                    MinimalInterval = round(Interval * 0.01),
+                    MinimalInterval = round(Interval * 0.02),
 
                     case MinimalInterval of
                         0 ->

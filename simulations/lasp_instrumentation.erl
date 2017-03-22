@@ -333,6 +333,7 @@ record_batch(Start, End, Events) ->
     Filename = main_log(),
     Timestamp = timestamp(),
     MsDiff = round(timer:now_diff(End, Start) / 1000),
+    lager:info("Batch finished! Start: ~p End: ~p Diff: ~p", [Start, End, MsDiff]),
     Line = get_batch_line(Timestamp, Start, End, Events, MsDiff),
     append_to_file(Filename, Line).
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
 # CLIENTS=(1 2 4 6 8 10)
-CLIENTS=(1 4 8)
+CLIENTS=(1)
 NODES=3
 LASP_BRANCH=unstable
 IMAGE=lasp-exp
-REPS=10
+REPS=1
 GCE=true
 MACHINE="n1-standard-8"
 MAX_EVENTS=100000

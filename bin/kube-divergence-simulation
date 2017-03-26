@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 
-CLIENTS=(1 2 4 6 8 10)
+CLIENTS=(1)
 NODES=6
 LASP_BRANCH=unstable
 IMAGE=lasp-exp
-REPS=10
+REPS=1
 GCE=true
 MACHINE="n1-standard-8"
 MAX_EVENTS=50000
 BLOCKING_SYNC=false
 EVENT_INTERVAL=0
-JITTER=true
+JITTER=false
 
 # Environment variables.
 ENV_VARS=(
@@ -73,7 +73,7 @@ fi
 # Allocate machines accordingly.
 for i in ${CLIENTS[@]}; do
   # Find a machine we can allocate these to.
-  AVAILABLE=$(kubectl get nodes -l '!client_number' | grep Ready | head -1 | awk '{print $1}')
+  AVAILABLE=$(kubectl get nodes -l '!client_number' | grep -v master | grep Ready | head -1 | awk '{print $1}')
 
   # Label the node.
   kubectl label node ${AVAILABLE} client_number=${i}
@@ -87,7 +87,7 @@ cp bin/sync-redis.erl /tmp
 cp bin/kube-divergence /tmp
 cp bin/event-interval /tmp
 mkdir -p /tmp/_build/default/lib/eredis/ebin
-cp -Rp _build/default/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/ebin
+cp -Rp _build/exp/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/ebin
 
 cd /tmp
 
@@ -125,10 +125,12 @@ EOF
 
 echo "Creating redis deployment."
 kubectl create -f /tmp/redis.yaml
-echo
 
-echo "Sleeping for redis deployment..."
-sleep 10
+while [ -z "$REDIS_RUNNING" ]; do
+  REDIS_RUNNING=$(kubectl get pods | grep redis | grep Running)
+  echo "Sleeping for redis deployment..."
+  sleep 10
+done
 
 # Start the executions in parallel.
 for k in ${CLIENTS[@]}; do
@@ -192,8 +194,8 @@ fi
 
 echo "Downloading data from Redis."
 ./sync-redis.erl
-mkdir -p ~/Documents/lasp/priv/evaluation/logs
-cp -Rp /tmp/logs/* ~/Documents/lasp/priv/evaluation/logs
+mkdir -p ~/lasp/priv/evaluation/logs
+cp -Rp /tmp/logs/* ~/lasp/priv/evaluation/logs
 
 # Terminate redis only if we explicitly say so, given sometimes we have
 # to aggregate the logs later if for some instance we are being port

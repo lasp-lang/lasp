@@ -129,7 +129,7 @@ kubectl create -f /tmp/redis.yaml
 while [ -z "$REDIS_RUNNING" ]; do
   REDIS_RUNNING=$(kubectl get pods | grep redis | grep Running)
   echo "Sleeping for redis deployment..."
-  sleep 10
+  sleep 5
 done
 
 # Start the executions in parallel.

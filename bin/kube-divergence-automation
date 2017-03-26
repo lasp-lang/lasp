@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # STATE_INTERVALS=(1 2 4 8 16 32 64 128 256 512 1024)
-STATE_INTERVALS=(1024)
+STATE_INTERVALS=(256)
 
 for k in ${STATE_INTERVALS[@]}; do
   echo "Running simulation with interval ${k}"

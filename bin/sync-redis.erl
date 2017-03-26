@@ -1,6 +1,6 @@
 #!/usr/bin/env escript
 
-%%! -pa _build/exp/lib/eredis/ebin/
+%%! -pa _build/default/lib/eredis/ebin/
 
 main(_) ->
     RedisHost = os:getenv("REDIS_SERVICE_HOST", "127.0.0.1"),

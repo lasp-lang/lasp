@@ -7,7 +7,7 @@ IMAGE=lasp-exp
 REPS=1
 GCE=false
 MACHINE="n1-standard-8"
-MAX_EVENTS=50000
+MAX_EVENTS=500
 BLOCKING_SYNC=false
 EVENT_INTERVAL=0
 JITTER=false
@@ -87,7 +87,7 @@ cp bin/sync-redis.erl /tmp
 cp bin/kube-divergence /tmp
 cp bin/event-interval /tmp
 mkdir -p /tmp/_build/default/lib/eredis/ebin
-cp -Rp _build/exp/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/ebin
+cp -Rp _build/exp/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/
 
 cd /tmp
 
@@ -185,12 +185,13 @@ if [ "$GCE" == "true" ]; then
   export REDIS_SERVICE_HOST=$(kubectl get services | grep redis | awk '{print $3}' | head -1)
   # export REDIS_SERVICE_HOST=$(gcloud compute forwarding-rules list | grep TCP | awk '{print $3}' | tail -1)
   export REDIS_SERVICE_PORT=6379
-  echo "REDIS_SERVICE_HOST: ${REDIS_SERVICE_HOST}"
-  echo "REDIS_SERVICE_PORT: ${REDIS_SERVICE_PORT}"
 else
   export REDIS_SERVICE_HOST=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1 | cut -f 2-2 -d ":" | sed -e 's/\/\///g')
   export REDIS_SERVICE_PORT=$(kubectl get service redis -o jsonpath="{.spec.ports[*].nodePort}")
 fi
+
+echo "REDIS_SERVICE_HOST: ${REDIS_SERVICE_HOST}"
+echo "REDIS_SERVICE_PORT: ${REDIS_SERVICE_PORT}"
 
 echo "Downloading data from Redis."
 ./sync-redis.erl

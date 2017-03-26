@@ -87,7 +87,7 @@ for i in `seq 1 ${REPS}`; do
           client_number: "${CLIENT_NUMBER}"
         containers:
         - name: "lasp-server-${EVAL_TIMESTAMP}"
-          image: cmeiklejohn/${IMAGE}
+          image: ${IMAGE}
           imagePullPolicy: IfNotPresent
           env:
           - name: TAG
@@ -189,7 +189,7 @@ for i in `seq 1 ${REPS}`; do
           client_number: "${CLIENT_NUMBER}"
         containers:
         - name: "lasp-client-${EVAL_TIMESTAMP}"
-          image: cmeiklejohn/${IMAGE}
+          image: ${IMAGE}
           imagePullPolicy: IfNotPresent
           env:
           - name: TAG

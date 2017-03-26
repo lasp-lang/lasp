@@ -180,7 +180,7 @@ kubectl get pods
 echo "All tasks are finished."
 
 # Download data from Redis at the end of the execution.
-if [ "$GCE" ]; then
+if [ "$GCE" == "true" ]; then
   echo "Running in Google Container Engine."
   export REDIS_SERVICE_HOST=$(kubectl get services | grep redis | awk '{print $3}' | head -1)
   # export REDIS_SERVICE_HOST=$(gcloud compute forwarding-rules list | grep TCP | awk '{print $3}' | tail -1)

@@ -278,7 +278,7 @@ EOF
   kubectl create -f /tmp/lasp-${EVAL_TIMESTAMP}.yaml
   echo
 
-  while [ -z "SERVER_RUNNING" ]; do
+  while [ -z "$SERVER_RUNNING" ]; do
     SERVER_RUNNING=$(kubectl get pods | grep lasp-server-${EVAL_TIMESTAMP} | grep Running)
     echo "Sleeping for server deployment..."
     sleep 5

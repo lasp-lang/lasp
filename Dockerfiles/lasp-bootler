@@ -1,0 +1,12 @@
+FROM erlang:19.3-slim
+
+MAINTAINER Vitor Enes Duarte <vitorenesduarte@gmail.com>
+
+RUN apt-get update && apt-get install -y git make
+
+RUN cd /opt && \
+    git clone https://github.com/lasp-lang/lasp.git -b unstable && \
+    cd lasp && \
+    make stage
+
+CMD /opt/lasp/_build/exp/rel/lasp/bin/env

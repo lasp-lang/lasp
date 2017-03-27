@@ -287,6 +287,8 @@ EOF
   echo "Tailing logs."
   export SERVER_POD_NAME=$(kubectl get pods | grep lasp-server-${EVAL_TIMESTAMP} | head -1 | awk '{print $1}')
   kubectl logs --tail=-1 -f $SERVER_POD_NAME
+
+  SERVER_RUNNING=""
 done
 
 # Only remove after *all* repetitions are completed.

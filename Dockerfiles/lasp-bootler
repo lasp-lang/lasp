@@ -1,11 +1,11 @@
-FROM erlang:19.3-slim
+FROM vitorenesduarte/lasp-base
 
 MAINTAINER Vitor Enes Duarte <vitorenesduarte@gmail.com>
 
-RUN apt-get update && apt-get install -y git make
+ARG BRANCH=bootler
 
 RUN cd /opt && \
-    git clone https://github.com/lasp-lang/lasp.git -b bootler && \
+    git clone https://github.com/lasp-lang/lasp.git -b $BRANCH && \
     cd lasp && \
     make stage
 

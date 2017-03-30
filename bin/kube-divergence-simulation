@@ -8,13 +8,15 @@ DOCKERFILE=Dockerfiles/lasp-bootler
 REPS=10
 GCE=false
 MACHINE="n1-standard-8"
-MAX_EVENTS=50000
+MAX_EVENTS=100000
 BLOCKING_SYNC=false
 EVENT_INTERVAL=0
 JITTER=false
+SLOWDOWN=false
 
 # Environment variables.
 ENV_VARS=(
+  JITTER
   SLOWDOWN
 )
 
@@ -57,11 +59,13 @@ fi
 echo "Removing initial labeling."
 kubectl label nodes --all client_number-
 
-echo "Removing deployments, services, pods, and replicasets."
-kubectl delete deployments --all
-kubectl delete replicasets --all
-kubectl delete services --all
-kubectl delete pods --all
+if [ ! -z "$REMOVE" ]; then
+  echo "Removing deployments, services, pods, and replicasets."
+  kubectl delete deployments --all
+  kubectl delete replicasets --all
+  kubectl delete services --all
+  kubectl delete pods --all
+fi
 
 echo "Removing /tmp logs."
 rm -rf /tmp/logs
@@ -87,8 +91,8 @@ echo "Copying code to /tmp"
 cp bin/sync-redis.erl /tmp
 cp bin/kube-divergence /tmp
 cp bin/event-interval /tmp
-mkdir -p /tmp/_build/default/lib/eredis/ebin
-cp -Rp _build/exp/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/
+mkdir -p /tmp/_build/exp/lib/eredis/ebin
+cp -Rp _build/exp/lib/eredis/ebin/* /tmp/_build/exp/lib/eredis/ebin
 
 cd /tmp
 

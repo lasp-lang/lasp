@@ -1,4 +1,4 @@
-FROM vitorenesduarte/lasp-base
+FROM lasplang/lasp-base
 
 MAINTAINER Vitor Enes Duarte <vitorenesduarte@gmail.com>
 

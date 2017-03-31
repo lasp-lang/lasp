@@ -85,7 +85,7 @@ for i in `seq 1 ${REPS}`; do
           run: lasp-server
       spec:
         nodeSelector:
-          client_number: "${CLIENT_NUMBER}"
+          lasp_selector: "${CLIENT_NUMBER}"
         containers:
         - name: "lasp-server-${EVAL_TIMESTAMP}"
           image: ${IMAGE}
@@ -189,7 +189,7 @@ for i in `seq 1 ${REPS}`; do
           run: lasp-client
       spec:
         nodeSelector:
-          client_number: "${CLIENT_NUMBER}"
+          lasp_selector: "${CLIENT_NUMBER}"
         containers:
         - name: "lasp-client-${EVAL_TIMESTAMP}"
           image: ${IMAGE}
@@ -297,6 +297,6 @@ EOF
 done
 
 # Only remove after *all* repetitions are completed.
-NODE=$(echo "client_number=${CLIENT_NUMBER}" | xargs kubectl get nodes -l | grep Ready | head -1 | awk '{print $1}')
+NODE=$(echo "lasp_selector=${CLIENT_NUMBER}" | xargs kubectl get nodes -l | grep Ready | head -1 | awk '{print $1}')
 echo "Removing label for node ${NODE}"
-kubectl label node ${NODE} client_number-
+kubectl label node ${NODE} lasp_selector-

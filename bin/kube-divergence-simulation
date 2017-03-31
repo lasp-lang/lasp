@@ -59,7 +59,7 @@ if [ ! -z "$CLUSTER_START" ]; then
 fi
 
 echo "Removing initial labeling."
-kubectl label nodes --all client_number-
+kubectl label nodes --all lasp_selector-
 
 if [ ! -z "$REMOVE" ]; then
   echo "Removing deployments, services, pods, and replicasets."
@@ -80,13 +80,18 @@ fi
 # Allocate machines accordingly.
 for i in ${CLIENTS[@]}; do
   # Find a machine we can allocate these to.
-  AVAILABLE=$(kubectl get nodes -l '!client_number' | grep -v master | grep Ready | head -1 | awk '{print $1}')
+  AVAILABLE=$(kubectl get nodes -l '!lasp_selector' | grep -v master | grep Ready | head -1 | awk '{print $1}')
 
   # Label the node.
-  kubectl label node ${AVAILABLE} client_number=${i}
+  kubectl label node ${AVAILABLE} lasp_selector=${i}
 
   echo "Labeled node ${AVAILABLE} for runs of ${i} clients."
 done
+
+# Allocate machine for redis.
+AVAILABLE=$(kubectl get nodes -l '!lasp_selector' | grep -v master | grep Ready | head -1 | awk '{print $1}')
+kubectl label node ${AVAILABLE} lasp_selector=redis
+echo "Labeled node ${AVAILABLE} for runs of redis."
 
 # Deploy a single redis instance.
 echo "Copying code to /tmp"
@@ -125,6 +130,8 @@ cat <<EOF > redis.yaml
         labels:
           run: redis
       spec:
+        nodeSelector:
+          lasp_selector: redis
         containers:
         - name: redis
           image: redis

@@ -43,6 +43,7 @@ ENV_VARS=(
   MAX_EVENTS
   EVENT_INTERVAL
   JITTER
+  JITTER_PERCENT
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -156,6 +157,8 @@ for i in `seq 1 ${REPS}`; do
             value: "${MAX_EVENTS}"
           - name: JITTER
             value: "${JITTER}"
+          - name: JITTER_PERCENT
+            value: "${JITTER_PERCENT}"
           - name: WORKFLOW
             value: "${WORKFLOW}"
           - name: MY_POD_NAME
@@ -258,6 +261,8 @@ for i in `seq 1 ${REPS}`; do
             value: "${MAX_EVENTS}"
           - name: JITTER
             value: "${JITTER}"
+          - name: JITTER_PERCENT
+            value: "${JITTER_PERCENT}"
           - name: WORKFLOW
             value: "${WORKFLOW}"
           - name: MY_POD_NAME

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-CLIENTS=(6 8 10)
-NODES=3
+CLIENTS=(6)
+NODES=1
 LASP_BRANCH=unstable
 IMAGE=lasplang/lasp-bootler
 DOCKERFILE=Dockerfiles/lasp-bootler

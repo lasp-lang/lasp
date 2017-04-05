@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-CLIENTS=(6)
-NODES=1
+CLIENTS=(1 2 4)
+NODES=3
 LASP_BRANCH=unstable
 IMAGE=lasplang/lasp-bootler
 DOCKERFILE=Dockerfiles/lasp-bootler
-REPS=5
+REPS=1
 GCE=false
 MACHINE="n1-standard-8"
 MAX_EVENTS=100000

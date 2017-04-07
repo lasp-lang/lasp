@@ -110,7 +110,7 @@ publish:
 	${REBAR} as package hex publish
 
 shell:
-	${REBAR} shell --apps lasp
+	${REBAR} shell --apps lasp --name lasp@localhost
 
 ##
 ## Evaluation related targets

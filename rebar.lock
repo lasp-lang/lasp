@@ -10,7 +10,7 @@
  {<<"riak_dt">>,{pkg,<<"riak_dt">>,<<"2.1.1">>},1},
  {<<"sext">>,{pkg,<<"sext">>,<<"1.4.0">>},0},
  {<<"time_compat">>,{pkg,<<"time_compat">>,<<"0.0.1">>},0},
- {<<"types">>,{pkg,<<"types">>,<<"0.0.4">>},0}]}.
+ {<<"types">>,{pkg,<<"types">>,<<"0.0.6">>},0}]}.
 [
 {pkg_hash,[
  {<<"acceptor_pool">>, <<"679D741DF87FC13599B1AEF2DF8F78F1F880449A6BEFAB7C44FB6FAE0E92A2DE">>},
@@ -24,5 +24,5 @@
  {<<"riak_dt">>, <<"56B1898A543C561994F5D052FDEA972525CA98F46FDB3DCDB7366E4F92EE8F54">>},
  {<<"sext">>, <<"2A9443A90C3164231A5E11C73133C4B1762B27FBF1647AA0DE06EF565C47B38B">>},
  {<<"time_compat">>, <<"23FE0AD1FDF3B5B88821B2D04B4B5E865BF587AE66056D671FE0F53514ED8139">>},
- {<<"types">>, <<"B2BC2D58F12D85EFD06BC3A28B3DDE3C5AEF29EFB0FEE71FC2F1B6968C5E0DC1">>}]}
+ {<<"types">>, <<"DF10A65C2A06B79D300BD74DEB783FA8E9B16A1B5AFC75F26C0C7302D558EEE9">>}]}
 ].

@@ -28,8 +28,6 @@
 -define(PEER_SERVICE, partisan_peer_service).
 
 -export([join/1,
-         join/2,
-         join/3,
          leave/0,
          members/0,
          manager/0,
@@ -41,20 +39,8 @@
 %%%===================================================================
 
 %% @doc Prepare node to join a cluster.
-join(Node) ->
-    do(join, [Node, true]).
-
-%% @doc Convert nodename to atom.
-join(NodeStr, Auto) when is_list(NodeStr) ->
-    do(join, [NodeStr, Auto]);
-join(Node, Auto) when is_atom(Node) ->
-    do(join, [Node, Auto]);
-join({_Name, _IPAddress, _Port} = Node, Auto) ->
-    do(join, [Node, Auto]).
-
-%% @doc Initiate join. Nodes cannot join themselves.
-join(Node, Node, Auto) ->
-    do(join, [Node, Node, Auto]).
+join({_Name, _IPAddress, _Port} = Node) ->
+    do(join, [Node]).
 
 %% @doc Leave the cluster.
 leave() ->

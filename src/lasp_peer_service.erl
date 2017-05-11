@@ -26,8 +26,6 @@
 -export([peer_service/0]).
 
 -export([join/1,
-         join/2,
-         join/3,
          leave/0,
          members/0,
          manager/0,
@@ -40,14 +38,6 @@
 
 %% Attempt to join node.
 -callback join(node()) -> ok | {error, atom()}.
-
-%% Attempt to join node with or without automatically claiming ring
-%% ownership.
--callback join(node(), boolean()) -> ok | {error, atom()}.
-
-%% Attempt to join node with or without automatically claiming ring
-%% ownership.
--callback join(node(), node(), boolean()) -> ok | {error, atom()}.
 
 %% Remove a node from the cluster.
 -callback leave() -> ok.
@@ -70,17 +60,7 @@
 
 %% @doc Prepare node to join a cluster.
 join(Node) ->
-    do(join, [Node, true]).
-
-%% @doc Convert nodename to atom.
-join(NodeStr, Auto) when is_list(NodeStr) ->
-    do(join, [NodeStr, Auto]);
-join(Node, Auto) when is_atom(Node) ->
-    do(join, [Node, Auto]).
-
-%% @doc Initiate join. Nodes cannot join themselves.
-join(Node, Node, Auto) ->
-    do(join, [Node, Node, Auto]).
+    do(join, [Node]).
 
 %% @doc Return cluster members.
 members() ->

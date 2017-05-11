@@ -492,7 +492,7 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                                     {DeltaTime, Delta} = timer:tc(fun() ->
                                         case lasp_config:get(join_decompositions, false) of
                                             true ->
-                                                lasp_type:delta(Type, state_driven, Value, Value0);
+                                                lasp_type:delta(Type, state, Value, Value0);
                                             false ->
                                                 Value
                                         end

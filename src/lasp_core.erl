@@ -497,7 +497,7 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                                                 Value
                                         end
                                     end),
-                                    lager:info("Join decomposition took ~p microseconds", [DeltaTime]),
+                                    lasp_logger:extended("Join decomposition took ~p microseconds", [DeltaTime]),
                                     DeltaMap1 = store_delta(Origin, Counter0, Delta, DeltaMap0),
                                     {ok, increment_counter(Counter0), DeltaMap1}
                             end,

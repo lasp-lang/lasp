@@ -219,6 +219,11 @@ configure_defaults() ->
     lager:info("Setting jitter: ~p", [Jitter]),
     lasp_config:set(jitter, Jitter),
 
+    JitterPercentDefault = list_to_integer(os:getenv("JITTER_PERCENT", "1")),
+    JitterPercent = application:get_env(?APP, jitter_percent, JitterPercentDefault),
+    lager:info("Setting jitter percent: ~p", [JitterPercent]),
+    lasp_config:set(jitter_percent, JitterPercent),
+
     TutorialDefault = list_to_atom(os:getenv("TUTORIAL", "false")),
     Tutorial = application:get_env(?APP, tutorial, TutorialDefault),
     lager:info("Setting tutorial: ~p", [Tutorial]),

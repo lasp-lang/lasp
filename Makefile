@@ -50,7 +50,7 @@ client-server-ad-counter-simulation:
 	${REBAR} ct --suite=lasp_client_server_advertisement_counter_SUITE
 
 ad-counter-overcounting:
-	${REBAR} ct --suite=lasp_advertisement_counter_overcounting_SUITE
+	#${REBAR} ct --suite=lasp_advertisement_counter_overcounting_SUITE
 
 ad-counter-partition-overcounting:
 	${REBAR} ct --suite=lasp_advertisement_counter_partition_overcounting_SUITE
@@ -110,7 +110,7 @@ publish:
 	${REBAR} as package hex publish
 
 shell:
-	${REBAR} shell --apps lasp
+	${REBAR} shell --apps lasp --name lasp@localhost
 
 ##
 ## Evaluation related targets

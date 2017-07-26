@@ -43,6 +43,7 @@ ENV_VARS=(
   MAX_EVENTS
   EVENT_INTERVAL
   JITTER
+  JITTER_PERCENT
 )
 
 for ENV_VAR in "${ENV_VARS[@]}"
@@ -84,10 +85,10 @@ for i in `seq 1 ${REPS}`; do
           run: lasp-server
       spec:
         nodeSelector:
-          client_number: "${CLIENT_NUMBER}"
+          lasp_selector: "${CLIENT_NUMBER}"
         containers:
         - name: "lasp-server-${EVAL_TIMESTAMP}"
-          image: cmeiklejohn/${IMAGE}
+          image: ${IMAGE}
           imagePullPolicy: IfNotPresent
           env:
           - name: TAG
@@ -156,6 +157,8 @@ for i in `seq 1 ${REPS}`; do
             value: "${MAX_EVENTS}"
           - name: JITTER
             value: "${JITTER}"
+          - name: JITTER_PERCENT
+            value: "${JITTER_PERCENT}"
           - name: WORKFLOW
             value: "${WORKFLOW}"
           - name: MY_POD_NAME
@@ -186,10 +189,10 @@ for i in `seq 1 ${REPS}`; do
           run: lasp-client
       spec:
         nodeSelector:
-          client_number: "${CLIENT_NUMBER}"
+          lasp_selector: "${CLIENT_NUMBER}"
         containers:
         - name: "lasp-client-${EVAL_TIMESTAMP}"
-          image: cmeiklejohn/${IMAGE}
+          image: ${IMAGE}
           imagePullPolicy: IfNotPresent
           env:
           - name: TAG
@@ -258,6 +261,8 @@ for i in `seq 1 ${REPS}`; do
             value: "${MAX_EVENTS}"
           - name: JITTER
             value: "${JITTER}"
+          - name: JITTER_PERCENT
+            value: "${JITTER_PERCENT}"
           - name: WORKFLOW
             value: "${WORKFLOW}"
           - name: MY_POD_NAME
@@ -278,14 +283,20 @@ EOF
   kubectl create -f /tmp/lasp-${EVAL_TIMESTAMP}.yaml
   echo
 
-  sleep 120
+  while [ -z "$SERVER_RUNNING" ]; do
+    SERVER_RUNNING=$(kubectl get pods | grep lasp-server-${EVAL_TIMESTAMP} | grep Running)
+    echo "Sleeping for server deployment..."
+    sleep 5
+  done
 
   echo "Tailing logs."
   export SERVER_POD_NAME=$(kubectl get pods | grep lasp-server-${EVAL_TIMESTAMP} | head -1 | awk '{print $1}')
   kubectl logs --tail=-1 -f $SERVER_POD_NAME
+
+  SERVER_RUNNING=""
 done
 
 # Only remove after *all* repetitions are completed.
-NODE=$(echo "client_number=${CLIENT_NUMBER}" | xargs kubectl get nodes -l | grep Ready | head -1 | awk '{print $1}')
+NODE=$(echo "lasp_selector=${CLIENT_NUMBER}" | xargs kubectl get nodes -l | grep Ready | head -1 | awk '{print $1}')
 echo "Removing label for node ${NODE}"
-kubectl label node ${NODE} client_number-
+kubectl label node ${NODE} lasp_selector-

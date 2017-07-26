@@ -1,0 +1,12 @@
+FROM lasplang/lasp-base
+
+MAINTAINER Vitor Enes Duarte <vitorenesduarte@gmail.com>
+
+ARG BRANCH=bootler
+
+RUN cd /opt && \
+    git clone https://github.com/lasp-lang/lasp.git -b $BRANCH && \
+    cd lasp && \
+    make stage
+
+CMD /opt/lasp/_build/exp/rel/lasp/bin/env

@@ -34,7 +34,7 @@
          decode/3,
          query/2,
          get_type/1,
-         delta/4]).
+         delta/3]).
 
 types() ->
     [
@@ -159,6 +159,6 @@ query(Type, Value) ->
     T:query(Value).
 
 %% @doc
-delta(Type, Method, Remote, Local) ->
+delta(Type, A, B) ->
     T = get_type(remove_args(Type)),
-    T:delta(Method, Remote, Local).
+    T:delta(A, B).

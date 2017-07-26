@@ -2,27 +2,25 @@
 [{<<"acceptor_pool">>,{pkg,<<"acceptor_pool">>,<<"1.0.0-rc.0">>},1},
  {<<"gen_flow">>,{pkg,<<"gen_flow">>,<<"0.0.3">>},0},
  {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
- {<<"lager">>,{pkg,<<"lager">>,<<"3.2.4">>},0},
- {<<"lasp_support">>,{pkg,<<"lasp_support">>,<<"0.0.1">>},0},
- {<<"partisan">>,{pkg,<<"partisan">>,<<"0.2.0">>},0},
- {<<"plumtree">>,{pkg,<<"plumtree">>,<<"0.1.0">>},0},
+ {<<"lager">>,{pkg,<<"lager">>,<<"3.5.1">>},0},
+ {<<"lasp_support">>,{pkg,<<"lasp_support">>,<<"0.0.3">>},0},
+ {<<"partisan">>,{pkg,<<"partisan">>,<<"0.3.0">>},0},
+ {<<"plumtree">>,{pkg,<<"plumtree">>,<<"0.3.0">>},0},
  {<<"rand_compat">>,{pkg,<<"rand_compat">>,<<"0.0.1">>},0},
- {<<"riak_dt">>,{pkg,<<"riak_dt">>,<<"2.1.1">>},1},
  {<<"sext">>,{pkg,<<"sext">>,<<"1.4.0">>},0},
  {<<"time_compat">>,{pkg,<<"time_compat">>,<<"0.0.1">>},0},
- {<<"types">>,{pkg,<<"types">>,<<"0.0.6">>},0}]}.
+ {<<"types">>,{pkg,<<"types">>,<<"0.1.6">>},0}]}.
 [
 {pkg_hash,[
  {<<"acceptor_pool">>, <<"679D741DF87FC13599B1AEF2DF8F78F1F880449A6BEFAB7C44FB6FAE0E92A2DE">>},
  {<<"gen_flow">>, <<"639F5C3F52DC3F7459542DE3F72D5BFF11EB7DB8FB055657A3011F9A70FCF0D7">>},
  {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
- {<<"lager">>, <<"A6DEB74DAE7927F46BD13255268308EF03EB206EC784A94EAF7C1C0F3B811615">>},
- {<<"lasp_support">>, <<"28E79936E10C5BFB9B8246AC1F4F8385224D4E1E288F318C6D51C42D277A7A6E">>},
- {<<"partisan">>, <<"8E44E20FD2E904D53D8FF2287C1397F71BC9BFF36B4DB6996C207AAFEFBE3ED1">>},
- {<<"plumtree">>, <<"6FD05600AFE22706ED2C4CD64B37FB155363B4FAD922F538FB8376A409569A9E">>},
+ {<<"lager">>, <<"63897A61AF646C59BB928FEE9756CE8BDD02D5A1A2F3551D4A5E38386C2CC071">>},
+ {<<"lasp_support">>, <<"C1B7E1A472037AE82C71D2D16A10B7D644A621B66AE5AFE834CECF170F2E9169">>},
+ {<<"partisan">>, <<"10938301AF8E67DED9291C61DC6C9221558566D26C6563FF646CABEB0AF60356">>},
+ {<<"plumtree">>, <<"08DC7DE4AD61B3941D28EDC339BC2EF48D4C501059AB1B437CE06994160FEABF">>},
  {<<"rand_compat">>, <<"624B590931D27252D0BCF710211699DB3695540706F57D2E91B918A17AB58839">>},
- {<<"riak_dt">>, <<"56B1898A543C561994F5D052FDEA972525CA98F46FDB3DCDB7366E4F92EE8F54">>},
  {<<"sext">>, <<"2A9443A90C3164231A5E11C73133C4B1762B27FBF1647AA0DE06EF565C47B38B">>},
  {<<"time_compat">>, <<"23FE0AD1FDF3B5B88821B2D04B4B5E865BF587AE66056D671FE0F53514ED8139">>},
- {<<"types">>, <<"DF10A65C2A06B79D300BD74DEB783FA8E9B16A1B5AFC75F26C0C7302D558EEE9">>}]}
+ {<<"types">>, <<"03BB7140016C896D3441A77CB0B7D6ACAA583D6D6E9C4A3E1FD3C25123710290">>}]}
 ].

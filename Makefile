@@ -5,7 +5,7 @@ ERLANG_BIN       = $(shell dirname $(shell which erl))
 REBAR            = $(shell pwd)/rebar3
 MAKE						 = make
 
-.PHONY: rel deps test plots dcos logs
+.PHONY: rel deps test plots dcos logs fpm
 
 all: compile
 
@@ -84,7 +84,10 @@ stage:
 ## Packaging targets
 ##
 
-package: rel
+fpm:
+	gem install --no-ri --no-rdoc fpm
+
+package: rel fpm
 	fpm -s dir -t deb -n $(PACKAGE) -v $(VERSION) \
 		--deb-user $(PACKAGE) \
 		--deb-group $(PACKAGE) \
@@ -96,7 +99,7 @@ package: rel
 		rel/etc/$(PACKAGE)/$(PACKAGE).config=/etc/$(PACKAGE)/$(PACKAGE).config \
 		rel/etc/default/$(PACKAGE)=/etc/default/$(PACKAGE)
 
-package_cloud:
+package_cloud: package
 	docker build -f Dockerfiles/packager -t cmeiklejohn/packager .
 	docker run -i -t -v ~/.packagecloud:/root/.packagecloud cmeiklejohn/packager
 
@@ -107,7 +110,7 @@ publish:
 	${REBAR} as package hex publish
 
 shell:
-	${REBAR} shell --apps lasp
+	${REBAR} shell --apps lasp --name lasp@localhost
 
 ##
 ## Evaluation related targets

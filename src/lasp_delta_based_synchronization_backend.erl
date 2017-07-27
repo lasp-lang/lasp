@@ -161,7 +161,7 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
                                                ?CLOCK_INCR(Actor),
                                                ?CLOCK_INIT(Actor)})
              end),
-    lager:info("Receiving delta took: ~p microseconds.", [Time]),
+    lasp_logger:extended("Receiving delta took: ~p microseconds.", [Time]),
 
     %% Acknowledge message.
     ?SYNC_BACKEND:send(?MODULE, {delta_ack, node(), Id, Counter}, From),
@@ -256,25 +256,17 @@ handle_info(delta_gc, #state{store=Store}=State) ->
 
         DeltaMapGC = orddict:filter(DeltaMapGCFun, DeltaMap0),
 
-        lager:info("\n\n\n--------------------GC--------------------"),
-        lager:info("GC stats for ~p", [Id]),
-        lager:info("Delta Map size: before ~p | after ~p", [orddict:size(DeltaMap0), orddict:size(DeltaMapGC)]),
-        lager:info("Ack Map size:   before ~p | after ~p", [orddict:size(AckMap0), orddict:size(PrunedAckMap)]),
-        lager:info("--------------------GC--------------------\n\n\n"),
-
         {Object#dv{delta_map=DeltaMapGC, delta_ack_map=PrunedAckMap}, Id}
     end,
 
-    {ok, Results} = lasp_storage_backend:do(update_all, [Store, Mutator]),
-    lager:info("Garbage collection complete for objects: ~p", [Results]),
+    {ok, _} = lasp_storage_backend:do(update_all, [Store, Mutator]),
 
     %% Schedule next GC and reset counter.
     schedule_delta_garbage_collection(),
 
     {noreply, State};
 
-handle_info(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+handle_info(_Msg, State) ->
     {noreply, State}.
 
 %% @private

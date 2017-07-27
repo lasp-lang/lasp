@@ -1,19 +1,24 @@
 #!/usr/bin/env bash
 
-CLIENTS=(1 2 4 6 8 10)
-NODES=6
+CLIENTS=(8)
+NODES=3
 LASP_BRANCH=unstable
-IMAGE=lasp-exp
-REPS=10
-GCE=true
+IMAGE=lasplang/lasp-bootler
+DOCKERFILE=Dockerfiles/lasp-bootler
+REPS=20
+GCE=false
 MACHINE="n1-standard-8"
-MAX_EVENTS=50000
+MAX_EVENTS=100000
 BLOCKING_SYNC=false
 EVENT_INTERVAL=0
-JITTER=true
+JITTER=false
+JITTER_PERCENT=1
+SLOWDOWN=false
 
 # Environment variables.
 ENV_VARS=(
+  JITTER
+  JITTER_PERCENT
   SLOWDOWN
 )
 
@@ -28,7 +33,7 @@ done
 # Rebuild image if desired.
 if [ ! -z "$REBUILD_IMAGE" ]; then
     # Delete image
-    IMAGE_IDS=$(docker images | grep cmeiklejohn/${IMAGE} | awk '{print $3}')
+    IMAGE_IDS=$(docker images | grep ${IMAGE} | awk '{print $3}')
     echo "Images matching for deletion: ${IMAGE_IDS}"
 
     if [ ! -z "$IMAGE_IDS" ]; then
@@ -36,10 +41,10 @@ if [ ! -z "$REBUILD_IMAGE" ]; then
     fi
 
     # Rebuild image fresh, to ensure no stale dependencies
-    docker build -f Dockerfiles/$IMAGE -t cmeiklejohn/${IMAGE} .
+    docker build -f ${DOCKERFILE} -t ${IMAGE} .
 
     # Push image to hub
-    docker push cmeiklejohn/${IMAGE}
+    docker push ${IMAGE}
 fi
 
 # Perform cluster operations if necessary.
@@ -54,13 +59,15 @@ if [ ! -z "$CLUSTER_START" ]; then
 fi
 
 echo "Removing initial labeling."
-kubectl label nodes --all client_number-
+kubectl label nodes --all lasp_selector-
 
-echo "Removing deployments, services, pods, and replicasets."
-kubectl delete deployments --all
-kubectl delete replicasets --all
-kubectl delete services --all
-kubectl delete pods --all
+if [ ! -z "$REMOVE" ]; then
+  echo "Removing deployments, services, pods, and replicasets."
+  kubectl delete deployments --all
+  kubectl delete replicasets --all
+  kubectl delete services --all
+  kubectl delete pods --all
+fi
 
 echo "Removing /tmp logs."
 rm -rf /tmp/logs
@@ -73,21 +80,26 @@ fi
 # Allocate machines accordingly.
 for i in ${CLIENTS[@]}; do
   # Find a machine we can allocate these to.
-  AVAILABLE=$(kubectl get nodes -l '!client_number' | grep Ready | head -1 | awk '{print $1}')
+  AVAILABLE=$(kubectl get nodes -l '!lasp_selector' | grep -v master | grep Ready | head -1 | awk '{print $1}')
 
   # Label the node.
-  kubectl label node ${AVAILABLE} client_number=${i}
+  kubectl label node ${AVAILABLE} lasp_selector=${i}
 
   echo "Labeled node ${AVAILABLE} for runs of ${i} clients."
 done
+
+# Allocate machine for redis.
+AVAILABLE=$(kubectl get nodes -l '!lasp_selector' | grep -v master | grep Ready | head -1 | awk '{print $1}')
+kubectl label node ${AVAILABLE} lasp_selector=redis
+echo "Labeled node ${AVAILABLE} for runs of redis."
 
 # Deploy a single redis instance.
 echo "Copying code to /tmp"
 cp bin/sync-redis.erl /tmp
 cp bin/kube-divergence /tmp
 cp bin/event-interval /tmp
-mkdir -p /tmp/_build/default/lib/eredis/ebin
-cp -Rp _build/default/lib/eredis/ebin/ /tmp/_build/default/lib/eredis/ebin
+mkdir -p /tmp/_build/exp/lib/eredis/ebin
+cp -Rp _build/exp/lib/eredis/ebin/* /tmp/_build/exp/lib/eredis/ebin
 
 cd /tmp
 
@@ -118,6 +130,8 @@ cat <<EOF > redis.yaml
         labels:
           run: redis
       spec:
+        nodeSelector:
+          lasp_selector: redis
         containers:
         - name: redis
           image: redis
@@ -125,10 +139,12 @@ EOF
 
 echo "Creating redis deployment."
 kubectl create -f /tmp/redis.yaml
-echo
 
-echo "Sleeping for redis deployment..."
-sleep 10
+while [ -z "$REDIS_RUNNING" ]; do
+  REDIS_RUNNING=$(kubectl get pods | grep redis | grep Running)
+  echo "Sleeping for redis deployment..."
+  sleep 5
+done
 
 # Start the executions in parallel.
 for k in ${CLIENTS[@]}; do
@@ -152,6 +168,7 @@ for k in ${CLIENTS[@]}; do
 
   BLOCKING_SYNC=${BLOCKING_SYNC} \
     JITTER=${JITTER} \
+    JITTER_PERCENT=${JITTER_PERCENT} \
     EVENT_INTERVAL=${EVENT_INTERVAL} \
     STATE_INTERVAL=${MODIFIED_STATE_INTERVAL} \
     MAX_EVENTS=${MAX_EVENTS} \
@@ -178,22 +195,23 @@ kubectl get pods
 echo "All tasks are finished."
 
 # Download data from Redis at the end of the execution.
-if [ "$GCE" ]; then
+if [ "$GCE" == "true" ]; then
   echo "Running in Google Container Engine."
   export REDIS_SERVICE_HOST=$(kubectl get services | grep redis | awk '{print $3}' | head -1)
   # export REDIS_SERVICE_HOST=$(gcloud compute forwarding-rules list | grep TCP | awk '{print $3}' | tail -1)
   export REDIS_SERVICE_PORT=6379
-  echo "REDIS_SERVICE_HOST: ${REDIS_SERVICE_HOST}"
-  echo "REDIS_SERVICE_PORT: ${REDIS_SERVICE_PORT}"
 else
   export REDIS_SERVICE_HOST=$(kubectl config view | grep server | cut -f 2- -d ":" | tr -d " " | head -1 | cut -f 2-2 -d ":" | sed -e 's/\/\///g')
   export REDIS_SERVICE_PORT=$(kubectl get service redis -o jsonpath="{.spec.ports[*].nodePort}")
 fi
 
+echo "REDIS_SERVICE_HOST: ${REDIS_SERVICE_HOST}"
+echo "REDIS_SERVICE_PORT: ${REDIS_SERVICE_PORT}"
+
 echo "Downloading data from Redis."
 ./sync-redis.erl
-mkdir -p ~/Documents/lasp/priv/evaluation/logs
-cp -Rp /tmp/logs/* ~/Documents/lasp/priv/evaluation/logs
+mkdir -p ~/lasp/priv/evaluation/logs
+cp -Rp /tmp/logs/* ~/lasp/priv/evaluation/logs
 
 # Terminate redis only if we explicitly say so, given sometimes we have
 # to aggregate the logs later if for some instance we are being port

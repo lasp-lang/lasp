@@ -232,12 +232,9 @@ handle_info({state_sync, ObjectFilterFun},
     %% Remove ourself and compute exchange peers.
     Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
 
-    % lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
-
     %% Ship buffered updates for the fanout value.
     SyncFun = fun(Peer) ->
-                      case lasp_config:get(reverse_topological_sync,
-                                           ?REVERSE_TOPOLOGICAL_SYNC) of
+                      case lasp_config:get(reverse_topological_sync, ?REVERSE_TOPOLOGICAL_SYNC) of
                           true ->
                               init_reverse_topological_sync(Peer, ObjectFilterFun, Store);
                           false ->
@@ -310,7 +307,8 @@ schedule_state_synchronization() ->
             case lasp_config:get(jitter, false) of
                 true ->
                     %% Add random jitter.
-                    MinimalInterval = round(Interval * 0.10),
+                    JitterPercent = lasp_config:get(jitter_percent, 1) * 0.01,
+                    MinimalInterval = round(Interval * JitterPercent),
 
                     case MinimalInterval of
                         0 ->

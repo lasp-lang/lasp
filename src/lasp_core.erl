@@ -492,12 +492,12 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                                     {DeltaTime, Delta} = timer:tc(fun() ->
                                         case lasp_config:get(join_decompositions, false) of
                                             true ->
-                                                lasp_type:delta(Type, state_driven, Value, Value0);
+                                                lasp_type:delta(Type, Value, {state, Value0});
                                             false ->
                                                 Value
                                         end
                                     end),
-                                    lager:info("Join decomposition took ~p microseconds", [DeltaTime]),
+                                    lasp_logger:extended("Join decomposition took ~p microseconds", [DeltaTime]),
                                     DeltaMap1 = store_delta(Origin, Counter0, Delta, DeltaMap0),
                                     {ok, increment_counter(Counter0), DeltaMap1}
                             end,

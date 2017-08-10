@@ -50,7 +50,9 @@
          thread/3,
          enforce_once/3]).
 -export([
-    length/2]).
+    length/2,
+    singleton/2,
+    unsingleton/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -257,6 +259,16 @@ wait_needed(Id, Threshold) ->
 -spec length(id(), id()) -> {ok, id()} | error().
 length(IdSet, IdSizeT) ->
     gen_server:call(?MODULE, {length, IdSet, IdSizeT}, infinity).
+
+%% @doc @todo
+-spec singleton(id(), id()) -> {ok, id()} | error().
+singleton(IdIn, IdOut) ->
+    gen_server:call(?MODULE, {singleton, IdIn, IdOut}, infinity).
+
+%% @doc @todo
+-spec unsingleton(id(), id()) -> {ok, id()} | error().
+unsingleton(IdIn, IdOut) ->
+    gen_server:call(?MODULE, {unsingleton, IdIn, IdOut}, infinity).
 
 %%%===================================================================
 %%% Administrative controls
@@ -568,6 +580,20 @@ handle_call({length, IdSet, IdSizeT}, _From, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("length"),
 
     {ok, _Pid} = ?CORE:length(IdSet, IdSizeT, Store, ?CORE_WRITE, ?CORE_READ),
+    {reply, ok, State};
+
+%% Spawn a process to compute the singleton.
+handle_call({singleton, IdIn, IdOut}, _From, #state{store=Store}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("singleton"),
+
+    {ok, _Pid} = ?CORE:singleton(IdIn, IdOut, Store, ?CORE_WRITE, ?CORE_READ),
+    {reply, ok, State};
+
+%% Spawn a process to compute the unsingleton.
+handle_call({unsingleton, IdIn, IdOut}, _From, #state{store=Store}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("unsingleton"),
+
+    {ok, _Pid} = ?CORE:unsingleton(IdIn, IdOut, Store, ?CORE_WRITE, ?CORE_READ),
     {reply, ok, State};
 
 handle_call(Msg, _From, State) ->

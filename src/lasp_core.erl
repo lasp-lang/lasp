@@ -69,7 +69,9 @@
          fold/6]).
 
 -export([
-    length/5]).
+    length/5,
+    singleton/5,
+    unsingleton/5]).
 
 %% Tracked versions, used by dataflow functions.
 -export([read_var/3,
@@ -705,7 +707,7 @@ fold_internal(orset, Value, Function, AccType, AccValue) ->
 -spec product(id(), id(), id(), store(), function(), function(),
               function()) -> {ok, pid()}.
 product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    TransFun = fun({_, T, _, LValue}, {_, T, _, RValue}) ->
+    TransFun = fun({_, T, _, LValue}, {_, _, _, RValue}) ->
             case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
@@ -807,6 +809,8 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
                 state_awset_ps ->
                     state_awset_ps_ext:map(Function, V);
                 state_ps_aworset_naive ->
+                    state_ps_type_ext:map(Function, V);
+                state_ps_singleton_orset_naive ->
                     state_ps_type_ext:map(Function, V)
             end
     end,
@@ -856,6 +860,39 @@ length(IdSet, IdSizeT, Store, BindFun, ReadFun) ->
         end,
     lasp_process:start_dag_link(
         [[{IdSet, ReadFun}], TransFun, {IdSizeT, BindFun(Store)}]).
+
+%% @doc @todo
+-spec singleton(id(), id(), store(), function(), function()) -> {ok, pid()}.
+singleton(IdIn, IdOut, Store, BindFun, ReadFun) ->
+    TransFun =
+        fun({Id, T, _, V}) ->
+            case lasp_type:get_type(T) of
+                state_ps_aworset_naive ->
+                    ObjectId =
+                        case Id of
+                            {BinaryId, _Type} ->
+                                BinaryId;
+                            _ ->
+                                Id
+                        end,
+                    state_ps_type_ext:singleton(ObjectId, V)
+            end
+        end,
+    lasp_process:start_dag_link(
+        [[{IdIn, ReadFun}], TransFun, {IdOut, BindFun(Store)}]).
+
+%% @doc @todo
+-spec unsingleton(id(), id(), store(), function(), function()) -> {ok, pid()}.
+unsingleton(IdIn, IdOut, Store, BindFun, ReadFun) ->
+    TransFun =
+        fun({_, T, _, V}) ->
+            case lasp_type:get_type(T) of
+                state_ps_singleton_orset_naive ->
+                    state_ps_type_ext:unsingleton(V)
+            end
+        end,
+    lasp_process:start_dag_link(
+        [[{IdIn, ReadFun}], TransFun, {IdOut, BindFun(Store)}]).
 
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.

@@ -51,7 +51,9 @@
          enforce_once/3]).
 
 -export([
-    length/2]).
+    length/2,
+    singleton/2,
+    unsingleton/2]).
 
 %% Public Helpers
 
@@ -59,6 +61,16 @@
 -spec length(id(), id()) -> {ok, id()} | {error, timeout}.
 length(IdSet, IdSizeT) ->
     do(length, [IdSet, IdSizeT]).
+
+%% @doc @todo
+-spec singleton(id(), id()) -> {ok, id()} | {error, timeout}.
+singleton(IdIn, IdOut) ->
+    do(singleton, [IdIn, IdOut]).
+
+%% @doc @todo
+-spec unsingleton(id(), id()) -> {ok, id()} | {error, timeout}.
+unsingleton(IdIn, IdOut) ->
+    do(unsingleton, [IdIn, IdOut]).
 
 %% @doc Invariant enforcing function; once a particular threhsold for an
 %%      object is met, then invoke the enforce function.

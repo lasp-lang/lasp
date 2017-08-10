@@ -28,12 +28,17 @@
     union/2,
     product/2,
     length/2,
+    singleton/2,
+    unsingleton/1,
     threshold_met/2,
     threshold_met_strict/2]).
 
 map(Function, {state_ps_aworset_naive, Payload}) ->
     NewPayload = map_internal(Function, Payload),
-    {state_ps_aworset_naive, NewPayload}.
+    {state_ps_aworset_naive, NewPayload};
+map(Function, {state_ps_singleton_orset_naive, Payload}) ->
+    NewPayload = map_internal(Function, Payload),
+    {state_ps_singleton_orset_naive, NewPayload}.
 
 filter(Function, {state_ps_aworset_naive, Payload}) ->
     NewPayload = filter_internal(Function, Payload),
@@ -47,11 +52,22 @@ union(
 product(
     {state_ps_aworset_naive, PayloadL}, {state_ps_aworset_naive, PayloadR}) ->
     NewPayload = product_internal(PayloadL, PayloadR),
+    {state_ps_aworset_naive, NewPayload};
+product(
+    {state_ps_aworset_naive, PayloadL}, {state_ps_size_t_naive, PayloadR}) ->
+    NewPayload = product_internal(PayloadL, PayloadR),
     {state_ps_aworset_naive, NewPayload}.
 
-length(
-    ObjectId, {state_ps_aworset_naive, PayloadR}) ->
+length(ObjectId, {state_ps_aworset_naive, PayloadR}) ->
     NewCRDT = length_internal(ObjectId, {state_ps_aworset_naive, PayloadR}),
+    NewCRDT.
+
+singleton(ObjectId, {state_ps_aworset_naive, PayloadR}) ->
+    NewCRDT = singleton_internal(ObjectId, {state_ps_aworset_naive, PayloadR}),
+    NewCRDT.
+
+unsingleton({state_ps_singleton_orset_naive, PayloadR}) ->
+    NewCRDT = unsingleton_internal({state_ps_singleton_orset_naive, PayloadR}),
     NewCRDT.
 
 threshold_met(
@@ -62,6 +78,15 @@ threshold_met(
             state_ps_size_t_naive:is_inflation(Threshold, CRDT);
         true ->
             false
+    end;
+threshold_met(
+    Threshold,
+    {state_ps_singleton_orset_naive, {ProvenanceStore, _, _}=_Payload}=CRDT) ->
+    case orddict:size(ProvenanceStore) > 1 of
+        false ->
+            state_ps_singleton_orset_naive:is_inflation(Threshold, CRDT);
+        true ->
+            false
     end.
 
 threshold_met_strict(
@@ -70,6 +95,15 @@ threshold_met_strict(
     case orddict:size(ProvenanceStore) > 1 of
         false ->
             state_ps_size_t_naive:is_strict_inflation(Threshold, CRDT);
+        true ->
+            false
+    end;
+threshold_met_strict(
+    Threshold,
+    {state_ps_singleton_orset_naive, {ProvenanceStore, _, _}=_Payload}=CRDT) ->
+    case orddict:size(ProvenanceStore) > 1 of
+        false ->
+            state_ps_singleton_orset_naive:is_strict_inflation(Threshold, CRDT);
         true ->
             false
     end.
@@ -183,12 +217,12 @@ length_internal(
     ObjectId,
     {state_ps_aworset_naive,
         {ProvenanceStore, SubsetEvents, AllEvents}=_Payload}) ->
-    {Length, LengthProvenance, NewEvents} =
+    {Length, LengthProvenance, LengthNewEvents} =
         orddict:fold(
             fun(_Elem,
                 Provenance,
                 {AccLength, AccLengthProvenance, AccNewEvents}) ->
-                {NewProvenance, LengthNewEvents} =
+                {NewProvenance, NewEvents} =
                     case AccLengthProvenance of
                         [] ->
                             {Provenance, AccNewEvents};
@@ -198,7 +232,7 @@ length_internal(
                     end,
                 {AccLength + 1,
                     NewProvenance,
-                    ordsets:union(AccNewEvents, LengthNewEvents)}
+                    ordsets:union(AccNewEvents, NewEvents)}
             end,
             {0, ordsets:new(), ordsets:new()},
             ProvenanceStore),
@@ -243,11 +277,105 @@ length_internal(
         state_ps_type:event_set_max(
             state_ps_type:event_set_union(
                 SubsetEvents,
-                state_ps_type:event_set_union(AddedEvents, NewEvents))),
+                state_ps_type:event_set_union(AddedEvents, LengthNewEvents))),
     NewAllEvents =
         state_ps_type:event_set_max(
             state_ps_type:event_set_union(
                 AllEvents,
-                state_ps_type:event_set_union(AddedEvents, NewEvents))),
+                state_ps_type:event_set_union(AddedEvents, LengthNewEvents))),
     NewPayload = {NewProvenanceStore, NewSubsetEvents, NewAllEvents},
     {state_ps_size_t_naive, NewPayload}.
+
+%% @private
+singleton_internal(
+    ObjectId,
+    {state_ps_aworset_naive,
+        {ProvenanceStore, SubsetEvents, AllEvents}=_Payload}) ->
+    {SingletonElem, SingletonProvenance, SingletonNewEvents} =
+        orddict:fold(
+            fun(Elem,
+                Provenance,
+                {AccSingletonElem, AccSingletonProvenance, AccNewEvents}) ->
+                NewElem = lists:append(AccSingletonElem, Elem),
+                {NewProvenance, NewEvents} =
+                    case AccSingletonProvenance of
+                        [] ->
+                            {Provenance, AccNewEvents};
+                        _ ->
+                            state_ps_type:cross_provenance(
+                                AccSingletonProvenance, Provenance)
+                    end,
+                {NewElem, NewProvenance, NewEvents}
+            end,
+            {[], ordsets:new(), ordsets:new()},
+            ProvenanceStore),
+    {NewSingletonProvenance, AddedEvents} =
+        ordsets:fold(
+            fun(Dot, {AccNewSingletonProvenance, AccAddedEvents}) ->
+                DotWithoutESet =
+                    ordsets:fold(
+                        fun({EventType, _EventInfo}=Event, AccDotWithoutESet) ->
+                            case EventType of
+                                state_ps_event_partial_order_event_set ->
+                                    AccDotWithoutESet;
+                                _ ->
+                                    ordsets:add_element(
+                                        Event, AccDotWithoutESet)
+                            end
+                        end,
+                        ordsets:new(),
+                        Dot),
+                NewEvent =
+                    {state_ps_event_partial_order_event_set,
+                        {ObjectId, DotWithoutESet}},
+                NewDot =
+                    state_ps_type:event_set_max(
+                        ordsets:add_element(NewEvent, Dot)),
+                NewProvenance =
+                    ordsets:add_element(NewDot, AccNewSingletonProvenance),
+                NewAddedEvents = ordsets:add_element(NewEvent, AccAddedEvents),
+                {NewProvenance, NewAddedEvents}
+            end,
+            {ordsets:new(), ordsets:new()},
+            SingletonProvenance),
+    NewProvenanceStore =
+        case NewSingletonProvenance of
+            [] ->
+                orddict:new();
+            _ ->
+                orddict:store(
+                    SingletonElem, NewSingletonProvenance, orddict:new())
+        end,
+    NewSubsetEvents =
+        state_ps_type:event_set_max(
+            state_ps_type:event_set_union(
+                SubsetEvents,
+                state_ps_type:event_set_union(
+                    AddedEvents, SingletonNewEvents))),
+    NewAllEvents =
+        state_ps_type:event_set_max(
+            state_ps_type:event_set_union(
+                AllEvents,
+                state_ps_type:event_set_union(
+                    AddedEvents, SingletonNewEvents))),
+    NewPayload = {NewProvenanceStore, NewSubsetEvents, NewAllEvents},
+    {state_ps_singleton_orset_naive, NewPayload}.
+
+%% @private
+unsingleton_internal(
+    {state_ps_singleton_orset_naive,
+        {ProvenanceStore, SubsetEvents, AllEvents}=_Payload}) ->
+    NewProvenanceStore =
+        case ProvenanceStore of
+            [] ->
+                [];
+            [{ListElem, Provenance}] ->
+                lists:foldl(
+                    fun(Elem, AccNewProvenanceStore) ->
+                        orddict:store([Elem], Provenance, AccNewProvenanceStore)
+                    end,
+                    orddict:new(),
+                    ListElem)
+        end,
+    NewPayload = {NewProvenanceStore, SubsetEvents, AllEvents},
+    {state_ps_aworset_naive, NewPayload}.

@@ -50,6 +50,7 @@ types() ->
         {pair, {state_pair, undefined}},
         {pncounter, {state_pncounter, undefined}},
         {ps_aworset, {state_ps_aworset_naive, undefined}},
+        {ps_singleton_orset, {state_ps_singleton_orset_naive, undefined}},
         {ps_size_t, {state_ps_size_t_naive, undefined}},
         {twopset, {state_twopset, undefined}}
     ].
@@ -116,6 +117,8 @@ threshold_met(Type, Value, {strict, Threshold}) ->
     case T of
         state_ps_size_t_naive ->
             state_ps_type_ext:threshold_met_strict(Threshold, Value);
+        state_ps_singleton_orset_naive ->
+            state_ps_type_ext:threshold_met_strict(Threshold, Value);
         _ ->
             T:is_strict_inflation(Threshold, Value)
     end;
@@ -123,6 +126,8 @@ threshold_met(Type, Value, Threshold) ->
     T = get_type(remove_args(Type)),
     case T of
         state_ps_size_t_naive ->
+            state_ps_type_ext:threshold_met(Threshold, Value);
+        state_ps_singleton_orset_naive ->
             state_ps_type_ext:threshold_met(Threshold, Value);
         _ ->
             T:is_inflation(Threshold, Value)

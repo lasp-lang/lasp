@@ -40,6 +40,9 @@ eunit:
 ct:
 	${REBAR} ct --suite=lasp_SUITE
 
+ct_ps:
+	${REBAR} ct --suite=lasp_ps_SUITE
+
 ad-counter-simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation ad-counter-overcounting ad-counter-partition-overcounting
 game-tournament-simulations: client-server-game-tournament-simulation peer-to-peer-game-tournament-simulation
 

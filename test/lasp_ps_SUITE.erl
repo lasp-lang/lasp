@@ -86,6 +86,7 @@ all() ->
         product_test,
         filter_union_test,
         ps_size_t_test,
+        ps_gcounter_test,
         word_to_doc_frequency_test
     ].
 
@@ -459,6 +460,71 @@ ps_size_t_test(_Config) ->
     ?assertEqual({ok, 0}, {ok, SizeTProductV1}),
 
     ok.
+
+%% @doc Test of the gcounter with ps.
+ps_gcounter_test(_Config) ->
+    {ok, {L1, _, _, _}} = lasp:declare(ps_gcounter),
+    {ok, {L2, _, _, _}} = lasp:declare(ps_gcounter),
+    {ok, {L3, _, _, _}} = lasp:declare(ps_gcounter),
+
+    %% Attempt pre, and post- dataflow variable bind operations.
+    ?assertMatch(ok, lasp:bind_to(L2, L1)),
+    {ok, {_, _, _, C2}} = lasp:update(L1, increment, a),
+    ?assertMatch(ok, lasp:bind_to(L3, L1)),
+
+    timer:sleep(4000),
+
+    %% Verify the same value is contained by all.
+    {ok, {_, _, _, C1}} = lasp:read(L3, {strict, undefined}),
+    {ok, {_, _, _, C1}} = lasp:read(L2, {strict, undefined}),
+    {ok, {_, _, _, C1}} = lasp:read(L1, {strict, undefined}),
+
+    Self = self(),
+
+    spawn_link(
+        fun() ->
+            {ok, _} = lasp:wait_needed(L1, {strict, C1}),
+            Self ! threshold_met
+        end),
+
+    ?assertMatch({ok, _}, lasp:bind(L1, C2)),
+
+    timer:sleep(4000),
+
+    %% Verify the same value is contained by all.
+    {ok, {_, _, _, C2L3}} = lasp:read(L3, {strict, undefined}),
+    ?assertEqual(C2L3, lasp_type:merge(ps_gcounter, C2, C2L3)),
+    {ok, {_, _, _, C2L2}} = lasp:read(L2, {strict, undefined}),
+    ?assertEqual(C2L2, lasp_type:merge(ps_gcounter, C2, C2L2)),
+    {ok, {_, _, _, C2L1}} = lasp:read(L1, {strict, undefined}),
+    ?assertEqual(C2L1, lasp_type:merge(ps_gcounter, C2, C2L1)),
+
+    %% Read at the S2 threshold level.
+    {ok, {_, _, _, _}} = lasp:read(L1, C2),
+
+    %% Wait for wait_needed to unblock.
+    receive
+        threshold_met ->
+            ok
+    end,
+
+    {ok, {L5, _, _, _}} = lasp:declare(ps_gcounter),
+    {ok, {L6, _, _, _}} = lasp:declare(ps_gcounter),
+
+    spawn_link(
+        fun() ->
+            {ok, _} =
+                lasp:read_any(
+                    [{L5, {strict, undefined}}, {L6, {strict, undefined}}]),
+            Self ! read_any
+        end),
+
+    {ok, _} = lasp:update(L5, increment, a),
+
+    receive
+        read_any ->
+            ok
+    end.
 
 word_to_doc_frequency_test(_Config) ->
     {ok, {SetDocIdToContents, _, _, _}} = lasp:declare(ps_aworset),

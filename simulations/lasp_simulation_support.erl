@@ -204,6 +204,15 @@ start(_Case, _Config, Options) ->
                                     _ ->
                                         ok = rpc:call(Node, lasp_config, set, [tournament_simulation_client, true]),
                                         ok = rpc:call(Node, partisan_config, set, [tag, client])
+                                end;
+                            word_frequency ->
+                                case Node of
+                                    Server ->
+                                        ok = rpc:call(Node, lasp_config, set, [word_frequency_simulation_server, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, server]);
+                                    _ ->
+                                        ok = rpc:call(Node, lasp_config, set, [word_frequency_simulation_client, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, client])
                                 end
                         end,
 
@@ -277,7 +286,7 @@ start(_Case, _Config, Options) ->
                                       [evaluation_identifier, list_to_atom(RealEvalIdentifier)]),
 
                         %% Configure max impression number.
-                        MaxImpressions = 30,
+                        MaxImpressions = 10,
                         ok = rpc:call(Node, lasp_config, set,
                                       [max_impressions, MaxImpressions])
                    end,

@@ -73,6 +73,9 @@ client-server-throughput-simulation:
 client-server-divergence-simulation:
 	${REBAR} as test ct --suite=lasp_client_server_divergence_SUITE
 
+peer-to-peer-word-frequency-simulation:
+	${REBAR} ct --suite=lasp_ps_peer_to_peer_word_to_doc_frequency_SUITE
+
 ##
 ## Release targets
 ##

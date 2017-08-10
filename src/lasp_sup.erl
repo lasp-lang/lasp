@@ -168,12 +168,16 @@ init(_Args) ->
     %% Setup the divergence example, if necessary.
     DivergenceSpecs = divergence_child_specs(),
 
+    %% Setup the word to doc frequency example, if necessary.
+    WordSpecs = word_to_doc_frequency_child_specs(),
+
     %% Assemble specs.
     Children = lists:flatten([Children0,
                               AdSpecs,
                               TournamentSpecs,
                               ThroughputSpecs,
-                              DivergenceSpecs
+                              DivergenceSpecs,
+                              WordSpecs
                              ]),
 
     {ok, {{one_for_one, 5, 10}, Children}}.
@@ -580,5 +584,58 @@ divergence_child_specs() ->
         false ->
             []
     end,
+
+    ClientSpecs ++ ServerSpecs.
+
+%% @private
+word_to_doc_frequency_child_specs() ->
+    %% Figure out who is acting as the client.
+    WordClientDefault =
+        list_to_atom(os:getenv("WORD_FREQUENCY_SIM_CLIENT", "false")),
+    WordClientEnabled =
+        application:get_env(
+            ?APP, word_frequency_simulation_client, WordClientDefault),
+    lasp_config:set(word_frequency_simulation_client, WordClientEnabled),
+    lager:info("WordClientEnabled: ~p", [WordClientEnabled]),
+
+    ClientSpecs =
+        case WordClientEnabled of
+            true ->
+                %% Start one client process per node.
+                WordFrequencyClient =
+                    {lasp_word_to_doc_frequency_client,
+                        {lasp_word_to_doc_frequency_client, start_link, []},
+                        permanent,
+                        5000,
+                        worker,
+                        [lasp_word_to_doc_frequency_client]},
+                [WordFrequencyClient];
+            false ->
+                []
+        end,
+
+    %% Figure out who is acting as the server.
+    WordServerDefault =
+        list_to_atom(os:getenv("WORD_FREQUENCY_SIM_SERVER", "false")),
+    WordServerEnabled =
+        application:get_env(
+            ?APP, word_frequency_simulation_server, WordServerDefault),
+    lasp_config:set(word_frequency_simulation_server, WordServerEnabled),
+    lager:info("WordServerEnabled: ~p", [WordServerEnabled]),
+
+    ServerSpecs =
+        case WordServerEnabled of
+            true ->
+                WordFrequencyServer =
+                    {lasp_word_to_doc_frequency_server,
+                        {lasp_word_to_doc_frequency_server, start_link, []},
+                        permanent,
+                        5000,
+                        worker,
+                        [lasp_word_to_doc_frequency_server]},
+                [WordFrequencyServer];
+            false ->
+                []
+        end,
 
     ClientSpecs ++ ServerSpecs.

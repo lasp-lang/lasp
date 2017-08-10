@@ -113,10 +113,20 @@ is_inflation(Type, Previous, Current) ->
 %% @doc Determine if a threshold is met.
 threshold_met(Type, Value, {strict, Threshold}) ->
     T = get_type(remove_args(Type)),
-    T:is_strict_inflation(Threshold, Value);
+    case T of
+        state_ps_size_t_naive ->
+            state_ps_type_ext:threshold_met_strict(Threshold, Value);
+        _ ->
+            T:is_strict_inflation(Threshold, Value)
+    end;
 threshold_met(Type, Value, Threshold) ->
     T = get_type(remove_args(Type)),
-    T:is_inflation(Threshold, Value).
+    case T of
+        state_ps_size_t_naive ->
+            state_ps_type_ext:threshold_met(Threshold, Value);
+        _ ->
+            T:is_inflation(Threshold, Value)
+    end.
 
 %% @doc Initialize a new variable for a given type.
 new(Type) ->

@@ -27,7 +27,9 @@
     filter/2,
     union/2,
     product/2,
-    length/2]).
+    length/2,
+    threshold_met/2,
+    threshold_met_strict/2]).
 
 map(Function, {state_ps_aworset_naive, Payload}) ->
     NewPayload = map_internal(Function, Payload),
@@ -51,6 +53,26 @@ length(
     ObjectId, {state_ps_aworset_naive, PayloadR}) ->
     NewCRDT = length_internal(ObjectId, {state_ps_aworset_naive, PayloadR}),
     NewCRDT.
+
+threshold_met(
+    Threshold,
+    {state_ps_size_t_naive, {ProvenanceStore, _, _}=_Payload}=CRDT) ->
+    case orddict:size(ProvenanceStore) > 1 of
+        false ->
+            state_ps_size_t_naive:is_inflation(Threshold, CRDT);
+        true ->
+            false
+    end.
+
+threshold_met_strict(
+    Threshold,
+    {state_ps_size_t_naive, {ProvenanceStore, _, _}=_Payload}=CRDT) ->
+    case orddict:size(ProvenanceStore) > 1 of
+        false ->
+            state_ps_size_t_naive:is_strict_inflation(Threshold, CRDT);
+        true ->
+            false
+    end.
 
 %% @private
 map_internal(Function, {ProvenanceStore, SubsetEvents, AllEvents}=_POEORSet) ->

@@ -49,6 +49,8 @@
          wait_needed/2,
          thread/3,
          enforce_once/3]).
+-export([
+    length/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -250,6 +252,11 @@ enforce_once(Id, Threshold, EnforceFun) ->
 -spec wait_needed(id(), threshold()) -> ok | error().
 wait_needed(Id, Threshold) ->
     gen_server:call(?MODULE, {wait_needed, Id, Threshold}, infinity).
+
+%% @doc @todo
+-spec length(id(), id()) -> {ok, id()} | error().
+length(IdSet, IdSizeT) ->
+    gen_server:call(?MODULE, {length, IdSet, IdSizeT}, infinity).
 
 %%%===================================================================
 %%% Administrative controls
@@ -554,6 +561,13 @@ handle_call({fold, Id, Function, AccId}, _From, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("fold"),
 
     {ok, _Pid} = ?CORE:fold(Id, Function, AccId, Store, ?CORE_BIND, ?CORE_READ),
+    {reply, ok, State};
+
+%% Spawn a process to compute the length.
+handle_call({length, IdSet, IdSizeT}, _From, #state{store=Store}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("length"),
+
+    {ok, _Pid} = ?CORE:length(IdSet, IdSizeT, Store, ?CORE_WRITE, ?CORE_READ),
     {reply, ok, State};
 
 handle_call(Msg, _From, State) ->

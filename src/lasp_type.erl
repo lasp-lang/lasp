@@ -50,6 +50,7 @@ types() ->
         {pair, {state_pair, undefined}},
         {pncounter, {state_pncounter, undefined}},
         {ps_aworset, {state_ps_aworset_naive, undefined}},
+        {ps_size_t, {state_ps_size_t_naive, undefined}},
         {twopset, {state_twopset, undefined}}
     ].
 

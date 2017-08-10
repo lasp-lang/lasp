@@ -26,7 +26,8 @@
     map/2,
     filter/2,
     union/2,
-    product/2]).
+    product/2,
+    length/2]).
 
 map(Function, {state_ps_aworset_naive, Payload}) ->
     NewPayload = map_internal(Function, Payload),
@@ -45,6 +46,11 @@ product(
     {state_ps_aworset_naive, PayloadL}, {state_ps_aworset_naive, PayloadR}) ->
     NewPayload = product_internal(PayloadL, PayloadR),
     {state_ps_aworset_naive, NewPayload}.
+
+length(
+    ObjectId, {state_ps_aworset_naive, PayloadR}) ->
+    NewCRDT = length_internal(ObjectId, {state_ps_aworset_naive, PayloadR}),
+    NewCRDT.
 
 %% @private
 map_internal(Function, {ProvenanceStore, SubsetEvents, AllEvents}=_POEORSet) ->
@@ -149,3 +155,77 @@ prune_provenance_store(ProvenanceStore, Events) ->
         end,
         orddict:new(),
         ProvenanceStore).
+
+%% @private
+length_internal(
+    ObjectId,
+    {state_ps_aworset_naive,
+        {ProvenanceStore, SubsetEvents, AllEvents}=_Payload}) ->
+    {Length, LengthProvenance, NewEvents} =
+        orddict:fold(
+            fun(_Elem,
+                Provenance,
+                {AccLength, AccLengthProvenance, AccNewEvents}) ->
+                {NewProvenance, LengthNewEvents} =
+                    case AccLengthProvenance of
+                        [] ->
+                            {Provenance, AccNewEvents};
+                        _ ->
+                            state_ps_type:cross_provenance(
+                                AccLengthProvenance, Provenance)
+                    end,
+                {AccLength + 1,
+                    NewProvenance,
+                    ordsets:union(AccNewEvents, LengthNewEvents)}
+            end,
+            {0, ordsets:new(), ordsets:new()},
+            ProvenanceStore),
+    {NewLengthProvenance, AddedEvents} =
+        ordsets:fold(
+            fun(Dot, {AccNewLengthProvenance, AccAddedEvents}) ->
+                DotWithoutESet =
+                    ordsets:fold(
+                        fun({EventType, _EventInfo}=Event, AccDotWithoutESet) ->
+                            case EventType of
+                                state_ps_event_partial_order_event_set ->
+                                    AccDotWithoutESet;
+                                _ ->
+                                    ordsets:add_element(
+                                        Event, AccDotWithoutESet)
+                            end
+                        end,
+                        ordsets:new(),
+                        Dot),
+                NewEvent =
+                    {state_ps_event_partial_order_event_set,
+                        {ObjectId, DotWithoutESet}},
+                NewDot =
+                    state_ps_type:event_set_max(
+                        ordsets:add_element(NewEvent, Dot)),
+                NewProvenance =
+                    ordsets:add_element(NewDot, AccNewLengthProvenance),
+                NewAddedEvents = ordsets:add_element(NewEvent, AccAddedEvents),
+                {NewProvenance, NewAddedEvents}
+            end,
+            {ordsets:new(), ordsets:new()},
+            LengthProvenance),
+    NewProvenanceStore =
+        case NewLengthProvenance of
+            [] ->
+                orddict:new();
+            _ ->
+                orddict:store(
+                    Length, NewLengthProvenance, orddict:new())
+        end,
+    NewSubsetEvents =
+        state_ps_type:event_set_max(
+            state_ps_type:event_set_union(
+                SubsetEvents,
+                state_ps_type:event_set_union(AddedEvents, NewEvents))),
+    NewAllEvents =
+        state_ps_type:event_set_max(
+            state_ps_type:event_set_union(
+                AllEvents,
+                state_ps_type:event_set_union(AddedEvents, NewEvents))),
+    NewPayload = {NewProvenanceStore, NewSubsetEvents, NewAllEvents},
+    {state_ps_size_t_naive, NewPayload}.

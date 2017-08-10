@@ -68,6 +68,9 @@
          intersection/7,
          fold/6]).
 
+-export([
+    length/5]).
+
 %% Tracked versions, used by dataflow functions.
 -export([read_var/3,
          bind_var/3]).
@@ -833,6 +836,26 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
         end
     end,
     lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
+
+%% @doc @todo
+-spec length(id(), id(), store(), function(), function()) -> {ok, pid()}.
+length(IdSet, IdSizeT, Store, BindFun, ReadFun) ->
+    TransFun =
+        fun({Id, T, _, V}) ->
+            case lasp_type:get_type(T) of
+                state_ps_aworset_naive ->
+                    ObjectId =
+                        case Id of
+                            {BinaryId, _Type} ->
+                                BinaryId;
+                            _ ->
+                                Id
+                        end,
+                    state_ps_type_ext:length(ObjectId, V)
+            end
+        end,
+    lasp_process:start_dag_link(
+        [[{IdSet, ReadFun}], TransFun, {IdSizeT, BindFun(Store)}]).
 
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.

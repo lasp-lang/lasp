@@ -50,7 +50,15 @@
 -export([invariant/3,
          enforce_once/3]).
 
+-export([
+    length/2]).
+
 %% Public Helpers
+
+%% @doc @todo
+-spec length(id(), id()) -> {ok, id()} | {error, timeout}.
+length(IdSet, IdSizeT) ->
+    do(length, [IdSet, IdSizeT]).
 
 %% @doc Invariant enforcing function; once a particular threhsold for an
 %%      object is met, then invoke the enforce function.

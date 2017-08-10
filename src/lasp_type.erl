@@ -49,6 +49,7 @@ types() ->
         {orset, {state_orset, undefined}},
         {pair, {state_pair, undefined}},
         {pncounter, {state_pncounter, undefined}},
+        {ps_aworset, {state_ps_aworset_naive, undefined}},
         {twopset, {state_twopset, undefined}}
     ].
 
@@ -141,6 +142,8 @@ update(Type, Operation, Actor, Value) ->
     end.
 
 %% @private
+get_actor(state_ps_aworset_naive, {{StorageId, _TypeId}, Actor}) ->
+    {StorageId, Actor};
 get_actor(state_awset_ps, {{StorageId, _TypeId}, Actor}) ->
     {StorageId, Actor};
 get_actor(_Type, {_Id, Actor}) ->

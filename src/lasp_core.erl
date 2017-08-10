@@ -713,7 +713,9 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                         state_orset ->
                             state_orset_ext:product(LValue, RValue);
                         state_awset_ps ->
-                            state_awset_ps_ext:product(LValue, RValue)
+                            state_awset_ps_ext:product(LValue, RValue);
+                        state_ps_aworset_naive ->
+                            state_ps_type_ext:product(LValue, RValue)
                     end
             end
     end,
@@ -773,7 +775,9 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                         state_orset ->
                             state_orset_ext:union(LValue, RValue);
                         state_awset_ps ->
-                            state_awset_ps_ext:union(LValue, RValue)
+                            state_awset_ps_ext:union(LValue, RValue);
+                        state_ps_aworset_naive ->
+                            state_ps_type_ext:union(LValue, RValue)
                     end
             end
     end,
@@ -798,7 +802,9 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
                 state_orset ->
                     state_orset_ext:map(Function, V);
                 state_awset_ps ->
-                    state_awset_ps_ext:map(Function, V)
+                    state_awset_ps_ext:map(Function, V);
+                state_ps_aworset_naive ->
+                    state_ps_type_ext:map(Function, V)
             end
     end,
     lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
@@ -821,7 +827,9 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
             state_orset ->
                 state_orset_ext:filter(Function, V);
             state_awset_ps ->
-                state_awset_ps_ext:filter(Function, V)
+                state_awset_ps_ext:filter(Function, V);
+            state_ps_aworset_naive ->
+                state_ps_type_ext:filter(Function, V)
         end
     end,
     lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).

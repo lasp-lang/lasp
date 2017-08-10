@@ -85,7 +85,8 @@ all() ->
         union_test,
         product_test,
         filter_union_test,
-        ps_size_t_test
+        ps_size_t_test,
+        word_to_doc_frequency_test
     ].
 
 -include("lasp.hrl").
@@ -457,4 +458,218 @@ ps_size_t_test(_Config) ->
 
     ?assertEqual({ok, 0}, {ok, SizeTProductV1}),
 
+    ok.
+
+word_to_doc_frequency_test(_Config) ->
+    {ok, {SetDocIdToContents, _, _, _}} = lasp:declare(ps_aworset),
+
+    ?assertMatch(
+        {ok, _},
+        lasp:update(
+            SetDocIdToContents,
+            {add, {
+                list_to_atom("id1"),
+                lists:append(
+                    "the prime minister said the focus should be on getting ",
+                    "the best brexit deal for the whole of the uk")}},
+            a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(
+            SetDocIdToContents,
+            {add, {
+                list_to_atom("id2"),
+                lists:append(
+                    "you know history may look back on today and see it as ",
+                    "the day the fate of the union was sealed")}},
+            a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(
+            SetDocIdToContents,
+            {add, {
+                list_to_atom("id3"),
+                lists:append(
+                    "the conference comes less than two months before the ",
+                    "scottish council elections")}},
+            a)),
+
+    {ok, {SetDocIdToWordsNoDup, _, _, _}} = lasp:declare(ps_aworset),
+
+    ?assertMatch(
+        ok,
+        lasp:map(
+            SetDocIdToContents,
+            fun({DocId, Contents}) ->
+                Words = string:tokens(Contents, " "),
+                WordsNoDup = sets:from_list(Words),
+                WordAndDocIds =
+                    sets:fold(
+                        fun(Word, AccWordAndDocIds) ->
+                            lists:append(AccWordAndDocIds, [{Word, DocId}])
+                        end,
+                        [],
+                        WordsNoDup),
+                WordAndDocIds
+            end,
+            SetDocIdToWordsNoDup)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    {ok, {SingletonSetWordAndDocIds, _, _, _}} =
+        lasp:declare(ps_singleton_orset),
+
+    ?assertMatch(
+        ok, lasp:singleton(SetDocIdToWordsNoDup, SingletonSetWordAndDocIds)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    {ok, {SingletonSetWordAndDocCounts, _, _, _}} =
+        lasp:declare(ps_singleton_orset),
+
+    ?assertMatch(
+        ok,
+        lasp:map(
+            SingletonSetWordAndDocIds,
+            fun(ListWordAndDocIds) ->
+                WordToDocCounts =
+                    lists:foldl(
+                        fun({Word,_DocId}, AccWordToDocCounts) ->
+                            orddict:update_counter(Word, 1, AccWordToDocCounts)
+                        end,
+                        orddict:new(),
+                        ListWordAndDocIds),
+                orddict:to_list(WordToDocCounts)
+            end,
+            SingletonSetWordAndDocCounts)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    {ok, {SetWordAndDocCountList, _, _, _}} = lasp:declare(ps_aworset),
+
+    ?assertMatch(
+        ok,
+        lasp:unsingleton(SingletonSetWordAndDocCounts, SetWordAndDocCountList)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    {ok, {SetWordAndDocCount, _, _, _}} = lasp:declare(ps_aworset),
+
+    ?assertMatch(
+        ok,
+        lasp:map(
+            SetWordAndDocCountList,
+            fun([WordToDocCount]) ->
+                WordToDocCount
+            end,
+            SetWordAndDocCount)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    {ok, {SizeTDocIdToContents, _, _, _}} = lasp:declare(ps_size_t),
+
+    ?assertMatch(
+        ok,
+        lasp:length(SetDocIdToContents, SizeTDocIdToContents)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    %% Read.
+    {ok, {_, _, _, SizeTDocIdToContents0}} =
+        lasp:read(SizeTDocIdToContents, undefined),
+
+    %% Read value.
+    SizeTDocIdToContentsV =
+        lasp_type:query(ps_size_t, SizeTDocIdToContents0),
+
+    ?assertEqual(
+        {ok, 3},
+        {ok, SizeTDocIdToContentsV}),
+
+    {ok, {SetWordToDocCountAndNumOfDocs, _, _, _}} = lasp:declare(ps_aworset),
+
+    ?assertMatch(
+        ok,
+        lasp:product(
+            SetWordAndDocCount,
+            SizeTDocIdToContents,
+            SetWordToDocCountAndNumOfDocs)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    {ok, {SetWordToDocFrequency, _, _, _}} = lasp:declare(ps_aworset),
+
+    ?assertMatch(
+        ok,
+        lasp:map(
+            SetWordToDocCountAndNumOfDocs,
+            fun({{Word, DocCount}, NumOfDocsSizeT}) ->
+                NumOfDocs = NumOfDocsSizeT,
+                {Word, DocCount / NumOfDocs}
+            end,
+            SetWordToDocFrequency)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    %% Read.
+    {ok, {_, _, _, SetWordToDocFrequency0}} =
+        lasp:read(SetWordToDocFrequency, undefined),
+
+    %% Read value.
+    SetWordToDocFrequencyV =
+        lasp_type:query(ps_aworset, SetWordToDocFrequency0),
+
+    ?assertEqual(
+        {ok, ordsets:from_list([
+            {"comes",0.3333333333333333},
+            {"be",0.3333333333333333},
+            {"sealed",0.3333333333333333},
+            {"elections",0.3333333333333333},
+            {"day",0.3333333333333333},
+            {"best",0.3333333333333333},
+            {"you",0.3333333333333333},
+            {"see",0.3333333333333333},
+            {"prime",0.3333333333333333},
+            {"on",0.6666666666666666},
+            {"it",0.3333333333333333},
+            {"was",0.3333333333333333},
+            {"than",0.3333333333333333},
+            {"minister",0.3333333333333333},
+            {"before",0.3333333333333333},
+            {"and",0.3333333333333333},
+            {"two",0.3333333333333333},
+            {"union",0.3333333333333333},
+            {"today",0.3333333333333333},
+            {"the",1.0},
+            {"said",0.3333333333333333},
+            {"months",0.3333333333333333},
+            {"focus",0.3333333333333333},
+            {"fate",0.3333333333333333},
+            {"whole",0.3333333333333333},
+            {"should",0.3333333333333333},
+            {"may",0.3333333333333333},
+            {"less",0.3333333333333333},
+            {"know",0.3333333333333333},
+            {"for",0.3333333333333333},
+            {"deal",0.3333333333333333},
+            {"brexit",0.3333333333333333},
+            {"of",0.6666666666666666},
+            {"look",0.3333333333333333},
+            {"council",0.3333333333333333},
+            {"as",0.3333333333333333},
+            {"history",0.3333333333333333},
+            {"getting",0.3333333333333333},
+            {"scottish",0.3333333333333333},
+            {"back",0.3333333333333333},
+            {"uk",0.3333333333333333},
+            {"conference",0.3333333333333333}])},
+        {ok, ordsets:from_list(sets:to_list(SetWordToDocFrequencyV))}),
     ok.

@@ -51,6 +51,7 @@ types() ->
         {pncounter, {state_pncounter, undefined}},
         {ps_aworset, {state_ps_aworset_naive, undefined}},
         {ps_gcounter, {state_ps_gcounter_naive, undefined}},
+        {ps_lwwregister, {state_ps_lwwregister_naive, undefined}},
         {ps_singleton_orset, {state_ps_singleton_orset_naive, undefined}},
         {ps_size_t, {state_ps_size_t_naive, undefined}},
         {twopset, {state_twopset, undefined}}
@@ -162,6 +163,8 @@ update(Type, Operation, Actor, Value) ->
 get_actor(state_ps_aworset_naive, {{StorageId, _TypeId}, Actor}) ->
     {StorageId, Actor};
 get_actor(state_ps_gcounter_naive, {{StorageId, _TypeId}, Actor}) ->
+    {StorageId, Actor};
+get_actor(state_ps_lwwregister_naive, {{StorageId, _TypeId}, Actor}) ->
     {StorageId, Actor};
 get_actor(state_awset_ps, {{StorageId, _TypeId}, Actor}) ->
     {StorageId, Actor};

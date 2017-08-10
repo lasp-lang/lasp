@@ -84,7 +84,8 @@ all() ->
         filter_test,
         union_test,
         product_test,
-        filter_union_test
+        filter_union_test,
+        ps_size_t_test
     ].
 
 -include("lasp.hrl").
@@ -410,5 +411,50 @@ filter_union_test(_Config) ->
     ?assertEqual(
         {ok, sets:from_list([1,2,3,4])},
         {ok, lasp_type:query(ps_aworset, SetUnionV)}),
+
+    ok.
+
+ps_size_t_test(_Config) ->
+    {ok, {SetA, _, _, _}} = lasp:declare(ps_aworset),
+    {ok, {SetB, _, _, _}} = lasp:declare(ps_aworset),
+
+    {ok, {SetProduct, _, _, _}} = lasp:declare(ps_aworset),
+
+    ?assertMatch({ok, _}, lasp:update(SetA, {add, a}, a)),
+    ?assertMatch({ok, _}, lasp:update(SetB, {add, 1}, a)),
+
+    %% Apply product.
+    ?assertMatch(ok, lasp:product(SetA, SetB, SetProduct)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    {ok, {SizeTProduct, _, _, _}} = lasp:declare(ps_size_t),
+
+    ?assertMatch(ok, lasp:length(SetProduct, SizeTProduct)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    %% Read.
+    {ok, {_, _, _, SizeTProduct0}} = lasp:read(SizeTProduct, undefined),
+
+    %% Read value.
+    SizeTProductV0 = lasp_type:query(ps_size_t, SizeTProduct0),
+
+    ?assertEqual({ok, 1}, {ok, SizeTProductV0}),
+
+    ?assertMatch({ok, _}, lasp:update(SetB, {rmv, 1}, a)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    %% Read.
+    {ok, {_, _, _, SizeTProduct1}} = lasp:read(SizeTProduct, SizeTProduct0),
+
+    %% Read value.
+    SizeTProductV1 = lasp_type:query(ps_size_t, SizeTProduct1),
+
+    ?assertEqual({ok, 0}, {ok, SizeTProductV1}),
 
     ok.

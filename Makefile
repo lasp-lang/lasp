@@ -76,6 +76,9 @@ client-server-divergence-simulation:
 peer-to-peer-word-frequency-simulation:
 	${REBAR} ct --suite=lasp_ps_peer_to_peer_word_to_doc_frequency_SUITE
 
+peer-to-peer-group-rank-simulation:
+	${REBAR} ct --suite=lasp_ps_peer_to_peer_group_rank_SUITE
+
 ##
 ## Release targets
 ##

@@ -213,6 +213,15 @@ start(_Case, _Config, Options) ->
                                     _ ->
                                         ok = rpc:call(Node, lasp_config, set, [word_frequency_simulation_client, true]),
                                         ok = rpc:call(Node, partisan_config, set, [tag, client])
+                                end;
+                            group_rank ->
+                                case Node of
+                                    Server ->
+                                        ok = rpc:call(Node, lasp_config, set, [group_rank_simulation_server, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, server]);
+                                    _ ->
+                                        ok = rpc:call(Node, lasp_config, set, [group_rank_simulation_client, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, client])
                                 end
                         end,
 

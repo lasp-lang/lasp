@@ -171,13 +171,17 @@ init(_Args) ->
     %% Setup the word to doc frequency example, if necessary.
     WordSpecs = word_to_doc_frequency_child_specs(),
 
+    %% Setup the group rank example, if necessary.
+    RankSpecs = group_rank_child_specs(),
+
     %% Assemble specs.
     Children = lists:flatten([Children0,
                               AdSpecs,
                               TournamentSpecs,
                               ThroughputSpecs,
                               DivergenceSpecs,
-                              WordSpecs
+                              WordSpecs,
+                              RankSpecs
                              ]),
 
     {ok, {{one_for_one, 5, 10}, Children}}.
@@ -634,6 +638,63 @@ word_to_doc_frequency_child_specs() ->
                         worker,
                         [lasp_word_to_doc_frequency_server]},
                 [WordFrequencyServer];
+            false ->
+                []
+        end,
+
+    ClientSpecs ++ ServerSpecs.
+
+%% @private
+group_rank_child_specs() ->
+    %% Figure out who is acting as the client.
+    RankClientDefault =
+        list_to_atom(os:getenv("GROUP_RANK_SIM_CLIENT", "false")),
+    RankClientEnabled =
+        application:get_env(
+            ?APP,
+            group_rank_simulation_client,
+            RankClientDefault),
+    lasp_config:set(group_rank_simulation_client, RankClientEnabled),
+    lager:info("RankClientEnabled: ~p", [RankClientEnabled]),
+
+    ClientSpecs =
+        case RankClientEnabled of
+            true ->
+                %% Start one client process per node.
+                GroupRankClient =
+                    {lasp_group_rank_client,
+                        {lasp_group_rank_client, start_link, []},
+                        permanent,
+                        5000,
+                        worker,
+                        [lasp_group_rank_client]},
+                [GroupRankClient];
+            false ->
+                []
+        end,
+
+    %% Figure out who is acting as the server.
+    RankServerDefault =
+        list_to_atom(os:getenv("GROUP_RANK_SIM_SERVER", "false")),
+    RankServerEnabled =
+        application:get_env(
+            ?APP,
+            group_rank_simulation_server,
+            RankServerDefault),
+    lasp_config:set(group_rank_simulation_server, RankServerEnabled),
+    lager:info("RankServerEnabled: ~p", [RankServerEnabled]),
+
+    ServerSpecs =
+        case RankServerEnabled of
+            true ->
+                GroupRankServer =
+                    {lasp_group_rank_server,
+                        {lasp_group_rank_server, start_link, []},
+                        permanent,
+                        5000,
+                        worker,
+                        [lasp_group_rank_server]},
+                [GroupRankServer];
             false ->
                 []
         end,

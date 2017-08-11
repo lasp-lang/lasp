@@ -39,7 +39,7 @@
 -include("lasp_word_to_doc_frequency.hrl").
 
 %% State record.
--record(state, {actor, expected_result}).
+-record(state, {actor, expected_result, completed_clients}).
 
 %%%===================================================================
 %%% API
@@ -85,12 +85,16 @@ init([]) ->
 
     %% Create instance for clients completion tracking
     {Id, Type} = ?COUNTER_COMPLETED_CLIENTS,
-    {ok, _} = lasp:declare(Id, Type),
+    {ok, {CompletedClients, _, _, _}} = lasp:declare(Id, Type),
 
     %% Schedule check simulation end
     schedule_check_simulation_end(),
 
-    {ok, #state{actor=Actor, expected_result=ExpectedResult}}.
+    {ok,
+        #state{
+            actor=Actor,
+            expected_result=ExpectedResult,
+            completed_clients=CompletedClients}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -126,7 +130,10 @@ handle_info(log, #state{}=State) ->
     {noreply, State};
 
 handle_info(
-    check_simulation_end, #state{expected_result=ExpectedResult}=State) ->
+    check_simulation_end,
+    #state{
+        expected_result=ExpectedResult,
+        completed_clients=CompletedClients}=State) ->
     lasp_marathon_simulations:log_message_queue_size("check_simulation_end"),
 
     %% A simulation ends for the server when the result CRDT is same as the
@@ -137,7 +144,7 @@ handle_info(
         "Checking for simulation end: current result: ~p.",
         [WordToDocFrequency]),
 
-    {ok, CounterCompletedClients} = lasp:query(?COUNTER_COMPLETED_CLIENTS),
+    {ok, CounterCompletedClients} = lasp:query(CompletedClients),
 
     lager:info(
         "Checking for simulation end: completed clients: ~p.",

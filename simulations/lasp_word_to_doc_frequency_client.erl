@@ -39,7 +39,14 @@
 -include("lasp_word_to_doc_frequency.hrl").
 
 %% State record.
--record(state, {actor, client_num, input_updates, input_id, expected_result}).
+-record(
+    state,
+    {actor,
+        client_num,
+        input_updates,
+        input_id,
+        expected_result,
+        completed_clients}).
 
 %%%===================================================================
 %%% API
@@ -89,13 +96,18 @@ init([]) ->
     %% Calculate the expected result.
     {ok, ExpectedResult} = calc_expected_result(),
 
+    %% Create instance for clients completion tracking
+    {Id, Type} = ?COUNTER_COMPLETED_CLIENTS,
+    {ok, {CompletedClients, _, _, _}} = lasp:declare(Id, Type),
+
     {ok,
         #state{
             actor=Actor,
             client_num=ClientNum,
             input_updates=0,
             input_id=SetDocIdToContents,
-            expected_result=ExpectedResult}}.
+            expected_result=ExpectedResult,
+            completed_clients=CompletedClients}}.
 
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
@@ -182,7 +194,10 @@ handle_info(
 
 handle_info(
     check_simulation_end,
-    #state{actor=Actor, expected_result=ExpectedResult}=State) ->
+    #state{
+        actor=Actor,
+        expected_result=ExpectedResult,
+        completed_clients=CompletedClients}=State) ->
     lasp_marathon_simulations:log_message_queue_size("check_simulation_end"),
 
     %% A simulation ends for clients when the value of the result CRDT is
@@ -193,12 +208,18 @@ handle_info(
         "Checking for simulation end: current result: ~p.",
         [WordToDocFrequency]),
 
+    {ok, CounterCompletedClients} = lasp:query(CompletedClients),
+
+    lager:info(
+        "Checking for simulation end: completed clients: ~p.",
+        [CounterCompletedClients]),
+
     case WordToDocFrequency == ExpectedResult of
         true ->
             lager:info("This node gets the expected result. Node ~p", [Actor]),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(),
-            lasp:update(?COUNTER_COMPLETED_CLIENTS, increment, Actor);
+            lasp:update(CompletedClients, increment, Actor);
         false ->
             schedule_check_simulation_end()
     end,

@@ -30,6 +30,7 @@
     length/2,
     singleton/2,
     unsingleton/1,
+    group_by_first/2,
     threshold_met/2,
     threshold_met_strict/2]).
 
@@ -38,7 +39,10 @@ map(Function, {state_ps_aworset_naive, Payload}) ->
     {state_ps_aworset_naive, NewPayload};
 map(Function, {state_ps_singleton_orset_naive, Payload}) ->
     NewPayload = map_internal(Function, Payload),
-    {state_ps_singleton_orset_naive, NewPayload}.
+    {state_ps_singleton_orset_naive, NewPayload};
+map(Function, {state_ps_group_by_orset_naive, Payload}) ->
+    NewPayload = map_internal(Function, Payload),
+    {state_ps_group_by_orset_naive, NewPayload}.
 
 filter(Function, {state_ps_aworset_naive, Payload}) ->
     NewPayload = filter_internal(Function, Payload),
@@ -56,6 +60,16 @@ product(
 product(
     {state_ps_aworset_naive, PayloadL}, {state_ps_size_t_naive, PayloadR}) ->
     NewPayload = product_internal(PayloadL, PayloadR),
+    {state_ps_aworset_naive, NewPayload};
+product(
+    {state_ps_size_t_naive, PayloadL},
+    {state_ps_lwwregister_naive, PayloadR}) ->
+    NewPayload = product_internal(PayloadL, PayloadR),
+    {state_ps_aworset_naive, NewPayload};
+product(
+    {state_ps_singleton_orset_naive, PayloadL},
+    {state_ps_aworset_naive, PayloadR}) ->
+    NewPayload = product_internal(PayloadL, PayloadR),
     {state_ps_aworset_naive, NewPayload}.
 
 length(ObjectId, {state_ps_aworset_naive, PayloadR}) ->
@@ -64,10 +78,19 @@ length(ObjectId, {state_ps_aworset_naive, PayloadR}) ->
 
 singleton(ObjectId, {state_ps_aworset_naive, PayloadR}) ->
     NewCRDT = singleton_internal(ObjectId, {state_ps_aworset_naive, PayloadR}),
+    NewCRDT;
+singleton(ObjectId, {state_ps_group_by_orset_naive, PayloadR}) ->
+    NewCRDT =
+        singleton_internal(ObjectId, {state_ps_group_by_orset_naive, PayloadR}),
     NewCRDT.
 
 unsingleton({state_ps_singleton_orset_naive, PayloadR}) ->
     NewCRDT = unsingleton_internal({state_ps_singleton_orset_naive, PayloadR}),
+    NewCRDT.
+
+group_by_first(ObjectId, {state_ps_aworset_naive, PayloadR}) ->
+    NewCRDT =
+        group_by_first_internal(ObjectId, {state_ps_aworset_naive, PayloadR}),
     NewCRDT.
 
 threshold_met(
@@ -85,6 +108,29 @@ threshold_met(
     case orddict:size(ProvenanceStore) > 1 of
         false ->
             state_ps_singleton_orset_naive:is_inflation(Threshold, CRDT);
+        true ->
+            false
+    end;
+threshold_met(
+    Threshold,
+    {state_ps_group_by_orset_naive, {ProvenanceStore, _, _}=_Payload}=CRDT) ->
+    {FoundDupGroup, _GroupSet} =
+        orddict:fold(
+            fun({Fst, _SndSet}, _Provenance, {AccFoundDupGroup, AccGroupSet}) ->
+                case AccFoundDupGroup of
+                    true ->
+                        {true, ordsets:new()};
+                    false ->
+                        NewFoundDupGroup = ordsets:is_element(Fst, AccGroupSet),
+                        NewGroupSet = ordsets:add_element(Fst, AccGroupSet),
+                        {NewFoundDupGroup, NewGroupSet}
+                end
+            end,
+            {false, ordsets:new()},
+            ProvenanceStore),
+    case FoundDupGroup of
+        false ->
+            state_ps_group_by_orset_naive:is_inflation(Threshold, CRDT);
         true ->
             false
     end.
@@ -106,6 +152,29 @@ threshold_met_strict(
             state_ps_singleton_orset_naive:is_strict_inflation(Threshold, CRDT);
         true ->
             false
+    end;
+threshold_met_strict(
+    Threshold,
+    {state_ps_group_by_orset_naive, {ProvenanceStore, _, _}=_Payload}=CRDT) ->
+    {FoundDupGroup, _GroupSet} =
+        orddict:fold(
+            fun({Fst, _SndSet}, _Provenance, {AccFoundDupGroup, AccGroupSet}) ->
+                case AccFoundDupGroup of
+                    true ->
+                        {true, ordsets:new()};
+                    false ->
+                        NewFoundDupGroup = ordsets:is_element(Fst, AccGroupSet),
+                        NewGroupSet = ordsets:add_element(Fst, AccGroupSet),
+                        {NewFoundDupGroup, NewGroupSet}
+                end
+            end,
+            {false, ordsets:new()},
+            ProvenanceStore),
+    case FoundDupGroup of
+        false ->
+            state_ps_group_by_orset_naive:is_strict_inflation(Threshold, CRDT);
+        true ->
+            false
     end.
 
 %% @private
@@ -124,7 +193,8 @@ map_internal(Function, {ProvenanceStore, SubsetEvents, AllEvents}=_POEORSet) ->
     {MapProvenanceStore, SubsetEvents, AllEvents}.
 
 %% @private
-filter_internal(Function, {ProvenanceStore, SubsetEvents, AllEvents}=_POEORSet) ->
+filter_internal(
+    Function, {ProvenanceStore, SubsetEvents, AllEvents}=_POEORSet) ->
     FilterProvenanceStore =
         orddict:fold(
             fun(Elem, Provenance, AccInFilterProvenanceStore) ->
@@ -289,14 +359,21 @@ length_internal(
 %% @private
 singleton_internal(
     ObjectId,
-    {state_ps_aworset_naive,
-        {ProvenanceStore, SubsetEvents, AllEvents}=_Payload}) ->
+    {_Type, {ProvenanceStore, SubsetEvents, AllEvents}=_Payload}) ->
     {SingletonElem, SingletonProvenance, SingletonNewEvents} =
         orddict:fold(
             fun(Elem,
                 Provenance,
                 {AccSingletonElem, AccSingletonProvenance, AccNewEvents}) ->
-                NewElem = lists:append(AccSingletonElem, Elem),
+                %% @todo HACK!!!
+                RealElem =
+                    case Elem of
+                        [H|T] ->
+                            [H|T];
+                        _ ->
+                            [Elem]
+                    end,
+                NewElem = lists:append(AccSingletonElem, RealElem),
                 {NewProvenance, NewEvents} =
                     case AccSingletonProvenance of
                         [] ->
@@ -379,3 +456,99 @@ unsingleton_internal(
         end,
     NewPayload = {NewProvenanceStore, SubsetEvents, AllEvents},
     {state_ps_aworset_naive, NewPayload}.
+
+%% @private
+group_by_first_internal(
+    ObjectId,
+    {state_ps_aworset_naive,
+        {ProvenanceStore, SubsetEvents, AllEvents}=_Payload}) ->
+    FstToSndSetAndCrossedProvenancesAndNewEvents =
+        orddict:fold(
+            fun({Fst, Snd}=_Elem, Provenance, AccTempGroupBy) ->
+                orddict:update(
+                    Fst,
+                    fun({OldSndSet, OldCrossedProvenances, OldNewEvents}) ->
+                        {NewCrossedProvenance, NewNewEvents} =
+                            state_ps_type:cross_provenance(
+                                OldCrossedProvenances, Provenance),
+                        {ordsets:add_element(Snd, OldSndSet),
+                            NewCrossedProvenance,
+                            ordsets:union(OldNewEvents, NewNewEvents)}
+                    end,
+                    {ordsets:add_element(Snd, ordsets:new()),
+                        Provenance,
+                        ordsets:new()},
+                    AccTempGroupBy)
+            end,
+            orddict:new(),
+            ProvenanceStore),
+    FstToSndSetAndNewCrossedProvenancesAndNewEventsWithAddedEvents =
+        orddict:map(
+            fun(_Fst, {SndSet, CrossedProvenances, NewEvents}) ->
+                {NewCrossedProvenances, NewEventsWithAddedEvents} =
+                    ordsets:fold(
+                        fun(Dot, {AccNewSingletonProvenance, AccAddedEvents}) ->
+                            DotWithoutESet =
+                                ordsets:fold(
+                                    fun({EventType, _EventInfo}=Event,
+                                        AccDotWithoutESet) ->
+                                        case EventType of
+                                            state_ps_event_partial_order_event_set ->
+                                                AccDotWithoutESet;
+                                            _ ->
+                                                ordsets:add_element(
+                                                    Event, AccDotWithoutESet)
+                                        end
+                                    end,
+                                    ordsets:new(),
+                                    Dot),
+                            NewEvent =
+                                {state_ps_event_partial_order_event_set,
+                                    {ObjectId, DotWithoutESet}},
+                            NewDot = ordsets:add_element(NewEvent, Dot),
+                            NewProvenance =
+                                ordsets:add_element(
+                                    NewDot, AccNewSingletonProvenance),
+                            NewAddedEvents =
+                                ordsets:add_element(NewEvent, AccAddedEvents),
+                            {NewProvenance,
+                                ordsets:union(NewEvents, NewAddedEvents)}
+                        end,
+                        {ordsets:new(), ordsets:new()},
+                        CrossedProvenances),
+                {SndSet, NewCrossedProvenances, NewEventsWithAddedEvents}
+            end,
+            FstToSndSetAndCrossedProvenancesAndNewEvents),
+    {NewProvenanceStore, NewSubsetEvents, NewAllEvents} =
+        orddict:fold(
+            fun(Fst,
+                {SndSet, SndCrossedProvenances, SndNewEventsWithAddedEvents},
+                {AccNewProvenanceStore, AccNewSubsetEvents, AccNewAllEvents}) ->
+                NewAccNewProvenanceStore =
+                    case SndCrossedProvenances of
+                        [] ->
+                            AccNewProvenanceStore;
+                        _ ->
+                            orddict:store(
+                                {Fst, SndSet},
+                                SndCrossedProvenances,
+                                AccNewProvenanceStore)
+                    end,
+                NewAccNewSubsetEvents =
+                    state_ps_type:event_set_max(
+                        state_ps_type:event_set_union(
+                            AccNewSubsetEvents,
+                            SndNewEventsWithAddedEvents)),
+                NewAccNewAllEvents =
+                    state_ps_type:event_set_max(
+                        state_ps_type:event_set_union(
+                            AccNewAllEvents,
+                            SndNewEventsWithAddedEvents)),
+                {NewAccNewProvenanceStore,
+                    NewAccNewSubsetEvents,
+                    NewAccNewAllEvents}
+            end,
+            {orddict:new(), SubsetEvents, AllEvents},
+            FstToSndSetAndNewCrossedProvenancesAndNewEventsWithAddedEvents),
+    {state_ps_group_by_orset_naive,
+        {NewProvenanceStore, NewSubsetEvents, NewAllEvents}}.

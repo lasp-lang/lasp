@@ -71,7 +71,8 @@
 -export([
     length/5,
     singleton/5,
-    unsingleton/5]).
+    unsingleton/5,
+    group_by_first/5]).
 
 %% Tracked versions, used by dataflow functions.
 -export([read_var/3,
@@ -720,6 +721,10 @@ product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
                         state_awset_ps ->
                             state_awset_ps_ext:product(LValue, RValue);
                         state_ps_aworset_naive ->
+                            state_ps_type_ext:product(LValue, RValue);
+                        state_ps_size_t_naive ->
+                            state_ps_type_ext:product(LValue, RValue);
+                        state_ps_singleton_orset_naive ->
                             state_ps_type_ext:product(LValue, RValue)
                     end
             end
@@ -811,6 +816,8 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
                 state_ps_aworset_naive ->
                     state_ps_type_ext:map(Function, V);
                 state_ps_singleton_orset_naive ->
+                    state_ps_type_ext:map(Function, V);
+                state_ps_group_by_orset_naive ->
                     state_ps_type_ext:map(Function, V)
             end
     end,
@@ -846,15 +853,15 @@ filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
 length(IdSet, IdSizeT, Store, BindFun, ReadFun) ->
     TransFun =
         fun({Id, T, _, V}) ->
+            ObjectId =
+                case Id of
+                    {BinaryId, _Type} ->
+                        BinaryId;
+                    _ ->
+                        Id
+                end,
             case lasp_type:get_type(T) of
                 state_ps_aworset_naive ->
-                    ObjectId =
-                        case Id of
-                            {BinaryId, _Type} ->
-                                BinaryId;
-                            _ ->
-                                Id
-                        end,
                     state_ps_type_ext:length(ObjectId, V)
             end
         end,
@@ -866,15 +873,17 @@ length(IdSet, IdSizeT, Store, BindFun, ReadFun) ->
 singleton(IdIn, IdOut, Store, BindFun, ReadFun) ->
     TransFun =
         fun({Id, T, _, V}) ->
+            ObjectId =
+                case Id of
+                    {BinaryId, _Type} ->
+                        BinaryId;
+                    _ ->
+                        Id
+                end,
             case lasp_type:get_type(T) of
                 state_ps_aworset_naive ->
-                    ObjectId =
-                        case Id of
-                            {BinaryId, _Type} ->
-                                BinaryId;
-                            _ ->
-                                Id
-                        end,
+                    state_ps_type_ext:singleton(ObjectId, V);
+                state_ps_group_by_orset_naive ->
                     state_ps_type_ext:singleton(ObjectId, V)
             end
         end,
@@ -889,6 +898,27 @@ unsingleton(IdIn, IdOut, Store, BindFun, ReadFun) ->
             case lasp_type:get_type(T) of
                 state_ps_singleton_orset_naive ->
                     state_ps_type_ext:unsingleton(V)
+            end
+        end,
+    lasp_process:start_dag_link(
+        [[{IdIn, ReadFun}], TransFun, {IdOut, BindFun(Store)}]).
+
+%% @doc @todo
+-spec group_by_first(
+    id(), id(), store(), function(), function()) -> {ok, pid()}.
+group_by_first(IdIn, IdOut, Store, BindFun, ReadFun) ->
+    TransFun =
+        fun({Id, T, _, V}) ->
+            ObjectId =
+                case Id of
+                    {BinaryId, _Type} ->
+                        BinaryId;
+                    _ ->
+                        Id
+                end,
+            case lasp_type:get_type(T) of
+                state_ps_aworset_naive ->
+                    state_ps_type_ext:group_by_first(ObjectId, V)
             end
         end,
     lasp_process:start_dag_link(

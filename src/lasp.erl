@@ -53,7 +53,8 @@
 -export([
     length/2,
     singleton/2,
-    unsingleton/2]).
+    unsingleton/2,
+    group_by_first/2]).
 
 %% Public Helpers
 
@@ -71,6 +72,11 @@ singleton(IdIn, IdOut) ->
 -spec unsingleton(id(), id()) -> {ok, id()} | {error, timeout}.
 unsingleton(IdIn, IdOut) ->
     do(unsingleton, [IdIn, IdOut]).
+
+%% @doc @todo
+-spec group_by_first(id(), id()) -> ok | {error, timeout}.
+group_by_first(IdIn, IdOut) ->
+    do(group_by_first, [IdIn, IdOut]).
 
 %% @doc Invariant enforcing function; once a particular threhsold for an
 %%      object is met, then invoke the enforce function.

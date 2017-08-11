@@ -88,7 +88,8 @@ all() ->
         ps_size_t_test,
         ps_gcounter_test,
         ps_lwwregister_test,
-        word_to_doc_frequency_test
+        word_to_doc_frequency_test,
+        group_rank_test
     ].
 
 -include("lasp.hrl").
@@ -804,4 +805,304 @@ word_to_doc_frequency_test(_Config) ->
             {"uk",0.3333333333333333},
             {"conference",0.3333333333333333}])},
         {ok, ordsets:from_list(sets:to_list(SetWordToDocFrequencyV))}),
+    ok.
+
+group_rank_test(_Config) ->
+    %% [{user1, 1000}, {user2, 2000}, ...]
+    {ok, {SetUserIdToPoints, _, _, _}} = lasp:declare(ps_aworset),
+    %% [{group1, {user1, user2}}, {group2, {user3}}, ...]
+    {ok, {SetGroupIdToUsers, _, _, _}} = lasp:declare(ps_aworset),
+    %% [[5,15,30,100]] -> top 5%: Gold, next 10%: Silver. next 15%: Bronze and
+    %%     next 70%: Black
+    {ok, {RegisterDivider, _, _, _}} = lasp:declare(ps_lwwregister),
+
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetUserIdToPoints, {add, {list_to_atom("user1"), 1000}}, a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetUserIdToPoints, {add, {list_to_atom("user2"), 1000}}, a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetUserIdToPoints, {add, {list_to_atom("user3"), 1000}}, a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetUserIdToPoints, {add, {list_to_atom("user4"), 1000}}, a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetUserIdToPoints, {add, {list_to_atom("user5"), 1000}}, a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetUserIdToPoints, {add, {list_to_atom("user6"), 1000}}, a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetUserIdToPoints, {add, {list_to_atom("user7"), 1000}}, a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetUserIdToPoints, {add, {list_to_atom("user8"), 1000}}, a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetUserIdToPoints, {add, {list_to_atom("user9"), 1000}}, a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(SetUserIdToPoints, {add, {list_to_atom("user10"), 1000}}, a)),
+
+    ?assertMatch(
+        {ok, _},
+        lasp:update(
+            SetGroupIdToUsers,
+            {add,
+                {list_to_atom("group1"),
+                    ordsets:add_element(
+                        list_to_atom("user2"),
+                        ordsets:add_element(
+                            list_to_atom("user1"), ordsets:new()))}},
+            a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(
+            SetGroupIdToUsers,
+            {add,
+                {list_to_atom("group2"),
+                    ordsets:add_element(
+                        list_to_atom("user5"),
+                        ordsets:add_element(
+                            list_to_atom("user4"),
+                            ordsets:add_element(
+                                list_to_atom("user3"), ordsets:new())))}},
+            a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(
+            SetGroupIdToUsers,
+            {add,
+                {list_to_atom("group3"),
+                    ordsets:add_element(
+                        list_to_atom("user6"), ordsets:new())}},
+            a)),
+    ?assertMatch(
+        {ok, _},
+        lasp:update(
+            SetGroupIdToUsers,
+            {add,
+                {list_to_atom("group4"),
+                    ordsets:add_element(
+                        list_to_atom("user10"),
+                        ordsets:add_element(
+                            list_to_atom("user9"),
+                            ordsets:add_element(
+                                list_to_atom("user8"),
+                                ordsets:add_element(
+                                    list_to_atom("user7"), ordsets:new()))))}},
+            a)),
+
+    ?assertMatch(
+        {ok, _},
+        %% top 25%: Gold, next 25%: Silver. next 50%: Bronze
+        lasp:update(RegisterDivider, {set, [25, 50, 100]}, a)),
+
+    {ok, {SetGroupAndUsers, _, _, _}} = lasp:declare(ps_aworset),
+
+    %% Apply product.
+    ?assertMatch(
+        ok,
+        lasp:product(SetGroupIdToUsers, SetUserIdToPoints, SetGroupAndUsers)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    {ok, {SetGroupAndItsUsers, _, _, _}} = lasp:declare(ps_aworset),
+
+    %% Apply filter.
+    ?assertMatch(
+        ok,
+        lasp:filter(
+            SetGroupAndUsers,
+            fun({{_GroupId, UserSet}, {UserId, _Points}}) ->
+                ordsets:is_element(UserId, UserSet)
+            end,
+            SetGroupAndItsUsers)),
+
+    %% Wait.
+    timer:sleep(400),
+
+    {ok, {GroupBySetGroupAndItsUsers, _, _, _}} =
+        lasp:declare(ps_group_by_orset),
+
+    %% Apply group_by.
+    ?assertMatch(
+        ok,
+        lasp:group_by_first(SetGroupAndItsUsers, GroupBySetGroupAndItsUsers)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    {ok, {GroupBySetGroupAndItsPoints, _, _, _}} =
+        lasp:declare(ps_group_by_orset),
+
+    %% Apply map.
+    ?assertMatch(
+        ok,
+        lasp:map(
+            GroupBySetGroupAndItsUsers,
+            fun({{GroupId, _UserSet}, UserIdAndPointsSet}) ->
+                GroupPoints =
+                    ordsets:fold(
+                        fun({_UserId, Points}, AccGroupPoints) ->
+                            AccGroupPoints + Points
+                        end,
+                        0,
+                        UserIdAndPointsSet),
+                {GroupId, GroupPoints}
+            end,
+            GroupBySetGroupAndItsPoints)),
+
+    %% Wait.
+    timer:sleep(400),
+
+%%    {ok, {GroupBySetGroupAndItsPointsForSingleton, _, _, _}} =
+%%        lasp:declare(ps_group_by_orset),
+%%
+%%    %% Apply map.
+%%    ?assertMatch(
+%%        ok,
+%%        lasp:map(
+%%            GroupBySetGroupAndItsPoints,
+%%            fun(X) ->
+%%                [X]
+%%            end,
+%%            GroupBySetGroupAndItsPointsForSingleton)),
+%%
+%%    %% Wait.
+%%    timer:sleep(400),
+
+    {ok, {SingletonGroupAndItsPoints, _, _, _}} =
+        lasp:declare(ps_singleton_orset),
+
+    ?assertMatch(
+        ok,
+        lasp:singleton(
+            GroupBySetGroupAndItsPoints,
+            SingletonGroupAndItsPoints)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    {ok, {SizeTSetGroupIdToUsers, _, _, _}} = lasp:declare(ps_size_t),
+
+    %% Apply length.
+    ?assertMatch(ok, lasp:length(SetGroupIdToUsers, SizeTSetGroupIdToUsers)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    %% Read.
+    {ok, {_, _, _, SizeTSetGroupIdToUsers0}} =
+        lasp:read(SizeTSetGroupIdToUsers, undefined),
+    %% Read value.
+    SizeTSetGroupIdToUsersV0 =
+        lasp_type:query(ps_size_t, SizeTSetGroupIdToUsers0),
+    ?assertEqual({ok, 4}, {ok, SizeTSetGroupIdToUsersV0}),
+
+    {ok, {SetGroupSizeAndDivider, _, _, _}} = lasp:declare(ps_aworset),
+
+    %% Apply product.
+    ?assertMatch(
+        ok,
+        lasp:product(
+            SizeTSetGroupIdToUsers, RegisterDivider, SetGroupSizeAndDivider)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    {ok, {SetDividerWithRank, _, _, _}} = lasp:declare(ps_aworset),
+
+    %% Apply map.
+    ?assertMatch(
+        ok,
+        lasp:map(
+            SetGroupSizeAndDivider,
+            fun({SizeTNumOfGroups, Divider}) ->
+                NumOfGroups = SizeTNumOfGroups,
+                RankDivider =
+                    lists:foldl(
+                        fun(Percents, AccNewDivider) ->
+                            Rank = (Percents * NumOfGroups) div 100,
+                            AccNewDivider ++ [Rank]
+                        end,
+                        [],
+                        Divider),
+                RankDivider
+            end,
+            SetDividerWithRank)),
+
+    %% Wait.
+    timer:sleep(400),
+
+    {ok, {SetGroupPointsAndDivider, _, _, _}} = lasp:declare(ps_aworset),
+
+    %% Apply product.
+    ?assertMatch(
+        ok,
+        lasp:product(
+            SingletonGroupAndItsPoints,
+            SetDividerWithRank,
+            SetGroupPointsAndDivider)),
+
+    %% Sleep.
+    timer:sleep(400),
+
+    {ok, {SetGroupAndItsRank, _, _, _}} = lasp:declare(ps_aworset),
+
+    %% Apply map.
+    ?assertMatch(
+        ok,
+        lasp:map(
+            SetGroupPointsAndDivider,
+            fun({ListGroupAndItsPoints, DividerWithRank}) ->
+                SortedListGroupAndItsPoints =
+                    lists:sort(
+                        fun({_GroupIdA, GroupPointsA},
+                            {_GroupIdB, GroupPointsB}) ->
+                            GroupPointsA =< GroupPointsB
+                        end,
+                        ListGroupAndItsPoints),
+                {GroupAndItsRank, _Index, _Rank} =
+                    lists:foldl(
+                        fun({GroupId, _GroupPoints},
+                            {AccGroupAndItsRank, AccIndex, AccRank}) ->
+                            CurRank = lists:nth(AccRank, DividerWithRank),
+                            NewGroupAndItsRank =
+                                ordsets:add_element(
+                                    {GroupId, AccRank}, AccGroupAndItsRank),
+                            NewRank =
+                                case AccIndex >= CurRank of
+                                    true ->
+                                        AccRank + 1;
+                                    false ->
+                                        AccRank
+                                end,
+                            NewIndex = AccIndex + 1,
+                            {NewGroupAndItsRank, NewIndex, NewRank}
+                        end,
+                        {ordsets:new(), 1, 1},
+                        SortedListGroupAndItsPoints),
+                GroupAndItsRank
+            end,
+            SetGroupAndItsRank)),
+
+    %% Wait.
+    timer:sleep(400),
+
+    %% Read.
+    {ok, {_, _, _, SetGroupAndItsRank0}} =
+        lasp:read(SetGroupAndItsRank, undefined),
+
+    %% Read value.
+    SetGroupAndItsRankV =
+        lasp_type:query(ps_aworset, SetGroupAndItsRank0),
+
+    ?assertEqual(
+        {ok, sets:from_list([[{group1,2}, {group2,3}, {group3,1}, {group4,3}]])},
+        {ok, SetGroupAndItsRankV}),
     ok.

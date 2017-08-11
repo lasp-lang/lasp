@@ -52,7 +52,8 @@
 -export([
     length/2,
     singleton/2,
-    unsingleton/2]).
+    unsingleton/2,
+    group_by_first/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -269,6 +270,11 @@ singleton(IdIn, IdOut) ->
 -spec unsingleton(id(), id()) -> {ok, id()} | error().
 unsingleton(IdIn, IdOut) ->
     gen_server:call(?MODULE, {unsingleton, IdIn, IdOut}, infinity).
+
+%% @doc @todo
+-spec group_by_first(id(), id()) -> ok | error().
+group_by_first(IdIn, IdOut) ->
+    gen_server:call(?MODULE, {group_by_first, IdIn, IdOut}, infinity).
 
 %%%===================================================================
 %%% Administrative controls
@@ -594,6 +600,16 @@ handle_call({unsingleton, IdIn, IdOut}, _From, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("unsingleton"),
 
     {ok, _Pid} = ?CORE:unsingleton(IdIn, IdOut, Store, ?CORE_WRITE, ?CORE_READ),
+    {reply, ok, State};
+
+%% Spawn a process to compute the group_by.
+handle_call({group_by_first, IdIn, IdOut},
+    _From,
+    #state{store=Store}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("group_by_first"),
+
+    {ok, _Pid} =
+        ?CORE:group_by_first(IdIn, IdOut, Store, ?CORE_WRITE, ?CORE_READ),
     {reply, ok, State};
 
 handle_call(Msg, _From, State) ->

@@ -1,5 +1,5 @@
 -define(
-INPUT_DATA,
+    INPUT_DATA,
     [
         [{"id1", "a b c d b"}, {"id2", "b c a c"}, {"id3", "d e f g h"},
             {"id4", "a f t e f"}, {"id5", "w q q r t t d"},
@@ -21,9 +21,9 @@ INPUT_DATA,
 -define(SET_WORD_TO_DOC_COUNT_LIST, {<<"word_to_doc_count_list">>, ps_aworset}).
 -define(SET_WORD_TO_DOC_COUNT, {<<"word_to_doc_count">>, ps_aworset}).
 -define(
-SIZE_T_DOC_ID_TO_CONTENTS, {<<"size_t_doc_id_to_contents">>, ps_size_t}).
+    SIZE_T_DOC_ID_TO_CONTENTS, {<<"size_t_doc_id_to_contents">>, ps_size_t}).
 -define(
-SET_WORD_TO_DOC_COUNT_AND_NUM_OF_DOCS,
+    SET_WORD_TO_DOC_COUNT_AND_NUM_OF_DOCS,
     {<<"word_to_doc_count_and_num_of_docs">>, ps_aworset}).
 
 %% Result set id.

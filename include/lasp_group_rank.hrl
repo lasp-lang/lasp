@@ -1,5 +1,5 @@
 -define(
-INPUT_DATA,
+    INPUT_DATA,
     [
         [{"user1", 1000}, {"user4", 1000}, {"user7", 1000},
             {"group1", ["user1", "user4"]}, {"user1", 2000}, {"user4", 3000},

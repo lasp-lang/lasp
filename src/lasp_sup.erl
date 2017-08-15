@@ -174,6 +174,9 @@ init(_Args) ->
     %% Setup the group rank example, if necessary.
     RankSpecs = group_rank_child_specs(),
 
+    %% Setup the group-by stress example, if necessary.
+    StressSpecs = group_by_stress_child_specs(),
+
     %% Assemble specs.
     Children = lists:flatten([Children0,
                               AdSpecs,
@@ -181,7 +184,8 @@ init(_Args) ->
                               ThroughputSpecs,
                               DivergenceSpecs,
                               WordSpecs,
-                              RankSpecs
+                              RankSpecs,
+                              StressSpecs
                              ]),
 
     {ok, {{one_for_one, 5, 10}, Children}}.
@@ -695,6 +699,66 @@ group_rank_child_specs() ->
                         worker,
                         [lasp_group_rank_server]},
                 [GroupRankServer];
+            false ->
+                []
+        end,
+
+    ClientSpecs ++ ServerSpecs.
+
+%% @private
+group_by_stress_child_specs() ->
+%%    ImpressionNumber = 100,
+%%    lasp_config:set(max_impressions, ImpressionNumber),
+
+    %% Figure out who is acting as the client.
+    StressClientDefault =
+        list_to_atom(os:getenv("GROUP_BY_STRESS_SIM_CLIENT", "false")),
+    StressClientEnabled =
+        application:get_env(
+            ?APP,
+            group_by_stress_simulation_client,
+            StressClientDefault),
+    lasp_config:set(group_by_stress_simulation_client, StressClientEnabled),
+    lager:info("StressClientEnabled: ~p", [StressClientEnabled]),
+
+    ClientSpecs =
+        case StressClientEnabled of
+            true ->
+                %% Start one client process per node.
+                GroupByStressClient =
+                    {lasp_group_by_stress_client,
+                        {lasp_group_by_stress_client, start_link, []},
+                        permanent,
+                        5000,
+                        worker,
+                        [lasp_group_by_stress_client]},
+                [GroupByStressClient];
+            false ->
+                []
+        end,
+
+    %% Figure out who is acting as the server.
+    StressServerDefault =
+        list_to_atom(os:getenv("GROUP_BY_STRESS_SIM_SERVER", "false")),
+    StressServerEnabled =
+        application:get_env(
+            ?APP,
+            group_by_stress_simulation_server,
+            StressServerDefault),
+    lasp_config:set(group_by_stress_simulation_server, StressServerEnabled),
+    lager:info("StressServerEnabled: ~p", [StressServerEnabled]),
+
+    ServerSpecs =
+        case StressServerEnabled of
+            true ->
+                GroupByStressServer =
+                    {lasp_group_by_stress_server,
+                        {lasp_group_by_stress_server, start_link, []},
+                        permanent,
+                        5000,
+                        worker,
+                        [lasp_group_by_stress_server]},
+                [GroupByStressServer];
             false ->
                 []
         end,

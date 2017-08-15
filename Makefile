@@ -40,9 +40,6 @@ eunit:
 ct:
 	${REBAR} ct --suite=lasp_SUITE
 
-ct_ps:
-	${REBAR} ct --suite=lasp_ps_SUITE
-
 ad-counter-simulations: client-server-ad-counter-simulation peer-to-peer-ad-counter-simulation ad-counter-overcounting ad-counter-partition-overcounting
 game-tournament-simulations: client-server-game-tournament-simulation peer-to-peer-game-tournament-simulation
 
@@ -73,11 +70,21 @@ client-server-throughput-simulation:
 client-server-divergence-simulation:
 	${REBAR} as test ct --suite=lasp_client_server_divergence_SUITE
 
+check_ps: test_ps xref dialyzer
+
+test_ps: ct_ps eunit peer-to-peer-group-by-stress-simulation peer-to-peer-word-frequency-simulation peer-to-peer-group-rank-simulation
+
+ct_ps:
+	${REBAR} ct --suite=lasp_ps_SUITE
+
 peer-to-peer-word-frequency-simulation:
 	${REBAR} ct --suite=lasp_ps_peer_to_peer_word_to_doc_frequency_SUITE
 
 peer-to-peer-group-rank-simulation:
 	${REBAR} ct --suite=lasp_ps_peer_to_peer_group_rank_SUITE
+
+peer-to-peer-group-by-stress-simulation:
+	${REBAR} ct --suite=lasp_ps_peer_to_peer_group_by_stress_SUITE
 
 ##
 ## Release targets

@@ -31,7 +31,7 @@
          all/0]).
 
 %% tests
--compile([export_all]).
+%%-compile([export_all]).
 
 -include("lasp.hrl").
 

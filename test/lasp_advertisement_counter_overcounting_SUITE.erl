@@ -31,7 +31,7 @@
          all/0]).
 
 %% tests
--compile([export_all]).
+%%-compile([export_all]).
 
 -include("lasp.hrl").
 
@@ -150,4 +150,3 @@ clients() ->
         end,
         lists:seq(?MIN_POW, ?MAX_POW)
     ).
-

@@ -71,7 +71,7 @@ handle_call(get, _From, #state{clock=LastClock}=State) ->
     NewClock = LastClock + 1,
     {reply, {ok, NewClock}, State#state{clock=NewClock}};
 handle_call({update, IncomingClock}, _From, #state{clock=LastClock}=State) ->
-    MergedClock = max(LastClock, IncomingClock) + 1,
+    MergedClock = max(LastClock, IncomingClock),
     {reply, {ok, MergedClock}, State#state{clock=MergedClock}};
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),

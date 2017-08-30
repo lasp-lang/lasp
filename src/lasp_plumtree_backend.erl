@@ -185,6 +185,7 @@ handle_info(heartbeat, State) ->
     case lists:member(Node, Servers) of
         true ->
             %% Generate message with monotonically increasing integer.
+            %% TODO: This can probably be the causal vclock.
             Counter = time_compat:unique_integer([monotonic, positive]),
 
             %% Make sure the node prefixes the timestamp with it's own

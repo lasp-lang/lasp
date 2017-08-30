@@ -215,23 +215,23 @@
 
 -define(CLOCK_INIT(BackendActor), fun(Metadata) ->
                                     VClock = lasp_vclock:increment(BackendActor, lasp_vclock:fresh()),
-                                    orddict:store(clock, VClock, Metadata)
+                                    orddict:store(vclock, VClock, Metadata)
                                   end).
 
 -define(CLOCK_INCR(BackendActor), fun(Metadata) ->
-                                        Clock = orddict:fetch(clock, Metadata),
+                                        Clock = orddict:fetch(vclock, Metadata),
                                         VClock = lasp_vclock:increment(BackendActor, Clock),
-                                        orddict:store(clock, VClock, Metadata)
+                                        orddict:store(vclock, VClock, Metadata)
                                   end).
 
 -define(CLOCK_MERG, fun(Metadata) ->
             %% Incoming request has to have a clock, given it's coming
             %% in the broadcast path.
-            TheirClock = orddict:fetch(clock, Metadata0),
+            TheirClock = orddict:fetch(vclock, Metadata0),
 
             %% We may not have a clock yet, if we are first initializing
             %% an object.
-            OurClock = case orddict:find(clock, Metadata) of
+            OurClock = case orddict:find(vclock, Metadata) of
                 {ok, Clock} ->
                     Clock;
                 _ ->
@@ -240,5 +240,5 @@
 
             %% Merge the clocks.
             Merged = lasp_vclock:merge([TheirClock, OurClock]),
-            orddict:store(clock, Merged, Metadata)
+            orddict:store(vclock, Merged, Metadata)
     end).

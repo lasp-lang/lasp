@@ -80,6 +80,11 @@ init(_Args) ->
                         permanent, 5000, worker,
                         [lasp_plumtree_backend]},
 
+    Clock = {lasp_clock,
+             {lasp_clock, start_link, []},
+              permanent, 5000, worker,
+              [lasp_clock]},
+
     MembershipDefault = list_to_atom(os:getenv("MEMBERSHIP", "false")),
     MembershipEnabled = application:get_env(?APP,
                                             membership,
@@ -119,6 +124,7 @@ init(_Args) ->
     WebSpecs = web_specs(),
 
     BaseSpecs0 = lists:flatten([Unique,
+                                Clock,
                                 PlumtreeBackend,
                                 PlumtreeMemoryReport,
                                 MemoryUtilizationReport,

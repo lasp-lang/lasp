@@ -211,34 +211,45 @@
 
 -define(NOREPLY, fun() -> {noreply, State} end).
 
-%% Metadata mutation macros.
+%% Metadata mutation macros: note the vclock here is a version vector.
 
 -define(CLOCK_INIT(BackendActor), fun(Metadata) ->
                                     VClock = lasp_vclock:increment(BackendActor, lasp_vclock:fresh()),
-                                    orddict:store(clock, VClock, Metadata)
+                                    {ok, Clock} = lasp_clock:get(),
+                                    orddict:store(clock, Clock, orddict:store(vclock, VClock, Metadata))
                                   end).
 
 -define(CLOCK_INCR(BackendActor), fun(Metadata) ->
-                                        Clock = orddict:fetch(clock, Metadata),
-                                        VClock = lasp_vclock:increment(BackendActor, Clock),
-                                        orddict:store(clock, VClock, Metadata)
+                                        VClock0 = orddict:fetch(vclock, Metadata),
+                                        VClock = lasp_vclock:increment(BackendActor, VClock0),
+                                        {ok, Clock} = lasp_clock:get(),
+                                        orddict:store(clock, Clock, orddict:store(vclock, VClock, Metadata))
                                   end).
 
 -define(CLOCK_MERG, fun(Metadata) ->
-            %% Incoming request has to have a clock, given it's coming
+            %% Incoming request has to have a vector clock, given it's coming
             %% in the broadcast path.
+            TheirVClock = orddict:fetch(vclock, Metadata0),
+
+            %% Get incoming lamport clock for causality tracking.
             TheirClock = orddict:fetch(clock, Metadata0),
 
-            %% We may not have a clock yet, if we are first initializing
+            %% We may not have a vector clock yet, if we are first initializing
             %% an object.
-            OurClock = case orddict:find(clock, Metadata) of
-                {ok, Clock} ->
-                    Clock;
+            OurVClock = case orddict:find(vclock, Metadata) of
+                {ok, VC} ->
+                    VC;
                 _ ->
                     lasp_vclock:fresh()
             end,
 
-            %% Merge the clocks.
-            Merged = lasp_vclock:merge([TheirClock, OurClock]),
-            orddict:store(clock, Merged, Metadata)
+            %% Merge the vector clocks: ensures the merged contents of the object
+            %% match the wrapping version vector in the object metadata.
+            MergedVClock = lasp_vclock:merge([TheirVClock, OurVClock]),
+
+            %% Integrate the incoming clock.
+            {ok, _} = lasp_clock:update(TheirClock),
+
+            %% Store updated vector clock.
+            orddict:store(vclock, MergedVClock, Metadata)
     end).

@@ -4,9 +4,9 @@
  {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
  {<<"lager">>,{pkg,<<"lager">>,<<"3.5.1">>},0},
  {<<"lasp_support">>,{pkg,<<"lasp_support">>,<<"0.0.3">>},0},
- {<<"partisan">>,{pkg,<<"partisan">>,<<"0.3.0">>},0},
+ {<<"partisan">>,{pkg,<<"partisan">>,<<"1.0.0">>},0},
  {<<"plumtree">>,{pkg,<<"plumtree">>,<<"0.3.0">>},0},
- {<<"rand_compat">>,{pkg,<<"rand_compat">>,<<"0.0.2">>},0},
+ {<<"rand_compat">>,{pkg,<<"rand_compat">>,<<"0.0.3">>},0},
  {<<"sext">>,{pkg,<<"sext">>,<<"1.4.0">>},0},
  {<<"time_compat">>,{pkg,<<"time_compat">>,<<"0.0.1">>},0},
  {<<"types">>,{pkg,<<"types">>,<<"0.1.6">>},0}]}.
@@ -17,9 +17,9 @@
  {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
  {<<"lager">>, <<"63897A61AF646C59BB928FEE9756CE8BDD02D5A1A2F3551D4A5E38386C2CC071">>},
  {<<"lasp_support">>, <<"C1B7E1A472037AE82C71D2D16A10B7D644A621B66AE5AFE834CECF170F2E9169">>},
- {<<"partisan">>, <<"10938301AF8E67DED9291C61DC6C9221558566D26C6563FF646CABEB0AF60356">>},
+ {<<"partisan">>, <<"AA53E977FFC64BF176A3D62BA83C1A51F9BBB87E92D55A992E91A03D22A4604D">>},
  {<<"plumtree">>, <<"08DC7DE4AD61B3941D28EDC339BC2EF48D4C501059AB1B437CE06994160FEABF">>},
- {<<"rand_compat">>, <<"CBFB9385A996CD1E3A58FFE06AF805AB153B7419BCCEACA461E13CE61A15C103">>},
+ {<<"rand_compat">>, <<"011646BC1F0B0C432FE101B816F25B9BBB74A085713CEE1DAFD2D62E9415EAD3">>},
  {<<"sext">>, <<"2A9443A90C3164231A5E11C73133C4B1762B27FBF1647AA0DE06EF565C47B38B">>},
  {<<"time_compat">>, <<"23FE0AD1FDF3B5B88821B2D04B4B5E865BF587AE66056D671FE0F53514ED8139">>},
  {<<"types">>, <<"03BB7140016C896D3441A77CB0B7D6ACAA583D6D6E9C4A3E1FD3C25123710290">>}]}

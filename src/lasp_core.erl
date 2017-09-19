@@ -99,7 +99,17 @@ enforce_once(Id, Threshold, EnforceFun, Store) ->
                    case lasp_type:threshold_met(Type, Value, Threshold) of
                        true ->
                            {ok, Membership} = lasp:query(?MEMBERSHIP_ID),
-                           SortedMembership = lists:usort(Membership),
+
+                           Membership1 = case Membership of
+                               undefined ->
+                                   %% This is a register, and not a set so if this hasn't
+                                   %% been set yet, it's going to be bottom - undefined.
+                                   [];
+                                L ->
+                                    L
+                           end,
+
+                           SortedMembership = lists:usort(Membership1),
                            EnforcementNode = hd(SortedMembership),
 
                            case node() of

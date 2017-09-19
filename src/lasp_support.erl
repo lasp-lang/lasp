@@ -286,7 +286,9 @@ join_to(N, RunnerNode) ->
     ok = rpc:call(RunnerNode,
                   lasp_peer_service,
                   join,
-                  [{N, {127, 0, 0, 1}, PeerPort}]),
+                  [#{name => N,
+                     listen_addrs => [#{ip => {127, 0, 0, 1}, port => PeerPort}],
+                     parallelism => 1}]),
     ct:pal("Joining issued: ~p to ~p at port ~p",
            [N, RunnerNode, PeerPort]).
 

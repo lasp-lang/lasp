@@ -28,10 +28,13 @@
          end_per_suite/1,
          init_per_testcase/2,
          end_per_testcase/2,
-         all/0]).
+         all/0,
+         default_test/1,
+         peer_to_peer_state_based/1
+        ]).
 
 %% tests
--compile([export_all]).
+%%-compile([export_all]).
 
 -include("lasp.hrl").
 

@@ -28,10 +28,18 @@
          end_per_suite/1,
          init_per_testcase/2,
          end_per_testcase/2,
-         all/0]).
+         all/0,
+         default_test/1,
+         client_server_state_based_test/1,
+         client_server_delta_based_test/1,
+         reactive_client_server_state_based_test/1,
+         reactive_client_server_delta_based_test/1,
+         client_server_state_based_ps_test/1,
+         client_server_delta_based_ps_test/1
+        ]).
 
 %% tests
--compile([export_all]).
+%%-compile([export_all]).
 
 -include("lasp.hrl").
 

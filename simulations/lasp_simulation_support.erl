@@ -316,7 +316,9 @@ cluster(Node, OtherNode) ->
     ok = rpc:call(Node,
                   lasp_peer_service,
                   join,
-                  [{OtherNode, {127, 0, 0, 1}, PeerPort}]).
+                  [#{name => OtherNode,
+                     listen_addrs => [#{ip => {127, 0, 0, 1}, port => PeerPort}],
+                     parallelism => 1}]).
 
 %% @private
 stop(Nodes) ->

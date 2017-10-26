@@ -7,7 +7,6 @@
  {<<"partisan">>,{pkg,<<"partisan">>,<<"1.0.0">>},0},
  {<<"plumtree">>,{pkg,<<"plumtree">>,<<"0.4.0">>},0},
  {<<"rand_compat">>,{pkg,<<"rand_compat">>,<<"0.0.3">>},0},
- {<<"sext">>,{pkg,<<"sext">>,<<"1.4.0">>},0},
  {<<"time_compat">>,{pkg,<<"time_compat">>,<<"0.0.1">>},0},
  {<<"types">>,{pkg,<<"types">>,<<"0.1.6">>},0}]}.
 [
@@ -20,7 +19,6 @@
  {<<"partisan">>, <<"AA53E977FFC64BF176A3D62BA83C1A51F9BBB87E92D55A992E91A03D22A4604D">>},
  {<<"plumtree">>, <<"14E9E28C81FA03F1BDC544EA27BD1969E66ED106725A5042DAA40C5F7B246DBF">>},
  {<<"rand_compat">>, <<"011646BC1F0B0C432FE101B816F25B9BBB74A085713CEE1DAFD2D62E9415EAD3">>},
- {<<"sext">>, <<"2A9443A90C3164231A5E11C73133C4B1762B27FBF1647AA0DE06EF565C47B38B">>},
  {<<"time_compat">>, <<"23FE0AD1FDF3B5B88821B2D04B4B5E865BF587AE66056D671FE0F53514ED8139">>},
  {<<"types">>, <<"03BB7140016C896D3441A77CB0B7D6ACAA583D6D6E9C4A3E1FD3C25123710290">>}]}
 ].

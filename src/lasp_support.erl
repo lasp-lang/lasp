@@ -278,7 +278,7 @@ stop_runner() ->
 
 join_to(N, RunnerNode) ->
     ListenAddrs = rpc:call(N, partisan_config, get, [listen_addrs]),
-    ct:pal("Joining node: ~p to ~p at port ~p",
+    ct:pal("Joining node: ~p to ~p at listen_addr ~p",
            [N, RunnerNode, ListenAddrs]),
     ok = rpc:call(RunnerNode,
                   lasp_peer_service,

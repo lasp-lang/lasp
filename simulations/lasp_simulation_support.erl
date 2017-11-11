@@ -308,16 +308,16 @@ start(_Case, _Config, Options) ->
 cluster(Node, Nodes) when is_list(Nodes) ->
     lists:map(fun(OtherNode) -> cluster(Node, OtherNode) end, Nodes -- [Node]);
 cluster(Node, OtherNode) ->
-    PeerPort = rpc:call(OtherNode,
-                        partisan_config,
-                        get,
-                        [peer_port, ?PEER_PORT]),
-    ct:pal("Joining node: ~p to ~p at port ~p", [Node, OtherNode, PeerPort]),
+    ListenAddrs = rpc:call(OtherNode,
+                           partisan_config,
+                           get,
+                           [listen_addrs]),
+    ct:pal("Joining node: ~p to ~p at listen_addrs ~p", [Node, OtherNode, ListenAddrs]),
     ok = rpc:call(Node,
                   lasp_peer_service,
                   join,
                   [#{name => OtherNode,
-                     listen_addrs => [#{ip => {127, 0, 0, 1}, port => PeerPort}],
+                     listen_addrs => ListenAddrs,
                      parallelism => 1}]).
 
 %% @private

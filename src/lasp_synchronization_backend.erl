@@ -135,7 +135,7 @@ reactive_server() ->
 send(Mod, Msg, Peer) ->
     log_transmission(Mod:extract_log_type_and_payload(Msg), 1),
     PeerServiceManager = lasp_config:peer_service_manager(),
-    case PeerServiceManager:forward_message(Peer, Mod, Msg) of
+    case PeerServiceManager:cast_message(Peer, Mod, Msg) of
         ok ->
             ok;
         _Error ->

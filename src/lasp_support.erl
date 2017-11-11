@@ -277,20 +277,17 @@ stop_runner() ->
     application:stop(partisan).
 
 join_to(N, RunnerNode) ->
-    PeerPort = rpc:call(N,
-                        partisan_config,
-                        get,
-                        [peer_port, ?PEER_PORT]),
+    ListenAddrs = rpc:call(N, partisan_config, get, [listen_addrs]),
     ct:pal("Joining node: ~p to ~p at port ~p",
-           [N, RunnerNode, PeerPort]),
+           [N, RunnerNode, ListenAddrs]),
     ok = rpc:call(RunnerNode,
                   lasp_peer_service,
                   join,
                   [#{name => N,
-                     listen_addrs => [#{ip => {127, 0, 0, 1}, port => PeerPort}],
+                     listen_addrs => ListenAddrs,
                      parallelism => 1}]),
-    ct:pal("Joining issued: ~p to ~p at port ~p",
-           [N, RunnerNode, PeerPort]).
+    ct:pal("Joining issued: ~p to ~p at listen_addrs ~p",
+           [N, RunnerNode, ListenAddrs]).
 
 load_lasp(Node, Config, Case) ->
     PrivDir = proplists:get_value(priv_dir, Config),

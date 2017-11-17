@@ -435,6 +435,12 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
                                    ?CLOCK_INIT(Actor), Store),
             Final = {ok, {_, _, Metadata, _}} = declare_if_not_found(Result0, Id, State, ?CORE, update,
                                  [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
+            case lasp_config:get(propagate_on_update, false) of
+                true ->
+                    ok = propagate_on_update(Id, Metadata);
+                false ->
+                    ok
+            end,
             case lasp_config:get(blocking_sync, false) of
                 true ->
                     ok = blocking_sync(Id, Metadata);
@@ -457,6 +463,12 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
                                            ?CLOCK_INIT(Actor), Store),
                     Final = {ok, {_, _, Metadata, _}} = declare_if_not_found(Result0, Id, State, ?CORE, update,
                                          [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
+                    case lasp_config:get(propagate_on_update, false) of
+                        true ->
+                            ok = propagate_on_update(Id, Metadata);
+                        false ->
+                            ok
+                    end,
                     case lasp_config:get(blocking_sync, false) of
                         true ->
                             ok = blocking_sync(Id, Metadata);
@@ -627,6 +639,23 @@ declare_if_not_found({error, not_found}, {StorageId, TypeId},
     erlang:apply(Module, Function, Args);
 declare_if_not_found(Result, _Id, _State, _Module, _Function, _Args) ->
     Result.
+
+%% @private
+propagate_on_update(Id, Metadata) ->
+    case orddict:find(dynamic, Metadata) of
+        {ok, true} ->
+            %% Ignore: this is a dynamic variable.
+            ok;
+        _ ->
+            ObjectFilterFun = fun(I) -> Id == I end,
+
+            case lasp_config:get(mode, ?DEFAULT_MODE) of
+                state_based ->
+                    lasp_state_based_synchronization_backend:propagate_on_update(ObjectFilterFun);
+                delta_based ->
+                    {error, not_implemented}
+            end
+    end.
 
 %% @private
 blocking_sync(Id, Metadata) ->

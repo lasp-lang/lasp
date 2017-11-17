@@ -278,6 +278,10 @@ configure_defaults() ->
                                        SimulationDefault),
     lasp_config:set(simulation, Simulation),
 
+    PropagateOnUpdateDefault = list_to_atom(os:getenv("PROPAGATE_ON_UPDATE", "false")),
+    PropagateOnUpdate = application:get_env(?APP, propagate_on_update, PropagateOnUpdateDefault),
+    lasp_config:set(propagate_on_update, PropagateOnUpdate),
+
     BlockingSyncDefault = list_to_atom(os:getenv("BLOCKING_SYNC", "false")),
     BlockingSync = application:get_env(?APP,
                                        blocking_sync,

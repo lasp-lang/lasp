@@ -35,7 +35,8 @@
          terminate/2,
          code_change/3]).
 
--export([blocking_sync/1]).
+-export([blocking_sync/1,
+         propagate_on_update/1]).
 
 %% lasp_synchronization_backend callbacks
 -export([extract_log_type_and_payload/1]).
@@ -66,6 +67,9 @@ extract_log_type_and_payload({state_send, _Node, {Id, Type, _Metadata, State}, _
 -spec start_link(list())-> {ok, pid()} | ignore | {error, term()}.
 start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
+
+propagate_on_update(ObjectFilterFun) ->
+    gen_server:call(?MODULE, {propagate_on_update, ObjectFilterFun}, infinity).
 
 blocking_sync(ObjectFilterFun) ->
     gen_server:call(?MODULE, {blocking_sync, ObjectFilterFun}, infinity).
@@ -106,6 +110,36 @@ init([Store, Actor]) ->
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
+
+handle_call({propagate_on_update, ObjectFilterFun}, _From,
+            #state{gossip_peers=GossipPeers,
+                   store=Store}=State) ->
+    %% Get the peers to synchronize with.
+    Members = case ?SYNC_BACKEND:broadcast_tree_mode() of
+        true ->
+            GossipPeers;
+        false ->
+            {ok, Members1} = ?SYNC_BACKEND:membership(),
+            Members1
+    end,
+
+    %% Remove ourself and compute exchange peers.
+    Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
+
+    case length(Peers) > 0 of
+         true ->
+            %% Send the object.
+            SyncFun = fun(Peer) ->
+                            {ok, Os} = init_state_sync(Peer, ObjectFilterFun, true, Store),
+                            [{Peer, O} || O <- Os]
+                      end,
+            lists:flatmap(SyncFun, Peers),
+
+            {reply, ok, State};
+        false ->
+            % lager:info("No peers, not blocking.", []),
+            {reply, ok, State}
+    end;
 
 handle_call({blocking_sync, ObjectFilterFun}, From,
             #state{gossip_peers=GossipPeers,

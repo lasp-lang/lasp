@@ -245,7 +245,7 @@ wait_needed(Id, Threshold) ->
 reset() ->
     do(reset, []).
 
-%% @doc
+%% @doc Propagate values by identifier.
 propagate(Id) ->
     do(propagate, [Id]).
 

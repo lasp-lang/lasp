@@ -381,6 +381,8 @@ start_slave(Name, NodeConfig, _Case) ->
                         Error ->
                             ct:fail(Error)
                     end;
+                {error, stop_timeout, _Node} ->
+                    ok;
                 Error ->
                     ct:fail(Error)
             end

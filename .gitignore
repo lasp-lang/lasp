@@ -43,3 +43,4 @@ dcos.pem
 logs/
 erl_crash.dump
 rebar3.crashdump
+dump.rdb

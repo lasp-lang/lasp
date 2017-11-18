@@ -134,8 +134,11 @@ part-div:
 		clear; \
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_partition_overcounting_SUITE
 
+tail-logs:
+	tail -F priv/lager/*/*/log/*.log
+
 logs:
-	tail -F priv/lager/*/log/*.log
+	cat priv/lager/*/*/log/*.log
 
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 

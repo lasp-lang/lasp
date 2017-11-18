@@ -23,7 +23,8 @@
 
 -include("lasp.hrl").
 
--export([reset/0]).
+-export([reset/0,
+         propagate/1]).
 
 -export([bind/4,
          declare/1,
@@ -243,6 +244,10 @@ wait_needed(Id, Threshold) ->
 %% @doc Reset state.
 reset() ->
     do(reset, []).
+
+%% @doc Propagate values by identifier.
+propagate(Id) ->
+    do(propagate, [Id]).
 
 %%%===================================================================
 %%% Internal Functions

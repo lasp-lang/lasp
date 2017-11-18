@@ -36,7 +36,7 @@
          code_change/3]).
 
 -export([blocking_sync/1,
-         propagate_on_update/1]).
+         propagate/1]).
 
 %% lasp_synchronization_backend callbacks
 -export([extract_log_type_and_payload/1]).
@@ -68,8 +68,8 @@ extract_log_type_and_payload({state_send, _Node, {Id, Type, _Metadata, State}, _
 start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
 
-propagate_on_update(ObjectFilterFun) ->
-    gen_server:call(?MODULE, {propagate_on_update, ObjectFilterFun}, infinity).
+propagate(ObjectFilterFun) ->
+    gen_server:call(?MODULE, {propagate, ObjectFilterFun}, infinity).
 
 blocking_sync(ObjectFilterFun) ->
     gen_server:call(?MODULE, {blocking_sync, ObjectFilterFun}, infinity).
@@ -111,7 +111,7 @@ init([Store, Actor]) ->
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({propagate_on_update, ObjectFilterFun}, _From,
+handle_call({propagate, ObjectFilterFun}, _From,
             #state{gossip_peers=GossipPeers,
                    store=Store}=State) ->
     %% Get the peers to synchronize with.

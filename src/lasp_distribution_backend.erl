@@ -24,7 +24,8 @@
 -behaviour(gen_server).
 
 %% Administrative controls.
--export([reset/0]).
+-export([reset/0, 
+         propagate/1]).
 
 %% API
 -export([start_link/0,
@@ -260,6 +261,10 @@ wait_needed(Id, Threshold) ->
 reset() ->
     gen_server:call(?MODULE, reset, infinity).
 
+-spec propagate(id()) -> ok.
+propagate(Id) ->
+    gen_server:call(?MODULE, {propagate, Id}, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -301,6 +306,13 @@ init([]) ->
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
+
+handle_call({propagate, Id}, _From, #state{store=Store}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("propagate"),
+
+    ok = do_propagate(Id, Store),
+
+    {reply, ok, State};
 
 %% Reset all Lasp application state.
 handle_call(reset, _From, #state{store=Store}=State) ->
@@ -437,7 +449,7 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
                                  [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
             case lasp_config:get(propagate_on_update, false) of
                 true ->
-                    ok = propagate_on_update(Id, Metadata);
+                    ok = do_propagate(Id, Metadata, Store);
                 false ->
                     ok
             end,
@@ -465,7 +477,7 @@ handle_call({update, Id, Operation, CRDTActor}, _From,
                                          [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
                     case lasp_config:get(propagate_on_update, false) of
                         true ->
-                            ok = propagate_on_update(Id, Metadata);
+                            ok = do_propagate(Id, Metadata, Store);
                         false ->
                             ok
                     end,
@@ -641,7 +653,25 @@ declare_if_not_found(Result, _Id, _State, _Module, _Function, _Args) ->
     Result.
 
 %% @private
-propagate_on_update(Id, Metadata) ->
+do_propagate(Id, Store) ->
+    ReplyFun = fun({_Id, Type, Metadata, Value}) ->
+                    {ok, {_Id, Type, Metadata, Value}};
+                  ({error, Error}) ->
+                    {error, Error}
+               end,
+    BlockingFun = fun() ->
+            {error, blocking}
+    end,
+    Threshold = undefined,
+    case ?CORE:read(Id, Threshold, Store, self(), ReplyFun, BlockingFun) of
+        {ok, {Id, _Type, Metadata, _Value}} ->
+            do_propagate(Id, Metadata, Store);
+        _ ->
+            ok
+    end.
+
+%% @private
+do_propagate(Id, Metadata, _Store) ->
     case orddict:find(dynamic, Metadata) of
         {ok, true} ->
             %% Ignore: this is a dynamic variable.
@@ -651,7 +681,7 @@ propagate_on_update(Id, Metadata) ->
 
             case lasp_config:get(mode, ?DEFAULT_MODE) of
                 state_based ->
-                    lasp_state_based_synchronization_backend:propagate_on_update(ObjectFilterFun);
+                    lasp_state_based_synchronization_backend:propagate(ObjectFilterFun);
                 delta_based ->
                     {error, not_implemented}
             end

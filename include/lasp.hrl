@@ -154,6 +154,7 @@
 -define(ENROLLMENT_INTERVAL, 500).
 
 -define(COUNTER_TYPE, gcounter).
+-define(AWSET_TYPE, awset).
 -define(GMAP_TYPE, gmap).
 -define(GSET_TYPE, gset).
 -define(GCOUNTER_TYPE, gcounter).

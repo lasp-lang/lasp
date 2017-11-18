@@ -98,7 +98,7 @@ all() ->
      product_test,
      intersection_test,
      membership_test,
-     enforce_once_test
+     counter_enforce_once_test
     ].
 
 -include("lasp.hrl").
@@ -777,7 +777,7 @@ orset_test(_Config) ->
     ok.
 
 %% @doc Enforce once test.
-enforce_once_test(Config) ->
+counter_enforce_once_test(Config) ->
     Manager = lasp_peer_service:manager(),
     lager:info("Manager: ~p", [Manager]),
 
@@ -794,7 +794,7 @@ enforce_once_test(Config) ->
 
     %% Define an enforce-once invariant.
     Self = self(),
-    Threshold = {value, 1},
+    Threshold = {value, 3},
 
     EnforceFun = fun(X) ->
                          lager:info("Enforce function fired with: ~p", [X]),
@@ -814,6 +814,7 @@ enforce_once_test(Config) ->
     %% Increment counter twice to get trigger to fire.
     {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
     {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
 
     lager:info("Waiting for response..."),
     receive
@@ -825,7 +826,16 @@ enforce_once_test(Config) ->
             ct:fail(failed)
     end,
 
-    lager:info("Finished enforce_once test."),
+    lager:info("Ensuring only one response."),
+    receive
+        {ok, Threshold} ->
+            ct:fail(failed)
+    after
+        10000 ->
+            ok
+    end,
+
+    lager:info("Finished counter_enforce_once test."),
 
     ok.
 

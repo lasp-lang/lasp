@@ -289,9 +289,11 @@ join_to(N, RunnerNode) ->
     ct:pal("Joining issued: ~p to ~p at listen_addrs ~p",
            [N, RunnerNode, ListenAddrs]).
 
-load_lasp(Node, Config, Case) ->
-    PrivDir = proplists:get_value(priv_dir, Config),
-    NodeDir = filename:join([PrivDir, Node, Case]),
+load_lasp(Node, _Config, Case) ->
+    ct:pal("Loading applications on node: ~p", [Node]),
+        
+    PrivDir = code:priv_dir(?APP),
+    NodeDir = filename:join([PrivDir, "lager", Node, Case]),
 
     %% Manually force sasl loading, and disable the logger.
     ok = rpc:call(Node, application, load, [sasl]),

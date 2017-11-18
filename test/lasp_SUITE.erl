@@ -98,7 +98,8 @@ all() ->
      product_test,
      intersection_test,
      membership_test,
-     counter_enforce_once_test
+     counter_enforce_once_test,
+     counter_strict_enforce_once_test
     ].
 
 -include("lasp.hrl").
@@ -835,7 +836,70 @@ counter_enforce_once_test(Config) ->
             ok
     end,
 
-    lager:info("Finished counter_enforce_once test."),
+    lager:info("Finished counter_enforce_once_test."),
+
+    ok.
+
+%% @doc Enforce once test.
+counter_strict_enforce_once_test(Config) ->
+    Manager = lasp_peer_service:manager(),
+    lager:info("Manager: ~p", [Manager]),
+
+    Nodes = proplists:get_value(nodes, Config),
+    lager:info("Nodes: ~p", [Nodes]),
+    Node = hd(lists:usort(Nodes)),
+
+    lager:info("Waiting for cluster to stabilize."),
+    timer:sleep(10000),
+
+    %% Declare the object first: if not, invariant can't be registered.
+    Id = {<<"object">>, ?COUNTER_TYPE},
+    {ok, _} = rpc:call(Node, lasp, declare, [Id, ?COUNTER_TYPE]),
+
+    %% Define an enforce-once invariant.
+    Self = self(),
+    Threshold = {strict, {value, 2}},
+
+    EnforceFun = fun(X) ->
+                         lager:info("Enforce function fired with: ~p", [X]),
+                         Self ! {ok, Threshold}
+                 end,
+
+    lager:info("Adding invariant on node: ~p!", [Node]),
+
+    case rpc:call(Node, lasp, enforce_once, [Id, Threshold, EnforceFun]) of
+        ok ->
+            lager:info("Invariant configured!");
+        Error ->
+            lager:info("Invariant can't be configured: ~p", [Error]),
+            ct:fail(failed)
+    end,
+
+    %% Increment counter twice to get trigger to fire.
+    {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
+
+    lager:info("Waiting for response..."),
+    receive
+        {ok, Threshold} ->
+            ok
+    after
+        10000 ->
+            lager:info("Did not receive response!"),
+            ct:fail(failed)
+    end,
+
+    lager:info("Ensuring only one response."),
+    receive
+        {ok, Threshold} ->
+            ct:fail(failed)
+    after
+        10000 ->
+            ok
+    end,
+
+    lager:info("Finished counter_strict_enforce_once_test."),
 
     ok.
 

@@ -101,7 +101,9 @@ all() ->
      counter_enforce_once_test,
      counter_strict_enforce_once_test,
      awset_enforce_once_test,
-     awset_strict_enforce_once_test
+     awset_strict_enforce_once_test,
+     orset_enforce_once_test,
+     orset_strict_enforce_once_test
     ].
 
 -include("lasp.hrl").
@@ -992,6 +994,114 @@ awset_strict_enforce_once_test(Config) ->
     end,
 
     lager:info("Finished awset_strict_enforce_once_test."),
+
+    ok.
+
+%% @doc Enforce once test.
+orset_enforce_once_test(Config) ->
+    Manager = lasp_peer_service:manager(),
+    lager:info("Manager: ~p", [Manager]),
+
+    Nodes = proplists:get_value(nodes, Config),
+    lager:info("Nodes: ~p", [Nodes]),
+    Node = hd(lists:usort(Nodes)),
+
+    lager:info("Waiting for cluster to stabilize."),
+    timer:sleep(10000),
+
+    %% Declare the object first: if not, invariant can't be registered.
+    Id = {<<"object">>, ?SET},
+    {ok, _} = rpc:call(Node, lasp, declare, [Id, ?SET]),
+
+    %% Define an enforce-once invariant.
+    Self = self(),
+    Threshold = {cardinality, 1},
+
+    EnforceFun = fun(X) ->
+                         lager:info("Enforce function fired with: ~p", [X]),
+                         Self ! {ok, Threshold}
+                 end,
+
+    lager:info("Adding invariant on node: ~p!", [Node]),
+
+    case rpc:call(Node, lasp, enforce_once, [Id, Threshold, EnforceFun]) of
+        ok ->
+            lager:info("Invariant configured!");
+        Error ->
+            lager:info("Invariant can't be configured: ~p", [Error]),
+            ct:fail(failed)
+    end,
+
+    %% Increment counter twice to get trigger to fire.
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 1}, self()]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 2}, self()]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 3}, self()]),
+
+    lager:info("Waiting for response..."),
+    receive
+        {ok, Threshold} ->
+            ok
+    after
+        10000 ->
+            lager:info("Did not receive response!"),
+            ct:fail(failed)
+    end,
+
+    lager:info("Finished orset_enforce_once_test."),
+
+    ok.
+
+%% @doc Enforce once test.
+orset_strict_enforce_once_test(Config) ->
+    Manager = lasp_peer_service:manager(),
+    lager:info("Manager: ~p", [Manager]),
+
+    Nodes = proplists:get_value(nodes, Config),
+    lager:info("Nodes: ~p", [Nodes]),
+    Node = hd(lists:usort(Nodes)),
+
+    lager:info("Waiting for cluster to stabilize."),
+    timer:sleep(10000),
+
+    %% Declare the object first: if not, invariant can't be registered.
+    Id = {<<"object">>, ?SET},
+    {ok, _} = rpc:call(Node, lasp, declare, [Id, ?SET]),
+
+    %% Define an enforce-once invariant.
+    Self = self(),
+    Threshold = {strict, {cardinality, 1}},
+
+    EnforceFun = fun(X) ->
+                         lager:info("Enforce function fired with: ~p", [X]),
+                         Self ! {ok, Threshold}
+                 end,
+
+    lager:info("Adding invariant on node: ~p!", [Node]),
+
+    case rpc:call(Node, lasp, enforce_once, [Id, Threshold, EnforceFun]) of
+        ok ->
+            lager:info("Invariant configured!");
+        Error ->
+            lager:info("Invariant can't be configured: ~p", [Error]),
+            ct:fail(failed)
+    end,
+
+    %% Increment counter twice to get trigger to fire.
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 1}, self()]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 2}, self()]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 3}, self()]),
+
+    lager:info("Waiting for response..."),
+    receive
+        {ok, Threshold} ->
+            ok
+    after
+        10000 ->
+            lager:info("Did not receive response!"),
+            ct:fail(failed)
+    end,
+
+    lager:info("Finished orset_strict_enforce_once_test."),
 
     ok.
 

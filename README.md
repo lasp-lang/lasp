@@ -9,7 +9,7 @@ Lasp is a programming model for synchronization-free computations.
 
 ## Installing
 
-Lasp requires Erlang 18 or greater.  Once you have Erlang installed, do
+Lasp requires Erlang 19 or greater.  Once you have Erlang installed, do
 the following to install and build Lasp.
 
 ```

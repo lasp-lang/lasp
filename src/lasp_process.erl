@@ -135,9 +135,19 @@ single_fire_function(From, To, Fn, Args) ->
         Self ! {Ref, Res}
     end},
 
-    {ok, _Pid} = start_single_fire_process([ReadFun, TransFun, WriteFun]),
-
-    receive {Ref, Result} -> Result end.
+    case start_single_fire_process([ReadFun, TransFun, WriteFun]) of
+        {ok, ignore} ->
+            error;
+        {ok, Pid} ->
+            MonRef = erlang:monitor(process, Pid),
+            receive
+                {'DOWN', _Ref, process, _, Reason} ->
+                    {error, Reason};
+                {Ref, Result} ->
+                    erlang:demonitor(MonRef),
+                    Result
+            end
+    end.
 
 %%%===================================================================
 %%% Callbacks

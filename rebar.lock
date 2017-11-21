@@ -1,5 +1,6 @@
 {"1.1.0",
 [{<<"acceptor_pool">>,{pkg,<<"acceptor_pool">>,<<"1.0.0-rc.0">>},1},
+ {<<"gen_flow">>,{pkg,<<"gen_flow">>,<<"0.0.4">>},0},
  {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
  {<<"lager">>,{pkg,<<"lager">>,<<"3.5.2">>},0},
  {<<"lasp_support">>,{pkg,<<"lasp_support">>,<<"0.0.3">>},0},
@@ -10,6 +11,7 @@
 [
 {pkg_hash,[
  {<<"acceptor_pool">>, <<"679D741DF87FC13599B1AEF2DF8F78F1F880449A6BEFAB7C44FB6FAE0E92A2DE">>},
+ {<<"gen_flow">>, <<"E5F401967B2EE073EA4635AC8E98CC68139115473B036CC7220BB62AE4A78F2C">>},
  {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>},
  {<<"lager">>, <<"614A8C8F67BF99B69EB264EA22121AD25511C055AAEC09B086773D5108C6767F">>},
  {<<"lasp_support">>, <<"C1B7E1A472037AE82C71D2D16A10B7D644A621B66AE5AFE834CECF170F2E9169">>},

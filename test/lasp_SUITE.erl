@@ -881,7 +881,7 @@ counter_strict_enforce_once_test(Config) ->
     lager:info("Waiting for response..."),
     receive
         {ok, Threshold} ->
-            ok
+            ok;
         Other ->
             ct:fail({received_other_message, Other})
     after

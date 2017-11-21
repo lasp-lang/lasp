@@ -132,12 +132,22 @@ single_fire_function(From, To, Fn, Args) ->
 
     %% The write function "returns" the value by sending a message.
     WriteFun = {To, fun(_, Res) ->
-        Self ! {Ref, Res}
+        Self ! {Ref, self(), Res}
     end},
 
-    {ok, _Pid} = start_single_fire_process([ReadFun, TransFun, WriteFun]),
-
-    receive {Ref, Result} -> Result end.
+    case start_single_fire_process([ReadFun, TransFun, WriteFun]) of
+        {ok, ignore} ->
+            exit(cycle_detected);
+        {ok, Pid} ->
+            MonRef = erlang:monitor(process, Pid),
+            receive
+                {'DOWN', MonRef, process, Pid, Reason} ->
+                    {error, Reason};
+                {Ref, _SourcePid, Result} ->
+                    erlang:demonitor(MonRef),
+                    Result
+            end
+    end.
 
 %%%===================================================================
 %%% Callbacks

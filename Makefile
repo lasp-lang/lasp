@@ -27,7 +27,12 @@ packageclean:
 ## Test targets
 ##
 
-check: test xref dialyzer
+kill:
+	pkill -9 beam.smp; \
+	pkill -9 epmd; \
+	exit 0
+
+check: kill test xref dialyzer
 
 test: ct eunit ad-counter-simulations game-tournament-simulations
 
@@ -135,7 +140,10 @@ part-div:
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_partition_overcounting_SUITE
 
 logs:
-	tail -F priv/lager/*/log/*.log
+	cat priv/lager/*/*/log/*.log
+
+tail-logs:
+	tail -F priv/lager/*/*/log/*.log
 
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 

@@ -870,6 +870,9 @@ counter_strict_enforce_once_test(Config) ->
             ct:fail(failed)
     end,
 
+    %% Wait.
+    timer:sleep(1000),
+
     %% Increment counter twice to get trigger to fire.
     {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
     {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),

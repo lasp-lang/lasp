@@ -137,7 +137,7 @@ single_fire_function(From, To, Fn, Args) ->
 
     case start_single_fire_process([ReadFun, TransFun, WriteFun]) of
         {ok, ignore} ->
-            {error, cycle_detected};
+            exit(cycle_detected);
         {ok, Pid} ->
             MonRef = erlang:monitor(process, Pid),
             receive

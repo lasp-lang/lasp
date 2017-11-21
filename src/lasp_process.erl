@@ -143,7 +143,7 @@ single_fire_function(From, To, Fn, Args) ->
             receive
                 {'DOWN', MonRef, process, Pid, Reason} ->
                     {error, Reason};
-                {Ref, SourcePid, Result} ->
+                {Ref, _SourcePid, Result} ->
                     erlang:demonitor(MonRef),
                     Result
             end

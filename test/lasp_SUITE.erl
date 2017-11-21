@@ -882,6 +882,8 @@ counter_strict_enforce_once_test(Config) ->
     receive
         {ok, Threshold} ->
             ok
+        Other ->
+            ct:fail({received_other_message, Other})
     after
         10000 ->
             lager:info("Did not receive response!"),

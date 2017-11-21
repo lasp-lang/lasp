@@ -142,11 +142,9 @@ single_fire_function(From, To, Fn, Args) ->
             MonRef = erlang:monitor(process, Pid),
             receive
                 {'DOWN', MonRef, process, Pid, Reason} ->
-                    lager:info("cmeik received down: ~p reason: ~p", [Pid, Reason]),
                     {error, Reason};
                 {Ref, SourcePid, Result} ->
                     erlang:demonitor(MonRef),
-                    lager:info("cmeik received process node ~p result: ~p", [SourcePid, Result]),
                     Result
             end
     end.

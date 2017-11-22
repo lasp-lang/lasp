@@ -290,6 +290,8 @@ join_to(N, RunnerNode) ->
            [N, RunnerNode, ListenAddrs]).
 
 load_lasp(Node, _Config, Case) ->
+    ct:pal("Loading applications on node: ~p", [Node]),
+        
     PrivDir = code:priv_dir(?APP),
     NodeDir = filename:join([PrivDir, "lager", Case, Node]),
 

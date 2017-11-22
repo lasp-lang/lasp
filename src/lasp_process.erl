@@ -145,6 +145,10 @@ single_fire_function(From, To, Fn, Args) ->
                     {error, Reason};
                 {Ref, _SourcePid, Result} ->
                     erlang:demonitor(MonRef),
+
+                    %% There's a race here where the process can go down before the demonitor, so attempt to clear the mailbox.
+                    clear_down_inbox(MonRef, Pid),
+
                     Result
             end
     end.
@@ -222,3 +226,12 @@ gen_read_fun(Id, ReadFun) ->
                         exit({lasp_process, not_found})
                 end
         end.
+
+%% @private
+clear_down_inbox(MonRef, Pid) ->
+    receive
+        {'DOWN', MonRef, process, Pid, normal} ->
+            clear_down_inbox(MonRef, Pid)
+    after
+        0 -> ok
+    end.

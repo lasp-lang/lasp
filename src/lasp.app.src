@@ -6,7 +6,7 @@
               {licenses,["Apache 2"]},
               {registered,[]},
               {applications,[kernel,stdlib,types,gen_flow,lager,sasl,
-                             time_compat,os_mon,lasp_support,rand_compat,
+                             time_compat,lasp_support,rand_compat,
                              partisan,plumtree]},
               {mod,{lasp_app,[]}},
               {env,[{data_root,"data"},

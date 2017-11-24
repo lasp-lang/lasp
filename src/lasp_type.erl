@@ -38,6 +38,7 @@
 
 types() ->
     [
+        {awmap, {state_awmap, undefined}},
         {awset, {state_awset, undefined}},
         {awset_ps, {state_awset_ps, undefined}},
         {boolean, {state_boolean, undefined}},

@@ -229,7 +229,7 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
          ?SYNC_BACKEND:i_am_server() andalso
          ?SYNC_BACKEND:reactive_server() of
         true ->
-            ObjectFilterFun = fun(Id1) ->
+            ObjectFilterFun = fun(Id1, _) ->
                                       Id =:= Id1
                               end,
             init_state_sync(From, ObjectFilterFun, false, Store),
@@ -337,7 +337,7 @@ schedule_state_synchronization() ->
     case ShouldSync of
         true ->
             Interval = lasp_config:get(state_interval, 10000),
-            ObjectFilterFun = fun(_) -> true end,
+            ObjectFilterFun = fun(_, _) -> true end,
             case lasp_config:get(jitter, false) of
                 true ->
                     %% Add random jitter.
@@ -382,7 +382,7 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
                             %% Ignore: this is a dynamic variable.
                             ok;
                         _ ->
-                            case ObjectFilterFun(Id) of
+                            case ObjectFilterFun(Id, Metadata) of
                                 true ->
                                     ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, false}, Peer);
                                 false ->
@@ -422,12 +422,21 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                             %% Ignore: this is a dynamic variable.
                             Acc0;
                         _ ->
-                            case ObjectFilterFun(Id) of
+                            try ObjectFilterFun(Id, Metadata) of
                                 true ->
                                     ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, Blocking}, Peer),
                                     [Id|Acc0];
                                 false ->
                                     Acc0
+                            catch 
+                                _:_ ->
+                                    case ObjectFilterFun(Id, Metadata) of
+                                        true ->
+                                            ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, Blocking}, Peer),
+                                            [Id|Acc0];
+                                        false ->
+                                            Acc0
+                                    end
                             end
                     end
                end,

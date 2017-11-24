@@ -96,7 +96,7 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
     Mutator = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
                            delta_counter=Counter, delta_map=DeltaMap,
                            delta_ack_map=AckMap0}=Object}) ->
-        case ObjectFilterFun(Id) of
+        case ObjectFilterFun(Id, Metadata) of
             true ->
                 Ack = case orddict:find(Peer, AckMap0) of
                     {ok, {Ack0, _GCCounter}} ->
@@ -170,7 +170,7 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
     case ?SYNC_BACKEND:client_server_mode() andalso
          ?SYNC_BACKEND:i_am_server() andalso ?SYNC_BACKEND:reactive_server() of
         true ->
-            ObjectFilterFun = fun(Id1) ->
+            ObjectFilterFun = fun(Id1, _) ->
                                       Id =:= Id1
                               end,
             init_delta_sync(From, ObjectFilterFun);

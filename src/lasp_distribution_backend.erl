@@ -743,7 +743,7 @@ do_propagate(Id, Metadata, _Store) ->
             %% Ignore: this is a dynamic variable.
             ok;
         _ ->
-            ObjectFilterFun = fun(I) -> Id == I end,
+            ObjectFilterFun = fun(I, _) -> Id == I end,
 
             case lasp_config:get(mode, ?DEFAULT_MODE) of
                 state_based ->
@@ -760,7 +760,7 @@ blocking_sync(Id, Metadata) ->
             %% Ignore: this is a dynamic variable.
             ok;
         _ ->
-            ObjectFilterFun = fun(I) -> Id == I end,
+            ObjectFilterFun = fun(I, _) -> Id == I end,
 
             case lasp_config:get(mode, ?DEFAULT_MODE) of
                 state_based ->

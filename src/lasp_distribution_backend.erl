@@ -380,7 +380,7 @@ handle_call({disinterested, Topic}, _From,
 
     Myself = partisan_peer_service_manager:myself(),
     Id = {<<"_interests">>, awmap},
-    Operation = {apply, Myself, {add, Topic}},
+    Operation = {apply, Myself, {rmv, Topic}},
     Result0 = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR(Actor),
                             ?CLOCK_INIT(Actor), Store),
     Final = {ok, {_, _, Metadata, _}} = declare_if_not_found(Result0, Id, State, ?CORE, update,

@@ -46,7 +46,9 @@
          intersection/3,
          fold/3,
          wait_needed/2,
-         thread/3]).
+         thread/3,
+         interested/1,
+         disinterested/1]).
 
 -export([invariant/3,
          enforce_once/3]).
@@ -248,6 +250,14 @@ reset() ->
 %% @doc Propagate values by identifier.
 propagate(Id) ->
     do(propagate, [Id]).
+
+%% @todo
+interested(Topic) ->
+    do(interested, [Topic]).
+
+%% @todo
+disinterested(Topic) ->
+    do(disinterested, [Topic]).
 
 %%%===================================================================
 %%% Internal Functions

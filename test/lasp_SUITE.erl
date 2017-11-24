@@ -103,7 +103,8 @@ all() ->
      awset_enforce_once_test,
      awset_strict_enforce_once_test,
      orset_enforce_once_test,
-     orset_strict_enforce_once_test
+     orset_strict_enforce_once_test,
+     interest_test
     ].
 
 -include("lasp.hrl").
@@ -446,6 +447,25 @@ stream_test(_Config) ->
 
 %% @doc Test query functionality.
 query_test(_Config) ->
+    %% Declare a variable.
+    {ok, {I1, _, _, _}} = lasp:declare(ivar),
+
+    %% Change it's value.
+    ?assertMatch({ok, _}, lasp:update(I1, {set, 2}, a)),
+
+    %% Threshold read just to create a synchronization point for the
+    %% value to change.
+    {ok, _} = lasp:read(I1, {strict, undefined}),
+
+    %% Query it.
+    ?assertMatch({ok, 2}, lasp:query(I1)),
+
+    ok.
+
+interest_test(_Config) ->
+    %% Declare an interest.
+    ok = lasp:interested(updates),
+
     %% Declare a variable.
     {ok, {I1, _, _, _}} = lasp:declare(ivar),
 

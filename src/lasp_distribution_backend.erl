@@ -49,7 +49,9 @@
          fold/3,
          wait_needed/2,
          thread/3,
-         enforce_once/3]).
+         enforce_once/3,
+         interested/1,
+         disinterested/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -252,6 +254,14 @@ enforce_once(Id, Threshold, EnforceFun) ->
 wait_needed(Id, Threshold) ->
     gen_server:call(?MODULE, {wait_needed, Id, Threshold}, infinity).
 
+%% @todo
+interested(Topic) ->
+    gen_server:call(?MODULE, {interested, Topic}, infinity).
+
+%% @todo
+disinterested(Topic) ->
+    gen_server:call(?MODULE, {disinterested, Topic}, infinity).
+
 %%%===================================================================
 %%% Administrative controls
 %%%===================================================================
@@ -334,6 +344,62 @@ handle_call({declare, Id, Type}, _From,
 
     Result = ?CORE:declare(Id, Type, ?CLOCK_INIT(Actor), Store),
     {reply, Result, State};
+
+%% @todo
+handle_call({interested, Topic}, _From, 
+            #state{store=Store, actor=Actor}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("interested/1"),
+
+    Myself = partisan_peer_service_manager:myself(),
+    Id = {<<"_interests">>, awmap},
+    Operation = {apply, Myself, {add, Topic}},
+    Result0 = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR(Actor),
+                            ?CLOCK_INIT(Actor), Store),
+    Final = {ok, {_, _, Metadata, _}} = declare_if_not_found(Result0, Id, State, ?CORE, update,
+                            [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
+
+    case lasp_config:get(propagate_on_update, false) of
+        true ->
+            ok = do_propagate(Id, Metadata, Store);
+        false ->
+            ok
+    end,
+    case lasp_config:get(blocking_sync, false) of
+        true ->
+            ok = blocking_sync(Id, Metadata);
+        false ->
+            ok
+    end,
+
+    {reply, Final, State};
+
+%% @todo
+handle_call({disinterested, Topic}, _From, 
+             #state{store=Store, actor=Actor}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("disinterested/1"),
+
+    Myself = partisan_peer_service_manager:myself(),
+    Id = {<<"_interests">>, awmap},
+    Operation = {apply, Myself, {add, Topic}},
+    Result0 = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR(Actor),
+                            ?CLOCK_INIT(Actor), Store),
+    Final = {ok, {_, _, Metadata, _}} = declare_if_not_found(Result0, Id, State, ?CORE, update,
+                            [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
+
+    case lasp_config:get(propagate_on_update, false) of
+        true ->
+            ok = do_propagate(Id, Metadata, Store);
+        false ->
+            ok
+    end,
+    case lasp_config:get(blocking_sync, false) of
+        true ->
+            ok = blocking_sync(Id, Metadata);
+        false ->
+            ok
+    end,
+
+    {reply, Final, State};
 
 %% Incoming bind request, where we do not have information about the
 %% variable yet.  In this case, take the remote metadata, if we don't

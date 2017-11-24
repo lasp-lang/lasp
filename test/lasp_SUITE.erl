@@ -464,7 +464,7 @@ query_test(_Config) ->
 
 interest_test(_Config) ->
     %% Declare an interest.
-    ok = lasp:interested(updates),
+    {ok, _} = lasp:interested(updates),
 
     %% Declare a variable.
     {ok, {I1, _, _, _}} = lasp:declare(ivar),

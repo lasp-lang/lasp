@@ -414,7 +414,14 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
     ok.
 
 %% @private
+interests(Peer, Store) ->
+    {ok, Value} = ?CORE:query(?INTERESTS_ID, Store),
+    proplists:get_value(Peer, Value, sets:new()).
+
+%% @private
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
+    PeerInterests = interests(Peer, Store),
+
     % lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     Dynamic = case orddict:find(dynamic, Metadata) of
@@ -424,8 +431,30 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                             false
                     end,
 
-                    case Dynamic of
+                    ObjectTopics = case orddict:find(topics, Metadata) of
+                        {ok, T} ->
+                            %% TODO: Fix me
+                            {ok, Topics} = state_awset:query(T),
+                            Topics;
+                        _ ->
+                            sets:new()
+                    end,
+
+                    Filtered = case sets:size(ObjectTopics) > 0 andalso sets:size(PeerInterests) > 0 of
+                        true ->
+                            %% If the node has interests, and the object is on a topic, only allow 
+                            %% if they are not disjoint.
+                            not sets:is_disjoint(ObjectTopics, PeerInterests);
                         false ->
+                            %% Otherwise, send.
+                            true
+                    end,
+
+                    %% Sync as long as it's not dynamically scoped, and is filtered.
+                    ShouldSync = not Dynamic andalso Filtered,
+
+                    case ShouldSync of
+                        true ->
                             try ObjectFilterFun(Id, Metadata) of
                                 true ->
                                     ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, Blocking}, Peer),
@@ -442,7 +471,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                                             Acc0
                                     end
                             end;
-                        true ->
+                        false ->
                             Acc0
                     end
                end,

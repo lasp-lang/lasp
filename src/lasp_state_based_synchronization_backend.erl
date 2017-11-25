@@ -430,7 +430,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                                     Acc0
                             catch 
                                 _:_ ->
-                                    case ObjectFilterFun(Id, Metadata) of
+                                    case ObjectFilterFun(Id) of
                                         true ->
                                             ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, Blocking}, Peer),
                                             [Id|Acc0];

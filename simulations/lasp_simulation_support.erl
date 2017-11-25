@@ -51,7 +51,7 @@ run(Case, Config, Options) ->
     ).
 
 %% @private
-start(_Case, _Config, Options) ->
+start(Case, _Config, Options) ->
     %% Launch distribution for the test runner.
     ct:pal("Launching Erlang distribution..."),
 
@@ -97,7 +97,7 @@ start(_Case, _Config, Options) ->
                             ct:pal("Loading lasp on node: ~p", [Node]),
 
                             PrivDir = code:priv_dir(?APP),
-                            NodeDir = filename:join([PrivDir, "lager", Node]),
+                            NodeDir = filename:join([PrivDir, "lager", Case, Node]),
 
                             %% Manually force sasl loading, and disable the logger.
                             ok = rpc:call(Node, application, load, [sasl]),

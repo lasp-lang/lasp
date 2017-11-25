@@ -417,11 +417,15 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
     % lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
-                    case orddict:find(dynamic, Metadata) of
+                    Dynamic = case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
-                            %% Ignore: this is a dynamic variable.
-                            Acc0;
+                            true;
                         _ ->
+                            false
+                    end,
+
+                    case Dynamic of
+                        false ->
                             try ObjectFilterFun(Id, Metadata) of
                                 true ->
                                     ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, Blocking}, Peer),
@@ -437,7 +441,9 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                                         false ->
                                             Acc0
                                     end
-                            end
+                            end;
+                        true ->
+                            Acc0
                     end
                end,
     %% TODO: Should this be parallel?

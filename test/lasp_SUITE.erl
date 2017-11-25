@@ -469,12 +469,17 @@ interest_test(_Config) ->
     %% Declare a variable.
     {ok, {I1, _, _, _}} = lasp:declare(ivar),
 
+    %% Set interest.
+    ok = lasp:set_topic(I1, things),
+
     %% Change it's value.
     ?assertMatch({ok, _}, lasp:update(I1, {set, 2}, a)),
 
     %% Threshold read just to create a synchronization point for the
     %% value to change.
-    {ok, _} = lasp:read(I1, {strict, undefined}),
+    {ok, {_, _, Metadata, _}} = lasp:read(I1, {strict, undefined}),
+
+    ct:pal("Metadata: ~p", [Metadata]),
 
     %% Query it.
     ?assertMatch({ok, 2}, lasp:query(I1)),

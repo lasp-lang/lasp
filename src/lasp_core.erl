@@ -41,6 +41,7 @@
          stream/3,
          update/4,
          update/6,
+         update_metadata/5,
          thread/4,
          filter/4,
          map/4,
@@ -446,6 +447,16 @@ update({_, Type} = Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store)
         {error, not_found} ->
             {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
             update(Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store)
+    end.
+
+%% @doc Update metadata.
+update_metadata({_, Type} = Id, Actor, MetadataFun, MetadataFunDeclare, Store) ->
+    case do(get, [Store, Id]) of
+        {ok, #dv{value=Value, type=Type}} ->
+            bind(Id, Value, MetadataFun, Store);
+        {error, not_found} ->
+            {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
+            update_metadata(Id, Actor, MetadataFun, MetadataFunDeclare, Store)
     end.
 
 %% @doc Define a dataflow variable to be bound a value.

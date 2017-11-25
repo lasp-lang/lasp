@@ -413,16 +413,53 @@ handle_call({disinterested, Topic}, _From,
     {reply, Final, State};
 
 %% @todo
-handle_call({set_topic, _Id, _Topic}, _From, 
-             #state{store=_Store, actor=_Actor}=State) ->
+handle_call({set_topic, Id, Topic}, _From, 
+             #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("set_topic/2"),
+
+    Type = lasp_type:get_type(?OBJECT_INTERESTS_TYPE),
+
+    MetadataFunDeclare = fun(Metadata) ->
+        NewTopicSet = Type:mutate({add, Topic}, Actor, Type:new()),
+        orddict:store(topics, NewTopicSet, Metadata)
+    end,
+
+    MetadataFun = fun(Metadata) ->
+        case orddict:find(topics, Metadata) of
+            error ->
+                MetadataFunDeclare(Metadata);
+            {ok, V} ->
+                TopicSet = Type:mutate({add, Topic}, Actor, V),
+                orddict:store(topics, TopicSet, Metadata)
+        end
+    end,
+
+    {ok, _} = ?CORE:update_metadata(Id, Actor, MetadataFun, MetadataFunDeclare, Store),
 
     {reply, ok, State};
 
 %% @todo
-handle_call({remove_topic, _Id, _Topic}, _From, 
-             #state{store=_Store, actor=_Actor}=State) ->
+handle_call({remove_topic, Id, Topic}, _From, 
+             #state{store=Store, actor=Actor}=State) ->
     lasp_marathon_simulations:log_message_queue_size("remove_topic/2"),
+
+    Type = lasp_type:get_type(?OBJECT_INTERESTS_TYPE),
+
+    MetadataFunDeclare = fun(Metadata) ->
+        orddict:store(topics, Type:new(), Metadata)
+    end,
+
+    MetadataFun = fun(Metadata) ->
+        case orddict:find(topics, Metadata) of
+            error ->
+                MetadataFunDeclare(Metadata);
+            {ok, V} ->
+                TopicSet = Type:mutate({rmv, Topic}, Actor, V),
+                orddict:store(topics, TopicSet, Metadata)
+        end
+    end,
+
+    {ok, _} = ?CORE:update_metadata(Id, Actor, MetadataFun, MetadataFunDeclare, Store),
 
     {reply, ok, State};
 

@@ -434,8 +434,8 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                     ObjectTopics = case orddict:find(topics, Metadata) of
                         {ok, T} ->
                             %% TODO: Fix me
-                            Type = lasp_type:get_type(?OBJECT_INTERESTS_TYPE),
-                            {ok, Topics} = Type:query(T),
+                            ObjectInterestType = lasp_type:get_type(?OBJECT_INTERESTS_TYPE),
+                            {ok, Topics} = ObjectInterestType:query(T),
                             Topics;
                         _ ->
                             sets:new()

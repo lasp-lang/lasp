@@ -46,9 +46,12 @@
          intersection/3,
          fold/3,
          wait_needed/2,
-         thread/3,
-         interested/1,
-         disinterested/1]).
+         thread/3]).
+
+-export([interested/1,
+         disinterested/1,
+         set_topic/2,
+         remove_topic/2]).
 
 -export([invariant/3,
          enforce_once/3]).
@@ -258,6 +261,14 @@ interested(Topic) ->
 %% @todo
 disinterested(Topic) ->
     do(disinterested, [Topic]).
+
+%% @todo
+set_topic(Id, Topic) ->
+    do(set_topic, [Id, Topic]).
+
+%% @todo
+remove_topic(Id, Topic) ->
+    do(remove_topic, [Id, Topic]).
 
 %%%===================================================================
 %%% Internal Functions

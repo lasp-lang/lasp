@@ -49,9 +49,12 @@
          fold/3,
          wait_needed/2,
          thread/3,
-         enforce_once/3,
-         interested/1,
-         disinterested/1]).
+         enforce_once/3]).
+
+-export([interested/1,
+         disinterested/1,
+         set_topic/2,
+         remove_topic/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -262,6 +265,14 @@ interested(Topic) ->
 disinterested(Topic) ->
     gen_server:call(?MODULE, {disinterested, Topic}, infinity).
 
+%% @todo
+set_topic(Id, Topic) ->
+    gen_server:call(?MODULE, {set_topic, Id, Topic}, infinity).
+
+%% @todo
+remove_topic(Id, Topic) ->
+    gen_server:call(?MODULE, {remove_topic, Id, Topic}, infinity).
+
 %%%===================================================================
 %%% Administrative controls
 %%%===================================================================
@@ -400,6 +411,20 @@ handle_call({disinterested, Topic}, _From,
     end,
 
     {reply, Final, State};
+
+%% @todo
+handle_call({set_topic, _Id, _Topic}, _From, 
+             #state{store=_Store, actor=_Actor}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("set_topic/2"),
+
+    {reply, ok, State};
+
+%% @todo
+handle_call({remove_topic, _Id, _Topic}, _From, 
+             #state{store=_Store, actor=_Actor}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("remove_topic/2"),
+
+    {reply, ok, State};
 
 %% Incoming bind request, where we do not have information about the
 %% variable yet.  In this case, take the remote metadata, if we don't

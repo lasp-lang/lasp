@@ -208,19 +208,19 @@ handle_info(delta_sync, #state{}=State) ->
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
-    WithoutConvergenceFun = fun(Id) ->
+    FilterWithoutConvergenceFun = fun(Id, _) ->
                               Id =/= ?SIM_STATUS_STRUCTURE
                       end,
     lists:foreach(fun(Peer) ->
-                          init_delta_sync(Peer, WithoutConvergenceFun) end,
+                          init_delta_sync(Peer, FilterWithoutConvergenceFun) end,
                   Peers),
 
     %% Synchronize convergence structure.
-    WithConvergenceFun = fun(Id) ->
+    FilterWithConvergenceFun = fun(Id, _) ->
                               Id =:= ?SIM_STATUS_STRUCTURE
                       end,
     lists:foreach(fun(Peer) ->
-                          init_delta_sync(Peer, WithConvergenceFun) end,
+                          init_delta_sync(Peer, FilterWithConvergenceFun) end,
                   ?SYNC_BACKEND:without_me(Members)),
 
     %% Schedule next synchronization.

@@ -375,7 +375,6 @@ schedule_plumtree_peer_refresh() ->
 %% @private
 init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
     % lasp_logger:extended("Initializing reverse toplogical state synchronization with peer: ~p", [Peer]),
-    PeerInterests = interests(Peer, Store),
 
     SendFun = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}) ->
                     Dynamic = case orddict:find(dynamic, Metadata) of
@@ -385,25 +384,7 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
                             false
                     end,
 
-                    ObjectTopics = case orddict:find(topics, Metadata) of
-                        {ok, T} ->
-                            %% TODO: Fix me
-                            ObjectInterestType = lasp_type:get_type(?OBJECT_INTERESTS_TYPE),
-                            {ok, Topics} = ObjectInterestType:query(T),
-                            Topics;
-                        _ ->
-                            sets:new()
-                    end,
-
-                    Filtered = case sets:size(ObjectTopics) > 0 andalso sets:size(PeerInterests) > 0 of
-                        true ->
-                            %% If the node has interests, and the object is on a topic, only allow 
-                            %% if they are not disjoint.
-                            not sets:is_disjoint(ObjectTopics, PeerInterests);
-                        false ->
-                            %% Otherwise, send.
-                            true
-                    end,
+                    Filtered = lasp_partial_replication:is_filtered(Peer, Metadata, Store),
 
                     %% Sync as long as it's not dynamically scoped, and is filtered.
                     ShouldSync = not Dynamic andalso Filtered,
@@ -445,15 +426,9 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
     ok.
 
 %% @private
-interests(Peer, Store) ->
-    {ok, Value} = ?CORE:query(?INTERESTS_ID, Store),
-    proplists:get_value(Peer, Value, sets:new()).
-
-%% @private
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
-    PeerInterests = interests(Peer, Store),
-
     % lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
+
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     Dynamic = case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
@@ -462,25 +437,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                             false
                     end,
 
-                    ObjectTopics = case orddict:find(topics, Metadata) of
-                        {ok, T} ->
-                            %% TODO: Fix me
-                            ObjectInterestType = lasp_type:get_type(?OBJECT_INTERESTS_TYPE),
-                            {ok, Topics} = ObjectInterestType:query(T),
-                            Topics;
-                        _ ->
-                            sets:new()
-                    end,
-
-                    Filtered = case sets:size(ObjectTopics) > 0 andalso sets:size(PeerInterests) > 0 of
-                        true ->
-                            %% If the node has interests, and the object is on a topic, only allow 
-                            %% if they are not disjoint.
-                            not sets:is_disjoint(ObjectTopics, PeerInterests);
-                        false ->
-                            %% Otherwise, send.
-                            true
-                    end,
+                    Filtered = lasp_partial_replication:is_filtered(Peer, Metadata, Store),
 
                     %% Sync as long as it's not dynamically scoped, and is filtered.
                     ShouldSync = not Dynamic andalso Filtered,

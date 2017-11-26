@@ -104,7 +104,7 @@ all() ->
      awset_strict_enforce_once_test,
      orset_enforce_once_test,
      orset_strict_enforce_once_test,
-     interest_test
+     full_mesh_partial_replication
     ].
 
 -include("lasp.hrl").
@@ -462,7 +462,7 @@ query_test(_Config) ->
 
     ok.
 
-interest_test(Config) ->
+full_mesh_partial_replication(Config) ->
     OtherTopic = other_updates,
     Topic = updates,
     Type = awset,

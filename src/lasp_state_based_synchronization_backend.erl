@@ -375,13 +375,44 @@ schedule_plumtree_peer_refresh() ->
 %% @private
 init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
     % lasp_logger:extended("Initializing reverse toplogical state synchronization with peer: ~p", [Peer]),
+    PeerInterests = interests(Peer, Store),
 
     SendFun = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}) ->
-                    case orddict:find(dynamic, Metadata) of
+                    Dynamic = case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
+                            true;
+                        _ ->
+                            false
+                    end,
+
+                    ObjectTopics = case orddict:find(topics, Metadata) of
+                        {ok, T} ->
+                            %% TODO: Fix me
+                            ObjectInterestType = lasp_type:get_type(?OBJECT_INTERESTS_TYPE),
+                            {ok, Topics} = ObjectInterestType:query(T),
+                            Topics;
+                        _ ->
+                            sets:new()
+                    end,
+
+                    Filtered = case sets:size(ObjectTopics) > 0 andalso sets:size(PeerInterests) > 0 of
+                        true ->
+                            %% If the node has interests, and the object is on a topic, only allow 
+                            %% if they are not disjoint.
+                            not sets:is_disjoint(ObjectTopics, PeerInterests);
+                        false ->
+                            %% Otherwise, send.
+                            true
+                    end,
+
+                    %% Sync as long as it's not dynamically scoped, and is filtered.
+                    ShouldSync = not Dynamic andalso Filtered,
+
+                    case ShouldSync of
+                        false ->
                             %% Ignore: this is a dynamic variable.
                             ok;
-                        _ ->
+                        true ->
                             case ObjectFilterFun(Id, Metadata) of
                                 true ->
                                     ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, false}, Peer);

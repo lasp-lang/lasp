@@ -462,27 +462,45 @@ query_test(_Config) ->
 
     ok.
 
-interest_test(_Config) ->
-    %% Declare an interest.
-    {ok, _} = lasp:interested(updates),
+interest_test(Config) ->
+    OtherTopic = other_updates,
+    Topic = updates,
+    Type = awset,
+    Id = {<<"id">>, Type},
 
-    %% Declare a variable.
-    {ok, {I1, _, _, _}} = lasp:declare(ivar),
+    %% Get nodes.
+    [Node1, Node2 | _Nodes] = proplists:get_value(nodes, Config),
 
-    %% Set interest.
-    ok = lasp:set_topic(I1, things),
+    %% Declare an interest on Node1.
+    {ok, _} = rpc:call(Node1, lasp, interested, [Topic]),
 
-    %% Change it's value.
-    ?assertMatch({ok, _}, lasp:update(I1, {set, 2}, a)),
+    %% Create an object on Node1.
+    {ok, {Id, _, _, _}} = rpc:call(Node1, lasp, declare, [Id, Type]),
 
-    %% Threshold read just to create a synchronization point for the
-    %% value to change.
-    {ok, {_, _, Metadata, _}} = lasp:read(I1, {strict, undefined}),
+    %% Create an object on Node2.
+    {ok, {Id, _, _, _}} = rpc:call(Node2, lasp, declare, [Id, Type]),
 
-    ct:pal("Metadata: ~p", [Metadata]),
+    %% Set interest on Node1.
+    ok = rpc:call(Node1, lasp, set_topic, [Id, OtherTopic]),
 
-    %% Query it.
-    ?assertMatch({ok, 2}, lasp:query(I1)),
+    %% Set interest on Node2.
+    ok = rpc:call(Node2, lasp, set_topic, [Id, Topic]),
+
+    %% Update object on Node2.
+    ?assertMatch({ok, _}, rpc:call(Node2, lasp, update, [Id, {add, 2}, node1])),
+
+    %% Sleep.
+    timer:sleep(1000),
+
+    %% Query on Node1.
+    {ok, Node1Value} = rpc:call(Node1, lasp, query, [Id]),
+    ct:pal("Node1Value: ~p", [Node1Value]),
+
+    %% Query on Node2.
+    {ok, Node2Value} = rpc:call(Node2, lasp, query, [Id]),
+    ct:pal("Node1Value: ~p", [Node2Value]),
+
+    ?assertNotEqual(Node1Value, Node2Value),
 
     ok.
 

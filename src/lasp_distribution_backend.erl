@@ -429,7 +429,7 @@ handle_call({set_topic, Id, Topic}, _From,
             error ->
                 MetadataFunDeclare(Metadata);
             {ok, V} ->
-                TopicSet = Type:mutate({add, Topic}, Actor, V),
+                {ok, TopicSet} = Type:mutate({add, Topic}, Actor, V),
                 orddict:store(topics, TopicSet, Metadata)
         end
     end,
@@ -454,7 +454,7 @@ handle_call({remove_topic, Id, Topic}, _From,
             error ->
                 MetadataFunDeclare(Metadata);
             {ok, V} ->
-                TopicSet = Type:mutate({rmv, Topic}, Actor, V),
+                {ok, TopicSet} = Type:mutate({rmv, Topic}, Actor, V),
                 orddict:store(topics, TopicSet, Metadata)
         end
     end,

@@ -51,6 +51,11 @@
          thread/3,
          enforce_once/3]).
 
+-export([interested/1,
+         disinterested/1,
+         set_topic/2,
+         remove_topic/2]).
+
 %% gen_server callbacks
 -export([init/1,
          handle_call/3,
@@ -252,6 +257,22 @@ enforce_once(Id, Threshold, EnforceFun) ->
 wait_needed(Id, Threshold) ->
     gen_server:call(?MODULE, {wait_needed, Id, Threshold}, infinity).
 
+%% @todo
+interested(Topic) ->
+    gen_server:call(?MODULE, {interested, Topic}, infinity).
+
+%% @todo
+disinterested(Topic) ->
+    gen_server:call(?MODULE, {disinterested, Topic}, infinity).
+
+%% @todo
+set_topic(Id, Topic) ->
+    gen_server:call(?MODULE, {set_topic, Id, Topic}, infinity).
+
+%% @todo
+remove_topic(Id, Topic) ->
+    gen_server:call(?MODULE, {remove_topic, Id, Topic}, infinity).
+
 %%%===================================================================
 %%% Administrative controls
 %%%===================================================================
@@ -334,6 +355,113 @@ handle_call({declare, Id, Type}, _From,
 
     Result = ?CORE:declare(Id, Type, ?CLOCK_INIT(Actor), Store),
     {reply, Result, State};
+
+%% @todo
+handle_call({interested, Topic}, _From, 
+            #state{store=Store, actor=Actor}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("interested/1"),
+
+    Myself = partisan_peer_service_manager:myself(),
+    Id = ?INTERESTS_ID,
+    Operation = {apply, Myself, {add, Topic}},
+    Result0 = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR(Actor),
+                            ?CLOCK_INIT(Actor), Store),
+    Final = {ok, {_, _, Metadata, _}} = declare_if_not_found(Result0, Id, State, ?CORE, update,
+                            [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
+
+    case lasp_config:get(propagate_on_update, false) of
+        true ->
+            ok = do_propagate(Id, Metadata, Store);
+        false ->
+            ok
+    end,
+    case lasp_config:get(blocking_sync, false) of
+        true ->
+            ok = blocking_sync(Id, Metadata);
+        false ->
+            ok
+    end,
+
+    {reply, Final, State};
+
+%% @todo
+handle_call({disinterested, Topic}, _From, 
+             #state{store=Store, actor=Actor}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("disinterested/1"),
+
+    Myself = partisan_peer_service_manager:myself(),
+    Id = ?INTERESTS_ID,
+    Operation = {apply, Myself, {rmv, Topic}},
+    Result0 = ?CORE:update(Id, Operation, Actor, ?CLOCK_INCR(Actor),
+                            ?CLOCK_INIT(Actor), Store),
+    Final = {ok, {_, _, Metadata, _}} = declare_if_not_found(Result0, Id, State, ?CORE, update,
+                            [Id, Operation, Actor, ?CLOCK_INCR(Actor), Store]),
+
+    case lasp_config:get(propagate_on_update, false) of
+        true ->
+            ok = do_propagate(Id, Metadata, Store);
+        false ->
+            ok
+    end,
+    case lasp_config:get(blocking_sync, false) of
+        true ->
+            ok = blocking_sync(Id, Metadata);
+        false ->
+            ok
+    end,
+
+    {reply, Final, State};
+
+%% @todo
+handle_call({set_topic, Id, Topic}, _From, 
+             #state{store=Store, actor=Actor}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("set_topic/2"),
+
+    Type = lasp_type:get_type(?OBJECT_INTERESTS_TYPE),
+
+    MetadataFunDeclare = fun(Metadata) ->
+        NewTopicSet = Type:mutate({add, Topic}, Actor, Type:new()),
+        orddict:store(topics, NewTopicSet, Metadata)
+    end,
+
+    MetadataFun = fun(Metadata) ->
+        case orddict:find(topics, Metadata) of
+            error ->
+                MetadataFunDeclare(Metadata);
+            {ok, V} ->
+                {ok, TopicSet} = Type:mutate({add, Topic}, Actor, V),
+                orddict:store(topics, TopicSet, Metadata)
+        end
+    end,
+
+    {ok, _} = ?CORE:update_metadata(Id, Actor, MetadataFun, MetadataFunDeclare, Store),
+
+    {reply, ok, State};
+
+%% @todo
+handle_call({remove_topic, Id, Topic}, _From, 
+             #state{store=Store, actor=Actor}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("remove_topic/2"),
+
+    Type = lasp_type:get_type(?OBJECT_INTERESTS_TYPE),
+
+    MetadataFunDeclare = fun(Metadata) ->
+        orddict:store(topics, Type:new(), Metadata)
+    end,
+
+    MetadataFun = fun(Metadata) ->
+        case orddict:find(topics, Metadata) of
+            error ->
+                MetadataFunDeclare(Metadata);
+            {ok, V} ->
+                {ok, TopicSet} = Type:mutate({rmv, Topic}, Actor, V),
+                orddict:store(topics, TopicSet, Metadata)
+        end
+    end,
+
+    {ok, _} = ?CORE:update_metadata(Id, Actor, MetadataFun, MetadataFunDeclare, Store),
+
+    {reply, ok, State};
 
 %% Incoming bind request, where we do not have information about the
 %% variable yet.  In this case, take the remote metadata, if we don't
@@ -677,7 +805,7 @@ do_propagate(Id, Metadata, _Store) ->
             %% Ignore: this is a dynamic variable.
             ok;
         _ ->
-            ObjectFilterFun = fun(I) -> Id == I end,
+            ObjectFilterFun = fun(I, _) -> Id == I end,
 
             case lasp_config:get(mode, ?DEFAULT_MODE) of
                 state_based ->
@@ -694,7 +822,7 @@ blocking_sync(Id, Metadata) ->
             %% Ignore: this is a dynamic variable.
             ok;
         _ ->
-            ObjectFilterFun = fun(I) -> Id == I end,
+            ObjectFilterFun = fun(I, _) -> Id == I end,
 
             case lasp_config:get(mode, ?DEFAULT_MODE) of
                 state_based ->

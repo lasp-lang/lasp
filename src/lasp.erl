@@ -48,6 +48,11 @@
          wait_needed/2,
          thread/3]).
 
+-export([interested/1,
+         disinterested/1,
+         set_topic/2,
+         remove_topic/2]).
+
 -export([invariant/3,
          enforce_once/3]).
 
@@ -249,6 +254,42 @@ reset() ->
 propagate(Id) ->
     do(propagate, [Id]).
 
+%% @todo
+interested(Topic) ->
+    case can_partially_replicate() of
+        true ->
+            do(interested, [Topic]);
+        false ->
+            {error, not_supported}
+    end.
+
+%% @todo
+disinterested(Topic) ->
+    case can_partially_replicate() of
+        true ->
+            do(disinterested, [Topic]);
+        false ->
+            {error, not_supported}
+    end.
+
+%% @todo
+set_topic(Id, Topic) ->
+    case can_partially_replicate() of
+        true ->
+            do(set_topic, [Id, Topic]);
+        false ->
+            {error, not_supported}
+    end.
+
+%% @todo
+remove_topic(Id, Topic) ->
+    case can_partially_replicate() of
+        true ->
+            do(remove_topic, [Id, Topic]);
+        false ->
+            {error, not_supported}
+    end.
+
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
@@ -258,3 +299,22 @@ do(Function, Args) ->
     Backend = lasp_config:get(distribution_backend,
                               lasp_distribution_backend),
     erlang:apply(Backend, Function, Args).
+
+%% @private
+can_partially_replicate() ->
+    case partisan_config:get(partisan_peer_service_manager) of
+        partisan_default_peer_service_manager ->
+            case ?SYNC_BACKEND:broadcast_tree_mode() of
+                true ->
+                    false;
+                false ->
+                    case lasp_config:get(mode, ?DEFAULT_MODE) of
+                        state_based ->
+                            true;
+                        delta_based ->
+                            false
+                    end
+            end;
+        _ ->
+            false
+    end.

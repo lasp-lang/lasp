@@ -96,7 +96,7 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
     Mutator = fun({Id, #dv{value=Value, type=Type, metadata=Metadata,
                            delta_counter=Counter, delta_map=DeltaMap,
                            delta_ack_map=AckMap0}=Object}) ->
-        case ObjectFilterFun(Id) of
+        case ObjectFilterFun(Id, Metadata) of
             true ->
                 Ack = case orddict:find(Peer, AckMap0) of
                     {ok, {Ack0, _GCCounter}} ->
@@ -170,7 +170,7 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
     case ?SYNC_BACKEND:client_server_mode() andalso
          ?SYNC_BACKEND:i_am_server() andalso ?SYNC_BACKEND:reactive_server() of
         true ->
-            ObjectFilterFun = fun(Id1) ->
+            ObjectFilterFun = fun(Id1, _) ->
                                       Id =:= Id1
                               end,
             init_delta_sync(From, ObjectFilterFun);
@@ -208,19 +208,19 @@ handle_info(delta_sync, #state{}=State) ->
     lasp_logger:extended("Beginning sync for peers: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
-    WithoutConvergenceFun = fun(Id) ->
+    FilterWithoutConvergenceFun = fun(Id, _) ->
                               Id =/= ?SIM_STATUS_STRUCTURE
                       end,
     lists:foreach(fun(Peer) ->
-                          init_delta_sync(Peer, WithoutConvergenceFun) end,
+                          init_delta_sync(Peer, FilterWithoutConvergenceFun) end,
                   Peers),
 
     %% Synchronize convergence structure.
-    WithConvergenceFun = fun(Id) ->
+    FilterWithConvergenceFun = fun(Id, _) ->
                               Id =:= ?SIM_STATUS_STRUCTURE
                       end,
     lists:foreach(fun(Peer) ->
-                          init_delta_sync(Peer, WithConvergenceFun) end,
+                          init_delta_sync(Peer, FilterWithConvergenceFun) end,
                   ?SYNC_BACKEND:without_me(Members)),
 
     %% Schedule next synchronization.

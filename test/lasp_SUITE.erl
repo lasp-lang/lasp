@@ -103,7 +103,8 @@ all() ->
      awset_enforce_once_test,
      awset_strict_enforce_once_test,
      orset_enforce_once_test,
-     orset_strict_enforce_once_test
+     orset_strict_enforce_once_test,
+     full_mesh_partial_replication
     ].
 
 -include("lasp.hrl").
@@ -458,6 +459,48 @@ query_test(_Config) ->
 
     %% Query it.
     ?assertMatch({ok, 2}, lasp:query(I1)),
+
+    ok.
+
+full_mesh_partial_replication(Config) ->
+    OtherTopic = other_updates,
+    Topic = updates,
+    Type = awset,
+    Id = {<<"id">>, Type},
+
+    %% Get nodes.
+    [Node1, Node2 | _Nodes] = proplists:get_value(nodes, Config),
+
+    %% Declare an interest on Node1.
+    {ok, _} = rpc:call(Node1, lasp, interested, [Topic]),
+
+    %% Create an object on Node1.
+    {ok, {Id, _, _, _}} = rpc:call(Node1, lasp, declare, [Id, Type]),
+
+    %% Create an object on Node2.
+    {ok, {Id, _, _, _}} = rpc:call(Node2, lasp, declare, [Id, Type]),
+
+    %% Set interest on Node1.
+    ok = rpc:call(Node1, lasp, set_topic, [Id, OtherTopic]),
+
+    %% Set interest on Node2.
+    ok = rpc:call(Node2, lasp, set_topic, [Id, Topic]),
+
+    %% Update object on Node2.
+    ?assertMatch({ok, _}, rpc:call(Node2, lasp, update, [Id, {add, 2}, node1])),
+
+    %% Sleep.
+    timer:sleep(1000),
+
+    %% Query on Node1.
+    {ok, Node1Value} = rpc:call(Node1, lasp, query, [Id]),
+    ct:pal("Node1Value: ~p", [Node1Value]),
+
+    %% Query on Node2.
+    {ok, Node2Value} = rpc:call(Node2, lasp, query, [Id]),
+    ct:pal("Node1Value: ~p", [Node2Value]),
+
+    ?assertNotEqual(Node1Value, Node2Value),
 
     ok.
 

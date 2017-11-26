@@ -1,6 +1,11 @@
 %% Membership.
--define(MEMBERSHIP_ID, {<<"_membership">>, lwwregister}).
 -define(MEMBERSHIP_TYPE, lwwregister).
+-define(MEMBERSHIP_ID, {<<"_membership">>, ?MEMBERSHIP_TYPE}).
+
+%% Interests.
+-define(INTERESTS_TYPE, awmap).
+-define(INTERESTS_ID, {<<"_interests">>, ?INTERESTS_TYPE}).
+-define(OBJECT_INTERESTS_TYPE, awset).
 
 %% Simulations.
 -define(SIMPLE_BOOLEAN, {<<"boolean">>, ?BOOLEAN_TYPE}).

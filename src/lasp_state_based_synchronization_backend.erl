@@ -229,7 +229,7 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
          ?SYNC_BACKEND:i_am_server() andalso
          ?SYNC_BACKEND:reactive_server() of
         true ->
-            ObjectFilterFun = fun(Id1) ->
+            ObjectFilterFun = fun(Id1, _) ->
                                       Id =:= Id1
                               end,
             init_state_sync(From, ObjectFilterFun, false, Store),
@@ -337,7 +337,7 @@ schedule_state_synchronization() ->
     case ShouldSync of
         true ->
             Interval = lasp_config:get(state_interval, 10000),
-            ObjectFilterFun = fun(_) -> true end,
+            ObjectFilterFun = fun(_, _) -> true end,
             case lasp_config:get(jitter, false) of
                 true ->
                     %% Add random jitter.
@@ -382,7 +382,7 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
                             %% Ignore: this is a dynamic variable.
                             ok;
                         _ ->
-                            case ObjectFilterFun(Id) of
+                            case ObjectFilterFun(Id, Metadata) of
                                 true ->
                                     ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, false}, Peer);
                                 false ->
@@ -414,21 +414,66 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
     ok.
 
 %% @private
+interests(Peer, Store) ->
+    {ok, Value} = ?CORE:query(?INTERESTS_ID, Store),
+    proplists:get_value(Peer, Value, sets:new()).
+
+%% @private
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
+    PeerInterests = interests(Peer, Store),
+
     % lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
-                    case orddict:find(dynamic, Metadata) of
+                    Dynamic = case orddict:find(dynamic, Metadata) of
                         {ok, true} ->
-                            %% Ignore: this is a dynamic variable.
-                            Acc0;
+                            true;
                         _ ->
-                            case ObjectFilterFun(Id) of
+                            false
+                    end,
+
+                    ObjectTopics = case orddict:find(topics, Metadata) of
+                        {ok, T} ->
+                            %% TODO: Fix me
+                            ObjectInterestType = lasp_type:get_type(?OBJECT_INTERESTS_TYPE),
+                            {ok, Topics} = ObjectInterestType:query(T),
+                            Topics;
+                        _ ->
+                            sets:new()
+                    end,
+
+                    Filtered = case sets:size(ObjectTopics) > 0 andalso sets:size(PeerInterests) > 0 of
+                        true ->
+                            %% If the node has interests, and the object is on a topic, only allow 
+                            %% if they are not disjoint.
+                            not sets:is_disjoint(ObjectTopics, PeerInterests);
+                        false ->
+                            %% Otherwise, send.
+                            true
+                    end,
+
+                    %% Sync as long as it's not dynamically scoped, and is filtered.
+                    ShouldSync = not Dynamic andalso Filtered,
+
+                    case ShouldSync of
+                        true ->
+                            try ObjectFilterFun(Id, Metadata) of
                                 true ->
                                     ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, Blocking}, Peer),
                                     [Id|Acc0];
                                 false ->
                                     Acc0
-                            end
+                            catch 
+                                _:_ ->
+                                    case ObjectFilterFun(Id) of
+                                        true ->
+                                            ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, Blocking}, Peer),
+                                            [Id|Acc0];
+                                        false ->
+                                            Acc0
+                                    end
+                            end;
+                        false ->
+                            Acc0
                     end
                end,
     %% TODO: Should this be parallel?

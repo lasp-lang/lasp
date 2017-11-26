@@ -1,0 +1,3 @@
+0.7.0:
+
+* Prototype support for partial replication if you're using the default peer service manager with no broadcast trees.

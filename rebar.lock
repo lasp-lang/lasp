@@ -5,10 +5,7 @@
  {<<"lager">>,{pkg,<<"lager">>,<<"3.5.2">>},0},
  {<<"lasp_support">>,{pkg,<<"lasp_support">>,<<"0.0.3">>},0},
  {<<"partisan">>,{pkg,<<"partisan">>,<<"1.2.0">>},0},
- {<<"plumtree">>,
-  {git,"git://github.com/lasp-lang/plumtree",
-       {ref,"f32f3bebd2fd7d4108e7adc4d3705be9a34f8f30"}},
-  0},
+ {<<"plumtree">>,{pkg,<<"plumtree">>,<<"0.5.0">>},0},
  {<<"rand_compat">>,{pkg,<<"rand_compat">>,<<"0.0.3">>},0},
  {<<"time_compat">>,{pkg,<<"time_compat">>,<<"0.0.1">>},0},
  {<<"types">>,{pkg,<<"types">>,<<"0.1.7">>},0}]}.
@@ -20,6 +17,7 @@
  {<<"lager">>, <<"614A8C8F67BF99B69EB264EA22121AD25511C055AAEC09B086773D5108C6767F">>},
  {<<"lasp_support">>, <<"C1B7E1A472037AE82C71D2D16A10B7D644A621B66AE5AFE834CECF170F2E9169">>},
  {<<"partisan">>, <<"460DE0CB05694C5AC2BD56E1F8F46B639D68F74D5C8AFA5D617A7F3CCFE28E75">>},
+ {<<"plumtree">>, <<"F3521CE631AD22AC00635E79C7F046A163BD1135889CDC1D0B18AB577F76EC70">>},
  {<<"rand_compat">>, <<"011646BC1F0B0C432FE101B816F25B9BBB74A085713CEE1DAFD2D62E9415EAD3">>},
  {<<"time_compat">>, <<"23FE0AD1FDF3B5B88821B2D04B4B5E865BF587AE66056D671FE0F53514ED8139">>},
  {<<"types">>, <<"7542CEE48E664521BCF0311EEC3B433E70D80DCDF34DC18D8F0D39921AFE6831">>}]}

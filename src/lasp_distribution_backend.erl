@@ -800,7 +800,7 @@ do_propagate(Id, Store) ->
 
 %% @private
 do_propagate(Id, Metadata, _Store) ->
-    case orddict:find(dynamic, Metadata) of
+    case is_dynamic(Metadata) of
         {ok, true} ->
             %% Ignore: this is a dynamic variable.
             ok;
@@ -817,7 +817,7 @@ do_propagate(Id, Metadata, _Store) ->
 
 %% @private
 blocking_sync(Id, Metadata) ->
-    case orddict:find(dynamic, Metadata) of
+    case is_dynamic(Metadata) of
         {ok, true} ->
             %% Ignore: this is a dynamic variable.
             ok;
@@ -839,4 +839,13 @@ blocking_sync(ObjectFilterFun) ->
             lasp_state_based_synchronization_backend:blocking_sync(ObjectFilterFun);
         delta_based ->
             {error, not_implemented}
+    end.
+
+%% @private
+is_dynamic(Metadata) ->
+    case orddict:find(dynamic, Metadata) of
+        {ok, true} ->
+            true;
+        _ ->
+            false
     end.

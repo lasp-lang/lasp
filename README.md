@@ -36,4 +36,3 @@ the following command.
 $ make check
 ```
 
-

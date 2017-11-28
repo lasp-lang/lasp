@@ -1,3 +1,7 @@
+# 0.7.2
+
+* Add partial replication support to the reverse topological sort behavior.
+
 # 0.7.1
 
 * Fix bad plumtree dependency.

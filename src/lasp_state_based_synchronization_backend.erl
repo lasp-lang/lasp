@@ -376,12 +376,20 @@ schedule_plumtree_peer_refresh() ->
 init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
     % lasp_logger:extended("Initializing reverse toplogical state synchronization with peer: ~p", [Peer]),
 
+    PeerInterests = get_peer_interests(Peer, Store),
+
     SendFun = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}) ->
-                    case orddict:find(dynamic, Metadata) of
-                        {ok, true} ->
+                    Dynamic = is_dynamic(Metadata),
+                    Filtered = is_filtered(PeerInterests, Metadata),
+
+                    %% Sync as long as it's not dynamically scoped, and is filtered.
+                    ShouldSync = not Dynamic andalso Filtered,
+
+                    case ShouldSync of
+                        false ->
                             %% Ignore: this is a dynamic variable.
                             ok;
-                        _ ->
+                        true ->
                             case ObjectFilterFun(Id, Metadata) of
                                 true ->
                                     ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, false}, Peer);
@@ -414,42 +422,19 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
     ok.
 
 %% @private
-interests(Peer, Store) ->
+get_peer_interests(Peer, Store) ->
     {ok, Value} = ?CORE:query(?INTERESTS_ID, Store),
     proplists:get_value(Peer, Value, sets:new()).
 
 %% @private
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
-    PeerInterests = interests(Peer, Store),
-
     % lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
+
+    PeerInterests = get_peer_interests(Peer, Store),
+
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
-                    Dynamic = case orddict:find(dynamic, Metadata) of
-                        {ok, true} ->
-                            true;
-                        _ ->
-                            false
-                    end,
-
-                    ObjectTopics = case orddict:find(topics, Metadata) of
-                        {ok, T} ->
-                            %% TODO: Fix me
-                            ObjectInterestType = lasp_type:get_type(?OBJECT_INTERESTS_TYPE),
-                            {ok, Topics} = ObjectInterestType:query(T),
-                            Topics;
-                        _ ->
-                            sets:new()
-                    end,
-
-                    Filtered = case sets:size(ObjectTopics) > 0 andalso sets:size(PeerInterests) > 0 of
-                        true ->
-                            %% If the node has interests, and the object is on a topic, only allow 
-                            %% if they are not disjoint.
-                            not sets:is_disjoint(ObjectTopics, PeerInterests);
-                        false ->
-                            %% Otherwise, send.
-                            true
-                    end,
+                    Dynamic = is_dynamic(Metadata),
+                    Filtered = is_filtered(PeerInterests, Metadata),
 
                     %% Sync as long as it's not dynamically scoped, and is filtered.
                     ShouldSync = not Dynamic andalso Filtered,
@@ -507,3 +492,33 @@ plumtree_gossip_peers(Root) ->
     lager:info("PLUMTREE DEBUG: Gossip Peers: ~p", [GossipPeers]),
 
     GossipPeers.
+
+%% @private
+is_filtered(PeerInterests, Metadata) ->
+    ObjectTopics = case orddict:find(topics, Metadata) of
+        {ok, T} ->
+            ObjectInterestType = lasp_type:get_type(?OBJECT_INTERESTS_TYPE),
+            {ok, Topics} = ObjectInterestType:query(T),
+            Topics;
+        _ ->
+            sets:new()
+    end,
+
+    case sets:size(ObjectTopics) > 0 andalso sets:size(PeerInterests) > 0 of
+        true ->
+            %% If the node has interests, and the object is on a topic, only allow 
+            %% if they are not disjoint.
+            not sets:is_disjoint(ObjectTopics, PeerInterests);
+        false ->
+            %% Otherwise, send.
+            true
+    end.
+
+%% @private
+is_dynamic(Metadata) ->
+    case orddict:find(dynamic, Metadata) of
+        {ok, true} ->
+            true;
+        _ ->
+            false
+    end.

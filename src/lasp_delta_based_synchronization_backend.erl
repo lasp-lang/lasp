@@ -35,6 +35,8 @@
          terminate/2,
          code_change/3]).
 
+-export([propagate/1]).
+
 %% lasp_synchronization_backend callbacks
 -export([extract_log_type_and_payload/1]).
 
@@ -62,6 +64,9 @@ extract_log_type_and_payload({delta_ack, Node, Id, Counter}) ->
 start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
 
+propagate(ObjectFilterFun) ->
+    gen_server:call(?MODULE, {propagate, ObjectFilterFun}, infinity).
+
 %%%===================================================================
 %%% gen_server callbacks
 %%%===================================================================
@@ -80,6 +85,21 @@ init([Store, Actor]) ->
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
+
+handle_call({propagate, ObjectFilterFun}, _From, State) ->
+    %% Get the active set from the membership protocol.
+    {ok, Members} = ?SYNC_BACKEND:membership(),
+
+    %% Remove ourself and compute exchange peers.
+    Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
+
+    %% Transmit updates.
+    lists:foreach(fun(Peer) ->
+                          init_delta_sync(Peer, ObjectFilterFun) end,
+                  Peers),
+
+    {reply, ok, State};
+
 
 handle_call(Msg, _From, State) ->
     _ = lager:warning("Unhandled messages: ~p", [Msg]),

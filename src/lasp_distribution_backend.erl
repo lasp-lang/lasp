@@ -375,6 +375,7 @@ handle_call({interested, Topic}, _From,
         false ->
             ok
     end,
+
     case lasp_config:get(blocking_sync, false) of
         true ->
             ok = blocking_sync(Id, Metadata);
@@ -811,7 +812,7 @@ do_propagate(Id, Metadata, _Store) ->
                 state_based ->
                     lasp_state_based_synchronization_backend:propagate(ObjectFilterFun);
                 delta_based ->
-                    {error, not_implemented}
+                    lasp_delta_based_synchronization_backend:propagate(ObjectFilterFun)
             end
     end.
 

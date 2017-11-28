@@ -19,7 +19,7 @@
 %% -------------------------------------------------------------------
 
 -module(lasp_core).
--author("Christopher Meiklejohn <cmeiklejohn@basho.com>").
+-author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -include("lasp.hrl").
 

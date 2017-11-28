@@ -376,12 +376,20 @@ schedule_plumtree_peer_refresh() ->
 init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
     % lasp_logger:extended("Initializing reverse toplogical state synchronization with peer: ~p", [Peer]),
 
+    PeerInterests = get_peer_interests(Peer, Store),
+
     SendFun = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}) ->
-                    case orddict:find(dynamic, Metadata) of
-                        {ok, true} ->
+                    Dynamic = is_dynamic(Metadata),
+                    Filtered = is_filtered(PeerInterests, Metadata),
+
+                    %% Sync as long as it's not dynamically scoped, and is filtered.
+                    ShouldSync = not Dynamic andalso Filtered,
+
+                    case ShouldSync of
+                        false ->
                             %% Ignore: this is a dynamic variable.
                             ok;
-                        _ ->
+                        true ->
                             case ObjectFilterFun(Id, Metadata) of
                                 true ->
                                     ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, false}, Peer);
@@ -420,9 +428,10 @@ get_peer_interests(Peer, Store) ->
 
 %% @private
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
+    % lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
+
     PeerInterests = get_peer_interests(Peer, Store),
 
-    % lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     Dynamic = is_dynamic(Metadata),
                     Filtered = is_filtered(PeerInterests, Metadata),

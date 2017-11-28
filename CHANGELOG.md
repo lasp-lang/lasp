@@ -1,3 +1,8 @@
+# 0.8.0
+
+* Delta dissemination supports forced propagation after update.
+* Added experimental Redis backend.
+
 # 0.7.2
 
 * Add partial replication support to the reverse topological sort behavior.

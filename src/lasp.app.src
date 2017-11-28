@@ -13,4 +13,4 @@
                     {web_ip,"0.0.0.0"},
                     {web_port,8080},
                     {peer_service,lasp_partisan_peer_service},
-                    {storage_backend,lasp_ets_storage_backend}]}]}.
+                    {storage_backend,lasp_redis_storage_backend}]}]}.

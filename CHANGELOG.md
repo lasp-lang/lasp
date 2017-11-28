@@ -1,3 +1,7 @@
+# 0.7.3 [TBD]
+
+* Add support for delta-based forced propagation on update.
+
 # 0.7.2
 
 * Add partial replication support to the reverse topological sort behavior.

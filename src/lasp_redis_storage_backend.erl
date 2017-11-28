@@ -122,7 +122,7 @@ handle_call({put, Id, Record}, _From, #state{eredis=Eredis, prefix=Prefix}=State
 handle_call({update, Id, Function}, _From, #state{eredis=Eredis, prefix=Prefix}=State) ->
     Result = case do_get(Eredis, Prefix, Id) of
         {ok, Value} ->
-            {NewValue, InnerResult} = Function(Value),
+            {NewValue, InnerResult} = Function({Id, decode(Value)}),
             case do_put(Eredis, Prefix, Id, NewValue) of
                 ok ->
                     InnerResult
@@ -137,7 +137,7 @@ handle_call({update_all, Function}, _From, #state{eredis=Eredis, prefix=Prefix}=
         fun(Id, Acc) ->
             {ok, Value1} = do_get(Eredis, Prefix, Id),
             Value = decode(Value1),
-            {NewValue, InnerResult} = Function({Id, Value}),
+            {NewValue, InnerResult} = Function({Id, decode(Value)}),
             case do_put(Eredis, Prefix, Id, NewValue) of
                 ok ->
                     Acc ++ [InnerResult]
@@ -153,7 +153,7 @@ handle_call({fold, Function, Acc0}, _From, #state{eredis=Eredis, prefix=Prefix}=
         fun(Id, Acc) ->
             {ok, Value1} = do_get(Eredis, Prefix, Id),
             Value = decode(Value1),
-            Function({Id, Value}, Acc)
+            Function({Id, decode(Value)}, Acc)
         end,
         Acc0,
         Objects

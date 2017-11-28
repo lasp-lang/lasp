@@ -414,16 +414,18 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
     ok.
 
 %% @private
-interests(Peer, Store) ->
+get_peer_interests(Peer, Store) ->
     {ok, Value} = ?CORE:query(?INTERESTS_ID, Store),
     proplists:get_value(Peer, Value, sets:new()).
 
 %% @private
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
+    PeerInterests = get_peer_interests(Peer, Store),
+
     % lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     Dynamic = is_dynamic(Metadata),
-                    Filtered = is_filtered(Peer, Metadata, Store),
+                    Filtered = is_filtered(PeerInterests, Metadata),
 
                     %% Sync as long as it's not dynamically scoped, and is filtered.
                     ShouldSync = not Dynamic andalso Filtered,
@@ -483,9 +485,7 @@ plumtree_gossip_peers(Root) ->
     GossipPeers.
 
 %% @private
-is_filtered(Peer, Metadata, Store) ->
-    PeerInterests = interests(Peer, Store),
-
+is_filtered(PeerInterests, Metadata) ->
     ObjectTopics = case orddict:find(topics, Metadata) of
         {ok, T} ->
             ObjectInterestType = lasp_type:get_type(?OBJECT_INTERESTS_TYPE),

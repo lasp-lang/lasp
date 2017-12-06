@@ -1,3 +1,7 @@
+# 0.8.1
+
+* Bump partisan dependencies.
+
 # 0.8.0
 
 * Delta dissemination supports forced propagation after update.

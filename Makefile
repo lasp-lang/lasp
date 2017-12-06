@@ -3,6 +3,7 @@ VERSION         ?= $(shell git describe --tags)
 BASE_DIR         = $(shell pwd)
 ERLANG_BIN       = $(shell dirname $(shell which erl))
 REBAR            = $(shell pwd)/rebar3
+VERSION 	 = "0.8.1" 
 MAKE						 = make
 
 .PHONY: rel deps test plots dcos logs fpm

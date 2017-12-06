@@ -17,7 +17,7 @@ RUN cd /tmp && \
 
 CMD cd /tmp && \
     git clone https://github.com/lasp-lang/lasp.git && \
-    cd lasp && make && make package && \
+    cd lasp && make && VERSION="0.8.1" make package && \
     locale-gen en_US en_US.UTF-8 && \
     dpkg-reconfigure locales && \
     LC_ALL="en_US.UTF-8" package_cloud push cmeiklejohn/lasp/ubuntu/trusty `find /tmp/lasp -name *.deb | tail -1`

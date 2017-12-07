@@ -1,3 +1,7 @@
+# 0.8.2
+
+* Fix packaging.
+
 # 0.8.1
 
 * Bump partisan dependencies.

@@ -104,7 +104,7 @@ package: rel fpm
 		--deb-user $(PACKAGE) \
 		--deb-group $(PACKAGE) \
 		--before-install=rel/before-install \
-		_build/lasp/rel/$(PACKAGE)=/opt/ \
+		_build/default/rel/$(PACKAGE)=/opt/ \
 		rel/init=/etc/init.d/$(PACKAGE) \
 		rel/var/lib/$(PACKAGE)/=/var/lib/$(PACKAGE)/ \
 		rel/var/log/$(PACKAGE)/=/var/log/$(PACKAGE)/ \

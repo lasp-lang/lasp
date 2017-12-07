@@ -9,5 +9,5 @@ RUN cd /tmp && \
 CMD cd /opt && \
     git clone https://github.com/lasp-lang/lasp.git -b $LASP_BRANCH && \
     cd lasp && \
-    make stage && \
+    make exp-stage && \
     /opt/lasp/_build/exp/rel/lasp/bin/env

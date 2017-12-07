@@ -1,0 +1,8 @@
+version: "2"
+services:
+  redis:
+    image: "redis:alpine"
+  node1:
+    environment:
+      - LASP_BRANCH=master
+    image: "lasplang/lasp-exp:latest" 

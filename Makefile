@@ -81,9 +81,15 @@ client-server-divergence-simulation:
 ##
 
 rel:
-	${REBAR} as exp release
+	${REBAR} release
 
 stage:
+	${REBAR} release -d
+
+exp-rel:
+	${REBAR} as exp release
+
+exp-stage:
 	${REBAR} as exp release -d
 
 ##

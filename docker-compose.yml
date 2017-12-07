@@ -2,7 +2,21 @@ version: "2"
 services:
   redis:
     image: "redis:alpine"
-  node1:
+    ports:
+      - "6379:6379"
+  lasp-client:
     environment:
-      - LASP_BRANCH=master
-    image: "lasplang/lasp-exp:latest" 
+      - TAG=client
+      - REDIS_SERVICE_HOST=redis
+      - REDIS_PORT=6379
+      - LASP_BRANCH=compose
+      - DOCKER_COMPOSE=true
+    build: .
+  lasp-server:
+    environment:
+      - TAG=server
+      - REDIS_SERVICE_HOST=redis
+      - REDIS_PORT=6379
+      - LASP_BRANCH=compose
+      - DOCKER_COMPOSE=true
+    build: .

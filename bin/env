@@ -43,6 +43,12 @@ if [ ! -z "$MESOS_TASK_ID" ]; then
   export PEER_PORT=${PORT1}
 fi
 
+# If we're running in Docker compose...
+if [ ! -z "$DOCKER_COMPOSE" ]; then
+  export IP=$(awk 'END{print $1}' /etc/hosts)
+  export NODE_NAME=${HOSTNAME}@${IP}
+fi
+
 # Assume 127.0.0.1 as bind host.
 if [ -z "$IP" ]; then
   echo "IP address not set; defaulting to 127.0.0.1."

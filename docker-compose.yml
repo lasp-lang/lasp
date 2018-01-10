@@ -9,7 +9,7 @@ services:
       - TAG=client
       - REDIS_SERVICE_HOST=redis
       - REDIS_PORT=6379
-      - LASP_BRANCH=compose
+      - LASP_BRANCH=master
       - DOCKER_COMPOSE=true
     build: .
   lasp-server:
@@ -17,6 +17,6 @@ services:
       - TAG=server
       - REDIS_SERVICE_HOST=redis
       - REDIS_PORT=6379
-      - LASP_BRANCH=compose
+      - LASP_BRANCH=master
       - DOCKER_COMPOSE=true
     build: .

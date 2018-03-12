@@ -113,7 +113,7 @@ enforce_once(Id, Threshold, EnforceFun, Store) ->
                            SortedMembership = lists:usort(Membership1),
                            EnforcementNode = hd(SortedMembership),
 
-                           case node() of
+                           case lasp_support:mynode() of
                                EnforcementNode ->
                                    EnforceFun(Value);
                                _ ->
@@ -467,10 +467,10 @@ bind(Id, Value, Store) ->
 
 bind_var(Id, Value, Store) ->
     MetadataFun = fun(X) -> X end,
-    bind_var(node(), Id, Value, MetadataFun, Store).
+    bind_var(lasp_support:mynode(), Id, Value, MetadataFun, Store).
 
 bind(Id, Value, MetadataFun, Store) ->
-    bind(node(), Id, Value, MetadataFun, Store).
+    bind(lasp_support:mynode(), Id, Value, MetadataFun, Store).
 
 %% @doc Define a dataflow variable to be bound a value.
 %%

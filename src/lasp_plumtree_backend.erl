@@ -131,7 +131,7 @@ exchange(_Peer) ->
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
     %% Seed the process at initialization.
-    rand_compat:seed(erlang:phash2([node()]),
+    rand_compat:seed(erlang:phash2([lasp_support:mynode()]),
                      erlang:monotonic_time(),
                      erlang:unique_integer()),
 
@@ -179,7 +179,7 @@ handle_cast(Msg, State) ->
 
 %% @private
 handle_info(heartbeat, State) ->
-    Node = node(),
+    Node = lasp_support:mynode(),
     Servers = servers(),
 
     case lists:member(Node, Servers) of
@@ -191,7 +191,7 @@ handle_info(heartbeat, State) ->
             %% identifier: this means that we can have this tree
             %% participate in multiple trees, each rooted at a different
             %% node.
-            Timestamp = {node(), Counter},
+            Timestamp = {lasp_support:mynode(), Counter},
 
             %% Insert a new message into the table.
             true = ets:insert(?MODULE, [{Timestamp, true}]),

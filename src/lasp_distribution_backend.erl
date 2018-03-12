@@ -299,7 +299,7 @@ init([]) ->
     {ok, Actor} = lasp_unique:unique(),
     lasp_config:set(actor, Actor),
 
-    Identifier = node(),
+    Identifier = lasp_support:mynode(),
 
     %% Start the storage backend.
     {ok, Store} = case ?CORE:start_link(Identifier) of

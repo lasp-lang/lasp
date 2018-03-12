@@ -45,7 +45,8 @@
          heal_cluster/2,
          load_lasp/3,
          start_lasp/2,
-         push_logs/0]).
+         push_logs/0,
+         mynode/0]).
 
 -define(EXCHANGE_TIMER, 120).
 
@@ -266,7 +267,7 @@ start_runner() ->
     ok = partisan_config:set(partisan_peer_service_manager,
                              partisan_default_peer_service_manager),
     lager:info("Configured peer_service_manager ~p on node ~p",
-               [partisan_default_peer_service_manager, node()]),
+               [partisan_default_peer_service_manager, lasp_support:mynode()]),
 
     {ok, _} = application:ensure_all_started(lasp),
 
@@ -447,3 +448,7 @@ push_logs() ->
                     lager:info("Pushing logs completed.")
             end
     end.
+
+%% @doc Return node name.
+mynode() ->
+    node().

@@ -44,7 +44,7 @@ membership() ->
 
 %% @private
 seed() ->
-    rand_compat:seed(erlang:phash2([node()]),
+    rand_compat:seed(erlang:phash2([lasp_support:mynode()]),
                      erlang:monotonic_time(),
                      erlang:unique_integer()).
 
@@ -92,7 +92,7 @@ compute_exchange(Peers) ->
 
 %% @private
 without_me(Members) ->
-    Members -- [node()].
+    Members -- [lasp_support:mynode()].
 
 %% @private
 select_random_sublist(List, K) ->

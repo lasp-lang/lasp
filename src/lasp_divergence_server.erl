@@ -82,7 +82,7 @@ init([]) ->
     schedule_check_simulation_end(),
 
     %% Mark that the convergence reached.
-    lasp_workflow:task_completed(convergence, node()),
+    lasp_workflow:task_completed(convergence, lasp_support:mynode()),
 
     {ok, #state{}}.
 
@@ -115,7 +115,7 @@ handle_info(check_simulation_end, State) ->
                     lager:info("Performing anti-entropy pass with all clients."),
                     ObjectFilterFun = fun(_, _) -> true end,
                     ok = lasp_distribution_backend:blocking_sync(ObjectFilterFun),
-                    lasp_workflow:task_completed(anti_entropy, node());
+                    lasp_workflow:task_completed(anti_entropy, lasp_support:mynode());
                 true ->
                     ok
             end;

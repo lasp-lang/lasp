@@ -58,7 +58,7 @@ init([]) ->
     lager:info("Throughput client initialized."),
 
     %% Generate actor identifier.
-    Actor = node(),
+    Actor = lasp_support:mynode(),
 
     %% Schedule event.
     schedule_event(),
@@ -127,7 +127,7 @@ handle_info(event, #state{actor=Actor,
                     lager:info("All events done. Node: ~p", [Actor]),
 
                     %% Update Simulation Status Instance
-                    lasp_workflow:task_completed(events, node()),
+                    lasp_workflow:task_completed(events, lasp_support:mynode()),
                     log_convergence(),
                     schedule_check_simulation_end();
                 false ->
@@ -151,7 +151,7 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
             lager:info("All nodes did all events. Node ~p", [Actor]),
             lasp_instrumentation:stop(),
             lasp_support:push_logs(),
-            lasp_workflow:task_completed(logs, node());
+            lasp_workflow:task_completed(logs, lasp_support:mynode());
         false ->
             schedule_check_simulation_end()
     end,

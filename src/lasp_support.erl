@@ -451,4 +451,4 @@ push_logs() ->
 
 %% @doc Return node name.
 mynode() ->
-    node().
+    partisan_peer_service_manager:mynode().

@@ -68,7 +68,7 @@ init([]) ->
     schedule_check_simulation_end(),
 
     %% Mark that the convergence reached.
-    lasp_workflow:task_completed(convergence, node()),
+    lasp_workflow:task_completed(convergence, lasp_support:mynode()),
 
     {ok, #state{}}.
 

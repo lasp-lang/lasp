@@ -48,7 +48,7 @@ connect() ->
                 Result = lasp_peer_service:join({Node, {127,0,0,1}, PeerPort}),
                 lager:info("Join result: ~p", [Result])
 
-        end, lists:delete(node(), ?NODES)),
+        end, lists:delete(lasp_support:mynode(), ?NODES)),
 
     ok.
 
@@ -69,7 +69,7 @@ tutorial_query_result(Value) ->
 
 mutate(Id, Type, Operation) ->
     %% Convert actor to binary representation.
-    Actor = list_to_binary(atom_to_list(node())),
+    Actor = list_to_binary(atom_to_list(lasp_support:mynode())),
 
     %% Get actual identifier.
     Identifier = identifier(Id, Type),

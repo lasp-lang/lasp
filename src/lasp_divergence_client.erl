@@ -58,7 +58,7 @@ init([]) ->
     lager:info("Divergence client initialized."),
 
     %% Generate actor identifier.
-    Actor = node(),
+    Actor = lasp_support:mynode(),
 
     %% Schedule event.
     schedule_event(),
@@ -158,7 +158,7 @@ handle_info(event, #state{actor=Actor,
                     end,
 
                     %% Update Simulation Status Instance
-                    lasp_workflow:task_completed(events, node()),
+                    lasp_workflow:task_completed(events, lasp_support:mynode()),
                     log_convergence(),
                     log_event_number(Events1),
                     schedule_check_simulation_end();
@@ -185,7 +185,7 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
                 true ->
                     lasp_instrumentation:stop(),
                     lasp_support:push_logs(),
-                    lasp_workflow:task_completed(logs, node());
+                    lasp_workflow:task_completed(logs, lasp_support:mynode());
                 false ->
                     schedule_check_simulation_end()
             end;

@@ -140,7 +140,7 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
 
                 AckMap = case Ack < Counter orelse ClientInReactiveMode of
                     true ->
-                        ?SYNC_BACKEND:send(?MODULE, {delta_send, node(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
+                        ?SYNC_BACKEND:send(?MODULE, {delta_send, lasp_support:mynode(), {Id, Type, Metadata, Deltas}, Counter}, Peer),
 
                         orddict:map(
                             fun(Peer0, {Ack0, GCCounter0}) ->
@@ -184,7 +184,7 @@ handle_cast({delta_send, From, {Id, Type, _Metadata, Deltas}, Counter},
     lasp_logger:extended("Receiving delta took: ~p microseconds.", [Time]),
 
     %% Acknowledge message.
-    ?SYNC_BACKEND:send(?MODULE, {delta_ack, node(), Id, Counter}, From),
+    ?SYNC_BACKEND:send(?MODULE, {delta_ack, lasp_support:mynode(), Id, Counter}, From),
 
     %% Send back just the updated state for the object received.
     case ?SYNC_BACKEND:client_server_mode() andalso

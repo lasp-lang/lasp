@@ -219,7 +219,7 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
 
     case AckRequired of
         true ->
-            ?SYNC_BACKEND:send(?MODULE, {state_ack, node(), Id, Object}, From);
+            ?SYNC_BACKEND:send(?MODULE, {state_ack, lasp_support:mynode(), Id, Object}, From);
         false ->
             ok
     end,
@@ -392,7 +392,7 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
                         true ->
                             case ObjectFilterFun(Id, Metadata) of
                                 true ->
-                                    ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, false}, Peer);
+                                    ?SYNC_BACKEND:send(?MODULE, {state_send, lasp_support:mynode(), {Id, Type, Metadata, Value}, false}, Peer);
                                 false ->
                                     ok
                             end
@@ -443,7 +443,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                         true ->
                             try ObjectFilterFun(Id, Metadata) of
                                 true ->
-                                    ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, Blocking}, Peer),
+                                    ?SYNC_BACKEND:send(?MODULE, {state_send, lasp_support:mynode(), {Id, Type, Metadata, Value}, Blocking}, Peer),
                                     [Id|Acc0];
                                 false ->
                                     Acc0
@@ -451,7 +451,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                                 _:_ ->
                                     case ObjectFilterFun(Id) of
                                         true ->
-                                            ?SYNC_BACKEND:send(?MODULE, {state_send, node(), {Id, Type, Metadata, Value}, Blocking}, Peer),
+                                            ?SYNC_BACKEND:send(?MODULE, {state_send, lasp_support:mynode(), {Id, Type, Metadata, Value}, Blocking}, Peer),
                                             [Id|Acc0];
                                         false ->
                                             Acc0
@@ -475,7 +475,7 @@ plumtree_gossip_peers(Root) ->
                             down ->
                                 In;
                             {Eager, _Lazy} ->
-                                case lists:member(node(), Eager) of
+                                case lists:member(lasp_support:mynode(), Eager) of
                                     true ->
                                         In ++ [Node];
                                     false ->
@@ -485,7 +485,7 @@ plumtree_gossip_peers(Root) ->
                 end,
     InLinks = lists:foldl(FolderFun, [], Tree),
 
-    {EagerPeers, _LazyPeers} = plumtree_broadcast:debug_get_peers(node(), Root),
+    {EagerPeers, _LazyPeers} = plumtree_broadcast:debug_get_peers(lasp_support:mynode(), Root),
     OutLinks = ordsets:to_list(EagerPeers),
 
     GossipPeers = lists:usort(InLinks ++ OutLinks),

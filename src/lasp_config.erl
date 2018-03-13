@@ -58,7 +58,7 @@ web_config() ->
         {log_dir, "priv/log"},
         {dispatch, dispatch()}
     ],
-    Node = node(),
+    Node = lasp_support:mynode(),
     lager:info("Node ~p enabling web configuration: ~p", [Node, Config]),
     Config.
 

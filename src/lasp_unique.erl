@@ -106,7 +106,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 mk_unique() ->
-    Node = atom_to_list(node()),
+    Node = atom_to_list(lasp_support:mynode()),
     Unique = time_compat:unique_integer([monotonic, positive]),
     TS = integer_to_list(Unique),
     Term = Node ++ TS,

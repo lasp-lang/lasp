@@ -25,7 +25,7 @@
 join([NodeStr]) ->
     Node = list_to_atom(NodeStr),
     join(NodeStr, fun lasp_peer_service:join/1,
-         "Success: join request for ~p to ~p~n", [node(), Node]).
+         "Success: join request for ~p to ~p~n", [lasp_support:mynode(), Node]).
 
 join(NodeStr, JoinFn, SuccessFmt, SuccessArgs) ->
     try

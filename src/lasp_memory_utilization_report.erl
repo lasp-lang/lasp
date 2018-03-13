@@ -62,7 +62,7 @@ start_link(Opts) ->
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
     %% Seed the process at initialization.
-    rand_compat:seed(erlang:phash2([node()]),
+    rand_compat:seed(erlang:phash2([lasp_support:mynode()]),
                      erlang:monotonic_time(),
                      erlang:unique_integer()),
 

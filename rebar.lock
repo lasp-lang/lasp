@@ -6,15 +6,19 @@
  {<<"lasp_support">>,{pkg,<<"lasp_support">>,<<"0.0.3">>},0},
  {<<"partisan">>,
   {git,"https://github.com/lasp-lang/partisan",
-       {ref,"f14bd011bd1443858efd18054610c445cb751016"}},
+       {ref,"7240dd573f4135291f365aecea8d00abc30bd672"}},
   0},
  {<<"plumtree">>,{pkg,<<"plumtree">>,<<"0.5.0">>},0},
+ {<<"quickrand">>,
+  {git,"https://github.com/okeuday/quickrand.git",
+       {ref,"336c0d94a6a384f307183b3c14fc2112656dac37"}},
+  2},
  {<<"rand_compat">>,{pkg,<<"rand_compat">>,<<"0.0.3">>},0},
  {<<"time_compat">>,{pkg,<<"time_compat">>,<<"0.0.1">>},0},
  {<<"types">>,{pkg,<<"types">>,<<"0.1.8">>},0},
  {<<"uuid">>,
-  {git,"https://github.com/avtobiff/erlang-uuid.git",
-       {ref,"1fdc1b367902da71b774a34ae15690811ac17b99"}},
+  {git,"https://github.com/okeuday/uuid.git",
+       {ref,"aadf1be200d318f2fdf2f996b58852a4a49244f0"}},
   1}]}.
 [
 {pkg_hash,[

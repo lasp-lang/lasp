@@ -982,7 +982,16 @@ reply_to_all([From|T], StillWaiting, Result) ->
             From ! Result
     end,
     reply_to_all(T, StillWaiting, Result);
-reply_to_all([], StillWaiting, _Result) ->
+reply_to_all([], StillWaiting0, _Result) ->
+    GCFun = fun({_, _, From, _, _}) ->
+        case is_pid(From) of
+            true ->
+                is_process_alive(From);
+            false ->
+                true
+        end
+    end,
+    StillWaiting = lists:filter(GCFun, StillWaiting0),
     {ok, StillWaiting}.
 
 -spec receive_value(store(), {state_send, node(), value(), function(),

@@ -92,6 +92,7 @@ identifier(Id, Type) ->
     Identifier.
 
 sync() ->
+    ObjectFilterFun = fun(_, _) -> true end,
     Pid = whereis(lasp_state_based_synchronization_backend),
-    Pid ! state_sync,
+    Pid ! {state_sync, ObjectFilterFun},
     ok.

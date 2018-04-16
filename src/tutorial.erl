@@ -45,7 +45,7 @@ connect() ->
                                     [peer_port, ?PEER_PORT]),
 
                 %% Now, connect with the Lasp peer service.
-                Result = lasp_peer_service:join({Node, {127,0,0,1}, PeerPort}),
+                Result = lasp_peer_service:join(#{name => Node, listen_addrs => [#{ip => {127,0,0,1}, port => PeerPort}]}),
                 lager:info("Join result: ~p", [Result])
 
         end, lists:delete(lasp_support:mynode(), ?NODES)),

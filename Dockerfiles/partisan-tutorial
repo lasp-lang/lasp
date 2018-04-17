@@ -12,4 +12,4 @@ RUN cd /opt && \
     make stage
 
 CMD cd /opt/lasp && \
-    make crdt-tutorial
+    make partisan-tutorial

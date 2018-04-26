@@ -84,17 +84,23 @@ init([Identifier]) ->
     %% Start the storage backend.
     case Backend:start_link(Identifier) of
         {ok, StorePid} ->
+            _ = lager:info("Backend ~p initialized: ~p", [Backend, StorePid]),
             {ok, #state{backend=Backend, store=StorePid}};
         {error, {already_started, StorePid}} ->
+            _ = lager:info("Backend ~p initialized: ~p", [Backend, StorePid]),
             {ok, #state{backend=Backend, store=StorePid}};
         {error, Reason} ->
             _ = lager:error("Failed to initialize backend ~p: ~p", [Backend, Reason]),
             {stop, Reason}
     end.
 
+%% XXX: Remove the leading pid, which is our pid and not the storage backend itself.
+%% XXX: Deprecate leading pid from the API eventually.
 %% @private
-handle_call({do, Function, Args}, _From, #state{backend=Backend}=State) ->
-    Result = erlang:apply(Backend, Function, Args),
+handle_call({do, Function, [_|Args]}, _From, #state{store=StorePid, backend=Backend}=State) ->
+    NewArgs = [StorePid] ++ Args,
+    _ = lager:info("Calling ~p ~p ~p", [Backend, Function, NewArgs]),
+    Result = erlang:apply(Backend, Function, NewArgs),
     {reply, Result, State};
 
 handle_call(Msg, _From, State) ->

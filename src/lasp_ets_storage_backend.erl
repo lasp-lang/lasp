@@ -103,6 +103,7 @@ init([Identifier]) ->
         Identifier = ets:new(Identifier, [ordered_set,
                                           named_table,
                                           public]),
+        _ = lager:info("Backend initialized with pid: ~p", [self()]),
         {ok, #state{ref=Identifier}}
     catch
         _:Reason ->

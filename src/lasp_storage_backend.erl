@@ -93,8 +93,8 @@ init([Identifier]) ->
     end.
 
 %% @private
-handle_call({do, Function, Args}, _From, #state{store=Store}=State) ->
-    Result = erlang:apply(Store, Function, Args),
+handle_call({do, Function, Args}, _From, #state{backend=Backend}=State) ->
+    Result = erlang:apply(Backend, Function, Args),
     {reply, Result, State};
 
 handle_call(Msg, _From, State) ->

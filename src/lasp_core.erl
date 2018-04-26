@@ -24,8 +24,7 @@
 -include("lasp.hrl").
 
 %% Core API.
--export([start_link/1,
-         bind/3,
+-export([bind/3,
          bind/4,
          bind_to/3,
          read/2,
@@ -126,11 +125,6 @@ enforce_once(Id, Threshold, EnforceFun, Store) ->
                    Value
                end,
     lasp_process:start_dag_link([[{Id, ?BACKEND_READ}], TransFun, undefined]).
-
-%% @doc Initialize the storage backend.
--spec start_link(atom()) -> {ok, store()} | {error, term()}.
-start_link(Identifier) ->
-    do(start_link, [Identifier]).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -983,6 +977,7 @@ reply_to_all([From|T], StillWaiting, Result) ->
     end,
     reply_to_all(T, StillWaiting, Result);
 reply_to_all([], StillWaiting0, _Result) ->
+    %% Attempt to eagerly prune.
     GCFun = fun({_, _, From, _, _}) ->
         case is_pid(From) of
             true ->
@@ -1085,19 +1080,6 @@ store_delta(Origin, Counter, Delta, DeltaMap0) ->
             orddict:store(Counter, {Origin, Delta}, DeltaMap0)
     end.
 
--ifdef(TEST).
-
-do(Function, Args) ->
-    Backend = lasp_ets_storage_backend,
-    erlang:apply(Backend, Function, Args).
-
--else.
-
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
-    Backend = application:get_env(?APP,
-                                  storage_backend,
-                                  lasp_ets_storage_backend),
-    erlang:apply(Backend, Function, Args).
-
--endif.
+    lasp_storage_backend:do(Function, Args).

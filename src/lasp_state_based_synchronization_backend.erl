@@ -400,7 +400,7 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
                end,
 
     SyncFun = fun({{_, _Type} = Id, _Depth}) ->
-                      {ok, Object} = lasp_storage_backend:do(get, [Store, Id]),
+                      {ok, Object} = lasp_storage_backend:get(Store, Id),
                       SendFun({Id, Object});
                  (_) ->
                       ok
@@ -462,7 +462,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                     end
                end,
     %% TODO: Should this be parallel?
-    {ok, Objects} = lasp_storage_backend:do(fold, [Store, Function, []]),
+    {ok, Objects} = lasp_storage_backend:fold(Store, Function, []),
     % lasp_logger:extended("Completed state propagation with peer: ~p", [Peer]),
     {ok, Objects}.
 

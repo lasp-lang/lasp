@@ -112,6 +112,9 @@ init([Identifier]) ->
     %% Select the appropriate backend.
     Backend = backend(),
 
+    %% Schedule waiting threads pruning.
+    schedule_waiting_threads_pruning(),
+
     %% Start the storage backend.
     case Backend:start_link(Identifier) of
         {ok, StorePid} ->
@@ -155,6 +158,12 @@ handle_cast(Msg, State) ->
     {noreply, State}.
 
 %% @private
+handle_info(waiting_threads_pruning, State) ->
+    %% Schedule next message.
+    schedule_waiting_threads_pruning(),
+
+    {noreply, State};
+
 handle_info(Msg, State) ->
     _ = lager:warning("Unhandled info messages: ~p", [Msg]),
     {noreply, State}.
@@ -184,3 +193,7 @@ backend() ->
     lasp_config:get(storage_backend, lasp_ets_storage_backend).
 
 -endif.
+
+%% @private
+schedule_waiting_threads_pruning() ->
+    timer:send_after(10000, waiting_threads_pruning).

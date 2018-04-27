@@ -159,9 +159,6 @@ handle_cast(Msg, State) ->
 
 %% @private
 handle_info(waiting_threads_pruning, #state{store=Store}=State) ->
-    %% Schedule next message.
-    schedule_waiting_threads_pruning(),
-
     Mutator = fun({Id, #dv{waiting_threads=WaitingThreads0}=Value}) ->
         GCFun = fun({_, _, From, _, _}) ->
             case is_pid(From) of
@@ -175,6 +172,9 @@ handle_info(waiting_threads_pruning, #state{store=Store}=State) ->
         {Value#dv{waiting_threads=WaitingThreads}, Id}
     end,
     gen_server:call(Store, {update_all, Mutator}, infinity),
+
+    %% Schedule next message.
+    schedule_waiting_threads_pruning(),
 
     {noreply, State};
 

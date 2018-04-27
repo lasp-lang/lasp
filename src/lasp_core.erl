@@ -1082,4 +1082,4 @@ store_delta(Origin, Counter, Delta, DeltaMap0) ->
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
-    lasp_storage_backend:do(Function, Args).
+    erlang:apply(lasp_storage_backend, Function, Args).

@@ -47,8 +47,7 @@
 -behaviour(gen_server).
 
 %% API
--export([do/2, 
-         start_link/1]).
+-export([start_link/1]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -57,6 +56,14 @@
          handle_info/2,
          terminate/2,
          code_change/3]).
+
+%% lasp_storage_backend callbacks
+-export([put/3,
+         update/3,
+         update_all/2,
+         get/2,
+         reset/1,
+         fold/3]).
 
 -record(state, {backend, store}).
 
@@ -68,9 +75,33 @@
 start_link(Identifier) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [Identifier], []).
 
-%% @doc Execute a function against the backend.
-do(Function, Args) ->
-    gen_server:call(?MODULE, {do, Function, Args}, infinity).
+%%%===================================================================
+%%% lasp_storage_backend callbacks
+%%%===================================================================
+
+%% @doc Write a record to the backend.
+put(Ref, Id, Record) ->
+    gen_server:call(Ref, {put, Id, Record}, infinity).
+
+%% @doc In-place update given a mutation function.
+update(Ref, Id, Function) ->
+    gen_server:call(Ref, {update, Id, Function}, infinity).
+
+%% @doc Update all objects given a mutation function.
+update_all(Ref, Function) ->
+    gen_server:call(Ref, {update_all, Function}, infinity).
+
+%% @doc Retrieve a record from the backend.
+get(Ref, Id) ->
+    gen_server:call(Ref, {get, Id}, infinity).
+
+%% @doc Fold operation.
+fold(Ref, Function, Acc) ->
+    gen_server:call(Ref, {fold, Function, Acc}, infinity).
+
+%% @doc Reset all application state.
+reset(Ref) ->
+    gen_server:call(Ref, reset, infinity).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -94,13 +125,24 @@ init([Identifier]) ->
             {stop, Reason}
     end.
 
-%% XXX: Remove the leading pid, which is our pid and not the storage backend itself.
-%% XXX: Deprecate leading pid from the API eventually.
-%% @private
-handle_call({do, Function, [_|Args]}, _From, #state{store=StorePid, backend=Backend}=State) ->
-    NewArgs = [StorePid] ++ Args,
-    _ = lager:info("Calling ~p ~p ~p", [Backend, Function, NewArgs]),
-    Result = erlang:apply(Backend, Function, NewArgs),
+%% Proxy calls to the storage instance.
+handle_call({get, Id}, _From, #state{store=Store}=State) ->
+    Result = gen_server:call(Store, {get, Id}, infinity),
+    {reply, Result, State};
+handle_call({put, Id, Record}, _From, #state{store=Store}=State) ->
+    Result = gen_server:call(Store, {put, Id, Record}, infinity),
+    {reply, Result, State};
+handle_call({update, Id, Function}, _From, #state{store=Store}=State) ->
+    Result = gen_server:call(Store, {update, Id, Function}, infinity),
+    {reply, Result, State};
+handle_call({update_all, Function}, _From, #state{store=Store}=State) ->
+    Result = gen_server:call(Store, {update_all, Function}, infinity),
+    {reply, Result, State};
+handle_call({fold, Function, Acc0}, _From, #state{store=Store}=State) ->
+    Result = gen_server:call(Store, {fold, Function, Acc0}, infinity),
+    {reply, Result, State};
+handle_call(reset, _From, #state{store=Store}=State) ->
+    Result = gen_server:call(Store, reset, infinity),
     {reply, Result, State};
 
 handle_call(Msg, _From, State) ->

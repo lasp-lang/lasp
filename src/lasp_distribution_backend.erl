@@ -302,7 +302,7 @@ init([]) ->
     Identifier = lasp_support:mynode(),
 
     %% Start the storage backend.
-    {ok, Store} = case ?CORE:start_link(Identifier) of
+    {ok, Store} = case lasp_storage_backend:start_link(Identifier) of
         {ok, Pid} ->
             {ok, Pid};
         {error, {already_started, Pid}} ->

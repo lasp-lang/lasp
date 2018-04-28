@@ -164,7 +164,7 @@ handle_cast({delta_exchange, Peer, ObjectFilterFun},
     end,
 
     %% TODO: Should this be parallel?
-    {ok, _} = lasp_storage_backend:do(update_all, [Store, Mutator]),
+    {ok, _} = lasp_storage_backend:update_all(Store, Mutator),
 
     lasp_logger:extended("Exchange finished for ~p", [Peer]),
 
@@ -279,7 +279,7 @@ handle_info(delta_gc, #state{store=Store}=State) ->
         {Object#dv{delta_map=DeltaMapGC, delta_ack_map=PrunedAckMap}, Id}
     end,
 
-    {ok, _} = lasp_storage_backend:do(update_all, [Store, Mutator]),
+    {ok, _} = lasp_storage_backend:update_all(Store, Mutator),
 
     %% Schedule next GC and reset counter.
     schedule_delta_garbage_collection(),

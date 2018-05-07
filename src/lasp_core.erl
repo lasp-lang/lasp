@@ -119,7 +119,6 @@ enforce_once(Id, Threshold, EnforceFun, Store) ->
                                    ok
                            end;
                        false ->
-                           lager:info("Threshold not met: ~p ~p", [Value, Threshold]),
                            ok
                    end,
                    Value

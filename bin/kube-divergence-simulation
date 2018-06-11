@@ -2,7 +2,7 @@
 
 CLIENTS=(8)
 NODES=3
-LASP_BRANCH=unstable
+LASP_BRANCH=partisan
 IMAGE=lasplang/lasp-bootler
 DOCKERFILE=Dockerfiles/lasp-bootler
 REPS=20

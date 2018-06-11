@@ -42,7 +42,7 @@ if [ ! -z "$REBUILD_IMAGE" ]; then
     fi
 
     # Rebuild image fresh, to ensure no stale dependencies
-    docker build -f ${DOCKERFILE} -t ${IMAGE} .
+    docker build --no-cache -f ${DOCKERFILE} -t ${IMAGE} .
 
     # Push image to hub
     docker push ${IMAGE}

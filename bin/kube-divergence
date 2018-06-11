@@ -89,7 +89,7 @@ for i in `seq 1 ${REPS}`; do
         containers:
         - name: "lasp-server-${EVAL_TIMESTAMP}"
           image: ${IMAGE}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           env:
           - name: TAG
             value: "server"
@@ -193,7 +193,7 @@ for i in `seq 1 ${REPS}`; do
         containers:
         - name: "lasp-client-${EVAL_TIMESTAMP}"
           image: ${IMAGE}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           env:
           - name: TAG
             value: "client"

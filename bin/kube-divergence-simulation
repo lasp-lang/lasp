@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-CLIENTS=(8)
+CLIENTS=(16)
 NODES=3
 LASP_BRANCH=partisan
-IMAGE=lasplang/lasp-bootler
-DOCKERFILE=Dockerfiles/lasp-bootler
-REPS=20
+IMAGE=lasplang/lasp-partisan
+DOCKERFILE=Dockerfiles/lasp-partisan
+REPS=1
 GCE=false
 MACHINE="n1-standard-8"
 MAX_EVENTS=100000
@@ -53,7 +53,8 @@ if [ ! -z "$CLUSTER_START" ]; then
   # Bootstrap cluster
   gcloud beta container clusters create lasp \
     --machine-type=${MACHINE} \
-    --num-nodes=${NODES}
+    --num-nodes=${NODES} \
+    --enable-legacy-authorization
 
   # Get container credential
   gcloud beta container clusters get-credentials lasp
@@ -93,6 +94,14 @@ done
 AVAILABLE=$(kubectl get nodes -l '!lasp_selector' | grep -v master | grep Ready | head -1 | awk '{print $1}')
 kubectl label node ${AVAILABLE} lasp_selector=redis
 echo "Labeled node ${AVAILABLE} for runs of redis."
+
+echo "Adding permissive permissions."
+kubectl create clusterrolebinding permissive-binding \
+  --clusterrole=cluster-admin \
+  --user=admin \
+  --user=kubelet \
+  --user=system:anonymous \
+  --group=system:serviceaccounts
 
 # Deploy a single redis instance.
 echo "Copying code to /tmp"

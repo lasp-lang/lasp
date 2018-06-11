@@ -3,7 +3,7 @@
 # Configure experiment.
 WORKFLOW=true
 SERVER_REPLICAS=1
-PEER_SERVICE=partisan_client_server_peer_service_manager
+PEER_SERVICE=partisan_hyparview_xbot_peer_service_manager
 MODE=state_based
 HEAVY_CLIENTS=false
 REACTIVE_SERVER=false

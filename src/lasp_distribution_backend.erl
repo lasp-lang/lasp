@@ -723,7 +723,7 @@ handle_cast(Msg, State) ->
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 
 handle_info(Msg, State) ->
-    _ = lager:warning("Unhandled info messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled info messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private

@@ -941,6 +941,7 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
                     gen_server:reply({Address, Ref},
                                      {ok, {Id, Type, Metadata, Value}});
                 _ ->
+                    lager:info("Threshold met, sending reply to ~p", [From]),
                     From ! Result
             end,
             StillWaiting0;

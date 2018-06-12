@@ -86,7 +86,10 @@ get(Ref, Id) ->
 %% @doc Fold operation.
 -spec fold(store(), function(), term()) -> {ok, term()}.
 fold(Ref, Function, Acc) ->
-    gen_server:call(Ref, {fold, Function, Acc}, infinity).
+    lager:info("=> Starting backend fold..."),
+    Result = gen_server:call(Ref, {fold, Function, Acc}, infinity),
+    lager:info("=> Fold returned ~p", [Result]),
+    Result.
 
 %% @doc Reset all application state.
 -spec reset(store()) -> ok.

@@ -284,13 +284,16 @@ handle_info({state_sync, ObjectFilterFun},
 
     %% Ship buffered updates for the fanout value.
     SyncFun = fun(Peer) ->
+                      lager:info("=> About to start for peer: ~p", [Peer]),
                       case lasp_config:get(reverse_topological_sync, ?REVERSE_TOPOLOGICAL_SYNC) of
                           true ->
                               init_reverse_topological_sync(Peer, ObjectFilterFun, Store);
                           false ->
-                              lager:info("=> State sync initialized for peer: ~p", [Peer]),
-                              init_state_sync(Peer, ObjectFilterFun, false, Store)
-                      end
+                              lager:info("=> => State sync initialized for peer: ~p", [Peer]),
+                              init_state_sync(Peer, ObjectFilterFun, false, Store),
+                              lager:info("=> => Out of state sync.")
+                      end,
+                      lager:info("=> Done for peer: ~p", [Peer])
               end,
     lists:foreach(SyncFun, Peers),
 

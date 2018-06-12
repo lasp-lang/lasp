@@ -981,8 +981,8 @@ reply_to_all([From|T], StillWaiting, Result) ->
     reply_to_all(T, StillWaiting, Result);
 reply_to_all([], StillWaiting0, _Result) ->
     %% Attempt to eagerly prune.
-    GCFun = fun({_, _, From, _, _}) ->
-        lager:info("Attmpting to prune threshold for from: ~p", [From]),
+    GCFun = fun({_, _, From, _, _} = T) ->
+        lager:info("Attmpting to prune threshold for from: ~p for threshold: ~p", [From, T]),
 
         case is_pid(From) of
             true ->

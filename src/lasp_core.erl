@@ -922,8 +922,10 @@ reply_to_all(List, Result) ->
 reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, {Id, Type, Metadata, Value}}=Result) ->
+    lager:info("Checking threshold for ~p on ~p", [Threshold, Id]),
     SW = case lasp_type:threshold_met(Type, Value, Threshold) of
         true ->
+            lager:info("Threshold met for ~p on ~p", [Threshold, Id]),
             case From of
                 {server, undefined, {Address, Ref}} ->
                     lager:info("Threshold met, sending reply to ~p", [{Address, Ref}]),

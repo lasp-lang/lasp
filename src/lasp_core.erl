@@ -945,8 +945,10 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
                     From ! Result
             end,
             StillWaiting0;
-        false ->
-            StillWaiting0 ++ [H]
+         false ->
+            {ok, V} = lasp:query(Id),
+            lager:info("Threshold not met ~p; value: ~p", [Threshold, V]),
+            StillWaiting064 ++ [H]
     end,
     reply_to_all(T, SW, Result);
 reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],

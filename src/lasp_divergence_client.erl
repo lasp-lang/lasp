@@ -167,6 +167,9 @@ handle_info(event, #state{actor=Actor,
             end,
             {Events1, BatchStart2, BatchEvents1};
         false ->
+            Value = lasp:query(?SIMPLE_COUNTER),
+            lager:info("All batches completed, convergence is false, value is ~p and should be ~p",
+                       [Value, max_events()]),
             schedule_event(),
             {Events0, undefined, 0}
     end,

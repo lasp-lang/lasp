@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-CLIENTS=(4)
+CLIENTS=(32)
 NODES=3
 LASP_BRANCH=partisan
 IMAGE=lasplang/lasp-partisan
 DOCKERFILE=Dockerfiles/lasp-partisan
 REPS=1
 GCE=false
-MACHINE="n1-standard-8"
+MACHINE="n1-highcpu-16"
 MAX_EVENTS=100000
 BLOCKING_SYNC=false
 EVENT_INTERVAL=0

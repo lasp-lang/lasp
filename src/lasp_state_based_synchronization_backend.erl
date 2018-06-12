@@ -489,6 +489,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                             Acc0
                     end
                end,
+    lager:info("=> Starting backend fold..."),
     %% TODO: Should this be parallel?
     {ok, Objects} = lasp_storage_backend:fold(Store, Function, []),
     lager:info("Completed state propagation with peer: ~p", [Peer]),

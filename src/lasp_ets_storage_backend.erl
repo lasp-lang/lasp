@@ -144,7 +144,9 @@ handle_call({update_all, Function}, _From, #state{ref=Ref}=State) ->
     ),
     {reply, {ok, Result}, State};
 handle_call({fold, Function, Acc0}, _From, #state{ref=Ref}=State) ->
+    lager:info("=> => in the fold..."),
     Acc1 = ets:foldl(Function, Acc0, Ref),
+    lager:info("=> => out of the fold..."),
     {reply, {ok, Acc1}, State};
 handle_call(reset, _From, #state{ref=Ref}=State) ->
     true = ets:delete_all_objects(Ref),

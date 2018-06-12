@@ -474,9 +474,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     lager:info("Processing id: ~p ~p", [Id, Value]),
                     Dynamic = is_dynamic(Metadata),
-                    lager:info("=> fold, is dynamic: ~p", [Dynamic]),
                     Filtered = is_filtered(PeerInterests, Metadata),
-                    lager:info("=> fold, is filtered: ~p", [Filtered]),
 
                     %% Sync as long as it's not dynamically scoped, and is filtered.
                     ShouldSync = not Dynamic andalso Filtered,

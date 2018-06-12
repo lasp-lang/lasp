@@ -164,7 +164,7 @@ handle_info(event, #state{actor=Actor,
                     schedule_check_simulation_end();
                 false ->
                     Value = lasp:query(?SIMPLE_COUNTER),
-                    {ok, MaxEvents} = max_events(),
+                    MaxEvents = max_events(),
                     lager:info("Max events have not been reached; max_events: ~p, local_events: ~p",
                                [MaxEvents, Value]),
                     schedule_event()
@@ -173,7 +173,7 @@ handle_info(event, #state{actor=Actor,
         false ->
             lager:info("Batches haven't started, convergence is has not been reached yet."),
             schedule_event(),
-            {Events0, undefined, 10}
+            {Events0, undefined, 0}
     end,
 
     {noreply, State#state{batch_events=BatchEvents,

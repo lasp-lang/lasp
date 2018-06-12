@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-CLIENTS=(32)
+CLIENTS=(64)
 NODES=3
 LASP_BRANCH=partisan
 IMAGE=lasplang/lasp-partisan

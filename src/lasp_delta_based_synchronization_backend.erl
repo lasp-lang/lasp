@@ -102,7 +102,7 @@ handle_call({propagate, ObjectFilterFun}, _From, State) ->
 
 
 handle_call(Msg, _From, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled call messages at module ~p: ~p", [?MODULE, Msg]),
     {reply, ok, State}.
 
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
@@ -208,7 +208,7 @@ handle_cast({delta_ack, From, Id, Counter}, #state{store=Store}=State) ->
 
 %% @private
 handle_cast(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled cast messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private

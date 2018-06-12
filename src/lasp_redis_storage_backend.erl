@@ -161,17 +161,17 @@ handle_call(reset, _From, #state{eredis=Eredis}=State) ->
     eredis:q(Eredis, ["FLUSHALL"]),
     {reply, ok, State};
 handle_call(Msg, _From, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled call messages at module ~p: ~p", [?MODULE, Msg]),
     {reply, ok, State}.
 
 %% @private
 handle_cast(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled cast messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private
 handle_info(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled info messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private

@@ -177,7 +177,7 @@ handle_call({blocking_sync, ObjectFilterFun}, From,
     end;
 
 handle_call(Msg, _From, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled call messages at module ~p: ~p", [?MODULE, Msg]),
     {reply, ok, State}.
 
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
@@ -241,7 +241,7 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
     {noreply, State};
 
 handle_cast(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled cast messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private
@@ -302,7 +302,7 @@ handle_info(plumtree_peer_refresh, State) ->
     {noreply, State#state{gossip_peers=GossipPeers}};
 
 handle_info(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled info messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private

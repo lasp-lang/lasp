@@ -445,8 +445,13 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
 
 %% @private
 get_peer_interests(Peer, Store) ->
-    {ok, Value} = ?CORE:query(?INTERESTS_ID, Store),
-    proplists:get_value(Peer, Value, sets:new()).
+    case ?CORE:query(?INTERESTS_ID, Store) of
+        {ok, Value} ->
+            proplists:get_value(Peer, Value, sets:new());
+        Other ->
+            lager:warning("Got invalid value: ~p", [Other]),
+            sets:new()
+    end.
 
 %% @private
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->

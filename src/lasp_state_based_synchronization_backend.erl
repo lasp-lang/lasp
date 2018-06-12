@@ -447,11 +447,12 @@ get_peer_interests(Peer, Store) ->
 
 %% @private
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
-    lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
+    lager:info("Initializing state propagation with peer: ~p", [Peer]),
 
     PeerInterests = get_peer_interests(Peer, Store),
 
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
+                    lager:info("Processing id: ~p ~p", [Id, Value]),
                     Dynamic = is_dynamic(Metadata),
                     Filtered = is_filtered(PeerInterests, Metadata),
 
@@ -460,19 +461,25 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
 
                     case ShouldSync of
                         true ->
+                            lager:info("=> Should sync ~p ~p", [Id, Value]),
                             try ObjectFilterFun(Id, Metadata) of
                                 true ->
+                                    lager:info("=> Passed filter ~p ~p", [Id, Value]),
                                     ?SYNC_BACKEND:send(?MODULE, {state_send, lasp_support:mynode(), {Id, Type, Metadata, Value}, Blocking}, Peer),
                                     [Id|Acc0];
                                 false ->
+                                    lager:info("=> DID NOT pass filter ~p ~p", [Id, Value]),
                                     Acc0
                             catch 
-                                _:_ ->
+                                _:Error ->
+                                    lager:info("=> Exception!! ~p ~p ~p", [Id, Value, Error]),
                                     case ObjectFilterFun(Id) of
                                         true ->
+                                            lager:info("=> Passed filter ~p", [Id]),
                                             ?SYNC_BACKEND:send(?MODULE, {state_send, lasp_support:mynode(), {Id, Type, Metadata, Value}, Blocking}, Peer),
                                             [Id|Acc0];
                                         false ->
+                                            lager:info("=> DID NOT filter ~p", [Id]),
                                             Acc0
                                     end
                             end;
@@ -482,7 +489,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                end,
     %% TODO: Should this be parallel?
     {ok, Objects} = lasp_storage_backend:fold(Store, Function, []),
-    lasp_logger:extended("Completed state propagation with peer: ~p", [Peer]),
+    lager:info("Completed state propagation with peer: ~p", [Peer]),
     {ok, Objects}.
 
 %% @private

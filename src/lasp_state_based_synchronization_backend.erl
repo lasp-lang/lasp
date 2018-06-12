@@ -449,7 +449,9 @@ get_peer_interests(Peer, Store) ->
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
     lager:info("Initializing state propagation with peer: ~p", [Peer]),
 
+    lager:info("Getting peer interests for peer: ~p", [Peer]),
     PeerInterests = get_peer_interests(Peer, Store),
+    lager:info("=> PeerInterests for peer ~p are ~p", [Peer, PeerInterests]),
 
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
                     lager:info("Processing id: ~p ~p", [Id, Value]),

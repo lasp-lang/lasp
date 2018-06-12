@@ -185,7 +185,7 @@ handle_call(Msg, _From, State) ->
 handle_cast({state_ack, From, Id, {Id, _Type, _Metadata, Value}},
             #state{store=Store,
                    blocking_syncs=BlockingSyncs0}=State) ->
-    % lager:info("Received ack from ~p for ~p with value ~p", [From, Id, Value]),
+    lager:info("Received ack from ~p for ~p with value ~p", [From, Id, Value]),
 
     BlockingSyncs = dict:fold(fun(K, V, Acc) ->
                 % lager:info("Was waiting ~p ~p", [Key, Value]),
@@ -205,6 +205,9 @@ handle_cast({state_ack, From, Id, {Id, _Type, _Metadata, Value}},
                         dict:store(K, StillWaiting, Acc)
                 end
               end, dict:new(), BlockingSyncs0),
+
+    lager:info("Finished ack."),
+
     {noreply, State#state{blocking_syncs=BlockingSyncs}};
 
 handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
@@ -217,12 +220,16 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
                                        ?CLOCK_INCR(Actor),
                                        ?CLOCK_INIT(Actor)}),
 
+    lager:info("Sending updates..."),
+
     case AckRequired of
         true ->
             ?SYNC_BACKEND:send(?MODULE, {state_ack, lasp_support:mynode(), Id, Object}, From);
         false ->
             ok
     end,
+
+    lager:info("Ack required: ~p", [AckRequired]),
 
     %% Send back just the updated state for the object received.
     case ?SYNC_BACKEND:client_server_mode() andalso
@@ -237,6 +244,8 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
         false ->
             ok
     end,
+
+    lager:info("State sync completed.", []),
 
     {noreply, State};
 

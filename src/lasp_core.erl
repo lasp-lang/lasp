@@ -590,7 +590,7 @@ read_var(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
                 true ->
                     {Object#dv{lazy_threads=SL}, {ok, {Id, Type, Metadata, Value}}};
                 false ->
-                    lager:info("Threshold read was not met for ~p and process ~p", [Id, self()]),
+                    lager:info("Threshold ~p read was not met for ~p and process ~p", [Threshold, Id, self()]),
                     WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
                     {Object#dv{waiting_threads=WT, lazy_threads=SL}, {error, threshold_not_met}}
             end
@@ -922,7 +922,8 @@ reply_to_all(List, Result) ->
 reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, {Id, Type, Metadata, Value}}=Result) ->
-    lager:info("Checking threshold for ~p on ~p", [Threshold, Id]),
+    {ok, V} = lasp:query(Id),
+    lager:info("Checking threshold for ~p on ~p for value ~p", [Threshold, Id, V]),
     SW = case lasp_type:threshold_met(Type, Value, Threshold) of
         true ->
             lager:info("Threshold met for ~p on ~p", [Threshold, Id]),
@@ -948,7 +949,7 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
          false ->
             {ok, V} = lasp:query(Id),
             lager:info("Threshold not met ~p; value: ~p", [Threshold, V]),
-            StillWaiting064 ++ [H]
+            StillWaiting0 ++ [H]
     end,
     reply_to_all(T, SW, Result);
 reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
@@ -987,15 +988,15 @@ reply_to_all([From|T], StillWaiting, Result) ->
 reply_to_all([], StillWaiting0, _Result) ->
     %% Attempt to eagerly prune.
     GCFun = fun({_, _, From, _, _} = T) ->
-        lager:info("Attmpting to prune threshold for from: ~p for threshold: ~p", [From, T]),
+        lager:info("Attempting to prune threshold for from: ~p for threshold: ~p", [From, T]),
 
         case is_pid(From) of
             true ->
                 Alive = is_process_alive(From),
-                lager:info("=> From ~p is ~p", [From, Alive]),
+                lager:info("=> Threshold, From ~p is ~p", [From, Alive]),
                 Alive;
             false ->
-                lager:info("=> From is not a PID, so we keep: ~p", [From]),
+                lager:info("=> Threshold, From is not a PID, so we keep: ~p", [From]),
                 true
         end
     end,

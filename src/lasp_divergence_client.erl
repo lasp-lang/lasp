@@ -176,7 +176,6 @@ handle_info(event, #state{actor=Actor,
             end,
             {Events1, BatchStart2, BatchEvents1};
         false ->
-            lager:info("Batches haven't started, convergence is has not been reached yet."),
             schedule_event(),
             {Events0, undefined, 0}
     end,

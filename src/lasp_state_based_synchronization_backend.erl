@@ -220,22 +220,23 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
                                        ?CLOCK_INCR(Actor),
                                        ?CLOCK_INIT(Actor)}),
 
-    lager:info("Sending updates..."),
+    lager:info("Receiving updates..."),
 
     case AckRequired of
         true ->
+            lager:info("Ack required, sending responses", []),
             ?SYNC_BACKEND:send(?MODULE, {state_ack, lasp_support:mynode(), Id, Object}, From);
         false ->
             ok
     end,
-
-    lager:info("Ack required: ~p", [AckRequired]),
 
     %% Send back just the updated state for the object received.
     case ?SYNC_BACKEND:client_server_mode() andalso
          ?SYNC_BACKEND:i_am_server() andalso
          ?SYNC_BACKEND:reactive_server() of
         true ->
+            lager:info("Initializing reverse sync...", []),
+
             ObjectFilterFun = fun(Id1, _) ->
                                       Id =:= Id1
                               end,
@@ -264,6 +265,8 @@ handle_info({state_sync, ObjectFilterFun},
     % lasp_logger:extended("Beginning state synchronization: ~p",
     %                      [PeerServiceManager]),
 
+    lager:info("Initializing state sync..."),
+
     Members = case ?SYNC_BACKEND:broadcast_tree_mode() of
         true ->
             GossipPeers;
@@ -272,8 +275,12 @@ handle_info({state_sync, ObjectFilterFun},
             Members1
     end,
 
+    lager:info("=> State sync members: ~p", [Members]),
+
     %% Remove ourself and compute exchange peers.
     Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
+
+    lager:info("=> Exchange computed: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
     SyncFun = fun(Peer) ->
@@ -281,10 +288,13 @@ handle_info({state_sync, ObjectFilterFun},
                           true ->
                               init_reverse_topological_sync(Peer, ObjectFilterFun, Store);
                           false ->
+                              lager:info("=> State sync initialized for peer: ~p", [Peer]),
                               init_state_sync(Peer, ObjectFilterFun, false, Store)
                       end
               end,
     lists:foreach(SyncFun, Peers),
+
+    lager:info("=> Done, scheduling next sync..."),
 
     %% Schedule next synchronization.
     schedule_state_synchronization(),
@@ -437,7 +447,7 @@ get_peer_interests(Peer, Store) ->
 
 %% @private
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
-    % lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
+    lasp_logger:extended("Initializing state propagation with peer: ~p", [Peer]),
 
     PeerInterests = get_peer_interests(Peer, Store),
 
@@ -472,7 +482,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                end,
     %% TODO: Should this be parallel?
     {ok, Objects} = lasp_storage_backend:fold(Store, Function, []),
-    % lasp_logger:extended("Completed state propagation with peer: ~p", [Peer]),
+    lasp_logger:extended("Completed state propagation with peer: ~p", [Peer]),
     {ok, Objects}.
 
 %% @private

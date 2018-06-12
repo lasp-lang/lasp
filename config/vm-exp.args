@@ -15,3 +15,6 @@
 
 ## Explicit connections only.
 -connect_all false
+
+## Port for Partisan.
+-partisan peer_port ${PEER_PORT}

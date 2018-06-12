@@ -590,6 +590,7 @@ read_var(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
                 true ->
                     {Object#dv{lazy_threads=SL}, {ok, {Id, Type, Metadata, Value}}};
                 false ->
+                    lager:info("Threshold read was not met for ~p and process ~p", [Id, self()]),
                     WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
                     {Object#dv{waiting_threads=WT, lazy_threads=SL}, {error, threshold_not_met}}
             end
@@ -925,13 +926,16 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
         true ->
             case From of
                 {server, undefined, {Address, Ref}} ->
+                    lager:info("Threshold met, sending reply to ~p", [{Address, Ref}]),
                     gen_server:reply({Address, Ref},
                                      {ok, {Id, Type, Metadata, Value}});
                 {fsm, undefined, Address} ->
+                    lager:info("Threshold met, sending reply to ~p", [Address]),
                     gen_fsm:send_event(Address,
                                        {ok, undefined,
                                         {Id, Type, Metadata, Value}});
                 {Address, Ref} ->
+                    lager:info("Threshold met, sending reply to ~p", [{Address, Ref}]),
                     gen_server:reply({Address, Ref},
                                      {ok, {Id, Type, Metadata, Value}});
                 _ ->
@@ -978,14 +982,21 @@ reply_to_all([From|T], StillWaiting, Result) ->
 reply_to_all([], StillWaiting0, _Result) ->
     %% Attempt to eagerly prune.
     GCFun = fun({_, _, From, _, _}) ->
+        lager:info("Attmpting to prune threshold for from: ~p", [From]),
+
         case is_pid(From) of
             true ->
-                is_process_alive(From);
+                Alive = is_process_alive(From),
+                lager:info("=> From ~p is ~p", [From, Alive]),
+                Alive;
             false ->
+                lager:info("=> From is not a PID, so we keep: ~p", [From]),
                 true
         end
     end,
+
     StillWaiting = lists:filter(GCFun, StillWaiting0),
+
     {ok, StillWaiting}.
 
 -spec receive_value(store(), {state_send, node(), value(), function(),

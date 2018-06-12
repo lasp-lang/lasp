@@ -62,6 +62,7 @@
 %%      object is met, then invoke the enforce function.
 %%
 invariant(Id, Threshold, EnforceFun) ->
+    lager:info("Registering threshold ~p for ~p", [Threshold, Id]),
     {ok, _Value} = lasp:read(Id, Threshold),
     {ok, QueryValue} = lasp:query(Id),
     lager:info("Threshold reached, invoking threshold function: ~p", [QueryValue]),

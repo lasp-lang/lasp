@@ -445,8 +445,6 @@ init_reverse_topological_sync(Peer, ObjectFilterFun, Store) ->
 
 %% @private
 get_peer_interests(Peer, Store) ->
-    lager:info("Getting peer interests for peer: ~p", [Peer]),
-
     case partisan_config:get(use_peer_interests, false) of
         false ->
             sets:new();
@@ -508,7 +506,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                             Acc0
                     end
                end,
-    lager:info("=> Starting backend fold..."),
+    lager:info("=> Starting backend fold at backend...", []),
     Trace = try throw(42) catch 42 -> erlang:get_stacktrace() end,
     lager:info("~p", [Trace]),
     %% TODO: Should this be parallel?

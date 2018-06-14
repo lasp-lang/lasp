@@ -86,7 +86,7 @@ get(Ref, Id) ->
 %% @doc Fold operation.
 -spec fold(store(), function(), term()) -> {ok, term()}.
 fold(Ref, Function, Acc) ->
-    lager:info("=> Starting backend fold..."),
+    lager:info("=> Starting backend foldt at ets backend...", []),
     Result = gen_server:call(Ref, {fold, Function, Acc}, infinity),
     lager:info("=> Fold returned ~p", [Result]),
     Result.

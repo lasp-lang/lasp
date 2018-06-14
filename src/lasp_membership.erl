@@ -112,7 +112,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 update_membership(State, Actor) ->
-    case lasp_config:get(membership_object, false) of
+    case lasp_config:get(membership_object, true) of
         true ->
             lager:info("Attempting to update membership; state: ~p", [State]),
 

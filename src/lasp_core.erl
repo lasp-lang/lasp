@@ -537,6 +537,7 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                 end
             end
     end,
+    lager:info("created update for process ~p id: ~p in bind var", [self(), Id]),
     do(update, [Store, Id, Mutator]).
 
 %% @doc Perform a read (or monotonic read) for a particular identifier.
@@ -599,6 +600,7 @@ read_var(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
                     {Object#dv{waiting_threads=WT, lazy_threads=SL}, {error, threshold_not_met}}
             end
     end,
+    lager:info("created update for process ~p id: ~p in read var", [self(), Id]),
     case do(update, [Store, Id, Mutator]) of
         {ok, {Id, Type, Metadata, Value}} ->
             ReplyFun({Id, Type, Metadata, Value});
@@ -904,6 +906,7 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                             end,
                             {Object#dv{lazy_threads=LazyThreads}, ok}
                     end,
+    lager:info("created update for process ~p id: ~p in wait needed", [self(), Id]),
                     ok = do(update, [Store, Id, Mutator]),
                     BlockingFun()
             end
@@ -1067,6 +1070,7 @@ receive_delta(Store, {delta_ack, Id, From, Counter}) ->
         {Object#dv{delta_ack_map=AckMap}, ok}
     end,
 
+    lager:info("created update for process ~p id: ~p in receive delta", [self(), Id]),
     case do(update, [Store, Id, Mutator]) of
         ok ->
             ok;

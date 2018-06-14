@@ -2,7 +2,7 @@ FROM lasplang/lasp-base
 
 ARG BRANCH=partisan
 
-CMD cd /opt && \
+RUN cd /opt && \
     git clone https://github.com/lasp-lang/lasp.git -b $BRANCH && \
     cd lasp && \
     make exp-stage

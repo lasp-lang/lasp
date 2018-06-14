@@ -2,9 +2,8 @@ FROM lasplang/lasp-base
 
 ARG BRANCH=partisan
 
-RUN cd /opt && \
+CMD cd /opt && \
     git clone https://github.com/lasp-lang/lasp.git -b $BRANCH && \
     cd lasp && \
-    make exp-stage
-
-CMD /opt/lasp/_build/exp/rel/lasp/bin/env
+    make exp-stage && \
+    /opt/lasp/_build/exp/rel/lasp/bin/env

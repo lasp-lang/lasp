@@ -64,8 +64,6 @@
 invariant(Id, Threshold, EnforceFun) ->
     lager:info("Registering threshold ~p for ~p", [Threshold, Id]),
     {ok, _Value} = lasp:read(Id, Threshold),
-    {ok, QueryValue} = lasp:query(Id),
-    lager:info("Threshold reached, invoking threshold function: ~p", [QueryValue]),
     EnforceFun().
 
 %% @doc Enforce an invariant once, by selecting the lowest node in the

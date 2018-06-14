@@ -163,15 +163,6 @@ handle_info(event, #state{actor=Actor,
                     log_event_number(Events1),
                     schedule_check_simulation_end();
                 false ->
-                    {ok, Value} = lasp:query(?SIMPLE_COUNTER),
-                    MaxEvents = max_events(),
-                    case Value > MaxEvents of
-                        true ->
-                            ok;
-                        false ->
-                            lager:info("Max events have not been reached; max_events: ~p, local_events: ~p",
-                                    [MaxEvents, Value])
-                    end,
                     schedule_event()
             end,
             {Events1, BatchStart2, BatchEvents1};

@@ -81,12 +81,12 @@ start_link(Identifier) ->
 
 %% @doc Write a record to the backend.
 put(Ref, Id, Record) ->
-    gen_server:call(Ref, {put, Id, Record}, infinity).
+    gen_server:call(Ref, {put, Id, Record}, ?TIMEOUT).
 
 %% @doc In-place update given a mutation function.
 update(Ref, Id, Function) ->
     lager:info("~p in the update for id ~p and ref ~p", [?MODULE, Id, Ref]),
-    Result = gen_server:call(Ref, {update, Id, Function}, infinity),
+    Result = gen_server:call(Ref, {update, Id, Function}, ?TIMEOUT),
     lager:info("~p out of the update with ref ~p and result ~p", [?MODULE, Ref, Result]),
     Trace = try throw(42) catch 42 -> erlang:get_stacktrace() end,
     lager:info("=> trace: ~p", [Trace]) ,
@@ -95,28 +95,28 @@ update(Ref, Id, Function) ->
 %% @doc Update all objects given a mutation function.
 update_all(Ref, Function) ->
     lager:info("~p in the update_all", [?MODULE]),
-    Result = gen_server:call(Ref, {update_all, Function}, infinity),
+    Result = gen_server:call(Ref, {update_all, Function}, ?TIMEOUT),
     lager:info("~p out of the update_all", [?MODULE]),
     Result.
 
 %% @doc Retrieve a record from the backend.
 get(Ref, Id) ->
     lager:info("~p in the get", [?MODULE]),
-    Result = gen_server:call(Ref, {get, Id}, infinity),
+    Result = gen_server:call(Ref, {get, Id}, ?TIMEOUT),
     lager:info("~p out of the get", [?MODULE]),
     Result.
 
 %% @doc Fold operation.
 fold(Ref, Function, Acc) ->
     lager:info("~p in the fold with ref ~p", [?MODULE, Ref]),
-    Result = gen_server:call(Ref, {fold, Function, Acc}, infinity),
+    Result = gen_server:call(Ref, {fold, Function, Acc}, ?TIMEOUT),
     lager:info("~p out of the fold with ref ~p", [?MODULE, Ref]),
     Result.
 
 %% @doc Reset all application state.
 reset(Ref) ->
     lager:info("~p in the reset", [?MODULE]),
-    Result = gen_server:call(Ref, reset, infinity),
+    Result = gen_server:call(Ref, reset, ?TIMEOUT),
     Result.
 
 %%%===================================================================
@@ -146,24 +146,24 @@ init([Identifier]) ->
 
 %% Proxy calls to the storage instance.
 handle_call({get, Id}, _From, #state{store=Store}=State) ->
-    Result = gen_server:call(Store, {get, Id}, infinity),
+    Result = gen_server:call(Store, {get, Id}, ?TIMEOUT),
     {reply, Result, State};
 handle_call({put, Id, Record}, _From, #state{store=Store}=State) ->
-    Result = gen_server:call(Store, {put, Id, Record}, infinity),
+    Result = gen_server:call(Store, {put, Id, Record}, ?TIMEOUT),
     {reply, Result, State};
 handle_call({update, Id, Function}, _From, #state{store=Store}=State) ->
-    Result = gen_server:call(Store, {update, Id, Function}, infinity),
+    Result = gen_server:call(Store, {update, Id, Function}, ?TIMEOUT),
     {reply, Result, State};
 handle_call({update_all, Function}, _From, #state{store=Store}=State) ->
-    Result = gen_server:call(Store, {update_all, Function}, infinity),
+    Result = gen_server:call(Store, {update_all, Function}, ?TIMEOUT),
     {reply, Result, State};
 handle_call({fold, Function, Acc0}, _From, #state{store=Store}=State) ->
     lager:info("at the inner fold of ~p", [?MODULE]),
-    Result = gen_server:call(Store, {fold, Function, Acc0}, infinity),
+    Result = gen_server:call(Store, {fold, Function, Acc0}, ?TIMEOUT),
     lager:info("exiting the inner fold of ~p", [?MODULE]),
     {reply, Result, State};
 handle_call(reset, _From, #state{store=Store}=State) ->
-    Result = gen_server:call(Store, reset, infinity),
+    Result = gen_server:call(Store, reset, ?TIMEOUT),
     {reply, Result, State};
 
 handle_call(Msg, _From, State) ->
@@ -189,7 +189,7 @@ handle_info(waiting_threads_pruning, #state{store=Store}=State) ->
         WaitingThreads = lists:filter(GCFun, WaitingThreads0),
         {Value#dv{waiting_threads=WaitingThreads}, Id}
     end,
-    gen_server:call(Store, {update_all, Mutator}, infinity),
+    gen_server:call(Store, {update_all, Mutator}, ?TIMEOUT),
 
     %% Schedule next message.
     schedule_waiting_threads_pruning(),

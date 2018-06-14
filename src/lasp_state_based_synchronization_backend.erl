@@ -69,10 +69,10 @@ start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
 
 propagate(ObjectFilterFun) ->
-    gen_server:call(?MODULE, {propagate, ObjectFilterFun}, infinity).
+    gen_server:call(?MODULE, {propagate, ObjectFilterFun}, ?TIMEOUT).
 
 blocking_sync(ObjectFilterFun) ->
-    gen_server:call(?MODULE, {blocking_sync, ObjectFilterFun}, infinity).
+    gen_server:call(?MODULE, {blocking_sync, ObjectFilterFun}, ?TIMEOUT).
 
 %%%===================================================================
 %%% gen_server callbacks

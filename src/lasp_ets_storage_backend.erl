@@ -64,37 +64,37 @@ start_link(Identifier) ->
 %% @doc Write a record to the backend.
 -spec put(ref(), id(), variable()) -> ok | {error, atom()}.
 put(Ref, Id, Record) ->
-    gen_server:call(Ref, {put, Id, Record}, infinity).
+    gen_server:call(Ref, {put, Id, Record}, ?TIMEOUT).
 
 %% @doc In-place update given a mutation function.
 -spec update(ref(), id(), function()) -> {ok, any()} | error |
                                          {error, atom()}.
 update(Ref, Id, Function) ->
-    gen_server:call(Ref, {update, Id, Function}, infinity).
+    gen_server:call(Ref, {update, Id, Function}, ?TIMEOUT).
 
 %% @doc Update all objects given a mutation function.
 -spec update_all(ref(), function()) -> {ok, term()}.
 update_all(Ref, Function) ->
-    gen_server:call(Ref, {update_all, Function}, infinity).
+    gen_server:call(Ref, {update_all, Function}, ?TIMEOUT).
 
 %% @doc Retrieve a record from the backend.
 -spec get(ref(), id()) -> {ok, variable()} | {error, not_found} |
                           {error, atom()}.
 get(Ref, Id) ->
-    gen_server:call(Ref, {get, Id}, infinity).
+    gen_server:call(Ref, {get, Id}, ?TIMEOUT).
 
 %% @doc Fold operation.
 -spec fold(store(), function(), term()) -> {ok, term()}.
 fold(Ref, Function, Acc) ->
     lager:info("=> Starting backend foldt at ets backend...", []),
-    Result = gen_server:call(Ref, {fold, Function, Acc}, infinity),
+    Result = gen_server:call(Ref, {fold, Function, Acc}, ?TIMEOUT),
     lager:info("=> Fold returned ~p", [Result]),
     Result.
 
 %% @doc Reset all application state.
 -spec reset(store()) -> ok.
 reset(Ref) ->
-    gen_server:call(Ref, reset, infinity).
+    gen_server:call(Ref, reset, ?TIMEOUT).
 
 %%%===================================================================
 %%% gen_server callbacks

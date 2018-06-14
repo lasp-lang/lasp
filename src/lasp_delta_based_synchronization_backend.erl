@@ -65,7 +65,7 @@ start_link(Opts) ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, Opts, []).
 
 propagate(ObjectFilterFun) ->
-    gen_server:call(?MODULE, {propagate, ObjectFilterFun}, infinity).
+    gen_server:call(?MODULE, {propagate, ObjectFilterFun}, ?TIMEOUT).
 
 %%%===================================================================
 %%% gen_server callbacks

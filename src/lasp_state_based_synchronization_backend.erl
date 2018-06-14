@@ -509,6 +509,8 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                     end
                end,
     lager:info("=> Starting backend fold..."),
+    Trace = try throw(42) catch 42 -> erlang:get_stacktrace() end,
+    lager:info("~p", [Trace]),
     %% TODO: Should this be parallel?
     {ok, Objects} = lasp_storage_backend:fold(Store, Function, []),
     lager:info("Completed state propagation with peer: ~p", [Peer]),

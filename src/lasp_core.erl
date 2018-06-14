@@ -999,10 +999,10 @@ reply_to_all([], StillWaiting0, _Result) ->
             case is_pid(From) of
                 true ->
                     Alive = is_process_alive(From),
-                    lager:info("=> Threshold, From ~p is ~p", [From, Alive]),
+                    lager:info("=> Threshold, from ~p is ~p", [From, Alive]),
                     Alive;
                 false ->
-                    lager:info("=> Threshold, From is not a PID, so we keep: ~p", [From]),
+                    lager:info("=> Threshold, from is not a PID, so we keep: ~p", [From]),
                     true
             end;
         (Other) ->

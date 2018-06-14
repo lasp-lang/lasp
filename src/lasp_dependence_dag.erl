@@ -177,13 +177,13 @@ add_vertices([]) ->
     ok;
 
 add_vertices(Vs) ->
-    gen_server:call(?MODULE, {add_vertices, Vs}, infinity).
+    gen_server:call(?MODULE, {add_vertices, Vs}, ?TIMEOUT).
 
 is_root(V) ->
-    gen_server:call(?MODULE, {is_root, V}, infinity).
+    gen_server:call(?MODULE, {is_root, V}, ?TIMEOUT).
 
 vertices() ->
-    gen_server:call(?MODULE, vertices, infinity).
+    gen_server:call(?MODULE, vertices, ?TIMEOUT).
 
 %% @doc Check if linking the given vertices will form a loop.
 %%
@@ -201,7 +201,7 @@ vertices() ->
 %%      as its own internal value is incremented forever.
 -spec will_form_cycle(list(lasp_vertex()), lasp_vertex()) -> boolean().
 will_form_cycle(Src, Dst) ->
-    gen_server:call(?MODULE, {will_form_cycle, Src, Dst}, infinity).
+    gen_server:call(?MODULE, {will_form_cycle, Src, Dst}, ?TIMEOUT).
 
 %% @doc For all V in Src, create an edge from V to Dst labelled with Pid.
 %%
@@ -217,38 +217,38 @@ will_form_cycle(Src, Dst) ->
                      {lasp_vertex(), function()}) -> ok | error.
 
 add_edges(Src, Dst, Pid, ReadFuns, TransFun, WriteFun) ->
-    gen_server:call(?MODULE, {add_edges, Src, Dst, Pid, ReadFuns, TransFun, WriteFun}, infinity).
+    gen_server:call(?MODULE, {add_edges, Src, Dst, Pid, ReadFuns, TransFun, WriteFun}, ?TIMEOUT).
 
 %% @doc Return the dot representation as a string.
 -spec to_dot() -> {ok, string()} | {error, no_data}.
 to_dot() ->
-    gen_server:call(?MODULE, to_dot, infinity).
+    gen_server:call(?MODULE, to_dot, ?TIMEOUT).
 
 %% @doc Write the dot representation of the dag to the given file path.
 -spec export_dot(string()) -> ok | {error, no_data}.
 export_dot(Path) ->
-    gen_server:call(?MODULE, {export_dot, Path}, infinity).
+    gen_server:call(?MODULE, {export_dot, Path}, ?TIMEOUT).
 
 n_vertices() ->
-    gen_server:call(?MODULE, n_vertices, infinity).
+    gen_server:call(?MODULE, n_vertices, ?TIMEOUT).
 
 n_edges() ->
-    gen_server:call(?MODULE, n_edges, infinity).
+    gen_server:call(?MODULE, n_edges, ?TIMEOUT).
 
 in_degree(V) ->
-    gen_server:call(?MODULE, {in_degree, V}, infinity).
+    gen_server:call(?MODULE, {in_degree, V}, ?TIMEOUT).
 
 out_degree(V) ->
-    gen_server:call(?MODULE, {out_degree, V}, infinity).
+    gen_server:call(?MODULE, {out_degree, V}, ?TIMEOUT).
 
 out_edges(V) ->
-    gen_server:call(?MODULE, {out_edges, V}, infinity).
+    gen_server:call(?MODULE, {out_edges, V}, ?TIMEOUT).
 
 in_edges(V) ->
-    gen_server:call(?MODULE, {in_edges, V}, infinity).
+    gen_server:call(?MODULE, {in_edges, V}, ?TIMEOUT).
 
 process_map() ->
-    gen_server:call(?MODULE, get_process_map, infinity).
+    gen_server:call(?MODULE, get_process_map, ?TIMEOUT).
 
 -ifdef(TEST).
 
@@ -261,7 +261,7 @@ process_map() ->
 %%      This removes intermediate vertices from the graph.
 %%
 contract() ->
-    gen_server:call(?MODULE, contract, infinity).
+    gen_server:call(?MODULE, contract, ?TIMEOUT).
 
 %% @doc Perform vertex cleaving on the given vertex.
 %%
@@ -271,14 +271,14 @@ contract() ->
 %%      Does nothing if the vertex was not removed.
 %%
 cleave(Vertex) ->
-    gen_server:call(?MODULE, {cleave, Vertex}, infinity).
+    gen_server:call(?MODULE, {cleave, Vertex}, ?TIMEOUT).
 
 %% @doc Perform vertex cleaving on all removed vertices.
 %%
 %%      Same as cleave/1, but on all removed vertices of the graph.
 %%
 cleave_all() ->
-    gen_server:call(?MODULE, cleave_all, infinity).
+    gen_server:call(?MODULE, cleave_all, ?TIMEOUT).
 
 -endif.
 

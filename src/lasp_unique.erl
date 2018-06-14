@@ -38,6 +38,8 @@
 
 -record(state, {}).
 
+-include("lasp.hrl").
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -54,7 +56,7 @@ start_link(Opts) ->
 
 -spec unique() -> {ok, binary()}.
 unique() ->
-    gen_server:call(?MODULE, unique, infinity).
+    gen_server:call(?MODULE, unique, ?TIMEOUT).
 
 %%%===================================================================
 %%% gen_server callbacks

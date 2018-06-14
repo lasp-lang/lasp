@@ -51,6 +51,8 @@
 %% Broadcast record.
 -record(broadcast, {timestamp}).
 
+-include("lasp.hrl").
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -91,7 +93,7 @@ merge(Timestamp, Timestamp) ->
         true ->
             false;
         false ->
-            gen_server:call(?MODULE, {merge, Timestamp}, infinity),
+            gen_server:call(?MODULE, {merge, Timestamp}, ?TIMEOUT),
             true
     end.
 
@@ -99,13 +101,13 @@ merge(Timestamp, Timestamp) ->
 %%      stale or not.
 -spec is_stale(broadcast_id()) -> boolean().
 is_stale(Timestamp) ->
-    gen_server:call(?MODULE, {is_stale, Timestamp}, infinity).
+    gen_server:call(?MODULE, {is_stale, Timestamp}, ?TIMEOUT).
 
 %% @doc Given a message identifier and a clock, return a given message.
 -spec graft(broadcast_id()) ->
     stale | {ok, broadcast_payload()} | {error, term()}.
 graft(Timestamp) ->
-    gen_server:call(?MODULE, {graft, Timestamp}, infinity).
+    gen_server:call(?MODULE, {graft, Timestamp}, ?TIMEOUT).
 
 %% @doc Anti-entropy mechanism.
 -spec exchange(node()) -> {ok, pid()}.

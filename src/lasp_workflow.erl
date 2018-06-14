@@ -40,6 +40,8 @@
 %% State record.
 -record(state, {eredis}).
 
+-include("lasp.hrl").
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -57,23 +59,23 @@ start_link(Opts) ->
 %% @doc Mark a task as completed.
 -spec task_completed(atom(), atom()) -> ok.
 task_completed(Task, Node) ->
-    gen_server:call(?MODULE, {task_completed, Task, Node}, infinity).
+    gen_server:call(?MODULE, {task_completed, Task, Node}, ?TIMEOUT).
 
 %% @doc Determine if a task is completed.
 -spec is_task_completed(atom()) -> ok.
 is_task_completed(Task) ->
     ClientNumber = lasp_config:get(client_number, 0),
-    gen_server:call(?MODULE, {is_task_completed, Task, ClientNumber}, infinity).
+    gen_server:call(?MODULE, {is_task_completed, Task, ClientNumber}, ?TIMEOUT).
 
 %% @doc Determine if a task is completed.
 -spec is_task_completed(atom(), non_neg_integer()) -> ok.
 is_task_completed(Task, NodeCount) ->
-    gen_server:call(?MODULE, {is_task_completed, Task, NodeCount}, infinity).
+    gen_server:call(?MODULE, {is_task_completed, Task, NodeCount}, ?TIMEOUT).
 
 %% @doc Determine if a task is completed.
 -spec task_progress(atom()) -> ok.
 task_progress(Task) ->
-    gen_server:call(?MODULE, {task_progress, Task}, infinity).
+    gen_server:call(?MODULE, {task_progress, Task}, ?TIMEOUT).
 
 %%%===================================================================
 %%% gen_server callbacks

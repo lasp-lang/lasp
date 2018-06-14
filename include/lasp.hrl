@@ -50,7 +50,7 @@
 -define(PLUMTREE_MEMORY_INTERVAL, 10000).
 
 %% General timeout value.
--define(TIMEOUT, 1000).
+-define(TIMEOUT, 10000).
 
 %% Application information.
 -define(APP, lasp).

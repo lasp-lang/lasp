@@ -122,16 +122,24 @@ handle_call({put, Id, Record}, _From, #state{ref=Ref}=State) ->
     Result = do_put(Ref, Id, Record),
     {reply, Result, State};
 handle_call({update, Id, Function}, _From, #state{ref=Ref}=State) ->
+    lager:info("=> ~p backend update for id ~p with function ~p", [?MODULE, Id, Function]),
+
     Result = case do_get(Ref, Id) of
         {ok, Value} ->
+            lager:info("=> ~p found value: ~p", [?MODULE, Value]),
             {NewValue, InnerResult} = Function(Value),
+            lager:info("=> ~p new value: ~p inner result ~p", [?MODULE, NewValue, InnerResult]),
             case do_put(Ref, Id, NewValue) of
                 ok ->
                     InnerResult
             end;
         Error ->
+            lager:info("=> ~p found error: ~p", [?MODULE, Error]),
             Error
     end,
+
+    lager:info("=> ~p backend update for id finished ~p", [?MODULE, Id]),
+
     {reply, Result, State};
 handle_call({update_all, Function}, _From, #state{ref=Ref}=State) ->
     Result = ets:foldl(

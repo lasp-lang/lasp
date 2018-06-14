@@ -590,7 +590,7 @@ read_var(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
                 true ->
                     {Object#dv{lazy_threads=SL}, {ok, {Id, Type, Metadata, Value}}};
                 false ->
-                    lager:info("Threshold ~p read was not met for ~p and process ~p", [Threshold, Id, self()]),
+                    %% lager:info("Threshold ~p read against value ~p was not met for ~p and process ~p", [Threshold, Value, Id, self()]),
                     WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
                     {Object#dv{waiting_threads=WT, lazy_threads=SL}, {error, threshold_not_met}}
             end
@@ -922,8 +922,7 @@ reply_to_all(List, Result) ->
 reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, {Id, Type, Metadata, Value}}=Result) ->
-    {ok, V} = lasp:query(Id),
-    lager:info("Checking threshold for ~p on ~p for value ~p", [Threshold, Id, V]),
+    lager:info("Checking threshold for ~p on ~p for value ~p", [Threshold, Id]),
     SW = case lasp_type:threshold_met(Type, Value, Threshold) of
         true ->
             lager:info("Threshold met for ~p on ~p", [Threshold, Id]),
@@ -947,8 +946,7 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
             end,
             StillWaiting0;
          false ->
-            {ok, V} = lasp:query(Id),
-            lager:info("Threshold not met ~p; value: ~p", [Threshold, V]),
+            lager:info("Threshold not met ~p; value: ~p", [Threshold]),
             StillWaiting0 ++ [H]
     end,
     reply_to_all(T, SW, Result);

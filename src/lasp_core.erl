@@ -98,6 +98,8 @@ enforce_once(Id, Threshold, EnforceFun, Store) ->
     TransFun = fun({_, Type, _, Value}) ->
                    case lasp_type:threshold_met(Type, Value, Threshold) of
                        true ->
+                           lager:info("enforce_once calling query at pid ~p", [self()]),
+
                            {ok, Membership} = lasp:query(?MEMBERSHIP_ID),
 
                            Membership1 = case Membership of
@@ -111,6 +113,8 @@ enforce_once(Id, Threshold, EnforceFun, Store) ->
 
                            SortedMembership = lists:usort(Membership1),
                            EnforcementNode = hd(SortedMembership),
+
+                           lager:info("enforce once, enforcement node: ~p our node ~p", [EnforcementNode, lasp_support:mynode()]),
 
                            case lasp_support:mynode() of
                                EnforcementNode ->

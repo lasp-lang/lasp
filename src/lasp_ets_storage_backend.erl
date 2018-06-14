@@ -126,9 +126,9 @@ handle_call({update, Id, Function}, _From, #state{ref=Ref}=State) ->
 
     Result = case do_get(Ref, Id) of
         {ok, Value} ->
-            lager:info("=> ~p found value: ~p", [?MODULE, Value]),
+            lager:info("=> ~p found value", [?MODULE, Value]),
             {NewValue, InnerResult} = Function(Value),
-            lager:info("=> ~p new value: ~p inner result ~p", [?MODULE, NewValue, InnerResult]),
+            lager:info("=> ~p new value produced.", [?MODULE]),
             case do_put(Ref, Id, NewValue) of
                 ok ->
                     InnerResult

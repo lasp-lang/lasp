@@ -985,18 +985,22 @@ reply_to_all([From|T], StillWaiting, Result) ->
     reply_to_all(T, StillWaiting, Result);
 reply_to_all([], StillWaiting0, _Result) ->
     %% Attempt to eagerly prune.
-    GCFun = fun({_, _, From, _, _} = T) ->
-        lager:info("Attempting to prune threshold for from: ~p for threshold: ~p", [From, T]),
+    GCFun = 
+        fun({_, _, From, _, _} = T) ->
+            lager:info("Attempting to prune threshold for from: ~p for threshold: ~p", [From, T]),
 
-        case is_pid(From) of
-            true ->
-                Alive = is_process_alive(From),
-                lager:info("=> Threshold, From ~p is ~p", [From, Alive]),
-                Alive;
-            false ->
-                lager:info("=> Threshold, From is not a PID, so we keep: ~p", [From]),
-                true
-        end
+            case is_pid(From) of
+                true ->
+                    Alive = is_process_alive(From),
+                    lager:info("=> Threshold, From ~p is ~p", [From, Alive]),
+                    Alive;
+                false ->
+                    lager:info("=> Threshold, From is not a PID, so we keep: ~p", [From]),
+                    true
+            end;
+        (Other) ->
+            lager:info("=> Other threshold detected: ~p; keeping.", [Other]),
+            true
     end,
 
     StillWaiting = lists:filter(GCFun, StillWaiting0),

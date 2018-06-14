@@ -202,5 +202,12 @@ do_get(Ref, Id) ->
 %% @doc Write a record to the backend.
 -spec do_put(ref(), id(), variable()) -> ok.
 do_put(Ref, Id, Record) ->
-    true = ets:insert(Ref, {Id, Record}),
-    ok.
+    Result = ets:insert(Ref, {Id, Record}),
+    case Result of
+        true ->
+            lager:info("=> insert on do was good!", []),
+            ok;
+        Other ->
+            lager:info("=> insert on do was NOT GOOD ~p", [Other]),
+            Other
+    end.

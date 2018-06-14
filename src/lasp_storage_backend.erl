@@ -81,16 +81,15 @@ start_link(Identifier) ->
 
 %% @doc Write a record to the backend.
 put(Ref, Id, Record) ->
-    lager:info("~p in the put", [?MODULE]),
-    Result = gen_server:call(Ref, {put, Id, Record}, infinity),
-    lager:info("~p out of the put", [?MODULE]),
-    Result.
+    gen_server:call(Ref, {put, Id, Record}, infinity).
 
 %% @doc In-place update given a mutation function.
 update(Ref, Id, Function) ->
     lager:info("~p in the update for id ~p and ref ~p", [?MODULE, Id, Ref]),
     Result = gen_server:call(Ref, {update, Id, Function}, infinity),
-    lager:info("~p out of the update with ref ~p", [?MODULE, Ref]),
+    lager:info("~p out of the update with ref ~p and result ~p", [?MODULE, Ref, Result]),
+    Trace = try throw(42) catch 42 -> erlang:get_stacktrace() end,
+    lager:info("=> trace: ~p", [Trace]) ,
     Result.
 
 %% @doc Update all objects given a mutation function.

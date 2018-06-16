@@ -156,7 +156,7 @@ bind_to(Id, TheirId) ->
 %%
 -spec read(id(), threshold()) -> {ok, var()} | error().
 read(Id, Threshold) ->
-    gen_server:call(?MODULE, {read, Id, Threshold}, ?TIMEOUT).
+    gen_server:call(?MODULE, {read, Id, Threshold}, infinity).
 
 %% @doc Blocking monotonic read operation for a list of given dataflow
 %%      variables.
@@ -328,7 +328,7 @@ init([]) ->
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({propagate, Id}, _From, #state{store=Store}=State) ->
+handle_call({propagate, Id}, _From, #state{store=Store}=State) -
     lasp_marathon_simulations:log_message_queue_size("propagate"),
 
     ok = do_propagate(Id, Store),

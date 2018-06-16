@@ -70,10 +70,10 @@ init([]) ->
                  end,
 
     lager:info("Configuring invariant for threshold: ~p", [Threshold]),
-    spawn_link(fun() ->
+    Pid = spawn_link(fun() ->
                        lasp:invariant(?SIMPLE_COUNTER, Threshold, EnforceFun)
                end),
-    lager:info("Configured."),
+    lager:info("Configured process: ~p", [Pid]),
 
     %% Track whether simulation has ended or not.
     lasp_config:set(simulation_end, false),

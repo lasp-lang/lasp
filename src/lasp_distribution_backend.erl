@@ -328,7 +328,7 @@ init([]) ->
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 
-handle_call({propagate, Id}, _From, #state{store=Store}=State) -
+handle_call({propagate, Id}, _From, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("propagate"),
 
     ok = do_propagate(Id, Store),

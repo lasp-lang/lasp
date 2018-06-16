@@ -86,9 +86,9 @@ get(Ref, Id) ->
 %% @doc Fold operation.
 -spec fold(store(), function(), term()) -> {ok, term()}.
 fold(Ref, Function, Acc) ->
-    lager:info("=> Starting backend foldt at ets backend...", []),
+    % lager:info("=> Starting backend foldt at ets backend...", []),
     Result = gen_server:call(Ref, {fold, Function, Acc}, ?TIMEOUT),
-    lager:info("=> Fold returned ~p", [Result]),
+    % lager:info("=> Fold returned ~p", [Result]),
     Result.
 
 %% @doc Reset all application state.
@@ -122,23 +122,23 @@ handle_call({put, Id, Record}, _From, #state{ref=Ref}=State) ->
     Result = do_put(Ref, Id, Record),
     {reply, Result, State};
 handle_call({update, Id, Function}, _From, #state{ref=Ref}=State) ->
-    lager:info("=> ~p backend update for id ~p with function ~p", [?MODULE, Id, Function]),
+    % lager:info("=> ~p backend update for id ~p with function ~p", [?MODULE, Id, Function]),
 
     Result = case do_get(Ref, Id) of
         {ok, Value} ->
-            lager:info("=> ~p found value", [?MODULE]),
+            % lager:info("=> ~p found value", [?MODULE]),
             {NewValue, InnerResult} = Function(Value),
-            lager:info("=> ~p new value produced.", [?MODULE]),
+            % lager:info("=> ~p new value produced.", [?MODULE]),
             case do_put(Ref, Id, NewValue) of
                 ok ->
                     InnerResult
             end;
         Error ->
-            lager:info("=> ~p found error: ~p", [?MODULE, Error]),
+            lager:error("=> ~p found error: ~p", [?MODULE, Error]),
             Error
     end,
 
-    lager:info("=> ~p backend update for id finished ~p", [?MODULE, Id]),
+    % lager:info("=> ~p backend update for id finished ~p", [?MODULE, Id]),
 
     {reply, Result, State};
 handle_call({update_all, Function}, _From, #state{ref=Ref}=State) ->
@@ -155,9 +155,9 @@ handle_call({update_all, Function}, _From, #state{ref=Ref}=State) ->
     ),
     {reply, {ok, Result}, State};
 handle_call({fold, Function, Acc0}, _From, #state{ref=Ref}=State) ->
-    lager:info("=> => in the fold..."),
+    % lager:info("=> => in the fold..."),
     Acc1 = ets:foldl(Function, Acc0, Ref),
-    lager:info("=> => out of the fold..."),
+    % lager:info("=> => out of the fold..."),
     {reply, {ok, Acc1}, State};
 handle_call(reset, _From, #state{ref=Ref}=State) ->
     true = ets:delete_all_objects(Ref),
@@ -205,9 +205,9 @@ do_put(Ref, Id, Record) ->
     Result = ets:insert(Ref, {Id, Record}),
     case Result of
         true ->
-            lager:info("=> insert on do was good!", []),
+            % lager:info("=> insert on do was good!", []),
             ok;
         Other ->
-            lager:info("=> insert on do was NOT GOOD ~p", [Other]),
+            % lager:info("=> insert on do was NOT GOOD ~p", [Other]),
             Other
     end.

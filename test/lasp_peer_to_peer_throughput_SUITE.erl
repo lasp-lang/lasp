@@ -61,7 +61,7 @@ end_per_testcase(Case, _Config) ->
 
 all() ->
     [
-     peer_to_peer_state_based
+%     peer_to_peer_state_based
     ].
 
 %% ===================================================================

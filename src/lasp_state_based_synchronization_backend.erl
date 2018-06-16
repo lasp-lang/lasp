@@ -185,7 +185,7 @@ handle_call(Msg, _From, State) ->
 handle_cast({state_ack, From, Id, {Id, _Type, _Metadata, Value}},
             #state{store=Store,
                    blocking_syncs=BlockingSyncs0}=State) ->
-    lager:info("Received ack from ~p for ~p with value ~p", [From, Id, Value]),
+    % lager:info("Received ack from ~p for ~p with value ~p", [From, Id, Value]),
 
     BlockingSyncs = dict:fold(fun(K, V, Acc) ->
                 % lager:info("Was waiting ~p ~p", [Key, Value]),
@@ -220,11 +220,11 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
                                        ?CLOCK_INCR(Actor),
                                        ?CLOCK_INIT(Actor)}),
 
-    lager:info("Receiving updates..."),
+    % lager:info("Receiving updates..."),
 
     case AckRequired of
         true ->
-            lager:info("Ack required, sending responses", []),
+            % lager:info("Ack required, sending responses", []),
             ?SYNC_BACKEND:send(?MODULE, {state_ack, lasp_support:mynode(), Id, Object}, From);
         false ->
             ok
@@ -235,7 +235,7 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
          ?SYNC_BACKEND:i_am_server() andalso
          ?SYNC_BACKEND:reactive_server() of
         true ->
-            lager:info("Initializing reverse sync...", []),
+            % lager:info("Initializing reverse sync...", []),
 
             ObjectFilterFun = fun(Id1, _) ->
                                       Id =:= Id1
@@ -246,7 +246,7 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
             ok
     end,
 
-    lager:info("State sync completed.", []),
+    % lager:info("State sync completed.", []),
 
     {noreply, State};
 
@@ -265,7 +265,7 @@ handle_info({state_sync, ObjectFilterFun},
     % lasp_logger:extended("Beginning state synchronization: ~p",
     %                      [PeerServiceManager]),
 
-    lager:info("Initializing state sync..."),
+    % lager:info("Initializing state sync..."),
 
     Members = case ?SYNC_BACKEND:broadcast_tree_mode() of
         true ->
@@ -275,29 +275,29 @@ handle_info({state_sync, ObjectFilterFun},
             Members1
     end,
 
-    lager:info("=> State sync members: ~p", [Members]),
+    % lager:info("=> State sync members: ~p", [Members]),
 
     %% Remove ourself and compute exchange peers.
     Peers = ?SYNC_BACKEND:compute_exchange(?SYNC_BACKEND:without_me(Members)),
 
-    lager:info("=> Exchange computed: ~p", [Peers]),
+    % lager:info("=> Exchange computed: ~p", [Peers]),
 
     %% Ship buffered updates for the fanout value.
     SyncFun = fun(Peer) ->
-                      lager:info("=> About to start for peer: ~p", [Peer]),
+                      % lager:info("=> About to start for peer: ~p", [Peer]),
                       case lasp_config:get(reverse_topological_sync, ?REVERSE_TOPOLOGICAL_SYNC) of
                           true ->
                               init_reverse_topological_sync(Peer, ObjectFilterFun, Store);
                           false ->
-                              lager:info("=> => State sync initialized for peer: ~p", [Peer]),
-                              init_state_sync(Peer, ObjectFilterFun, false, Store),
-                              lager:info("=> => Out of state sync.")
-                      end,
-                      lager:info("=> Done for peer: ~p", [Peer])
+                              % lager:info("=> => State sync initialized for peer: ~p", [Peer]),
+                              init_state_sync(Peer, ObjectFilterFun, false, Store)
+                              % lager:info("=> => Out of state sync.")
+                      end
+                      % lager:info("=> Done for peer: ~p", [Peer])
               end,
     lists:foreach(SyncFun, Peers),
 
-    lager:info("=> Done, scheduling next sync..."),
+    % lager:info("=> Done, scheduling next sync..."),
 
     %% Schedule next synchronization.
     schedule_state_synchronization(),
@@ -451,9 +451,9 @@ get_peer_interests(Peer, Store) ->
         true ->
             case ?CORE:query(?INTERESTS_ID, Store) of
                 {ok, Value} ->
-                    lager:info("Got value: ~p", [Value]),
+                    % lager:info("Got value: ~p", [Value]),
                     Result = proplists:get_value(Peer, Value, sets:new()),
-                    lager:info("Returning result: ~p", [Result]),
+                    % lager:info("Returning result: ~p", [Result]),
                     Result;
                 Other ->
                     lager:warning("Got invalid value: ~p", [Other]),
@@ -463,25 +463,25 @@ get_peer_interests(Peer, Store) ->
 
 %% @private
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
-    lager:info("Initializing state propagation with peer: ~p", [Peer]),
+    % lager:info("Initializing state propagation with peer: ~p", [Peer]),
 
     PeerInterests = get_peer_interests(Peer, Store),
 
     Function = fun({Id, #dv{type=Type, metadata=Metadata, value=Value}}, Acc0) ->
-                    lager:info("Processing id: ~p ~p", [Id, Value]),
+                    % lager:info("Processing id: ~p ~p", [Id, Value]),
                     Dynamic = is_dynamic(Metadata),
                     Filtered = is_filtered(PeerInterests, Metadata),
 
                     %% Sync as long as it's not dynamically scoped, and is filtered.
                     ShouldSync = not Dynamic andalso Filtered,
-                    lager:info("=> fold, is shouldsync: ~p", [ShouldSync]),
+                    % lager:info("=> fold, is shouldsync: ~p", [ShouldSync]),
 
                     case ShouldSync of
                         true ->
-                            lager:info("=> Should sync ~p ~p", [Id, Value]),
+                            % lager:info("=> Should sync ~p ~p", [Id, Value]),
                             try ObjectFilterFun(Id, Metadata) of
                                 true ->
-                                    lager:info("=> Passed filter ~p ~p", [Id, Value]),
+                                    % lager:info("=> Passed filter ~p ~p", [Id, Value]),
                                     ?SYNC_BACKEND:send(?MODULE, {state_send, lasp_support:mynode(), {Id, Type, Metadata, Value}, Blocking}, Peer),
                                     [Id|Acc0];
                                 false ->
@@ -504,12 +504,12 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
                             Acc0
                     end
                end,
-    lager:info("=> Starting backend fold at backend...", []),
+    % lager:info("=> Starting backend fold at backend...", []),
     % Trace = try throw(42) catch 42 -> erlang:get_stacktrace() end,
     % lager:info("~p", [Trace]),
     %% TODO: Should this be parallel?
     {ok, Objects} = lasp_storage_backend:fold(Store, Function, []),
-    lager:info("Completed state propagation with peer: ~p", [Peer]),
+    % lager:info("Completed state propagation with peer: ~p", [Peer]),
     {ok, Objects}.
 
 %% @private

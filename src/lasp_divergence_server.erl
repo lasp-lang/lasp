@@ -178,7 +178,9 @@ client_number() ->
 
 %% @private
 log_divergence() ->
+    lager:info("Attempting to get divergence count..."),
     {ok, Value} = lasp:query(?SIMPLE_COUNTER),
+    lager:info("Count is: ~p", [Value]),
 
     MaxEvents = max_events() * client_number(),
     Overcounting = Value - MaxEvents,

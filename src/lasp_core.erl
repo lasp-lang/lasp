@@ -530,7 +530,7 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                             %% Return value is a delta state.
                             {NewObject, {ok, {Id, Type, Metadata, Merged}}};
                         false ->
-                            lager:info("Merge failed from ~p to ~p", [Value0, Value]),
+                            % lager:info("Merge failed from ~p to ~p", [Value0, Value]),
                             %% Metadata change.
                             NewObject = Object#dv{metadata=Metadata},
                             {NewObject, {ok, {Id, Type, Metadata, Merged}}}
@@ -634,6 +634,16 @@ read_any(Reads, Self, Store) ->
             false ->
                 ReplyFun = fun
                     ({error, _}) ->
+
+%% @doc Blocking monotonic read operation for a given dataflow variable.
+%%
+%%      Block until the variable identified by `Id' has been bound, and
+%%      is monotonically greater (as defined by the lattice) then the
+%%      provided `Threshold' value.
+%%
+-spec read(id(), threshold(), non_neg_integer()) -> {ok, var()} | {error, timeout}.
+read(Id, Threshold, Timeout) ->
+    do(read, [Id, Threshold, Timeout]).
                         false;
                     ({_Id, _Type, _Metadata, _Value}=FoundValue) ->
                         {ok, FoundValue}

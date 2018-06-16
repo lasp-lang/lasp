@@ -114,6 +114,8 @@ init([Store, Actor]) ->
 handle_call({propagate, ObjectFilterFun}, _From,
             #state{gossip_peers=GossipPeers,
                    store=Store}=State) ->
+    lager:info("Sending updates..."),
+
     %% Get the peers to synchronize with.
     Members = case ?SYNC_BACKEND:broadcast_tree_mode() of
         true ->
@@ -220,7 +222,7 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
                                        ?CLOCK_INCR(Actor),
                                        ?CLOCK_INIT(Actor)}),
 
-    % lager:info("Receiving updates..."),
+    lager:info("Receiving updates..."),
 
     case AckRequired of
         true ->
@@ -246,7 +248,7 @@ handle_cast({state_send, From, {Id, Type, _Metadata, Value}, AckRequired},
             ok
     end,
 
-    % lager:info("State sync completed.", []),
+    lager:info("State sync completed.", []),
 
     {noreply, State};
 
@@ -463,7 +465,7 @@ get_peer_interests(Peer, Store) ->
 
 %% @private
 init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
-    % lager:info("Initializing state propagation with peer: ~p", [Peer]),
+    lager:info("Initializing state propagation with peer: ~p", [Peer]),
 
     PeerInterests = get_peer_interests(Peer, Store),
 
@@ -509,7 +511,7 @@ init_state_sync(Peer, ObjectFilterFun, Blocking, Store) ->
     % lager:info("~p", [Trace]),
     %% TODO: Should this be parallel?
     {ok, Objects} = lasp_storage_backend:fold(Store, Function, []),
-    % lager:info("Completed state propagation with peer: ~p", [Peer]),
+    lager:info("Completed state propagation with peer: ~p", [Peer]),
     {ok, Objects}.
 
 %% @private

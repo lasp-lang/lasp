@@ -503,7 +503,7 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                 %% Merge may throw for invalid types.
                 try
                     Merged = lasp_type:merge(Type, Value0, Value),
-                    lager:info("Merged value from ~p and ~p is ~p", [Value0, Value, Merged]),
+                    % lager:info("Merged value from ~p and ~p is ~p", [Value0, Value, Merged]),
                     case lasp_type:is_strict_inflation(Type, Value0, Merged) of
                         true ->
                             %% Object inflation.
@@ -960,7 +960,7 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
             end,
             StillWaiting0;
          false ->
-            lager:info("Threshold not met ~p.", [Threshold]),
+            lager:info("Threshold not met ~p: value is ~p", [Threshold, lasp_type:query(Type, Value)]),
             StillWaiting0 ++ [H]
     end,
     reply_to_all(T, SW, Result);

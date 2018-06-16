@@ -491,7 +491,7 @@ bind(Origin, Id, Value, MetadataFun, Store) ->
 -spec bind_var(node(), id(), value(), function(), store()) ->
     {ok, var()} | not_found().
 bind_var(Origin, Id, Value, MetadataFun, Store) ->
-    lager:info("Entering bind_var for value: ~p", [Value]),
+    % lager:info("Entering bind_var for value: ~p", [Value]),
     Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0, waiting_threads=WT, delta_counter=Counter0, delta_map=DeltaMap0, delta_ack_map=AckMap}=Object) ->
             Metadata = MetadataFun(Metadata0),
             case {Id, Type, Metadata0, Value0} of
@@ -1117,5 +1117,5 @@ store_delta(Origin, Counter, Delta, DeltaMap0) ->
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
-    lager:info("**** backened call to args ~p", [Args]),
+    % lager:info("**** backened call to args ~p", [Args]),
     erlang:apply(lasp_storage_backend, Function, Args).

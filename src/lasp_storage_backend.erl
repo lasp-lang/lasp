@@ -108,7 +108,7 @@ get(Ref, Id) ->
 
 %% @doc Fold operation.
 fold(Ref, Function, Acc) ->
-    % lager:info("~p in the fold with ref ~p", [?MODULE, Ref]),
+    lager:info("~p in the fold with ref ~p and timeout ~p", [?MODULE, Ref, ?TIMEOUT]),
     Result = gen_server:call(Ref, {fold, Function, Acc}, ?TIMEOUT),
     % lager:info("~p out of the fold with ref ~p", [?MODULE, Ref]),
     Result.

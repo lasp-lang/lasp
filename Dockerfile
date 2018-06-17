@@ -10,4 +10,4 @@ RUN cd /opt && \
     (git clone https://github.com/lasp-lang/lasp.git -b $LASP_BRANCH && cd lasp && make exp-stage);
 
 CMD cd /opt/lasp && \
-    /opt/lasp/_build/exp/rel/lasp/bin/env; cat erl_crash.dump
+    /opt/lasp/_build/exp/rel/lasp/bin/env

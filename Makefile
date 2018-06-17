@@ -25,13 +25,6 @@ packageclean:
 	rm -fr *.tar.gz
 
 ##
-## Temporary targets
-##
-
-ew:
-	clear; REBUILD_IMAGE=true CLUSTER_START=true STATE_INTERVAL=2048 bin/kube-divergence-simulation
-
-##
 ## Test targets
 ##
 

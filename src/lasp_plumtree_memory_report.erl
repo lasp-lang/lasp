@@ -118,7 +118,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 schedule_plumtree_memory_report() ->
-    case lasp_config:get(memory_report, false) of
+    case lasp_config:get(memory_report, true) of
         true ->
             timer:send_after(?PLUMTREE_MEMORY_INTERVAL, plumtree_memory_report);
         false ->

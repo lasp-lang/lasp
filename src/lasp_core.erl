@@ -437,7 +437,7 @@ update(Id, Operation, Actor, Store) ->
 -spec update(id(), operation(), actor(), function(), function(), store()) ->
     {ok, var()} | not_found().
 update({_, Type} = Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store) ->
-    lager:info("Node ~p: Update called for ~p and operation ~p and store ~p", [node(), Id, Operation, Store]),
+    %% lager:info("Node ~p: Update called for ~p and operation ~p and store ~p", [node(), Id, Operation, Store]),
     Res = case do(get, [Store, Id]) of
         {ok, #dv{value=Value0, type=Type}} ->
             {ok, Value} = lasp_type:update(Type, Operation, {Id, Actor}, Value0),
@@ -447,7 +447,7 @@ update({_, Type} = Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store)
             {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
             update(Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store)
     end,
-    lager:info("Update has result: ~p", [Res]),
+    %% lager:info("Update has result: ~p", [Res]),
     Res.
 
 %% @doc Update metadata.

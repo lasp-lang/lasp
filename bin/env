@@ -13,7 +13,7 @@ if [ ! -z "$KUBERNETES_PORT" ]; then
 fi
 
 if [ ! -z "$TRAFFIC_SHAPING" ]; then
-  export SHAPING_RANDOM=$((1 + RANDOM % 500))
+  export SHAPING_RANDOM=$((1 + RANDOM % 100))
   export EGRESS_DELAY=${SHAPING_RANDOM}
   export INGRESS_DELAY=${SHAPING_RANDOM}
   echo "Enabling traffic shaping: egress/ingress set to ${SHAPING_RANDOM} delay..."

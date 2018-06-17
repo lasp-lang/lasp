@@ -6,7 +6,7 @@
  {<<"lasp_support">>,{pkg,<<"lasp_support">>,<<"0.0.3">>},0},
  {<<"partisan">>,
   {git,"https://github.com/lasp-lang/partisan",
-       {ref,"33dd3efcb9052656d02bd0494621d078d9e306c2"}},
+       {ref,"f65828c5e4920f245290a433454e1874a22cc64f"}},
   0},
  {<<"plumtree">>,{pkg,<<"plumtree">>,<<"0.5.0">>},0},
  {<<"quickrand">>,{pkg,<<"quickrand">>,<<"1.7.3">>},2},

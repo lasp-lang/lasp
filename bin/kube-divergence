@@ -90,6 +90,13 @@ for i in `seq 1 ${REPS}`; do
         - name: "lasp-server-${EVAL_TIMESTAMP}"
           image: ${IMAGE}
           imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "1000m"
           env:
           - name: TAG
             value: "server"
@@ -194,6 +201,13 @@ for i in `seq 1 ${REPS}`; do
         - name: "lasp-client-${EVAL_TIMESTAMP}"
           image: ${IMAGE}
           imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "1000m"
           env:
           - name: TAG
             value: "client"

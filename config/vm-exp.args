@@ -18,3 +18,9 @@
 
 ## Port for Partisan.
 -partisan peer_port ${PEER_PORT}
+
+## Delays for Partisan.
+-partisan egress_delay ${EGRESS_DELAY}
+
+## Delays for Partisan.
+-partisan ingress_delay ${INGRESS_DELAY}

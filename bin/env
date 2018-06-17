@@ -12,8 +12,12 @@ if [ ! -z "$KUBERNETES_PORT" ]; then
   export IP=${MY_POD_IP}
 fi
 
-echo "Networking..."
-ifconfig -a
+if [ ! -z "$TRAFFIC_SHAPING" ]; then
+  export SHAPING_RANDOM=$((1 + RANDOM % 500))
+  export EGRESS_DELAY=${SHAPING_RANDOM}
+  export INGRESS_DELAY=${SHAPING_RANDOM}
+  echo "Enabling traffic shaping: egress/ingress set to ${SHAPING_RANDOM} delay..."
+fi
 
 # If we're running in Mesos...
 if [ ! -z "$MESOS_TASK_ID" ]; then

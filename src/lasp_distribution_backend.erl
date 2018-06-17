@@ -156,7 +156,7 @@ bind_to(Id, TheirId) ->
 %%
 -spec read(id(), threshold()) -> {ok, var()} | error().
 read(Id, Threshold) ->
-    gen_server:call(?MODULE, {read, Id, Threshold}, infinity).
+    gen_server:call(?MODULE, {read, Id, Threshold}, ?TIMEOUT).
 
 %% @doc Blocking monotonic read operation for a list of given dataflow
 %%      variables.

@@ -12,6 +12,9 @@ if [ ! -z "$KUBERNETES_PORT" ]; then
   export IP=${MY_POD_IP}
 fi
 
+echo "Networking..."
+ifconfig -a
+
 # If we're running in Mesos...
 if [ ! -z "$MESOS_TASK_ID" ]; then
   # Choose publicly routable IP.

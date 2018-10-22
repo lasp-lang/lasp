@@ -68,11 +68,17 @@ end_per_testcase(Case, Config) ->
     ct:pal("Case finished: ~p", [Case]),
 
     lasp_support:stop_nodes(Case, Config),
+    
+    ct:pal("Nodes stopped!", []),
 
     %% Runner must start and stop in between test runs as well, to
     %% ensure that we clear the membership list (otherwise, we could
     %% delete the data on disk, but this is cleaner.)
-    lasp_support:stop_runner().
+    lasp_support:stop_runner(),
+
+    ct:pal("Runner stopped!", []),
+
+    ok.
 
 all() ->
     [
@@ -859,14 +865,22 @@ counter_enforce_once_test(Config) ->
             ct:fail(failed)
     end,
 
+    ct:pal("About to issue increments...", []),
+
     %% Increment counter twice to get trigger to fire.
     {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
     {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
     {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
 
-    lager:info("Waiting for response..."),
+    ct:pal("Done with increments...", []),
+
+    {ok, V} = rpc:call(Node, lasp, query, [Id]),
+    lager:info("Value is ~p", [V]),
+
+    ct:pal("Waiting for responses...", []),
     receive
         {ok, Threshold} ->
+            lager:info("Got response!"),
             ok
     after
         10000 ->
@@ -906,15 +920,17 @@ counter_strict_enforce_once_test(Config) ->
             Threshold = {strict, {value, 2}},
 
             EnforceFun = fun(X) ->
-                                ct:pal("Enforce function fired with: ~p", [X]),
+                                lager:info("Enforce function fired with: ~p", [X]),
                                 Self ! {ok, Threshold}
                         end,
 
-            lager:info("Adding invariant on node: ~p!", [Node]),
+            lager:info("Adding invariant on node: ~p with threshold ~p", [Node, Threshold]),
+            ct:pal("Adding invariant on node: ~p with threshold ~p", [Node, Threshold]),
 
             case rpc:call(Node, lasp, enforce_once, [Id, Threshold, EnforceFun]) of
                 ok ->
-                    lager:info("Invariant configured!");
+                    lager:info("Invariant configured for threshold: ~p", [Threshold]),
+                    ok;
                 Error ->
                     lager:info("Invariant can't be configured: ~p", [Error]),
                     ct:fail(failed)
@@ -931,11 +947,13 @@ counter_strict_enforce_once_test(Config) ->
             lager:info("Waiting for response..."),
             receive
                 {ok, Threshold} ->
+                    lager:info("Got message!", []),
                     ok;
                 Other ->
+                    lager:info("Didn't get message!", []),
                     ct:fail({received_other_message, Other})
             after
-                10000 ->
+                20000 ->
                     lager:info("Did not receive response!"),
                     ct:fail(failed)
             end,

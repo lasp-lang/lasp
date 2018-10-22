@@ -40,6 +40,8 @@
 %% State record.
 -record(state, {eredis}).
 
+-include("lasp.hrl").
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -57,23 +59,23 @@ start_link(Opts) ->
 %% @doc Mark a task as completed.
 -spec task_completed(atom(), atom()) -> ok.
 task_completed(Task, Node) ->
-    gen_server:call(?MODULE, {task_completed, Task, Node}, infinity).
+    gen_server:call(?MODULE, {task_completed, Task, Node}, ?TIMEOUT).
 
 %% @doc Determine if a task is completed.
 -spec is_task_completed(atom()) -> ok.
 is_task_completed(Task) ->
     ClientNumber = lasp_config:get(client_number, 0),
-    gen_server:call(?MODULE, {is_task_completed, Task, ClientNumber}, infinity).
+    gen_server:call(?MODULE, {is_task_completed, Task, ClientNumber}, ?TIMEOUT).
 
 %% @doc Determine if a task is completed.
 -spec is_task_completed(atom(), non_neg_integer()) -> ok.
 is_task_completed(Task, NodeCount) ->
-    gen_server:call(?MODULE, {is_task_completed, Task, NodeCount}, infinity).
+    gen_server:call(?MODULE, {is_task_completed, Task, NodeCount}, ?TIMEOUT).
 
 %% @doc Determine if a task is completed.
 -spec task_progress(atom()) -> ok.
 task_progress(Task) ->
-    gen_server:call(?MODULE, {task_progress, Task}, infinity).
+    gen_server:call(?MODULE, {task_progress, Task}, ?TIMEOUT).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -102,40 +104,40 @@ init([]) ->
 handle_call({task_progress, Task}, _From, #state{eredis=Eredis}=State) ->
     {ok, Objects} = eredis:q(Eredis, ["KEYS", prefix(Task, "*")]),
     NumObjects = length(Objects),
-    % lager:info("Task ~p progress: ~p", [Task, NumObjects]),
+    lager:info("Task ~p progress: ~p", [Task, NumObjects]),
     {reply, {ok, NumObjects}, State};
 handle_call({is_task_completed, Task, NumNodes}, _From, #state{eredis=Eredis}=State) ->
     {ok, Objects} = eredis:q(Eredis, ["KEYS", prefix(Task, "*")]),
     Result = case length(Objects) of
         NumNodes ->
-            % lager:info("Task ~p completed on all nodes.", [Task]),
+            lager:info("Task ~p completed on all nodes.", [Task]),
             true;
-        _Other ->
-            % lager:info("Task ~p incomplete: only on ~p/~p nodes.",
-            %            [Task, Other, NumNodes]),
+        Other ->
+            lager:info("Task ~p incomplete: only on ~p/~p nodes.",
+                       [Task, Other, NumNodes]),
             false
     end,
     {reply, Result, State};
 handle_call({task_completed, Task, Node}, _From, #state{eredis=Eredis}=State) ->
     Path = prefix(Task, Node),
-    % lager:info("Setting ~p to true.", [Path]),
+    lager:info("Setting ~p to true.", [Path]),
     {ok, <<"OK">>} = eredis:q(Eredis, ["SET", Path, true]),
     {reply, ok, State};
 
 handle_call(Msg, _From, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled call messages at module ~p: ~p", [?MODULE, Msg]),
     {reply, ok, State}.
 
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 
 %% @private
 handle_cast(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled cast messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private
 handle_info(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled info messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private

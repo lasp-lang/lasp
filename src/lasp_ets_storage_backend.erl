@@ -64,34 +64,37 @@ start_link(Identifier) ->
 %% @doc Write a record to the backend.
 -spec put(ref(), id(), variable()) -> ok | {error, atom()}.
 put(Ref, Id, Record) ->
-    gen_server:call(Ref, {put, Id, Record}, infinity).
+    gen_server:call(Ref, {put, Id, Record}, ?TIMEOUT).
 
 %% @doc In-place update given a mutation function.
 -spec update(ref(), id(), function()) -> {ok, any()} | error |
                                          {error, atom()}.
 update(Ref, Id, Function) ->
-    gen_server:call(Ref, {update, Id, Function}, infinity).
+    gen_server:call(Ref, {update, Id, Function}, ?TIMEOUT).
 
 %% @doc Update all objects given a mutation function.
 -spec update_all(ref(), function()) -> {ok, term()}.
 update_all(Ref, Function) ->
-    gen_server:call(Ref, {update_all, Function}, infinity).
+    gen_server:call(Ref, {update_all, Function}, ?TIMEOUT).
 
 %% @doc Retrieve a record from the backend.
 -spec get(ref(), id()) -> {ok, variable()} | {error, not_found} |
                           {error, atom()}.
 get(Ref, Id) ->
-    gen_server:call(Ref, {get, Id}, infinity).
+    gen_server:call(Ref, {get, Id}, ?TIMEOUT).
 
 %% @doc Fold operation.
 -spec fold(store(), function(), term()) -> {ok, term()}.
 fold(Ref, Function, Acc) ->
-    gen_server:call(Ref, {fold, Function, Acc}, infinity).
+    % lager:info("=> Starting backend foldt at ets backend...", []),
+    Result = gen_server:call(Ref, {fold, Function, Acc}, ?TIMEOUT),
+    % lager:info("=> Fold returned ~p", [Result]),
+    Result.
 
 %% @doc Reset all application state.
 -spec reset(store()) -> ok.
 reset(Ref) ->
-    gen_server:call(Ref, reset, infinity).
+    gen_server:call(Ref, reset, ?TIMEOUT).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -119,16 +122,24 @@ handle_call({put, Id, Record}, _From, #state{ref=Ref}=State) ->
     Result = do_put(Ref, Id, Record),
     {reply, Result, State};
 handle_call({update, Id, Function}, _From, #state{ref=Ref}=State) ->
+    % lager:info("=> ~p backend update for id ~p with function ~p", [?MODULE, Id, Function]),
+
     Result = case do_get(Ref, Id) of
         {ok, Value} ->
+            % lager:info("=> ~p found value", [?MODULE]),
             {NewValue, InnerResult} = Function(Value),
+            % lager:info("=> ~p new value produced.", [?MODULE]),
             case do_put(Ref, Id, NewValue) of
                 ok ->
                     InnerResult
             end;
         Error ->
+            lager:error("=> ~p found error: ~p", [?MODULE, Error]),
             Error
     end,
+
+    % lager:info("=> ~p backend update for id finished ~p", [?MODULE, Id]),
+
     {reply, Result, State};
 handle_call({update_all, Function}, _From, #state{ref=Ref}=State) ->
     Result = ets:foldl(
@@ -144,23 +155,25 @@ handle_call({update_all, Function}, _From, #state{ref=Ref}=State) ->
     ),
     {reply, {ok, Result}, State};
 handle_call({fold, Function, Acc0}, _From, #state{ref=Ref}=State) ->
+    % lager:info("=> => in the fold..."),
     Acc1 = ets:foldl(Function, Acc0, Ref),
+    % lager:info("=> => out of the fold..."),
     {reply, {ok, Acc1}, State};
 handle_call(reset, _From, #state{ref=Ref}=State) ->
     true = ets:delete_all_objects(Ref),
     {reply, ok, State};
 handle_call(Msg, _From, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled call messages at module ~p: ~p", [?MODULE, Msg]),
     {reply, ok, State}.
 
 %% @private
 handle_cast(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled cast messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private
 handle_info(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled info messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private
@@ -189,5 +202,12 @@ do_get(Ref, Id) ->
 %% @doc Write a record to the backend.
 -spec do_put(ref(), id(), variable()) -> ok.
 do_put(Ref, Id, Record) ->
-    true = ets:insert(Ref, {Id, Record}),
-    ok.
+    Result = ets:insert(Ref, {Id, Record}),
+    case Result of
+        true ->
+            % lager:info("=> insert on do was good!", []),
+            ok;
+        Other ->
+            % lager:info("=> insert on do was NOT GOOD ~p", [Other]),
+            Other
+    end.

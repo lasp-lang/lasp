@@ -392,6 +392,14 @@ start_slave(Name, NodeConfig, _Case) ->
     end.
 
 push_logs() ->
+    case lasp_config:get(should_push_logs, false) of
+        true ->
+            maybe_actually_push_logs();
+        false ->
+            ok
+    end.
+
+maybe_actually_push_logs() ->
     LOGS = os:getenv("LOGS", "s3"),
 
     case sprinter:orchestrated() of

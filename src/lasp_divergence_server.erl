@@ -70,10 +70,10 @@ init([]) ->
                  end,
 
     lager:info("Configuring invariant for threshold: ~p", [Threshold]),
-    spawn_link(fun() ->
+    Pid = spawn_link(fun() ->
                        lasp:invariant(?SIMPLE_COUNTER, Threshold, EnforceFun)
                end),
-    lager:info("Configured."),
+    lager:info("Configured process: ~p", [Pid]),
 
     %% Track whether simulation has ended or not.
     lasp_config:set(simulation_end, false),
@@ -90,13 +90,13 @@ init([]) ->
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 handle_call(Msg, _From, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled call messages at module ~p: ~p", [?MODULE, Msg]),
     {reply, ok, State}.
 
 %% @private
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 handle_cast(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled cast messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 handle_info(check_simulation_end, State) ->
@@ -138,7 +138,7 @@ handle_info(check_simulation_end, State) ->
     {noreply, State};
 
 handle_info(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled info messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private
@@ -178,7 +178,9 @@ client_number() ->
 
 %% @private
 log_divergence() ->
+    lager:info("Attempting to get divergence count..."),
     {ok, Value} = lasp:query(?SIMPLE_COUNTER),
+    lager:info("Count is: ~p", [Value]),
 
     MaxEvents = max_events() * client_number(),
     Overcounting = Value - MaxEvents,

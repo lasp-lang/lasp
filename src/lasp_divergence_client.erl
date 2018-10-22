@@ -89,13 +89,13 @@ init([]) ->
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
 handle_call(Msg, _From, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled call messages at module ~p: ~p", [?MODULE, Msg]),
     {reply, ok, State}.
 
 %% @private
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 handle_cast(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled cast messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private
@@ -141,7 +141,10 @@ handle_info(event, #state{actor=Actor,
 
             case max_events_reached() of
                 true ->
+                    lager:info("Max events are reached...", []),
+
                     Value = lasp:query(?SIMPLE_COUNTER),
+
                     lager:info("All events done, counter is now: ~p.
                                Node: ~p", [Value, Actor]),
 
@@ -176,6 +179,8 @@ handle_info(event, #state{actor=Actor,
                           events=LocalEvents}};
 
 handle_info(check_simulation_end, #state{actor=Actor}=State) ->
+    lager:info("Checking for simulation end...", []),
+
     lasp_marathon_simulations:log_message_queue_size("check_simulation_end"),
 
     case lasp_workflow:is_task_completed(events) of
@@ -183,10 +188,12 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
             lager:info("All nodes did all events. Node ~p", [Actor]),
             case lasp_workflow:is_task_completed(anti_entropy, 1) of
                 true ->
+                    lager:info("Anti-entropy complete.", []),
                     lasp_instrumentation:stop(),
                     lasp_support:push_logs(),
                     lasp_workflow:task_completed(logs, lasp_support:mynode());
                 false ->
+                    lager:info("Anti-entropy incomplete.", []),
                     schedule_check_simulation_end()
             end;
         false ->
@@ -196,7 +203,7 @@ handle_info(check_simulation_end, #state{actor=Actor}=State) ->
     {noreply, State};
 
 handle_info(Msg, State) ->
-    lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled info messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private

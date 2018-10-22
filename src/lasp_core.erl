@@ -98,6 +98,8 @@ enforce_once(Id, Threshold, EnforceFun, Store) ->
     TransFun = fun({_, Type, _, Value}) ->
                    case lasp_type:threshold_met(Type, Value, Threshold) of
                        true ->
+                           lager:info("enforce_once calling query at pid ~p", [self()]),
+
                            {ok, Membership} = lasp:query(?MEMBERSHIP_ID),
 
                            Membership1 = case Membership of
@@ -111,6 +113,8 @@ enforce_once(Id, Threshold, EnforceFun, Store) ->
 
                            SortedMembership = lists:usort(Membership1),
                            EnforcementNode = hd(SortedMembership),
+
+                           lager:info("enforce once, enforcement node: ~p our node ~p", [EnforcementNode, lasp_support:mynode()]),
 
                            case lasp_support:mynode() of
                                EnforcementNode ->
@@ -433,14 +437,18 @@ update(Id, Operation, Actor, Store) ->
 -spec update(id(), operation(), actor(), function(), function(), store()) ->
     {ok, var()} | not_found().
 update({_, Type} = Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store) ->
-    case do(get, [Store, Id]) of
+    %% lager:info("Node ~p: Update called for ~p and operation ~p and store ~p", [node(), Id, Operation, Store]),
+    Res = case do(get, [Store, Id]) of
         {ok, #dv{value=Value0, type=Type}} ->
             {ok, Value} = lasp_type:update(Type, Operation, {Id, Actor}, Value0),
+            lager:info("Update should perform update from ~p ~p to ~p", [Id, Value0, Value]),
             bind(Id, Value, MetadataFun, Store);
         {error, not_found} ->
             {ok, _} = declare(Id, Type, MetadataFunDeclare, Store),
             update(Id, Operation, Actor, MetadataFun, MetadataFunDeclare, Store)
-    end.
+    end,
+    %% lager:info("Update has result: ~p", [Res]),
+    Res.
 
 %% @doc Update metadata.
 update_metadata({_, Type} = Id, Actor, MetadataFun, MetadataFunDeclare, Store) ->
@@ -461,7 +469,7 @@ bind(Id, Value, Store) ->
 bind_var(Id, Value, Store) ->
     MetadataFun = fun(X) -> X end,
     bind_var(lasp_support:mynode(), Id, Value, MetadataFun, Store).
-
+ 
 bind(Id, Value, MetadataFun, Store) ->
     bind(lasp_support:mynode(), Id, Value, MetadataFun, Store).
 
@@ -483,6 +491,7 @@ bind(Origin, Id, Value, MetadataFun, Store) ->
 -spec bind_var(node(), id(), value(), function(), store()) ->
     {ok, var()} | not_found().
 bind_var(Origin, Id, Value, MetadataFun, Store) ->
+    % lager:info("Entering bind_var for value: ~p", [Value]),
     Mutator = fun(#dv{type=Type, metadata=Metadata0, value=Value0, waiting_threads=WT, delta_counter=Counter0, delta_map=DeltaMap0, delta_ack_map=AckMap}=Object) ->
             Metadata = MetadataFun(Metadata0),
             case {Id, Type, Metadata0, Value0} of
@@ -494,6 +503,7 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                 %% Merge may throw for invalid types.
                 try
                     Merged = lasp_type:merge(Type, Value0, Value),
+                    % lager:info("Merged value from ~p and ~p is ~p", [Value0, Value, Merged]),
                     case lasp_type:is_strict_inflation(Type, Value0, Merged) of
                         true ->
                             %% Object inflation.
@@ -520,19 +530,21 @@ bind_var(Origin, Id, Value, MetadataFun, Store) ->
                             %% Return value is a delta state.
                             {NewObject, {ok, {Id, Type, Metadata, Merged}}};
                         false ->
+                            % lager:info("Merge failed from ~p to ~p", [Value0, Value]),
                             %% Metadata change.
                             NewObject = Object#dv{metadata=Metadata},
                             {NewObject, {ok, {Id, Type, Metadata, Merged}}}
                     end
                 catch
-                    _:_Reason ->
+                    _:Reason ->
                         %% Merge threw.
-                        % _ = lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
-                        %                   [Type, Reason, Value0, Value]),
+                        _ = lager:warning("Exception; type: ~p, reason: ~p ~p => ~p",
+                                          [Type, Reason, Value0, Value]),
                         {Object, {ok, {Id, Type, Metadata, Value0}}}
                 end
             end
     end,
+    % lager:info("created update for process ~p id: ~p in bind var", [self(), Id]),
     do(update, [Store, Id, Mutator]).
 
 %% @doc Perform a read (or monotonic read) for a particular identifier.
@@ -590,10 +602,12 @@ read_var(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
                 true ->
                     {Object#dv{lazy_threads=SL}, {ok, {Id, Type, Metadata, Value}}};
                 false ->
+                    %% lager:info("Threshold ~p read against value ~p was not met for ~p and process ~p", [Threshold, Value, Id, self()]),
                     WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
                     {Object#dv{waiting_threads=WT, lazy_threads=SL}, {error, threshold_not_met}}
             end
     end,
+    % lager:info("created update for process ~p id: ~p in read var", [self(), Id]),
     case do(update, [Store, Id, Mutator]) of
         {ok, {Id, Type, Metadata, Value}} ->
             ReplyFun({Id, Type, Metadata, Value});
@@ -899,6 +913,7 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                             end,
                             {Object#dv{lazy_threads=LazyThreads}, ok}
                     end,
+    % lager:info("created update for process ~p id: ~p in wait needed", [self(), Id]),
                     ok = do(update, [Store, Id, Mutator]),
                     BlockingFun()
             end
@@ -921,24 +936,31 @@ reply_to_all(List, Result) ->
 reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
              StillWaiting0,
              {ok, {Id, Type, Metadata, Value}}=Result) ->
+    lager:info("Checking threshold on ~p", [Id]),
     SW = case lasp_type:threshold_met(Type, Value, Threshold) of
         true ->
+            lager:info("Threshold met for ~p on ~p", [Threshold, Id]),
             case From of
                 {server, undefined, {Address, Ref}} ->
+                    lager:info("Threshold met, sending reply to ~p", [{Address, Ref}]),
                     gen_server:reply({Address, Ref},
                                      {ok, {Id, Type, Metadata, Value}});
                 {fsm, undefined, Address} ->
+                    lager:info("Threshold met, sending reply to ~p", [Address]),
                     gen_fsm:send_event(Address,
                                        {ok, undefined,
                                         {Id, Type, Metadata, Value}});
                 {Address, Ref} ->
+                    lager:info("Threshold met, sending reply to ~p", [{Address, Ref}]),
                     gen_server:reply({Address, Ref},
                                      {ok, {Id, Type, Metadata, Value}});
                 _ ->
+                    lager:info("Threshold met, sending reply to ~p", [From]),
                     From ! Result
             end,
             StillWaiting0;
-        false ->
+         false ->
+            lager:info("Threshold not met ~p: value is ~p", [Threshold, lasp_type:query(Type, Value)]),
             StillWaiting0 ++ [H]
     end,
     reply_to_all(T, SW, Result);
@@ -977,15 +999,28 @@ reply_to_all([From|T], StillWaiting, Result) ->
     reply_to_all(T, StillWaiting, Result);
 reply_to_all([], StillWaiting0, _Result) ->
     %% Attempt to eagerly prune.
-    GCFun = fun({_, _, From, _, _}) ->
-        case is_pid(From) of
-            true ->
-                is_process_alive(From);
-            false ->
-                true
-        end
+    GCFun = 
+        fun({_, _, From, _, _} = _T) ->
+            % lager:info("Attempting to prune threshold for from: ~p for threshold: ~p", [From, T]),
+
+            case is_pid(From) of
+                true ->
+                    Alive = is_process_alive(From),
+                    % lager:info("=> Threshold, from ~p is ~p", [From, Alive]),
+                    Alive;
+                false ->
+                    % lager:info("=> Threshold, from is not a PID, so we keep: ~p", [From]),
+                    true
+            end;
+        (_Other) ->
+            % lager:info("=> Other threshold detected: ~p; keeping.", [Other]),
+            true
     end,
+
+    % lager:info("Starting filtering of process identifiers...", []),
     StillWaiting = lists:filter(GCFun, StillWaiting0),
+    % lager:info("Finished filtering of process identifiers: ~p", [StillWaiting]),
+
     {ok, StillWaiting}.
 
 -spec receive_value(store(), {state_send, node(), value(), function(),
@@ -1044,6 +1079,7 @@ receive_delta(Store, {delta_ack, Id, From, Counter}) ->
         {Object#dv{delta_ack_map=AckMap}, ok}
     end,
 
+    % lager:info("created update for process ~p id: ~p in receive delta", [self(), Id]),
     case do(update, [Store, Id, Mutator]) of
         ok ->
             ok;
@@ -1081,4 +1117,5 @@ store_delta(Origin, Counter, Delta, DeltaMap0) ->
 
 %% @doc Execute call to the proper backend.
 do(Function, Args) ->
+    % lager:info("**** backened call to args ~p", [Args]),
     erlang:apply(lasp_storage_backend, Function, Args).

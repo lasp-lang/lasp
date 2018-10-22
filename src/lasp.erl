@@ -62,6 +62,7 @@
 %%      object is met, then invoke the enforce function.
 %%
 invariant(Id, Threshold, EnforceFun) ->
+    lager:info("Registering threshold ~p for ~p", [Threshold, Id]),
     {ok, _Value} = lasp:read(Id, Threshold),
     EnforceFun().
 
@@ -132,6 +133,7 @@ declare(Id, Type) ->
 %%
 -spec update(id(), operation(), actor()) -> {ok, var()} | {error, timeout}.
 update(Id, Operation, Actor) ->
+    lager:info("calling update on ~p and ~p", [Id, Operation]),
     do(update, [Id, Operation, Actor]).
 
 %% @doc Bind a dataflow variable to a value.

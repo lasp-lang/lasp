@@ -3,7 +3,7 @@
 # Configure experiment.
 WORKFLOW=true
 SERVER_REPLICAS=1
-PEER_SERVICE=partisan_client_server_peer_service_manager
+PEER_SERVICE=partisan_hyparview_peer_service_manager
 MODE=state_based
 HEAVY_CLIENTS=false
 REACTIVE_SERVER=false
@@ -89,7 +89,14 @@ for i in `seq 1 ${REPS}`; do
         containers:
         - name: "lasp-server-${EVAL_TIMESTAMP}"
           image: ${IMAGE}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "1000m"
           env:
           - name: TAG
             value: "server"
@@ -193,7 +200,14 @@ for i in `seq 1 ${REPS}`; do
         containers:
         - name: "lasp-client-${EVAL_TIMESTAMP}"
           image: ${IMAGE}
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "500m"
+            limits:
+              memory: "4Gi"
+              cpu: "1000m"
           env:
           - name: TAG
             value: "client"

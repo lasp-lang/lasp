@@ -38,6 +38,8 @@
 
 -record(state, {}).
 
+-include("lasp.hrl").
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -54,7 +56,7 @@ start_link(Opts) ->
 
 -spec unique() -> {ok, binary()}.
 unique() ->
-    gen_server:call(?MODULE, unique, infinity).
+    gen_server:call(?MODULE, unique, ?TIMEOUT).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -75,19 +77,19 @@ handle_call(unique, _From, State) ->
 
 %% @private
 handle_call(Msg, _From, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled call messages at module ~p: ~p", [?MODULE, Msg]),
     {reply, ok, State}.
 
 %% @private
 -spec handle_cast(term(), #state{}) -> {noreply, #state{}}.
 handle_cast(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled cast messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 handle_info(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled info messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private

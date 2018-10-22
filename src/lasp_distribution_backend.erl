@@ -96,18 +96,18 @@ start_link(Opts) ->
 %% @doc Declare a new dataflow variable of a given type.
 -spec declare(id(), type()) -> {ok, var()}.
 declare(Id, Type) ->
-    gen_server:call(?MODULE, {declare, Id, Type}, infinity).
+    gen_server:call(?MODULE, {declare, Id, Type}, ?TIMEOUT).
 
 %% @doc Declare a new dynamic variable of a given type.
 -spec declare_dynamic(id(), type()) -> {ok, var()}.
 declare_dynamic(Id, Type) ->
-    gen_server:call(?MODULE, {declare_dynamic, Id, Type}, infinity).
+    gen_server:call(?MODULE, {declare_dynamic, Id, Type}, ?TIMEOUT).
 
 %% @doc Stream values out of the Lasp system; using the values from this
 %%      stream can result in observable nondeterminism.
 %%
 stream(Id, Function) ->
-    gen_server:call(?MODULE, {stream, Id, Function}, infinity).
+    gen_server:call(?MODULE, {stream, Id, Function}, ?TIMEOUT).
 
 %% @doc Read the current value of a CRDT.
 %%
@@ -116,7 +116,7 @@ stream(Id, Function) ->
 %%
 -spec query(id()) -> {ok, term()} | error().
 query(Id) ->
-    gen_server:call(?MODULE, {query, Id}, infinity).
+    gen_server:call(?MODULE, {query, Id}, ?TIMEOUT).
 
 %% @doc Update a dataflow variable.
 %%
@@ -126,7 +126,7 @@ query(Id) ->
 %%
 -spec update(id(), operation(), actor()) -> {ok, var()} | error().
 update(Id, Operation, Actor) ->
-    gen_server:call(?MODULE, {update, Id, Operation, Actor}, infinity).
+    gen_server:call(?MODULE, {update, Id, Operation, Actor}, ?TIMEOUT).
 
 %% @doc Bind a dataflow variable to a value.
 %%
@@ -136,7 +136,7 @@ update(Id, Operation, Actor) ->
 %%
 -spec bind(id(), value()) -> {ok, var()}.
 bind(Id, Value0) ->
-    gen_server:call(?MODULE, {bind, Id, Value0}, infinity).
+    gen_server:call(?MODULE, {bind, Id, Value0}, ?TIMEOUT).
 
 %% @doc Bind a dataflow variable to another dataflow variable.
 %%
@@ -146,7 +146,7 @@ bind(Id, Value0) ->
 %%
 -spec bind_to(id(), id()) -> {ok, id()} | error().
 bind_to(Id, TheirId) ->
-    gen_server:call(?MODULE, {bind_to, Id, TheirId}, infinity).
+    gen_server:call(?MODULE, {bind_to, Id, TheirId}, ?TIMEOUT).
 
 %% @doc Blocking monotonic read operation for a given dataflow variable.
 %%
@@ -156,7 +156,7 @@ bind_to(Id, TheirId) ->
 %%
 -spec read(id(), threshold()) -> {ok, var()} | error().
 read(Id, Threshold) ->
-    gen_server:call(?MODULE, {read, Id, Threshold}, infinity).
+    gen_server:call(?MODULE, {read, Id, Threshold}, ?TIMEOUT).
 
 %% @doc Blocking monotonic read operation for a list of given dataflow
 %%      variables.
@@ -181,7 +181,7 @@ read_any(Reads) ->
 %%
 -spec product(id(), id(), id()) -> ok | error().
 product(Left, Right, Product) ->
-    gen_server:call(?MODULE, {product, Left, Right, Product}, infinity).
+    gen_server:call(?MODULE, {product, Left, Right, Product}, ?TIMEOUT).
 
 %% @doc Compute the union of two sets.
 %%
@@ -190,7 +190,7 @@ product(Left, Right, Product) ->
 %%
 -spec union(id(), id(), id()) -> ok | error().
 union(Left, Right, Union) ->
-    gen_server:call(?MODULE, {union, Left, Right, Union}, infinity).
+    gen_server:call(?MODULE, {union, Left, Right, Union}, ?TIMEOUT).
 
 %% @doc Compute the intersection of two sets.
 %%
@@ -201,7 +201,7 @@ union(Left, Right, Union) ->
 intersection(Left, Right, Intersection) ->
     gen_server:call(?MODULE,
                     {intersection, Left, Right, Intersection},
-                    infinity).
+                    ?TIMEOUT).
 
 %% @doc Map values from one lattice into another.
 %%
@@ -211,7 +211,7 @@ intersection(Left, Right, Intersection) ->
 %%
 -spec map(id(), function(), id()) -> ok | error().
 map(Id, Function, AccId) ->
-    gen_server:call(?MODULE, {map, Id, Function, AccId}, infinity).
+    gen_server:call(?MODULE, {map, Id, Function, AccId}, ?TIMEOUT).
 
 %% @doc Fold values from one lattice into another.
 %%
@@ -221,7 +221,7 @@ map(Id, Function, AccId) ->
 %%
 -spec fold(id(), function(), id()) -> ok | error().
 fold(Id, Function, AccId) ->
-    gen_server:call(?MODULE, {fold, Id, Function, AccId}, infinity).
+    gen_server:call(?MODULE, {fold, Id, Function, AccId}, ?TIMEOUT).
 
 %% @doc Filter values from one lattice into another.
 %%
@@ -231,7 +231,7 @@ fold(Id, Function, AccId) ->
 %%
 -spec filter(id(), function(), id()) -> ok | error().
 filter(Id, Function, AccId) ->
-    gen_server:call(?MODULE, {filter, Id, Function, AccId}, infinity).
+    gen_server:call(?MODULE, {filter, Id, Function, AccId}, ?TIMEOUT).
 
 %% @doc Spawn a function.
 %%
@@ -239,13 +239,13 @@ filter(Id, Function, AccId) ->
 %%
 -spec thread(module(), func(), args()) -> ok | error().
 thread(Module, Function, Args) ->
-    gen_server:call(?MODULE, {thread, Module, Function, Args}, infinity).
+    gen_server:call(?MODULE, {thread, Module, Function, Args}, ?TIMEOUT).
 
 %% @doc Enforce a invariant once over a monotonic condition.
 %%
 -spec enforce_once(id(), threshold(), function()) -> ok.
 enforce_once(Id, Threshold, EnforceFun) ->
-    gen_server:call(?MODULE, {enforce_once, Id, Threshold, EnforceFun}, infinity).
+    gen_server:call(?MODULE, {enforce_once, Id, Threshold, EnforceFun}, ?TIMEOUT).
 
 %% @doc Pause execution until value requested with given threshold.
 %%
@@ -255,23 +255,23 @@ enforce_once(Id, Threshold, EnforceFun) ->
 %%
 -spec wait_needed(id(), threshold()) -> ok | error().
 wait_needed(Id, Threshold) ->
-    gen_server:call(?MODULE, {wait_needed, Id, Threshold}, infinity).
+    gen_server:call(?MODULE, {wait_needed, Id, Threshold}, ?TIMEOUT).
 
 %% @todo
 interested(Topic) ->
-    gen_server:call(?MODULE, {interested, Topic}, infinity).
+    gen_server:call(?MODULE, {interested, Topic}, ?TIMEOUT).
 
 %% @todo
 disinterested(Topic) ->
-    gen_server:call(?MODULE, {disinterested, Topic}, infinity).
+    gen_server:call(?MODULE, {disinterested, Topic}, ?TIMEOUT).
 
 %% @todo
 set_topic(Id, Topic) ->
-    gen_server:call(?MODULE, {set_topic, Id, Topic}, infinity).
+    gen_server:call(?MODULE, {set_topic, Id, Topic}, ?TIMEOUT).
 
 %% @todo
 remove_topic(Id, Topic) ->
-    gen_server:call(?MODULE, {remove_topic, Id, Topic}, infinity).
+    gen_server:call(?MODULE, {remove_topic, Id, Topic}, ?TIMEOUT).
 
 %%%===================================================================
 %%% Administrative controls
@@ -280,11 +280,11 @@ remove_topic(Id, Topic) ->
 %% @doc Reset all Lasp application state.
 -spec reset() -> ok.
 reset() ->
-    gen_server:call(?MODULE, reset, infinity).
+    gen_server:call(?MODULE, reset, ?TIMEOUT).
 
 -spec propagate(id()) -> ok.
 propagate(Id) ->
-    gen_server:call(?MODULE, {propagate, Id}, infinity).
+    gen_server:call(?MODULE, {propagate, Id}, ?TIMEOUT).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -723,7 +723,7 @@ handle_cast(Msg, State) ->
 -spec handle_info(term(), #state{}) -> {noreply, #state{}}.
 
 handle_info(Msg, State) ->
-    _ = lager:warning("Unhandled info messages: ~p", [Msg]),
+    _ = lager:warning("Unhandled info messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private
@@ -743,11 +743,11 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% @private
 local_bind(Id, Type, Metadata, Value) ->
-    case gen_server:call(?MODULE, {bind, Id, Metadata, Value}, infinity) of
+    case gen_server:call(?MODULE, {bind, Id, Metadata, Value}, ?TIMEOUT) of
         {error, not_found} ->
             {ok, _} = gen_server:call(?MODULE,
                                       {declare, Id, Metadata, Type},
-                                      infinity),
+                                      ?TIMEOUT),
             local_bind(Id, Type, Metadata, Value);
         {ok, X} ->
            {ok, X}

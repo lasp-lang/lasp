@@ -65,34 +65,34 @@ start_link(Prefix) ->
 %% @doc Write a record to the backend.
 -spec put(eredis(), id(), variable()) -> ok | {error, atom()}.
 put(Eredis, Id, Record) ->
-    gen_server:call(Eredis, {put, Id, Record}, infinity).
+    gen_server:call(Eredis, {put, Id, Record}, ?TIMEOUT).
 
 %% @doc In-place update given a mutation function.
 -spec update(eredis(), id(), function()) -> {ok, any()} | error |
                                          {error, atom()}.
 update(Eredis, Id, Function) ->
-    gen_server:call(Eredis, {update, Id, Function}, infinity).
+    gen_server:call(Eredis, {update, Id, Function}, ?TIMEOUT).
 
 %% @doc Update all objects given a mutation function.
 -spec update_all(eredis(), function()) -> {ok, term()}.
 update_all(Eredis, Function) ->
-    gen_server:call(Eredis, {update_all, Function}, infinity).
+    gen_server:call(Eredis, {update_all, Function}, ?TIMEOUT).
 
 %% @doc Retrieve a record from the backend.
 -spec get(eredis(), id()) -> {ok, variable()} | {error, not_found} |
                           {error, atom()}.
 get(Eredis, Id) ->
-    gen_server:call(Eredis, {get, Id}, infinity).
+    gen_server:call(Eredis, {get, Id}, ?TIMEOUT).
 
 %% @doc Fold operation.
 -spec fold(store(), function(), term()) -> {ok, term()}.
 fold(Eredis, Function, Acc) ->
-    gen_server:call(Eredis, {fold, Function, Acc}, infinity).
+    gen_server:call(Eredis, {fold, Function, Acc}, ?TIMEOUT).
 
 %% @doc Reset all application state.
 -spec reset(store()) -> ok.
 reset(Eredis) ->
-    gen_server:call(Eredis, reset, infinity).
+    gen_server:call(Eredis, reset, ?TIMEOUT).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -161,17 +161,17 @@ handle_call(reset, _From, #state{eredis=Eredis}=State) ->
     eredis:q(Eredis, ["FLUSHALL"]),
     {reply, ok, State};
 handle_call(Msg, _From, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled call messages at module ~p: ~p", [?MODULE, Msg]),
     {reply, ok, State}.
 
 %% @private
 handle_cast(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled cast messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private
 handle_info(Msg, State) ->
-    _ = lager:warning("Unhandled messages: ~p", [Msg]),
+    lager:warning("Unhandled info messages at module ~p: ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 %% @private

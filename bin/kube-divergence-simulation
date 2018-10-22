@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-CLIENTS=(8)
-NODES=3
-LASP_BRANCH=unstable
-IMAGE=lasplang/lasp-bootler
-DOCKERFILE=Dockerfiles/lasp-bootler
-REPS=20
+CLIENTS=(16)
+NODES=10
+LASP_BRANCH=partisan
+IMAGE=lasplang/lasp-partisan
+DOCKERFILE=Dockerfiles/lasp-partisan
+REPS=1
 GCE=false
-MACHINE="n1-standard-8"
+MACHINE="n1-highmem-16"
 MAX_EVENTS=100000
 BLOCKING_SYNC=false
 EVENT_INTERVAL=0
@@ -19,6 +19,7 @@ SLOWDOWN=false
 ENV_VARS=(
   JITTER
   JITTER_PERCENT
+  STATE_INTERVAL
   SLOWDOWN
 )
 
@@ -41,7 +42,7 @@ if [ ! -z "$REBUILD_IMAGE" ]; then
     fi
 
     # Rebuild image fresh, to ensure no stale dependencies
-    docker build -f ${DOCKERFILE} -t ${IMAGE} .
+    docker build --no-cache -f ${DOCKERFILE} -t ${IMAGE} .
 
     # Push image to hub
     docker push ${IMAGE}
@@ -52,7 +53,8 @@ if [ ! -z "$CLUSTER_START" ]; then
   # Bootstrap cluster
   gcloud beta container clusters create lasp \
     --machine-type=${MACHINE} \
-    --num-nodes=${NODES}
+    --num-nodes=${NODES} \
+    --enable-legacy-authorization
 
   # Get container credential
   gcloud beta container clusters get-credentials lasp
@@ -92,6 +94,14 @@ done
 AVAILABLE=$(kubectl get nodes -l '!lasp_selector' | grep -v master | grep Ready | head -1 | awk '{print $1}')
 kubectl label node ${AVAILABLE} lasp_selector=redis
 echo "Labeled node ${AVAILABLE} for runs of redis."
+
+echo "Adding permissive permissions."
+kubectl create clusterrolebinding permissive-binding \
+  --clusterrole=cluster-admin \
+  --user=admin \
+  --user=kubelet \
+  --user=system:anonymous \
+  --group=system:serviceaccounts
 
 # Deploy a single redis instance.
 echo "Copying code to /tmp"

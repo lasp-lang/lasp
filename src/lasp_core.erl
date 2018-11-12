@@ -590,7 +590,7 @@ read_var(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
                 true ->
                     {Object#dv{lazy_threads=SL}, {ok, {Id, Type, Metadata, Value}}};
                 false ->
-                    WT = lists:append(Object#dv.waiting_threads, [{threshold, read, Self, Type, Threshold}]),
+                    WT = Object#dv.waiting_threads ++ [{threshold, read, Self, Type, Threshold}],
                     {Object#dv{waiting_threads=WT, lazy_threads=SL}, {error, threshold_not_met}}
             end
     end,
@@ -893,9 +893,9 @@ wait_needed(Id, Threshold, Store, Self, ReplyFun, BlockingFun) ->
                     Mutator = fun(Object) ->
                             LazyThreads = case Threshold of
                                             undefined ->
-                                                lists:append(LazyThreads0, [Self]);
+                                                LazyThreads0 ++ [Self];
                                             Threshold ->
-                                                lists:append(LazyThreads0, [{threshold, wait, Self, Type, Threshold}])
+                                                LazyThreads0 ++ [{threshold, wait, Self, Type, Threshold}]
                             end,
                             {Object#dv{lazy_threads=LazyThreads}, ok}
                     end,

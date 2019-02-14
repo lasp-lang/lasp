@@ -928,7 +928,7 @@ reply_to_all([{threshold, read, From, Type, Threshold}=H|T],
                     gen_server:reply({Address, Ref},
                                      {ok, {Id, Type, Metadata, Value}});
                 {fsm, undefined, Address} ->
-                    gen_fsm:send_event(Address,
+                    gen_fsm_compat:send_event(Address,
                                        {ok, undefined,
                                         {Id, Type, Metadata, Value}});
                 {Address, Ref} ->
@@ -951,7 +951,7 @@ reply_to_all([{threshold, wait, From, Type, Threshold}=H|T],
                 {server, undefined, {Address, Ref}} ->
                     gen_server:reply({Address, Ref}, {ok, RThreshold});
                 {fsm, undefined, Address} ->
-                    gen_fsm:send_event(Address,
+                    gen_fsm_compat:send_event(Address,
                                        {ok, undefined, RThreshold});
                 {Address, Ref} ->
                     gen_server:reply({Address, Ref}, {ok, RThreshold});
@@ -968,7 +968,7 @@ reply_to_all([From|T], StillWaiting, Result) ->
         {server, undefined, {Address, Ref}} ->
             gen_server:reply({Address, Ref}, Result);
         {fsm, undefined, Address} ->
-            gen_fsm:send_event(Address, Result);
+            gen_fsm_compat:send_event(Address, Result);
         {Address, Ref} ->
             gen_server:reply({Address, Ref}, Result);
         _ ->

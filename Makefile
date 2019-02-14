@@ -2,9 +2,9 @@ PACKAGE         ?= lasp
 VERSION         ?= $(shell git describe --tags)
 BASE_DIR         = $(shell pwd)
 ERLANG_BIN       = $(shell dirname $(shell which erl))
-REBAR            = $(shell pwd)/rebar3
-VERSION 	     = "0.8.2" 
-MAKE						 = make
+REBAR           ?= rebar3
+VERSION          = "0.8.2" 
+MAKE             = make
 
 .PHONY: rel deps test plots dcos logs fpm
 

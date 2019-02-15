@@ -1,5 +1,6 @@
 language: erlang
 otp_release:
+  - 21.2.5
   - 20.3
   - 19.3
 install:

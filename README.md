@@ -31,7 +31,8 @@ $ rebar3 shell --name b@127.0.0.1
 ```
 
 Exceute to node a:
-```1> lasp_peer_service:join('a@127.0.0.1').
+```
+1> lasp_peer_service:join('a@127.0.0.1').
 ok
 2> lasp_peer_service:members().
 {ok,['a@127.0.0.1','b@127.0.0.1']}

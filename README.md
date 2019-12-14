@@ -20,10 +20,13 @@ $ make
 
 ## Creating a small cluster
 Clone Lasp:
-```$ git clone https://github.com/lasp-lang/lasp.git```
+```
+$ git clone https://github.com/lasp-lang/lasp.git
+```
 
 Run two shells
-```$ rebar3 shell --name a@127.0.0.1
+```
+$ rebar3 shell --name a@127.0.0.1
 $ rebar3 shell --name b@127.0.0.1```
 
 Exceute to node a:
@@ -40,7 +43,8 @@ Execute node b:
 ```
 
 Go back to node a and run:
-```3> Content = #{what => i_am_an_awmap_value}.
+```
+3> Content = #{what => i_am_an_awmap_value}.
 
 % create a lasp CRDT
 AwMapVarName = <<"awmap">>.
@@ -50,13 +54,16 @@ AwMapType = {state_awmap, [state_mvregister]}.
 
 
 % Update the CRDT with the content
-{ok, _} = lasp:update(AwMap, {apply, Key1, {set, nil, Content}}, self()).```
+{ok, _} = lasp:update(AwMap, {apply, Key1, {set, nil, Content}}, self()).
+```
 
 Go to node b and retrieve the content of the CRDT:
-```2> {ok,[{_, AwMapSet}]} = lasp:query({<<"awmap">>,{state_awmap,[state_mvregister]}}).
+```
+2> {ok,[{_, AwMapSet}]} = lasp:query({<<"awmap">>,{state_awmap,[state_mvregister]}}).
 
 3> sets:to_list(AwMapSet).
-% [#{what => i_am_an_awmap_value}]```
+% [#{what => i_am_an_awmap_value}]
+```
 
 ## Running a shell
 

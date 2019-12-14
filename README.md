@@ -27,7 +27,8 @@ $ git clone https://github.com/lasp-lang/lasp.git
 Run two shells
 ```
 $ rebar3 shell --name a@127.0.0.1
-$ rebar3 shell --name b@127.0.0.1```
+$ rebar3 shell --name b@127.0.0.1
+```
 
 Exceute to node a:
 ```1> lasp_peer_service:join('a@127.0.0.1').

@@ -70,7 +70,7 @@ invariant(Id, Threshold, EnforceFun) ->
 %%
 enforce_once(Id, Threshold, EnforceFun) ->
     case lasp_config:peer_service_manager() of
-        partisan_default_peer_service_manager ->
+        partisan_pluggable_peer_service_manager ->
             do(enforce_once, [Id, Threshold, EnforceFun]);
         Manager ->
             {error, {incompatible_manager, Manager}}
@@ -303,7 +303,7 @@ do(Function, Args) ->
 %% @private
 can_partially_replicate() ->
     case partisan_config:get(partisan_peer_service_manager) of
-        partisan_default_peer_service_manager ->
+        partisan_pluggable_peer_service_manager ->
             case ?SYNC_BACKEND:broadcast_tree_mode() of
                 true ->
                     false;

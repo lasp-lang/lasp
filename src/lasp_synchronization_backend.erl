@@ -44,9 +44,9 @@ membership() ->
 
 %% @private
 seed() ->
-    rand_compat:seed(erlang:phash2([lasp_support:mynode()]),
-                     erlang:monotonic_time(),
-                     erlang:unique_integer()).
+    rand:seed(exsplus, {erlang:phash2([lasp_support:mynode()]),
+                        erlang:monotonic_time(),
+                        erlang:unique_integer()}).
 
 %% @private
 compute_exchange(Peers) ->
@@ -117,7 +117,7 @@ client_server_mode() ->
 %% @private
 peer_to_peer_mode() ->
     lasp_config:peer_service_manager() == partisan_hyparview_peer_service_manager orelse
-    lasp_config:peer_service_manager() == partisan_default_peer_service_manager.
+    lasp_config:peer_service_manager() == partisan_pluggable_peer_service_manager.
 
 %% @private
 i_am_server() ->

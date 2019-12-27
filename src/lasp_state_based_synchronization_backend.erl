@@ -323,7 +323,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 schedule_state_synchronization() ->
     ShouldSync = true
-            andalso (not ?SYNC_BACKEND:tutorial_mode())
             andalso (
               ?SYNC_BACKEND:peer_to_peer_mode()
               orelse

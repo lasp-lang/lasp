@@ -27,7 +27,6 @@
          log_transmission/2]).
 
 -export([broadcast_tree_mode/0,
-         tutorial_mode/0,
          client_server_mode/0,
          peer_to_peer_mode/0,
          i_am_server/0,
@@ -105,10 +104,6 @@ shuffle(L) ->
 %% @private
 broadcast_tree_mode() ->
     lasp_config:get(broadcast, false).
-
-%% @private
-tutorial_mode() ->
-    lasp_config:get(tutorial, false).
 
 %% @private
 client_server_mode() ->

@@ -6,9 +6,8 @@
  {<<"lager">>,{pkg,<<"lager">>,<<"3.6.8">>},0},
  {<<"lasp_support">>,{pkg,<<"lasp_support">>,<<"0.0.3">>},0},
  {<<"partisan">>,{pkg,<<"partisan">>,<<"4.1.0">>},0},
- {<<"plumtree">>,{pkg,<<"plumtree">>,<<"0.5.0">>},0},
+ {<<"plumtree">>,{pkg,<<"plumtree">>,<<"0.6.0">>},0},
  {<<"quickrand">>,{pkg,<<"quickrand">>,<<"1.7.5">>},2},
- {<<"rand_compat">>,{pkg,<<"rand_compat">>,<<"0.0.3">>},1},
  {<<"time_compat">>,{pkg,<<"time_compat">>,<<"0.0.1">>},1},
  {<<"types">>,{pkg,<<"types">>,<<"0.1.8">>},0},
  {<<"uuid">>,{pkg,<<"uuid_erl">>,<<"1.7.5">>},1}]}.
@@ -21,9 +20,8 @@
  {<<"lager">>, <<"897EFC7679BB82383448646C96768CDC4E747464DD18B999C7AACA485686B0DA">>},
  {<<"lasp_support">>, <<"C1B7E1A472037AE82C71D2D16A10B7D644A621B66AE5AFE834CECF170F2E9169">>},
  {<<"partisan">>, <<"51D3C1D6487BBB8F94D4FD313D03D93F1C0426350A3ADF84CC3B3243B8EA204E">>},
- {<<"plumtree">>, <<"F3521CE631AD22AC00635E79C7F046A163BD1135889CDC1D0B18AB577F76EC70">>},
+ {<<"plumtree">>, <<"B347D5FAA640419160CB9DBADF624123A6C0C66ACF7886F36F3F6AEAC99253FA">>},
  {<<"quickrand">>, <<"E3086A153EB13A057FC19192D05E2D4C6BB2BDBB55746A699BEAE9847AC17CA8">>},
- {<<"rand_compat">>, <<"011646BC1F0B0C432FE101B816F25B9BBB74A085713CEE1DAFD2D62E9415EAD3">>},
  {<<"time_compat">>, <<"23FE0AD1FDF3B5B88821B2D04B4B5E865BF587AE66056D671FE0F53514ED8139">>},
  {<<"types">>, <<"5782B67231E8C174FE2835395E71E669FE0121076779D2A09F1C0D58EE0E2F13">>},
  {<<"uuid">>, <<"3862FF9A21C42566DFD0376B97512FA202922897129E09A05E2AFA0D9CAFD97A">>}]}

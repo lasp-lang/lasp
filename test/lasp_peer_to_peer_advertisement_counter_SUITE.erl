@@ -99,7 +99,7 @@ full_peer_to_peer_state_based_tree_test(Config) ->
         Config,
         [{mode, state_based},
          {simulation, ad_counter},
-         {partisan_peer_service_manager, partisan_default_peer_service_manager},
+         {partisan_peer_service_manager, partisan_pluggable_peer_service_manager},
          {set, orset},
          {broadcast, true},
          {evaluation_identifier, full_peer_to_peer_state_based_tree}]),

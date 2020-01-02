@@ -62,9 +62,9 @@ start_link(Opts) ->
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
     %% Seed the process at initialization.
-    rand_compat:seed(erlang:phash2([lasp_support:mynode()]),
-                     erlang:monotonic_time(),
-                     erlang:unique_integer()),
+    rand:seed(exsplus, {erlang:phash2([lasp_support:mynode()]),
+                        erlang:monotonic_time(),
+                        erlang:unique_integer()}),
 
     %% Schedule reports.
     %% schedule_memory_utilization_report(),

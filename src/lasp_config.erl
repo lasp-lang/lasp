@@ -65,4 +65,4 @@ web_config() ->
 %% @private
 peer_service_manager() ->
     partisan_config:get(partisan_peer_service_manager,
-                        partisan_default_peer_service_manager).
+                        partisan_pluggable_peer_service_manager).

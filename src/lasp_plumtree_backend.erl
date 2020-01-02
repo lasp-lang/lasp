@@ -131,9 +131,9 @@ exchange(_Peer) ->
 -spec init([]) -> {ok, #state{}}.
 init([]) ->
     %% Seed the process at initialization.
-    rand_compat:seed(erlang:phash2([lasp_support:mynode()]),
-                     erlang:monotonic_time(),
-                     erlang:unique_integer()),
+    rand:seed(exsplus, {erlang:phash2([lasp_support:mynode()]),
+                        erlang:monotonic_time(),
+                        erlang:unique_integer()}),
 
     schedule_heartbeat(),
 
@@ -185,7 +185,7 @@ handle_info(heartbeat, State) ->
     case lists:member(Node, Servers) of
         true ->
             %% Generate message with monotonically increasing integer.
-            Counter = time_compat:unique_integer([monotonic, positive]),
+            Counter = erlang:unique_integer([monotonic, positive]),
 
             %% Make sure the node prefixes the timestamp with it's own
             %% identifier: this means that we can have this tree

@@ -217,7 +217,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 schedule_enrollment() ->
     %% Add random jitter.
-    Jitter = rand_compat:uniform(?ENROLLMENT_INTERVAL),
+    Jitter = rand:uniform(?ENROLLMENT_INTERVAL),
     timer:send_after(?ENROLLMENT_INTERVAL + Jitter, view).
 
 %% @private

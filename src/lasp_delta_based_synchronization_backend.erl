@@ -340,7 +340,7 @@ schedule_delta_synchronization() ->
             case lasp_config:get(jitter, false) of
                 true ->
                     %% Add random jitter.
-                    Jitter = rand_compat:uniform(Interval),
+                    Jitter = rand:uniform(Interval),
                     timer:send_after(Interval + Jitter, delta_sync);
                 false ->
                     timer:send_after(Interval, delta_sync)

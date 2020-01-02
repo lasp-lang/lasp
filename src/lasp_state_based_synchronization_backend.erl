@@ -323,7 +323,6 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 schedule_state_synchronization() ->
     ShouldSync = true
-            andalso (not ?SYNC_BACKEND:tutorial_mode())
             andalso (
               ?SYNC_BACKEND:peer_to_peer_mode()
               orelse
@@ -349,7 +348,7 @@ schedule_state_synchronization() ->
                             %% No jitter.
                             timer:send_after(Interval, {state_sync, ObjectFilterFun});
                         JitterInterval ->
-                            Jitter = rand_compat:uniform(JitterInterval * 2) - JitterInterval,
+                            Jitter = rand:uniform(JitterInterval * 2) - JitterInterval,
                             timer:send_after(Interval + Jitter, {state_sync, ObjectFilterFun})
                     end;
                 false ->
@@ -365,7 +364,7 @@ schedule_plumtree_peer_refresh() ->
         true ->
             Interval = lasp_config:get(plumtree_peer_refresh_interval,
                                        ?PLUMTREE_PEER_REFRESH_INTERVAL),
-            Jitter = rand_compat:uniform(Interval),
+            Jitter = rand:uniform(Interval),
             timer:send_after(Jitter + ?PLUMTREE_PEER_REFRESH_INTERVAL,
                              plumtree_peer_refresh);
         false ->

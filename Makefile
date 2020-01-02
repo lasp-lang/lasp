@@ -130,7 +130,7 @@ shell:
 plots:
 	pkill -9 beam.smp; \
 	  clear; \
-		rm -rf priv/lager/ priv/evaluation; \
+		rm -rf logs/lager/ logs/evaluation; \
 		(cd priv/ && git clone https://github.com/lasp-lang/evaluation); \
 		./rebar3 ct --readable=false --suite=test/lasp_peer_to_peer_advertisement_counter_SUITE; \
 		./rebar3 ct --readable=false --suite=test/lasp_client_server_advertisement_counter_SUITE; \
@@ -147,10 +147,10 @@ part-div:
 		./rebar3 ct --readable=false --suite=test/lasp_advertisement_counter_partition_overcounting_SUITE
 
 tail-logs:
-	tail -F priv/lager/*/*/log/*.log
+	tail -F logs/lager/*/*/log/*.log
 
 logs:
-	cat priv/lager/*/*/log/*.log
+	cat logs/lager/*/*/log/*.log
 
 DIALYZER_APPS = kernel stdlib erts sasl eunit syntax_tools compiler crypto
 

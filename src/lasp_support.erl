@@ -293,8 +293,8 @@ join_to(N, RunnerNode) ->
 load_lasp(Node, _Config, Case) ->
     ct:pal("Loading applications on node: ~p", [Node]),
         
-    PrivDir = code:priv_dir(?APP),
-    NodeDir = filename:join([PrivDir, "lager", Case, Node]),
+    LibDir = code:lib_dir(?APP),
+    NodeDir = filename:join([LibDir, "logs", "lager", Case, Node]),
 
     %% Manually force sasl loading, and disable the logger.
     ok = rpc:call(Node, application, load, [sasl]),

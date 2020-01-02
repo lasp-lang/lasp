@@ -391,7 +391,7 @@ sql_run_case(Iterations, Acc, From, To, Row, Threshold0) ->
     sql_run_case(Iterations - 1, [Time | Acc], From, To, Row, NewThreshold).
 
 write_csv(Dir, Option, Cases, Trim) ->
-    Path = code:priv_dir(lasp)
+    Path = code:lib_dir(lasp)
            ++ "/evaluation/logs/"
            ++ atom_to_list(Dir) ++ "/"
            ++ atom_to_list(Option) ++ "/"

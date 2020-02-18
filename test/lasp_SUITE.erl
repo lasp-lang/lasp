@@ -906,7 +906,7 @@ counter_strict_enforce_once_test(Config) ->
             Threshold = {strict, {value, 2}},
 
             EnforceFun = fun(X) ->
-                                ct:pal("Enforce function fired with: ~p", [X]),
+                                lager:info("Enforce function fired with: ~p", [X]),
                                 Self ! {ok, Threshold}
                         end,
 

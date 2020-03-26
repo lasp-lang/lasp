@@ -119,6 +119,8 @@ log_files() ->
     OtherLogs = case partisan_config:get(tag, undefined) of
         server ->
             case lasp_config:get(simulation, undefined) of
+                consistent_group_rank ->
+                    [];
                 throughput ->
                     [];
                 _ ->

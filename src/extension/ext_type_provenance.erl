@@ -199,7 +199,7 @@ get_CDSs(AllPathInfoList, SubsetInCoverWithGroupEvents) ->
         ext_type_event_history_set:build_event_dict(SubsetInCoverWithGroupEvents),
     InputNodeIdFromPath = ordsets:from_list(orddict:fetch_keys(DataflowPathDict)),
     InputNodeIdFromEvent = ordsets:from_list(orddict:fetch_keys(InputEventHistoryDict)),
-    case ordsets:is_empty(InputNodeIdFromEvent) orelse InputNodeIdFromPath /= InputNodeIdFromEvent of
+    case ordsets:size(InputNodeIdFromEvent) == 0 orelse InputNodeIdFromPath /= InputNodeIdFromEvent of
         true ->
             ordsets:new();
         false ->

@@ -22,6 +22,8 @@
 -author("Christopher S. Meiklejohn <christopher.meiklejohn@gmail.com>").
 
 -export([stop/0]).
+-export([
+    stop_ext/0]).
 
 stop() ->
     lists:foreach(
@@ -34,6 +36,26 @@ stop() ->
             delete_pods(Deployment)
         end,
         deployments()).
+
+stop_ext() ->
+    lists:foreach(
+        fun(Deployment) ->
+            lager:info("Deleting Kubernetes deployment: ~p", [Deployment]),
+            delete_deployment(Deployment),
+            lager:info("Deleting Kubernetes replicasets."),
+            delete_replicasets(Deployment),
+            lager:info("Deleting Kubernetes pods."),
+            delete_pods(Deployment)
+        end,
+        deployments_ext()).
+
+%% @private
+client_list(0) -> [];
+client_list(N) -> client_list(N - 1) ++ [list_to_atom("lasp-client-" ++ integer_to_list(N))].
+
+%% @private
+deployments_ext() ->
+    ["lasp-server"] ++ client_list(lasp_config:get(client_number, 3)).
 
 %% @private
 delete_deployment(Deployment) ->

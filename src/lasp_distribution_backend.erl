@@ -56,6 +56,11 @@
          set_topic/2,
          remove_topic/2]).
 
+-export([
+    set_count/2,
+    group_by_sum/3,
+    order_by/3]).
+
 %% gen_server callbacks
 -export([init/1,
          handle_call/3,
@@ -92,6 +97,18 @@ start_link(Opts) ->
 %%%===================================================================
 %%% lasp_distribution_backend callbacks
 %%%===================================================================
+
+-spec order_by(id(), function(), id()) -> ok | error().
+order_by(Id, Function, AccId) ->
+    gen_server:call(?MODULE, {order_by, Id, Function, AccId}, infinity).
+
+-spec group_by_sum(id(), function(), id()) -> ok | error().
+group_by_sum(Id, Function, AccId) ->
+    gen_server:call(?MODULE, {group_by_sum, Id, Function, AccId}, infinity).
+
+-spec set_count(id(), id()) -> ok | error().
+set_count(Id, AccId) ->
+    gen_server:call(?MODULE, {set_count, Id, AccId}, infinity).
 
 %% @doc Declare a new dataflow variable of a given type.
 -spec declare(id(), type()) -> {ok, var()}.
@@ -327,6 +344,24 @@ init([]) ->
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
+
+handle_call({order_by, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("order_by"),
+
+    {ok, _Pid} = ?CORE:order_by(Id, Function, AccId, Store, ?CORE_WRITE, ?CORE_READ),
+    {reply, ok, State};
+
+handle_call({group_by_sum, Id, Function, AccId}, _From, #state{store=Store}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("group_by_sum"),
+
+    {ok, _Pid} = ?CORE:group_by_sum(Id, Function, AccId, Store, ?CORE_WRITE, ?CORE_READ),
+    {reply, ok, State};
+
+handle_call({set_count, Id, AccId}, _From, #state{store=Store}=State) ->
+    lasp_marathon_simulations:log_message_queue_size("set_count"),
+
+    {ok, _Pid} = ?CORE:set_count(Id, AccId, Store, ?CORE_WRITE, ?CORE_READ),
+    {reply, ok, State};
 
 handle_call({propagate, Id}, _From, #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("propagate"),

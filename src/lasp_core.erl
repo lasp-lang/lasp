@@ -78,6 +78,11 @@
 %% Prototype features.
 -export([enforce_once/4]).
 
+-export([
+    set_count/5,
+    group_by_sum/6,
+    order_by/6]).
+
 %% Definitions for the bind/read fun abstraction.
 -define(BACKEND_BIND, fun(_AccId, AccValue, _Store) ->
                 ?MODULE:bind_var(_AccId, AccValue, _Store)
@@ -92,6 +97,47 @@
 -define(BACKEND_READ, fun(_Id, _Threshold) ->
                 ?MODULE:read_var(_Id, _Threshold, Store)
               end).
+
+-spec order_by(id(), function(), id(), store(), function(), function()) -> {ok, pid()}.
+order_by(Id, Function, AccId, Store, BindFun, ReadFun) ->
+    TransFun =
+        fun({_, T, _, V}) ->
+            case lasp_type:get_type(lasp_type:remove_args(T)) of
+                ext_type_aworset_input ->
+                    ext_type_lasp_ops:order_by(AccId, Function, V);
+                ext_type_aworset_intermediate ->
+                    ext_type_lasp_ops:order_by(AccId, Function, V);
+                ext_type_aggresult_intermediate ->
+                    ext_type_lasp_ops:order_by(AccId, Function, V)
+            end
+        end,
+    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
+
+-spec group_by_sum(id(), function(), id(), store(), function(), function()) -> {ok, pid()}.
+group_by_sum(Id, Function, AccId, Store, BindFun, ReadFun) ->
+    TransFun =
+        fun({_, T, _, V}) ->
+            case lasp_type:get_type(lasp_type:remove_args(T)) of
+                ext_type_aworset_input ->
+                    ext_type_lasp_ops:group_by_sum(AccId, Function, V);
+                ext_type_aworset_intermediate ->
+                    ext_type_lasp_ops:group_by_sum(AccId, Function, V)
+            end
+        end,
+    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
+
+-spec set_count(id(), id(), store(), function(), function()) -> {ok, pid()}.
+set_count(Id, AccId, Store, BindFun, ReadFun) ->
+    TransFun =
+        fun({_, T, _, V}) ->
+            case lasp_type:get_type(lasp_type:remove_args(T)) of
+                ext_type_aworset_input ->
+                    ext_type_lasp_ops:set_count(AccId, V);
+                ext_type_aworset_intermediate ->
+                    ext_type_lasp_ops:set_count(AccId, V)
+            end
+        end,
+    lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
 
 %% @private
 enforce_once(Id, Threshold, EnforceFun, Store) ->
@@ -304,7 +350,7 @@ declare(Id, Type, MetadataFun, MetadataNew, Store) ->
             %% Do nothing; make declare idempotent at each replica.
             {ok, {Id, Type, Metadata, Value}};
         _ ->
-            Value = lasp_type:new(Type),
+            Value = new_from_type(Id, Type),
             Metadata = MetadataFun(MetadataNew),
             Counter = 0,
             DeltaMap = orddict:new(),
@@ -573,14 +619,14 @@ read_var(Id, Threshold0, Store, Self, ReplyFun, BlockingFun) ->
             %% When no threshold is specified, use the bottom value for the
             %% given lattice.
             %%
-            Threshold = case Threshold0 of
-                undefined ->
-                    lasp_type:new(Type);
-                {strict, undefined} ->
-                    {strict, lasp_type:new(Type)};
-                Threshold0 ->
-                    Threshold0
-            end,
+        Threshold = case Threshold0 of
+            undefined ->
+                new_from_type(Id, Type);
+            {strict, undefined} ->
+                {strict, new_from_type(Id, Type)};
+            Threshold0 ->
+                Threshold0
+        end,
 
             %% Notify all lazy processes of this read.
             {ok, SL} = reply_to_all(LT, {ok, Threshold}),
@@ -717,18 +763,27 @@ fold_internal(orset, Value, Function, AccType, AccValue) ->
 -spec product(id(), id(), id(), store(), function(), function(),
               function()) -> {ok, pid()}.
 product(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
-    TransFun = fun({_, T, _, LValue}, {_, T, _, RValue}) ->
+    TransFun = fun({_, T, _, LValue}, {_, _, _, RValue}) ->
             case {LValue, RValue} of
                 {undefined, _} ->
                     ok;
                 {_, undefined} ->
                     ok;
                 {_, _} ->
-                    case lasp_type:get_type(T) of
+                    case lasp_type:get_type(lasp_type:remove_args(T)) of
                         state_orset ->
                             state_orset_ext:product(LValue, RValue);
                         state_awset_ps ->
-                            state_awset_ps_ext:product(LValue, RValue)
+                            state_awset_ps_ext:product(LValue, RValue);
+                        ext_type_aworset_input ->
+                            ext_type_lasp_ops:product(
+                                AccId, Left, Right, LValue, RValue);
+                        ext_type_aworset_intermediate ->
+                            ext_type_lasp_ops:product(
+                                AccId, Left, Right, LValue, RValue);
+                        ext_type_aggresult_intermediate ->
+                            ext_type_lasp_ops:product(
+                                AccId, Left, Right, LValue, RValue)
                     end
             end
     end,
@@ -809,11 +864,15 @@ union(Left, Right, AccId, Store, BindFun, ReadLeftFun, ReadRightFun) ->
     {ok, pid()}.
 map(Id, Function, AccId, Store, BindFun, ReadFun) ->
     TransFun = fun({_, T, _, V}) ->
-            case lasp_type:get_type(T) of
+            case lasp_type:get_type(lasp_type:remove_args(T)) of
                 state_orset ->
                     state_orset_ext:map(Function, V);
                 state_awset_ps ->
-                    state_awset_ps_ext:map(Function, V)
+                    state_awset_ps_ext:map(Function, V);
+                ext_type_aworset_input ->
+                    ext_type_lasp_ops:map(AccId, Function, V);
+                ext_type_aworset_intermediate ->
+                    ext_type_lasp_ops:map(AccId, Function, V)
             end
     end,
     lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
@@ -832,11 +891,15 @@ map(Id, Function, AccId, Store, BindFun, ReadFun) ->
     {ok, pid()}.
 filter(Id, Function, AccId, Store, BindFun, ReadFun) ->
     TransFun = fun({_, T, _, V}) ->
-        case lasp_type:get_type(T) of
+        case lasp_type:get_type(lasp_type:remove_args(T)) of
             state_orset ->
                 state_orset_ext:filter(Function, V);
             state_awset_ps ->
-                state_awset_ps_ext:filter(Function, V)
+                state_awset_ps_ext:filter(Function, V);
+            ext_type_aworset_input ->
+                ext_type_lasp_ops:filter(AccId, Function, V);
+            ext_type_aworset_intermediate ->
+                ext_type_lasp_ops:filter(AccId, Function, V)
         end
     end,
     lasp_process:start_dag_link([[{Id, ReadFun}], TransFun, {AccId, BindFun(Store)}]).
@@ -1052,6 +1115,22 @@ receive_delta(Store, {delta_ack, Id, From, Counter}) ->
     end.
 
 %% Internal functions.
+
+%% @private
+new_from_type(Id, Type) ->
+    case lasp_type:is_ext_type(Type) of
+        true ->
+            ObjectId =
+                case Id of
+                    {StoreId, Type} ->
+                        StoreId;
+                    _ ->
+                        Id
+                end,
+            lasp_type:new(Type, ObjectId);
+        false ->
+            lasp_type:new(Type)
+    end.
 
 % @private
 storage_backend_reset(Store) ->

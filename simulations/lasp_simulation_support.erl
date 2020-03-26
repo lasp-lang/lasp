@@ -136,7 +136,7 @@ start(Case, _Config, Options) ->
     SimulationsSyncInterval = 5000,
 
     %% Configure Lasp settings.
-    ConfigureFun = fun(Node) ->
+    ConfigureFun = fun(Node, AccInClientIndex) ->
                         %% Configure extended logging.
                         ok = rpc:call(Node, lasp_config, set,
                                       [extended_logging, true]),
@@ -204,6 +204,16 @@ start(Case, _Config, Options) ->
                                     _ ->
                                         ok = rpc:call(Node, lasp_config, set, [tournament_simulation_client, true]),
                                         ok = rpc:call(Node, partisan_config, set, [tag, client])
+                                end;
+                            consistent_group_rank ->
+                                case Node of
+                                    Server ->
+                                        ok = rpc:call(Node, lasp_config, set, [consistent_group_rank_simulation_server, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, server]);
+                                    _ ->
+                                        ok = rpc:call(Node, lasp_config, set, [consistent_group_rank_simulation_client, true]),
+                                        ok = rpc:call(Node, partisan_config, set, [tag, client]),
+                                        ok = rpc:call(Node, lasp_config, set, [group_rank_client_index, AccInClientIndex])
                                 end
                         end,
 
@@ -276,12 +286,37 @@ start(Case, _Config, Options) ->
                         ok = rpc:call(Node, lasp_config, set,
                                       [evaluation_identifier, list_to_atom(RealEvalIdentifier)]),
 
+                        %% Configure base orset type settings.
+                        TypeVersion = proplists:get_value(ext_type_version, Options),
+                        ok = rpc:call(Node, lasp_config, set, [ext_type_version, TypeVersion]),
+
+                        %% Configure group_rank_input_size.
+                        GroupRankInputSize = proplists:get_value(group_rank_input_size, Options),
+                        ok = rpc:call(Node, lasp_config, set, [group_rank_input_size, GroupRankInputSize]),
+
+                        %% Configure eval_id.
+                        EvalId = proplists:get_value(eval_id, Options),
+                        ok = rpc:call(Node, lasp_config, set,
+                            [eval_id, EvalId]),
+
+                        %% Configure jitter.
+                        Jitter = proplists:get_value(jitter, Options),
+                        ok = rpc:call(Node, lasp_config, set,
+                            [jitter, Jitter]),
+
+                        %% Configure jitter_percent.
+                        JitterPercent = proplists:get_value(jitter_percent, Options),
+                        ok = rpc:call(Node, lasp_config, set,
+                            [jitter_percent, JitterPercent]),
+
                         %% Configure max impression number.
                         MaxImpressions = 30,
                         ok = rpc:call(Node, lasp_config, set,
-                                      [max_impressions, MaxImpressions])
+                                      [max_impressions, MaxImpressions]),
+
+                        AccInClientIndex + 1
                    end,
-    lists:map(ConfigureFun, Nodes),
+    _Ignore = lists:foldl(ConfigureFun, 0, Nodes),
 
     ct:pal("Starting lasp."),
 

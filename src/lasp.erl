@@ -56,7 +56,24 @@
 -export([invariant/3,
          enforce_once/3]).
 
+-export([
+    set_count/2,
+    group_by_sum/3,
+    order_by/3]).
+
 %% Public Helpers
+
+-spec order_by(id(), function(), id()) -> ok | {error, timeout}.
+order_by(Id, Function, AccId) ->
+    do(order_by, [Id, Function, AccId]).
+
+-spec group_by_sum(id(), function(), id()) -> ok | {error, timeout}.
+group_by_sum(Id, Function, AccId) ->
+    do(group_by_sum, [Id, Function, AccId]).
+
+-spec set_count(id(), id()) -> ok | {error, timeout}.
+set_count(Id, AccId) ->
+    do(set_count, [Id, AccId]).
 
 %% @doc Invariant enforcing function; once a particular threhsold for an
 %%      object is met, then invoke the enforce function.

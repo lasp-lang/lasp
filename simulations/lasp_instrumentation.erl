@@ -36,6 +36,8 @@
          event/1,
          stop/0,
          log_files/0]).
+-export([
+    meta_size/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -62,6 +64,10 @@
 -spec start_link()-> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+-spec meta_size(term(), term()) -> ok | error().
+meta_size(Id, Payload) ->
+    gen_server:call(?MODULE, {meta_size, Id, Payload}, infinity).
 
 -spec transmission(term(), term()) -> ok | error().
 transmission(Type, Payload) ->
@@ -152,6 +158,11 @@ init([]) ->
 %% @private
 -spec handle_call(term(), {pid(), term()}, #state{}) ->
     {reply, term(), #state{}}.
+
+handle_call({meta_size, Id, Payload}, _From, #state{}=State) ->
+    Size = termsize(Payload),
+    record_meta_size(Id, Size),
+    {reply, ok, State};
 
 handle_call({transmission, Type, Payload, PeerCount}, _From, #state{size_per_type=Map0}=State) ->
     Size = termsize(Payload) * PeerCount,
@@ -263,7 +274,8 @@ simulation_id() ->
             {ok, O} = sprinter:orchestration(),
             atom_to_list(O)
     end,
-    EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
+%%    EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
+    EvalIdentifier = lasp_config:get(eval_id, undefined),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
 
     Id = atom_to_list(Simulation) ++ "/"
@@ -293,6 +305,13 @@ megasize(Size) ->
     KiloSize = Size / 1024,
     MegaSize = KiloSize / 1024,
     MegaSize.
+
+%% @private
+record_meta_size(_Id, Size) ->
+    Filename = main_log(),
+    Timestamp = timestamp(),
+    Line = get_line(meta_size, Timestamp, Size),
+    append_to_file(Filename, Line).
 
 %% @private
 record_transmission(Map) ->

@@ -35,6 +35,12 @@
          query/2,
          get_type/1,
          delta/3]).
+-export([
+    new/2,
+    remove_args/1,
+    is_ext_type/1,
+    query_ext/2,
+    query_ext_consistent/2]).
 
 types() ->
     [
@@ -42,6 +48,10 @@ types() ->
         {awset, {state_awset, undefined}},
         {awset_ps, {state_awset_ps, undefined}},
         {boolean, {state_boolean, undefined}},
+        {ext_aworset_aggresult, {ext_type_aggresult_intermediate, undefined}},
+        {ext_aworset_input, {ext_type_aworset_input, undefined}},
+        {ext_aworset_intermediate, {ext_type_aworset_intermediate, undefined}},
+        {ext_lwwregister_input, {ext_type_lwwregister_input, undefined}},
         {gcounter, {state_gcounter, undefined}},
         {gmap, {state_gmap, undefined}},
         {gset, {state_gset, undefined}},
@@ -127,6 +137,10 @@ new(Type) ->
             T:new()
     end.
 
+new(Type, ObjectId) ->
+    {TypeName, Args} = Type,
+    new({TypeName, Args ++ [ObjectId]}).
+
 %% @doc Use the proper type for performing an update.
 update(Type, Operation, Actor, Value) ->
     Mode = get_mode(),
@@ -142,6 +156,10 @@ update(Type, Operation, Actor, Value) ->
     end.
 
 %% @private
+get_actor(ext_type_lwwregister_input, {{StorageId, _TypeId}, Actor}) ->
+    {StorageId, Actor};
+get_actor(ext_type_aworset_input, {{StorageId, _TypeId}, Actor}) ->
+    {StorageId, Actor};
 get_actor(state_awset_ps, {{StorageId, _TypeId}, Actor}) ->
     {StorageId, Actor};
 get_actor(_Type, {_Id, Actor}) ->
@@ -158,6 +176,29 @@ merge(Type, Value0, Value) ->
 query(Type, Value) ->
     T = get_type(remove_args(Type)),
     T:query(Value).
+
+is_ext_type(Type) ->
+    T = get_type(remove_args(Type)),
+    case T of
+        ext_type_aggresult_intermediate ->
+            true;
+        ext_type_aworset_input ->
+            true;
+        ext_type_aworset_intermediate ->
+            true;
+        ext_type_lwwregister_input ->
+            true;
+        _ ->
+            false
+    end.
+
+query_ext(Type, {_PrevSubset, _Payload}=Value) ->
+    T = get_type(remove_args(Type)),
+    T:query_ext(Value).
+
+query_ext_consistent(Type, {_PrevSubset, _PrevCDS, _Payload}=Value) ->
+    T = get_type(remove_args(Type)),
+    T:query_ext_consistent(Value).
 
 %% @doc
 delta(Type, A, B) ->

@@ -168,12 +168,16 @@ init(_Args) ->
     %% Setup the divergence example, if necessary.
     DivergenceSpecs = divergence_child_specs(),
 
+    %% Setup the consistent group rank example, if necessary.
+    ConsistentGroupRankSpecs = consistent_group_rank_child_specs(),
+
     %% Assemble specs.
     Children = lists:flatten([Children0,
                               AdSpecs,
                               TournamentSpecs,
                               ThroughputSpecs,
-                              DivergenceSpecs
+                              DivergenceSpecs,
+                              ConsistentGroupRankSpecs
                              ]),
 
     {ok, {{one_for_one, 5, 10}, Children}}.
@@ -579,5 +583,63 @@ divergence_child_specs() ->
         false ->
             []
     end,
+
+    ClientSpecs ++ ServerSpecs.
+
+%% @private
+consistent_group_rank_child_specs() ->
+    ORSetBaseDefault = list_to_atom(os:getenv("EXT_TYPE_VERSION", "ext_type_orset_base_v1")),
+    ORSetBase = application:get_env(?APP, ext_type_version, ORSetBaseDefault),
+    lasp_config:set(ext_type_version, ORSetBase),
+    lager:info("ORSetBase: ~p", [ORSetBase]),
+
+    GroupRankInputSizeDefault = list_to_atom(os:getenv("GROUP_RANK_INPUT_SIZE", "9")),
+    GroupRankInputSize = application:get_env(?APP, group_rank_input_size, GroupRankInputSizeDefault),
+    lasp_config:set(group_rank_input_size, GroupRankInputSize),
+    lager:info("GroupRankInputSize: ~p", [GroupRankInputSize]),
+
+    GroupRankClientIndexDefault = list_to_atom(os:getenv("GROUP_RANK_CLIENT_INDEX", "1")),
+    GroupRankClientIndex = application:get_env(?APP, group_rank_client_index, GroupRankClientIndexDefault),
+    lasp_config:set(group_rank_client_index, GroupRankClientIndex),
+    lager:info("GroupRankClientIndex: ~p", [GroupRankClientIndex]),
+
+    %% Figure out who is acting as the client.
+    ConsistentGroupRankClientDefault = list_to_atom(os:getenv("CONSISTENT_GROUP_RANK_SIM_CLIENT", "false")),
+    ConsistentGroupRankClientEnabled = application:get_env(?APP,
+        consistent_group_rank_simulation_client,
+        ConsistentGroupRankClientDefault),
+    lasp_config:set(consistent_group_rank_simulation_client, ConsistentGroupRankClientEnabled),
+    lager:info("ConsistentGroupRankClientEnabled: ~p", [ConsistentGroupRankClientEnabled]),
+
+    ClientSpecs = case ConsistentGroupRankClientEnabled of
+                      true ->
+                          %% Start one group rank client process per node.
+                          ConsistentGroupRankCounterClient = {lasp_consistent_group_rank_client,
+                              {lasp_consistent_group_rank_client, start_link, []},
+                              permanent, 5000, worker,
+                              [lasp_consistent_group_rank_client]},
+                          [ConsistentGroupRankCounterClient];
+                      false ->
+                          []
+                  end,
+
+    %% Figure out who is acting as the server.
+    ConsistentGroupRankServerDefault = list_to_atom(os:getenv("CONSISTENT_GROUP_RANK_SIM_SERVER", "false")),
+    ConsistentGroupRankServerEnabled = application:get_env(?APP,
+        consistent_group_rank_simulation_server,
+        ConsistentGroupRankServerDefault),
+    lasp_config:set(consistent_group_rank_simulation_server, ConsistentGroupRankServerEnabled),
+    lager:info("ConsistentGroupRankServerEnabled: ~p", [ConsistentGroupRankServerEnabled]),
+
+    ServerSpecs = case ConsistentGroupRankServerEnabled of
+                      true ->
+                          ConsistentGroupRankCounterServer = {lasp_consistent_group_rank_server,
+                              {lasp_consistent_group_rank_server, start_link, []},
+                              permanent, 5000, worker,
+                              [lasp_consistent_group_rank_server]},
+                          [ConsistentGroupRankCounterServer];
+                      false ->
+                          []
+                  end,
 
     ClientSpecs ++ ServerSpecs.

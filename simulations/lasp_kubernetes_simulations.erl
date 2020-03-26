@@ -51,7 +51,7 @@ stop_ext() ->
 
 %% @private
 client_list(0) -> [];
-client_list(N) -> client_list(N - 1) ++ [list_to_atom("lasp-client-" ++ integer_to_list(N))].
+client_list(N) -> client_list(N - 1) ++ ["lasp-client-" ++ integer_to_list(N)].
 
 %% @private
 deployments_ext() ->

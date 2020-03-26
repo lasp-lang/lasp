@@ -593,12 +593,12 @@ consistent_group_rank_child_specs() ->
     lasp_config:set(ext_type_version, ORSetBase),
     lager:info("ORSetBase: ~p", [ORSetBase]),
 
-    GroupRankInputSizeDefault = list_to_atom(os:getenv("GROUP_RANK_INPUT_SIZE", "9")),
+    GroupRankInputSizeDefault = list_to_integer(os:getenv("GROUP_RANK_INPUT_SIZE", "9")),
     GroupRankInputSize = application:get_env(?APP, group_rank_input_size, GroupRankInputSizeDefault),
     lasp_config:set(group_rank_input_size, GroupRankInputSize),
     lager:info("GroupRankInputSize: ~p", [GroupRankInputSize]),
 
-    GroupRankClientIndexDefault = list_to_atom(os:getenv("GROUP_RANK_CLIENT_INDEX", "1")),
+    GroupRankClientIndexDefault = list_to_integer(os:getenv("GROUP_RANK_CLIENT_INDEX", "1")),
     GroupRankClientIndex = application:get_env(?APP, group_rank_client_index, GroupRankClientIndexDefault),
     lasp_config:set(group_rank_client_index, GroupRankClientIndex),
     lager:info("GroupRankClientIndex: ~p", [GroupRankClientIndex]),

@@ -276,8 +276,8 @@ simulation_id() ->
             {ok, O} = sprinter:orchestration(),
             atom_to_list(O)
     end,
-%%    EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
-    EvalIdentifier = lasp_config:get(eval_id, undefined),
+    EvalIdentifier = lasp_config:get(evaluation_identifier, undefined),
+%%    EvalIdentifier = lasp_config:get(eval_id, undefined),
     EvalTimestamp = lasp_config:get(evaluation_timestamp, 0),
 
     Id = atom_to_list(Simulation) ++ "/"

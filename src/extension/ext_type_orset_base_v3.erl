@@ -103,19 +103,18 @@ insert(EventHistory, Elem, {EventHistoryAll, EventRemoved, DataStore}=ORSetBaseV
 -spec read(ext_type_cover:ext_subset_in_cover(), ext_type_orset_base_v3()) ->
     {ext_type_cover:ext_subset_in_cover(), sets:set()}.
 read(
-    PrevSubsetUnknown,
+    PrevSubset,
     {EventHistoryAll, _EventRemoved, DataStore}=_ORSetBaseV3) ->
     case DataStore of
         [] ->
             {ext_type_cover:new_subset_in_cover(), sets:new()};
         _ ->
-            PrevSubset = ext_type_event_history_set:subtract(EventHistoryAll, PrevSubsetUnknown),
             Cover = ext_type_cover:generate_cover(orddict:fetch_keys(DataStore), EventHistoryAll),
             SuperSubsets = ext_type_cover:find_all_super_subsets(PrevSubset, Cover),
             SuperSubset = ext_type_cover:select_subset(SuperSubsets),
             SuperSubsetUnknown = ext_type_event_history_set:subtract(EventHistoryAll, SuperSubset),
             {
-                SuperSubsetUnknown,
+                SuperSubset,
                 sets:from_list(orddict:fetch_keys(orddict:fetch(SuperSubsetUnknown, DataStore)))}
     end.
 
@@ -425,14 +424,13 @@ product(
     {ext_type_cover:ext_subset_in_cover(), ext_type_provenance:ext_dot_set(), sets:set()}.
 consistent_read(
     AllPathInfoList,
-    PrevSubsetUnknown,
+    PrevSubset,
     PrevCDS,
     {EventHistoryAll, _EventRemoved, DataStore}=_ORSetBaseV3) ->
     case DataStore of
         [] ->
             {ordsets:new(), ordsets:new(), sets:new()};
         _ ->
-            PrevSubset = ext_type_event_history_set:subtract(EventHistoryAll, PrevSubsetUnknown),
             Cover = ext_type_cover:generate_cover(orddict:fetch_keys(DataStore), EventHistoryAll),
             SuperSubsets = ext_type_cover:find_all_super_subsets(PrevSubset, Cover),
             SuperSubset = ext_type_cover:select_subset(SuperSubsets),
@@ -441,7 +439,7 @@ consistent_read(
             SuperCDSs = ext_type_provenance:find_all_super_CDSs(PrevCDS, NewCDSs),
             NewCDS = ext_type_provenance:select_CDS(SuperCDSs),
             {
-                NewSubsetUnknown,
+                SuperSubset,
                 NewCDS,
                 orddict:fold(
                     fun(Elem, Provenance, AccInResultSet) ->

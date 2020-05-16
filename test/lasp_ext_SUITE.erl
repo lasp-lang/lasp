@@ -47,7 +47,7 @@
 %% ===================================================================
 
 init_per_suite(_Config) ->
-    lasp_config:set(ext_type_version, ext_type_orset_base_v3),
+    lasp_config:set(ext_type_version, ext_type_orset_base_v5),
     %% Start Lasp on the runner and enable instrumentation.
     lasp_support:start_runner(),
 

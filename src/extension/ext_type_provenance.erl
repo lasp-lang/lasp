@@ -23,6 +23,14 @@
     size_provenance/1]).
 -export([
     append_cur_node/2]).
+-export([
+    generate_group_event_history_for_provenance_v2/2]).
+-export([
+    encode_provenance/2,
+    decode_provenance/2,
+    append_cur_node_enc/3,
+    generate_group_event_history_for_provenance_dict/4,
+    cross_provenance_enc/2]).
 
 -export_type([
     ext_dot/0,
@@ -157,8 +165,6 @@ generate_group_event_history_for_provenance(Provenance, NodeId) ->
         fun(Dot, {AccInResultProvenance, AccInGroupEventHistorySet}) ->
             NewGroupEventHistory =
                 ext_type_event_history:new_group_event_history(NodeId, Dot),
-%%                ext_type_event_history:new_group_event_history(
-%%                    NodeId, ext_type_event_history_set:remove_group_event_history(Dot)),
             NewDot =
                 ext_type_event_history_set:add_event_history(NewGroupEventHistory, Dot),
             {
@@ -243,6 +249,92 @@ append_cur_node(Provenance, PathDict) ->
         end,
         ordsets:new(),
         Provenance).
+
+-spec generate_group_event_history_for_provenance_v2(ext_provenance(), ext_node_id()) ->
+    {ext_provenance(), ext_type_event_history_set:ext_event_history_set()}.
+generate_group_event_history_for_provenance_v2(Provenance, NodeId) ->
+    ordsets:fold(
+        fun(Dot, {AccInResultProvenance, AccInGroupEventHistorySet}) ->
+            DotWithoutGroup = ext_type_event_history_set:remove_group_event_history(Dot),
+            NewGroupEventHistory =
+                ext_type_event_history:new_group_event_history(NodeId, DotWithoutGroup),
+            NewDot =
+                ext_type_event_history_set:add_event_history(NewGroupEventHistory, DotWithoutGroup),
+            {
+                ordsets:add_element(NewDot, AccInResultProvenance),
+                ext_type_event_history_set:add_event_history(
+                    NewGroupEventHistory, AccInGroupEventHistorySet)}
+        end,
+        {ordsets:new(), ext_type_event_history_set:new_event_history_set()},
+        Provenance).
+
+-spec encode_provenance(ext_provenance(), term()) -> ext_provenance().
+encode_provenance(ProvenanceDec, GroupEncodeDict) ->
+    ordsets:fold(
+        fun(DotDec, AccInResult) ->
+            DotEnc = ext_type_event_history_set:encode_set(DotDec, GroupEncodeDict),
+            ordsets:add_element(DotEnc, AccInResult)
+        end,
+        ordsets:new(),
+        ProvenanceDec).
+
+-spec decode_provenance(ext_provenance(), term()) -> ext_provenance().
+decode_provenance(ProvenanceEnc, GroupDecodeDict) ->
+    ordsets:fold(
+        fun(DotEnc, AccInResult) ->
+            DotDec = ext_type_event_history_set:decode_set(DotEnc, GroupDecodeDict),
+            ordsets:add_element(DotDec, AccInResult)
+        end,
+        ordsets:new(),
+        ProvenanceEnc).
+
+-spec append_cur_node_enc(ext_node_id(), ext_path_info(), ext_provenance()) -> ext_provenance().
+append_cur_node_enc(CurNodeId, CurPathInfo, ProvenanceEnc) ->
+    ordsets:fold(
+        fun(DotEnc, AccInResult) ->
+            NewDotEnc =
+                ext_type_event_history_set:append_cur_node_enc(CurNodeId, CurPathInfo, DotEnc),
+            ordsets:add_element(NewDotEnc, AccInResult)
+        end,
+        ordsets:new(),
+        ProvenanceEnc).
+
+-spec generate_group_event_history_for_provenance_dict(
+    ext_provenance(), ext_node_id(), term(), term()) -> {ext_provenance(), term()}.
+generate_group_event_history_for_provenance_dict(
+    Provenance, NodeId, GroupDecodeDict, EventHistoryAllDict) ->
+    ordsets:fold(
+        fun(Dot, {AccInResultProvenance, AccInGroupDecodeDict, AccInEventHistoryAllDict}) ->
+            DotWithoutGroup = ext_type_event_history_set:remove_group_event_history(Dot),
+            {NewGroupEventHistoryEnc, NewGroupDecodeDict, NewEventHistoryAllDict} =
+                add_group_event_history_to_dict(
+                    NodeId, DotWithoutGroup, AccInGroupDecodeDict, AccInEventHistoryAllDict),
+            NewDot =
+                ext_type_event_history_set:add_event_history(
+                    NewGroupEventHistoryEnc, DotWithoutGroup),
+            {
+                ordsets:add_element(NewDot, AccInResultProvenance),
+                NewGroupDecodeDict,
+                NewEventHistoryAllDict}
+        end,
+        {ordsets:new(), GroupDecodeDict, EventHistoryAllDict},
+        Provenance).
+
+-spec cross_provenance_enc(ext_provenance(), ext_provenance()) -> ext_provenance().
+cross_provenance_enc(ProvenanceL, ProvenanceR) ->
+    ordsets:fold(
+        fun(DotL, AccInResultProvenance0) ->
+            ordsets:fold(
+                fun(DotR, AccInResultProvenance1) ->
+                    ordsets:add_element(
+                        ext_type_event_history_set:join_event_history_set(DotL, DotR),
+                        AccInResultProvenance1)
+                end,
+                AccInResultProvenance0,
+                ProvenanceR)
+        end,
+        ordsets:new(),
+        ProvenanceL).
 
 %% @private
 generate_event_history_set_dict_collection(InputEventHistoryDict) ->
@@ -374,6 +466,43 @@ find_all_super_CDSs_internal(Result, PrevCDS, [H | T]=_CDSs) ->
         false ->
             find_all_super_CDSs_internal(Result, PrevCDS, T)
     end.
+
+%% @private
+add_group_event_history_to_dict(NodeId, EventHistorySet, GroupDecodeDict, EventHistoryAllDict) ->
+    NewGroupEventHistoryDec =
+        ext_type_event_history:new_group_event_history(NodeId, EventHistorySet),
+    MaxCnt =
+        orddict:fold(
+            fun({_EHType, {EHNodeId, EHNodeCnt}}, _GroupEHDec, AccInMaxCnt) ->
+                case EHNodeId == NodeId of
+                    true ->
+                        max(AccInMaxCnt, EHNodeCnt);
+                    false ->
+                        AccInMaxCnt
+                end
+            end,
+            0,
+            GroupDecodeDict),
+    NewGroupEventHistoryEnc =
+        ext_type_event_history:new_group_event_history(NodeId, MaxCnt + 1),
+    NewGroupDecodeDict =
+        orddict:store(NewGroupEventHistoryEnc, NewGroupEventHistoryDec, GroupDecodeDict),
+    NewEventHistoryAllDict0 =
+        ordsets:fold(
+            fun(EventHistory, AccInNewEventHistoryAllDict0) ->
+                orddict:update(
+                    EventHistory,
+                    fun(OldGroupSet) ->
+                        ordsets:add_element(NewGroupEventHistoryEnc, OldGroupSet)
+                    end,
+                    ordsets:add_element(NewGroupEventHistoryEnc, ordsets:new()),
+                    AccInNewEventHistoryAllDict0)
+            end,
+            EventHistoryAllDict,
+            EventHistorySet),
+    NewEventHistoryAllDict =
+        orddict:store(NewGroupEventHistoryEnc, ordsets:new(), NewEventHistoryAllDict0),
+    {NewGroupEventHistoryEnc, NewGroupDecodeDict, NewEventHistoryAllDict}.
 
 %% ===================================================================
 %% EUnit tests

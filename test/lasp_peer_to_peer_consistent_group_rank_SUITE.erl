@@ -65,7 +65,9 @@ all() ->
     [
         peer_to_peer_state_based_ext_v1_test,
         peer_to_peer_state_based_ext_v2_test,
-        peer_to_peer_state_based_ext_v3_test
+        peer_to_peer_state_based_ext_v3_test,
+        peer_to_peer_state_based_ext_v4_test,
+        peer_to_peer_state_based_ext_v5_test
     ].
 
 %% ===================================================================
@@ -137,4 +139,44 @@ peer_to_peer_state_based_ext_v3_test(Config) ->
             {broadcast, false},
             {evaluation_identifier, peer_to_peer_state_based_v3},
             {eval_id, peer_to_peer_state_based_v3}]),
+    ok.
+
+peer_to_peer_state_based_ext_v4_test(Config) ->
+    lasp_simulation_support:run(
+        peer_to_peer_consistent_group_rank_state_based_ext_v4_test,
+        Config,
+        [
+            {mode, state_based},
+            {simulation, consistent_group_rank},
+            {
+                partisan_peer_service_manager,
+                partisan_hyparview_peer_service_manager},
+            {set, orset},
+            {ext_type_version, ext_type_orset_base_v4},
+            {group_rank_input_size, 9},
+            {jitter, true},
+            {jitter_percent, 50},
+            {broadcast, false},
+            {evaluation_identifier, peer_to_peer_state_based_v4},
+            {eval_id, peer_to_peer_state_based_v4}]),
+    ok.
+
+peer_to_peer_state_based_ext_v5_test(Config) ->
+    lasp_simulation_support:run(
+        peer_to_peer_consistent_group_rank_state_based_ext_v5_test,
+        Config,
+        [
+            {mode, state_based},
+            {simulation, consistent_group_rank},
+            {
+                partisan_peer_service_manager,
+                partisan_hyparview_peer_service_manager},
+            {set, orset},
+            {ext_type_version, ext_type_orset_base_v5},
+            {group_rank_input_size, 9},
+            {jitter, true},
+            {jitter_percent, 50},
+            {broadcast, false},
+            {evaluation_identifier, peer_to_peer_state_based_v5},
+            {eval_id, peer_to_peer_state_based_v5}]),
     ok.

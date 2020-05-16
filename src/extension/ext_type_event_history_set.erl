@@ -23,6 +23,14 @@
 -export([
     find_survived/2,
     subtract/2]).
+-export([
+    set_to_dict/1,
+    dict_to_set/1,
+    encode_set/2,
+    decode_set/2,
+    append_cur_node_enc/3,
+    from_list/1,
+    join_event_history_set/2]).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -218,6 +226,151 @@ find_survived(EventHistorySet, EventRemoved) ->
 -spec subtract(ext_event_history_set(), ext_event_history_set()) -> ext_event_history_set().
 subtract(EventHistorySetL, EventHistorySetR) ->
     ordsets:subtract(EventHistorySetL, EventHistorySetR).
+
+-spec set_to_dict(ext_event_history_set()) -> {term(), term()}.
+set_to_dict(EventHistoryAll) ->
+    {ResultDict, GroupEncodeDict, _GroupCntDict} =
+        ordsets:fold(
+            fun({ext_event_history_partial_order_group, {NodeId, EventHistorySet}}=GroupEH,
+                {AccInResultDict, AccInGroupEncodeDict, AccInGroupCntDict}) ->
+                CurCnt =
+                    case orddict:find(NodeId, AccInGroupCntDict) of
+                        error ->
+                            1;
+                        {ok, PrevCnt} ->
+                            PrevCnt + 1
+                    end,
+                CurGroupEH = {ext_event_history_partial_order_group, {NodeId, CurCnt}},
+                NewAccInResultDict0 =
+                    ordsets:fold(
+                        fun(EHInGroup, AccInNewAccInResultDict0) ->
+                            orddict:update(
+                                EHInGroup,
+                                fun(OldGroupSet) ->
+                                    ordsets:add_element(CurGroupEH, OldGroupSet)
+                                end,
+                                ordsets:add_element(CurGroupEH, ordsets:new()),
+                                AccInNewAccInResultDict0)
+                        end,
+                        AccInResultDict,
+                        EventHistorySet),
+                NewAccInResultDict =
+                    orddict:store(CurGroupEH, ordsets:new(), NewAccInResultDict0),
+                NewAccInGroupEncodeDict = orddict:store(GroupEH, CurGroupEH, AccInGroupEncodeDict),
+                NewAccInGroupCntDict = orddict:update_counter(NodeId, 1, AccInGroupCntDict),
+                {NewAccInResultDict, NewAccInGroupEncodeDict, NewAccInGroupCntDict};
+            (EventHistory, {AccInResultDict, AccInGroupEncodeDict, AccInGroupCntDict}) ->
+                NewAccInResultDict =
+                    orddict:update(
+                        EventHistory,
+                        fun(OldGroupSet) ->
+                            OldGroupSet
+                        end,
+                        ordsets:new(),
+                        AccInResultDict),
+                {NewAccInResultDict, AccInGroupEncodeDict, AccInGroupCntDict}
+            end,
+            {orddict:new(), orddict:new(), orddict:new()},
+            EventHistoryAll),
+    {ResultDict, GroupEncodeDict}.
+
+-spec dict_to_set(term()) -> {ext_event_history_set(), term()}.
+dict_to_set(EventHistoryAllDict) ->
+    {NonGroupEventHistoryAll, GroupDecodeDict} =
+        orddict:fold(
+            fun({ext_event_history_partial_order_group, {_NodeId, _NodeCnt}}, [],
+                {AccInNonGroupEventHistoryAll, AccInGroupDecodeDict}) ->
+                {AccInNonGroupEventHistoryAll, AccInGroupDecodeDict};
+            (EventHistory, GroupSet, {AccInNonGroupEventHistoryAll, AccInGroupDecodeDict}) ->
+                NewAccInNonGroupEventHistoryAll =
+                    ordsets:add_element(EventHistory, AccInNonGroupEventHistoryAll),
+                NewAccInGroupDict =
+                    ordsets:fold(
+                        fun({ext_event_history_partial_order_group, {NodeId, _NodeCnt}}=GroupEH,
+                            AccInNewAccInGroupDict) ->
+                            orddict:update(
+                                GroupEH,
+                                fun({ext_event_history_partial_order_group, {OldNodeId, OldEHSet}}) ->
+                                    {
+                                        ext_event_history_partial_order_group,
+                                        {
+                                            OldNodeId,
+                                            ext_type_event_history_set:add_event_history(
+                                                EventHistory, OldEHSet)}}
+                                end,
+                                {
+                                    ext_event_history_partial_order_group,
+                                    {
+                                        NodeId,
+                                        ext_type_event_history_set:add_event_history(
+                                            EventHistory,
+                                            ext_type_event_history_set:new_event_history_set())}},
+                                AccInNewAccInGroupDict)
+                        end,
+                        AccInGroupDecodeDict,
+                        GroupSet),
+                {NewAccInNonGroupEventHistoryAll, NewAccInGroupDict}
+            end,
+            {ordsets:new(), orddict:new()},
+            EventHistoryAllDict),
+    EventHistoryAll =
+        orddict:fold(
+            fun(_GroupEHEnc, GroupEHDec, AccInEventHistoryAll) ->
+                ordsets:add_element(GroupEHDec, AccInEventHistoryAll)
+            end,
+            NonGroupEventHistoryAll,
+            GroupDecodeDict),
+    {EventHistoryAll, GroupDecodeDict}.
+
+-spec encode_set(ext_event_history_set(), term()) -> ext_event_history_set().
+encode_set(EventHistorySetDec, GroupEncodeDict) ->
+    ordsets:fold(
+        fun({ext_event_history_partial_order_group, {_NodeId, _EHSet}}=GroupEHDec, AccInResult) ->
+            GroupEHEnc = orddict:fetch(GroupEHDec, GroupEncodeDict),
+            ordsets:add_element(GroupEHEnc, AccInResult);
+        (EventHistory, AccInResult) ->
+            ordsets:add_element(EventHistory, AccInResult)
+        end,
+        ordsets:new(),
+        EventHistorySetDec).
+
+-spec decode_set(ext_event_history_set(), term()) -> ext_event_history_set().
+decode_set(EventHistorySetEnc, GroupdecodeDict) ->
+    ordsets:fold(
+        fun({ext_event_history_partial_order_group, {_NodeId, _EHSet}}=GroupEHEnc, AccInResult) ->
+            GroupEHDec = orddict:fetch(GroupEHEnc, GroupdecodeDict),
+            ordsets:add_element(GroupEHDec, AccInResult);
+        (EventHistory, AccInResult) ->
+                ordsets:add_element(EventHistory, AccInResult)
+        end,
+        ordsets:new(),
+        EventHistorySetEnc).
+
+-spec append_cur_node_enc(ext_node_id(), ext_path_info(), ext_event_history_set()) ->
+    ext_event_history_set().
+append_cur_node_enc(NodeId, PathInfo, EventHistorySetEnc) ->
+    ordsets:fold(
+        fun(EventHistory, AccInResult) ->
+            NewEventHistory =
+                case ext_type_event_history:get_event(EventHistory) of
+                    group_event ->
+                        EventHistory;
+                    _ ->
+                        ext_type_event_history:append_cur_node(NodeId, PathInfo, EventHistory)
+                end,
+            ordsets:add_element(NewEventHistory, AccInResult)
+        end,
+        ordsets:new(),
+        EventHistorySetEnc).
+
+-spec from_list([ext_type_event_history:ext_event_history()]) -> ext_event_history_set().
+from_list(EventHistoryList) ->
+    ordsets:from_list(EventHistoryList).
+
+-spec join_event_history_set(ext_event_history_set(), ext_event_history_set()) ->
+    ext_event_history_set().
+join_event_history_set(EventHistorySetL, EventHistorySetR) ->
+    ordsets:union(EventHistorySetL, EventHistorySetR).
 
 %% @private
 max_event_history_set(AccInMaxEventHistorySet, []) ->

@@ -100,16 +100,13 @@ is_strict_inflation(ORSetL, ORSetR) ->
 %%        lager:info("Id: ~p", [Id])
 %%end,
 -spec print_value(ext_crdt()) -> non_neg_integer().
-print_value({_Type, Payload}=_Value) ->
-    {EventHistoryAll, EventHistorySurvived, Cover, DataStore} =
-        case lasp_config:get(ext_type_version, ext_type_orset_base_v1) of
-            ext_type_orset_base_v3 ->
-                {_NodeType, _AllPathInfoList, {EventHistoryAll0, EventRemoved0, DataStore0}} = Payload,
-                {EventHistoryAll0, EventRemoved0, ordsets:new(), DataStore0};
-            _ ->
-                {_NodeType, _AllPathInfoList, {EventHistoryAll1, EventHistorySurvived1, Cover1, DataStore1}} = Payload,
-                {EventHistoryAll1, EventHistorySurvived1, Cover1, DataStore1}
-        end,
+print_value({_Type, {_NodeType, _AllPathInfoList, {EventHistoryAll, EventHistorySurvived, Cover, DataStore}}}=_Value) ->
+    print_value_internal(EventHistoryAll, EventHistorySurvived, Cover, DataStore);
+print_value({_Type, {_NodeType, _AllPathInfoList, {EventHistoryAll, EventRemoved, DataStore}}}=_Value) ->
+    print_value_internal(EventHistoryAll, EventRemoved, ordsets:new(), DataStore).
+
+%% @private
+print_value_internal(EventHistoryAll, EventHistorySurvived, Cover, DataStore) ->
     lager:info("EventHistoryAll"),
     _ =
         ordsets:fold(

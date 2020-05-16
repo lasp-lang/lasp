@@ -20,6 +20,10 @@
     find_all_sub_subsets/2,
     select_subset_reverse/2,
     generate_cover/2]).
+-export([
+    encode_subset/2,
+    decode_subset/2,
+    append_cur_node_enc/3]).
 
 -export_type([
     ext_subset_in_cover/0,
@@ -124,6 +128,19 @@ generate_cover(SubsetUnknownList, EventHistoryAll) ->
         end,
         ordsets:new(),
         SubsetUnknownList).
+
+-spec encode_subset(ext_subset_in_cover(), term()) -> ext_subset_in_cover().
+encode_subset(SubsetDec, GroupEncodeDict) ->
+    ext_type_event_history_set:encode_set(SubsetDec, GroupEncodeDict).
+
+-spec decode_subset(ext_subset_in_cover(), term()) -> ext_subset_in_cover().
+decode_subset(SubsetEnc, GroupDecodeDict) ->
+    ext_type_event_history_set:decode_set(SubsetEnc, GroupDecodeDict).
+
+-spec append_cur_node_enc(ext_node_id(), ext_path_info(), ext_subset_in_cover()) ->
+    ext_subset_in_cover().
+append_cur_node_enc(CurNodeId, CurPathInfo, SubsetInCoverEnc) ->
+    ext_type_event_history_set:append_cur_node_enc(CurNodeId, CurPathInfo, SubsetInCoverEnc).
 
 %% @private
 find_all_super_subsets_internal(AccSupersets, _Subset, []) ->

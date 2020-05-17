@@ -287,11 +287,11 @@ start(Case, _Config, Options) ->
                                       [evaluation_identifier, list_to_atom(RealEvalIdentifier)]),
 
                         %% Configure base orset type settings.
-                        TypeVersion = proplists:get_value(ext_type_version, Options),
+                        TypeVersion = proplists:get_value(ext_type_version, Options, ext_type_orset_base_v1),
                         ok = rpc:call(Node, lasp_config, set, [ext_type_version, TypeVersion]),
 
                         %% Configure group_rank_input_size.
-                        GroupRankInputSize = proplists:get_value(group_rank_input_size, Options),
+                        GroupRankInputSize = proplists:get_value(group_rank_input_size, Options, 9),
                         ok = rpc:call(Node, lasp_config, set, [group_rank_input_size, GroupRankInputSize]),
 
                         %% Configure eval_id.
@@ -300,12 +300,12 @@ start(Case, _Config, Options) ->
                             [eval_id, EvalId]),
 
                         %% Configure jitter.
-                        Jitter = proplists:get_value(jitter, Options),
+                        Jitter = proplists:get_value(jitter, Options, false),
                         ok = rpc:call(Node, lasp_config, set,
                             [jitter, Jitter]),
 
                         %% Configure jitter_percent.
-                        JitterPercent = proplists:get_value(jitter_percent, Options),
+                        JitterPercent = proplists:get_value(jitter_percent, Options, 50),
                         ok = rpc:call(Node, lasp_config, set,
                             [jitter_percent, JitterPercent]),
 

@@ -13,9 +13,9 @@
     join/3,
     is_inflation/2,
     is_strict_inflation/2,
-    map/4,
-    filter/4,
-    product/4,
+    map/5,
+    filter/5,
+    product/5,
     consistent_read/4,
     set_count/4,
     group_by_sum/5,
@@ -293,10 +293,12 @@ is_strict_inflation(ORSetBaseL, ORSetBaseR) ->
 -spec map(
     {ext_node_id(), ext_replica_id()},
     function(),
+    ext_type_path:ext_path_info_list(),
     ext_type_path:ext_path_info(),
     ext_type_orset_base_v2()) -> ext_type_orset_base_v2().
 map({NodeId, _ReplicaId}=_Actor,
     Function,
+    _AllPathInfoList,
     PathInfo,
     {EventHistoryAll, EventHistorySurvived, Cover, DataStore}=_ORSetBaseV2) ->
     {PathDict, NewEventHistoryAll} =
@@ -341,11 +343,13 @@ map({NodeId, _ReplicaId}=_Actor,
 -spec filter(
     {ext_node_id(), ext_replica_id()},
     function(),
+    ext_type_path:ext_path_info_list(),
     ext_type_path:ext_path_info(),
     ext_type_orset_base_v2()) -> ext_type_orset_base_v2().
 filter(
     {NodeId, _ReplicaId}=_Actor,
     Function,
+    _AllPathInfoList,
     PathInfo,
     {EventHistoryAll, EventHistorySurvived, Cover, DataStore}=_ORSetBaseV2) ->
     {PathDict, NewEventHistoryAll} =
@@ -390,11 +394,13 @@ filter(
 
 -spec product(
     {ext_node_id(), ext_replica_id()},
+    ext_type_path:ext_path_info_list(),
     ext_type_path:ext_path_info(),
     ext_type_orset_base_v2(),
     ext_type_orset_base_v2()) -> ext_type_orset_base_v2().
 product(
     {NodeId, _ReplicaId}=_Actor,
+    _AllPathInfoList,
     PathInfo,
     {EventHistoryAllL, EventHistorySurvivedL, CoverL, DataStoreL}=_ORSetBaseV2L,
     {EventHistoryAllR, EventHistorySurvivedR, CoverR, DataStoreR}=_ORSetBaseV2R) ->

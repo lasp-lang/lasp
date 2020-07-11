@@ -18,7 +18,7 @@ map({ObjectId, _ReplicaId}=ResultId,
     {ChildLeft, _GrandChildrenPair} = H,
     ResultPathInfo = {ObjectId, {ChildLeft, undefined}},
     ResultAllPathInfoList = [ResultPathInfo] ++ AllPathInfoList,
-    ResultBORSet = internal_map(ResultId, Function, ResultPathInfo, BORSet),
+    ResultBORSet = internal_map(ResultId, Function, ResultAllPathInfoList, ResultPathInfo, BORSet),
     {ext_type_aworset_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}};
 map({ObjectId, _ReplicaId}=ResultId,
     Function,
@@ -26,7 +26,7 @@ map({ObjectId, _ReplicaId}=ResultId,
     {ChildLeft, _GrandChildrenPair} = H,
     ResultPathInfo = {ObjectId, {ChildLeft, undefined}},
     ResultAllPathInfoList = [ResultPathInfo] ++ AllPathInfoList,
-    ResultBORSet = internal_map(ResultId, Function, ResultPathInfo, BORSet),
+    ResultBORSet = internal_map(ResultId, Function, ResultAllPathInfoList, ResultPathInfo, BORSet),
     {ext_type_aworset_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}}.
 
 filter(
@@ -36,7 +36,8 @@ filter(
     {ChildLeft, _GrandChildrenPair} = H,
     ResultPathInfo = {ObjectId, {ChildLeft, undefined}},
     ResultAllPathInfoList = [ResultPathInfo] ++ AllPathInfoList,
-    ResultBORSet = internal_filter(ResultId, Function, ResultPathInfo, BORSet),
+    ResultBORSet =
+        internal_filter(ResultId, Function, ResultAllPathInfoList, ResultPathInfo, BORSet),
     {ext_type_aworset_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}};
 filter(
     {ObjectId, _ReplicaId}=ResultId,
@@ -45,7 +46,8 @@ filter(
     {ChildLeft, _GrandChildrenPair} = H,
     ResultPathInfo = {ObjectId, {ChildLeft, undefined}},
     ResultAllPathInfoList = [ResultPathInfo] ++ AllPathInfoList,
-    ResultBORSet = internal_filter(ResultId, Function, ResultPathInfo, BORSet),
+    ResultBORSet =
+        internal_filter(ResultId, Function, ResultAllPathInfoList, ResultPathInfo, BORSet),
     {ext_type_aworset_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}}.
 
 product(
@@ -58,7 +60,8 @@ product(
     {ChildRight, _} = HR,
     ResultPathInfo = {ObjectId, {ChildLeft, ChildRight}},
     ResultAllPathInfoList = [ResultPathInfo] ++ AllPathInfoListL ++ AllPathInfoListR,
-    ResultBORSet = internal_product(ResultId, ResultPathInfo, BORSetL, BORSetR),
+    ResultBORSet =
+        internal_product(ResultId, ResultAllPathInfoList, ResultPathInfo, BORSetL, BORSetR),
     {ext_type_aworset_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}};
 product(
     {ObjectId, _ReplicaId}=ResultId,
@@ -70,7 +73,8 @@ product(
     {ChildRight, _} = HR,
     ResultPathInfo = {ObjectId, {ChildLeft, ChildRight}},
     ResultAllPathInfoList = [ResultPathInfo] ++ AllPathInfoListL ++ AllPathInfoListR,
-    ResultBORSet = internal_product(ResultId, ResultPathInfo, BORSetL, BORSetR),
+    ResultBORSet =
+        internal_product(ResultId, ResultAllPathInfoList, ResultPathInfo, BORSetL, BORSetR),
     {ext_type_aworset_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}};
 product(
     {ObjectId, _ReplicaId}=ResultId,
@@ -82,7 +86,8 @@ product(
     {ChildRight, _} = HR,
     ResultPathInfo = {ObjectId, {ChildLeft, ChildRight}},
     ResultAllPathInfoList = [ResultPathInfo] ++ AllPathInfoListL ++ AllPathInfoListR,
-    ResultBORSet = internal_product(ResultId, ResultPathInfo, BORSetL, BORSetR),
+    ResultBORSet =
+        internal_product(ResultId, ResultAllPathInfoList, ResultPathInfo, BORSetL, BORSetR),
     {ext_type_aworset_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}};
 product(
     {ObjectId, _ReplicaId}=ResultId,
@@ -94,7 +99,8 @@ product(
     {ChildRight, _} = HR,
     ResultPathInfo = {ObjectId, {ChildLeft, ChildRight}},
     ResultAllPathInfoList = [ResultPathInfo] ++ AllPathInfoListL ++ AllPathInfoListR,
-    ResultBORSet = internal_product(ResultId, ResultPathInfo, BORSetL, BORSetR),
+    ResultBORSet =
+        internal_product(ResultId, ResultAllPathInfoList, ResultPathInfo, BORSetL, BORSetR),
     {ext_type_aworset_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}};
 product(
     {ObjectId, _ReplicaId}=ResultId,
@@ -106,7 +112,8 @@ product(
     {ChildRight, _} = HR,
     ResultPathInfo = {ObjectId, {ChildLeft, ChildRight}},
     ResultAllPathInfoList = [ResultPathInfo] ++ AllPathInfoListL ++ AllPathInfoListR,
-    ResultBORSet = internal_product(ResultId, ResultPathInfo, BORSetL, BORSetR),
+    ResultBORSet =
+        internal_product(ResultId, ResultAllPathInfoList, ResultPathInfo, BORSetL, BORSetR),
     {ext_type_aworset_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}};
 product(
     {ObjectId, _ReplicaId}=ResultId,
@@ -118,7 +125,8 @@ product(
     {ChildRight, _} = HR,
     ResultPathInfo = {ObjectId, {ChildLeft, ChildRight}},
     ResultAllPathInfoList = [ResultPathInfo] ++ AllPathInfoListL ++ AllPathInfoListR,
-    ResultBORSet = internal_product(ResultId, ResultPathInfo, BORSetL, BORSetR),
+    ResultBORSet =
+        internal_product(ResultId, ResultAllPathInfoList, ResultPathInfo, BORSetL, BORSetR),
     {ext_type_aworset_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}}.
 
 set_count(
@@ -191,16 +199,16 @@ order_by(
     {ext_type_aggresult_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}}.
 
 %% @private
-internal_map(ResultId, Function, PathInfo, BORSet) ->
-    do(map, [ResultId, Function, PathInfo, BORSet]).
+internal_map(ResultId, Function, ResultAllPathInfoList, PathInfo, BORSet) ->
+    do(map, [ResultId, Function, ResultAllPathInfoList, PathInfo, BORSet]).
 
 %% @private
-internal_filter(ResultId, Function, PathInfo, BORSet) ->
-    do(filter, [ResultId, Function, PathInfo, BORSet]).
+internal_filter(ResultId, Function, ResultAllPathInfoList, PathInfo, BORSet) ->
+    do(filter, [ResultId, Function, ResultAllPathInfoList, PathInfo, BORSet]).
 
 %% @private
-internal_product(ResultId, PathInfo, BORSetL, BORSetR) ->
-    do(product, [ResultId, PathInfo, BORSetL, BORSetR]).
+internal_product(ResultId, ResultAllPathInfoList, PathInfo, BORSetL, BORSetR) ->
+    do(product, [ResultId, ResultAllPathInfoList, PathInfo, BORSetL, BORSetR]).
 
 %% @private
 internal_set_count(ResultId, AllPathInfoList, ResultPathInfo, BORSet) ->

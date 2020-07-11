@@ -32,16 +32,24 @@
 -callback is_inflation(orset_base(), orset_base()) -> boolean().
 
 -callback map(
-    {ext_node_id(), ext_replica_id()}, function(), ext_type_path:ext_path_info(), orset_base()) ->
-    orset_base().
+    {ext_node_id(), ext_replica_id()},
+    function(),
+    ext_type_path:ext_path_info_list(),
+    ext_type_path:ext_path_info(),
+    orset_base()) -> orset_base().
 
 -callback filter(
-    {ext_node_id(), ext_replica_id()}, function(), ext_type_path:ext_path_info(), orset_base()) ->
-    orset_base().
+    {ext_node_id(), ext_replica_id()},
+    function(),
+    ext_type_path:ext_path_info_list(),
+    ext_type_path:ext_path_info(),
+    orset_base()) -> orset_base().
 
 -callback product(
-    {ext_node_id(), ext_replica_id()}, ext_type_path:ext_path_info(), orset_base(), orset_base()) ->
-    orset_base().
+    {ext_node_id(), ext_replica_id()},
+    ext_type_path:ext_path_info_list(),
+    ext_type_path:ext_path_info(),
+    orset_base(), orset_base()) -> orset_base().
 
 -callback consistent_read(
     ext_type_path:ext_path_info_list(),

@@ -1886,32 +1886,32 @@ add_subset_unknown_provenance_store_enc(
         EventHistoryAllDictsL, EventHistoryAllDictsR).
 
 %% @private
-consistent_read_internal(
-    _PrevSubsetDec, _EventHistoryAllDicts, _EventHistoryAllDec, _GroupDecodeDict, []) ->
-    {ext_type_cover:new_subset_in_cover(), sets:new()};
-consistent_read_internal(
-    PrevSubsetDec,
-    EventHistoryAllDicts,
-    EventHistoryAllDec,
-    GroupDecodeDict,
-    [H | T]=_DataStoreEnc) ->
-    {NewEventHistoryAllDec, NewGroupDecodeDict} =
-        case {EventHistoryAllDec, GroupDecodeDict} of
-            {[], []} ->
-                all_dicts_to_set(EventHistoryAllDicts);
-            _ ->
-                {EventHistoryAllDec, GroupDecodeDict}
-        end,
-    {SubsetUnknownEnc, ProvenanceStoreEnc} = H,
-    SubsetUnknownDec = ext_type_cover:decode_subset(SubsetUnknownEnc, NewGroupDecodeDict),
-    SubsetDec = ordsets:subtract(NewEventHistoryAllDec, SubsetUnknownDec),
-    case ext_type_event_history_set:is_orderly_subset(PrevSubsetDec, SubsetDec) of
-        true ->
-            {SubsetDec, sets:from_list(orddict:fetch_keys(ProvenanceStoreEnc))};
-        false ->
-            consistent_read_internal(
-                PrevSubsetDec, EventHistoryAllDicts, NewEventHistoryAllDec, NewGroupDecodeDict, T)
-    end.
+% consistent_read_internal(
+%     _PrevSubsetDec, _EventHistoryAllDicts, _EventHistoryAllDec, _GroupDecodeDict, []) ->
+%     {ext_type_cover:new_subset_in_cover(), sets:new()};
+% consistent_read_internal(
+%     PrevSubsetDec,
+%     EventHistoryAllDicts,
+%     EventHistoryAllDec,
+%     GroupDecodeDict,
+%     [H | T]=_DataStoreEnc) ->
+%     {NewEventHistoryAllDec, NewGroupDecodeDict} =
+%         case {EventHistoryAllDec, GroupDecodeDict} of
+%             {[], []} ->
+%                 all_dicts_to_set(EventHistoryAllDicts);
+%             _ ->
+%                 {EventHistoryAllDec, GroupDecodeDict}
+%         end,
+%     {SubsetUnknownEnc, ProvenanceStoreEnc} = H,
+%     SubsetUnknownDec = ext_type_cover:decode_subset(SubsetUnknownEnc, NewGroupDecodeDict),
+%     SubsetDec = ordsets:subtract(NewEventHistoryAllDec, SubsetUnknownDec),
+%     case ext_type_event_history_set:is_orderly_subset(PrevSubsetDec, SubsetDec) of
+%         true ->
+%             {SubsetDec, sets:from_list(orddict:fetch_keys(ProvenanceStoreEnc))};
+%         false ->
+%             consistent_read_internal(
+%                 PrevSubsetDec, EventHistoryAllDicts, NewEventHistoryAllDec, NewGroupDecodeDict, T)
+%     end.
 
 -spec new(ext_type_path:ext_path_info_list()) -> ext_type_orset_base_v6().
 new(AllPathInfoList) ->

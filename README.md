@@ -66,6 +66,7 @@ Go to node b and retrieve the content of the CRDT:
 3> sets:to_list(AwMapSet).
 % [#{what => i_am_an_awmap_value}]
 ```
+If you try to make a cluster with remote nodes and face an error related to connection attempts from disallowed nodes, you may simply need to put the same erlang.cookie on the machines beforehand to allow them to communicate.
 
 ## Running a shell
 

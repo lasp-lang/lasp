@@ -56,7 +56,7 @@ AwMapType = {state_awmap, [state_mvregister]}.
 
 
 % Update the CRDT with the content
-{ok, _} = lasp:update(AwMap, {apply, Key1, {set, nil, Content}}, self()).
+{ok, _} = lasp:update(AwMap, {apply, Key1, {set, nil, Content}}, term_to_binary(node())).
 ```
 
 Go to node b and retrieve the content of the CRDT:

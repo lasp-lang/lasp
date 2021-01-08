@@ -31,7 +31,7 @@ $ rebar3 shell --name b@127.0.0.1
 ```
 
 Exceute to node a:
-```
+```erlang
 1> lasp_peer_service:join('a@127.0.0.1').
 ok
 2> lasp_peer_service:members().
@@ -39,13 +39,13 @@ ok
 ```
 
 Execute node b:
-```
+```erlang
 1> lasp_peer_service:members().
 {ok,['a@127.0.0.1','b@127.0.0.1']}     
 ```
 
 Go back to node a and run:
-```
+```erlang
 3> Content = #{what => i_am_an_awmap_value}.
 
 % create a lasp CRDT
@@ -59,7 +59,7 @@ AwMapType = {state_awmap, [state_mvregister]}.
 ```
 
 Go to node b and retrieve the content of the CRDT:
-```
+```erlang
 2> {ok,[{_, AwMapSet}]} = lasp:query({<<"awmap">>,{state_awmap,[state_mvregister]}}).
 
 3> sets:to_list(AwMapSet).
@@ -80,7 +80,7 @@ $ make shell
 To run the test suite, which will execute all of the Lasp scenarios, use
 the following command.
 
-```
+```bash
 $ make check
 ```
 

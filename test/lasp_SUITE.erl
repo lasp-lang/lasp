@@ -860,9 +860,9 @@ counter_enforce_once_test(Config) ->
     end,
 
     %% Increment counter twice to get trigger to fire.
-    {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
-    {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
-    {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, increment, term_to_binary(self())]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, increment, term_to_binary(self())]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, increment, term_to_binary(self())]),
 
     lager:info("Waiting for response..."),
     receive
@@ -924,9 +924,9 @@ counter_strict_enforce_once_test(Config) ->
             timer:sleep(1000),
 
             %% Increment counter twice to get trigger to fire.
-            {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
-            {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
-            {ok, _} = rpc:call(Node, lasp, update, [Id, increment, self()]),
+            {ok, _} = rpc:call(Node, lasp, update, [Id, increment, term_to_binary(self())]),
+            {ok, _} = rpc:call(Node, lasp, update, [Id, increment, term_to_binary(self())]),
+            {ok, _} = rpc:call(Node, lasp, update, [Id, increment, term_to_binary(self())]),
 
             lager:info("Waiting for response..."),
             receive
@@ -981,9 +981,9 @@ awset_enforce_once_test(Config) ->
     end,
 
     %% Increment counter twice to get trigger to fire.
-    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 1}, self()]),
-    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 2}, self()]),
-    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 3}, self()]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 1}, term_to_binary(self())]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 2}, term_to_binary(self())]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 3}, term_to_binary(self())]),
 
     lager:info("Waiting for response..."),
     receive
@@ -1035,9 +1035,9 @@ awset_strict_enforce_once_test(Config) ->
     end,
 
     %% Increment counter twice to get trigger to fire.
-    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 1}, self()]),
-    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 2}, self()]),
-    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 3}, self()]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 1}, term_to_binary(self())]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 2}, term_to_binary(self())]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 3}, term_to_binary(self())]),
 
     lager:info("Waiting for response..."),
     receive
@@ -1089,9 +1089,9 @@ orset_enforce_once_test(Config) ->
     end,
 
     %% Increment counter twice to get trigger to fire.
-    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 1}, self()]),
-    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 2}, self()]),
-    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 3}, self()]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 1}, term_to_binary(self())]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 2}, term_to_binary(self())]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 3}, term_to_binary(self())]),
 
     lager:info("Waiting for response..."),
     receive
@@ -1143,9 +1143,9 @@ orset_strict_enforce_once_test(Config) ->
     end,
 
     %% Increment counter twice to get trigger to fire.
-    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 1}, self()]),
-    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 2}, self()]),
-    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 3}, self()]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 1}, term_to_binary(self())]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 2}, term_to_binary(self())]),
+    {ok, _} = rpc:call(Node, lasp, update, [Id, {add, 3}, term_to_binary(self())]),
 
     lager:info("Waiting for response..."),
     receive

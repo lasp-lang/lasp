@@ -131,7 +131,11 @@ declare(Id, Type) ->
 %%      at the given `Id'.
 %%
 -spec update(id(), operation(), actor()) -> {ok, var()} | {error, timeout}.
-update(Id, Operation, Actor) ->
+update(Id, Operation, Actor) when is_list(Actor) ->
+    do(update, [Id, Operation, Actor]);
+update(Id, Operation, Actor) when is_binary(Actor) ->
+    do(update, [Id, Operation, Actor]);
+update(Id, Operation, Actor) when is_atom(Actor) ->
     do(update, [Id, Operation, Actor]).
 
 %% @doc Bind a dataflow variable to a value.

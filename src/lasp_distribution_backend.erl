@@ -243,7 +243,7 @@ thread(Module, Function, Args) ->
 
 %% @doc Enforce a invariant once over a monotonic condition.
 %%
--spec enforce_once(id(), threshold(), function()) -> ok.
+-spec enforce_once(id(), threshold(), function()) -> {ok, pid()}.
 enforce_once(Id, Threshold, EnforceFun) ->
     gen_server:call(?MODULE, {enforce_once, Id, Threshold, EnforceFun}, infinity).
 

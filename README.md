@@ -84,6 +84,10 @@ the following command.
 $ make check
 ```
 
+## Notes
+
+If using the Distributed Erlang backend, make sure that all nodes are configured to use the same cookie.
+
 ## Code examples
 
 [This blog post](http://marianoguerra.org/posts/playing-with-lasp-and-crdts.html) by [@marianoguerra](https://github.com/marianoguerra) contains concise sample code.

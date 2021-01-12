@@ -243,7 +243,7 @@ thread(Module, Function, Args) ->
 
 %% @doc Enforce a invariant once over a monotonic condition.
 %%
--spec enforce_once(id(), threshold(), function()) -> ok.
+-spec enforce_once(id(), threshold(), function()) -> {ok, pid()}.
 enforce_once(Id, Threshold, EnforceFun) ->
     gen_server:call(?MODULE, {enforce_once, Id, Threshold, EnforceFun}, infinity).
 
@@ -627,9 +627,9 @@ handle_call({enforce_once, Id, Threshold, EnforceFun},
             #state{store=Store}=State) ->
     lasp_marathon_simulations:log_message_queue_size("enforce_once"),
 
-    {ok, _Pid} = ?CORE:enforce_once(Id, Threshold, EnforceFun, Store),
+    {ok, Pid} = ?CORE:enforce_once(Id, Threshold, EnforceFun, Store),
 
-    {reply, ok, State};
+    {reply, {ok, Pid}, State};
 
 %% Spawn a function.
 handle_call({thread, Module, Function, Args},

@@ -852,7 +852,7 @@ counter_enforce_once_test(Config) ->
     lager:info("Adding invariant on node: ~p!", [Node]),
 
     case rpc:call(Node, lasp, enforce_once, [Id, Threshold, EnforceFun]) of
-        ok ->
+        {ok, _Pid} ->
             lager:info("Invariant configured!");
         Error ->
             lager:info("Invariant can't be configured: ~p", [Error]),
@@ -913,7 +913,7 @@ counter_strict_enforce_once_test(Config) ->
             lager:info("Adding invariant on node: ~p!", [Node]),
 
             case rpc:call(Node, lasp, enforce_once, [Id, Threshold, EnforceFun]) of
-                ok ->
+                {ok, _Pid} ->
                     lager:info("Invariant configured!");
                 Error ->
                     lager:info("Invariant can't be configured: ~p", [Error]),
@@ -973,7 +973,7 @@ awset_enforce_once_test(Config) ->
     lager:info("Adding invariant on node: ~p!", [Node]),
 
     case rpc:call(Node, lasp, enforce_once, [Id, Threshold, EnforceFun]) of
-        ok ->
+        {ok, _Pid} ->
             lager:info("Invariant configured!");
         Error ->
             lager:info("Invariant can't be configured: ~p", [Error]),
@@ -1027,7 +1027,7 @@ awset_strict_enforce_once_test(Config) ->
     lager:info("Adding invariant on node: ~p!", [Node]),
 
     case rpc:call(Node, lasp, enforce_once, [Id, Threshold, EnforceFun]) of
-        ok ->
+        {ok, _Pid} ->
             lager:info("Invariant configured!");
         Error ->
             lager:info("Invariant can't be configured: ~p", [Error]),
@@ -1081,7 +1081,7 @@ orset_enforce_once_test(Config) ->
     lager:info("Adding invariant on node: ~p!", [Node]),
 
     case rpc:call(Node, lasp, enforce_once, [Id, Threshold, EnforceFun]) of
-        ok ->
+        {ok, _Pid} ->
             lager:info("Invariant configured!");
         Error ->
             lager:info("Invariant can't be configured: ~p", [Error]),
@@ -1135,7 +1135,7 @@ orset_strict_enforce_once_test(Config) ->
     lager:info("Adding invariant on node: ~p!", [Node]),
 
     case rpc:call(Node, lasp, enforce_once, [Id, Threshold, EnforceFun]) of
-        ok ->
+        {ok, _Pid} ->
             lager:info("Invariant configured!");
         Error ->
             lager:info("Invariant can't be configured: ~p", [Error]),

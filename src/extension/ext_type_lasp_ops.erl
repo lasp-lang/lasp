@@ -12,6 +12,14 @@
     group_by_sum/3,
     order_by/3]).
 
+map({_ObjectId, _ReplicaId}=ResultId, Function, {ext_type_aworset_input, {input, BORSet}}) ->
+    ResultBORSet = internal_map(ResultId, Function, undefined, undefined, BORSet),
+    {ext_type_aworset_intermediate, {intermediate, ResultBORSet}};
+map({_ObjectId, _ReplicaId}=ResultId,
+    Function,
+    {ext_type_aworset_intermediate, {intermediate, BORSet}}) ->
+    ResultBORSet = internal_map(ResultId, Function, undefined, undefined, BORSet),
+    {ext_type_aworset_intermediate, {intermediate, ResultBORSet}};
 map({ObjectId, _ReplicaId}=ResultId,
     Function,
     {ext_type_aworset_input, {input, [H | _T]=AllPathInfoList, BORSet}}) ->
@@ -29,6 +37,16 @@ map({ObjectId, _ReplicaId}=ResultId,
     ResultBORSet = internal_map(ResultId, Function, ResultAllPathInfoList, ResultPathInfo, BORSet),
     {ext_type_aworset_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}}.
 
+filter(
+    {_ObjectId, _ReplicaId}=ResultId, Function, {ext_type_aworset_input, {input, BORSet}}) ->
+    ResultBORSet = internal_filter(ResultId, Function, undefined, undefined, BORSet),
+    {ext_type_aworset_intermediate, {intermediate, ResultBORSet}};
+filter(
+    {_ObjectId, _ReplicaId}=ResultId,
+    Function,
+    {ext_type_aworset_intermediate, {intermediate, BORSet}}) ->
+    ResultBORSet = internal_filter(ResultId, Function, undefined, undefined, BORSet),
+    {ext_type_aworset_intermediate, {intermediate, ResultBORSet}};
 filter(
     {ObjectId, _ReplicaId}=ResultId,
     Function,
@@ -50,6 +68,41 @@ filter(
         internal_filter(ResultId, Function, ResultAllPathInfoList, ResultPathInfo, BORSet),
     {ext_type_aworset_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}}.
 
+product(
+    {_ObjectId, _ReplicaId}=ResultId, _LeftId, _RightId,
+    {ext_type_aworset_input, {input, BORSetL}}, {ext_type_aworset_input, {input, BORSetR}}) ->
+    ResultBORSet = internal_product(ResultId, undefined, undefined, BORSetL, BORSetR),
+    {ext_type_aworset_intermediate, {intermediate, ResultBORSet}};
+product(
+    {_ObjectId, _ReplicaId}=ResultId, _LeftId, _RightId,
+    {ext_type_aworset_input, {input, BORSetL}},
+    {ext_type_aworset_intermediate, {intermediate, BORSetR}}) ->
+    ResultBORSet = internal_product(ResultId, undefined, undefined, BORSetL, BORSetR),
+    {ext_type_aworset_intermediate, {intermediate, ResultBORSet}};
+product(
+    {_ObjectId, _ReplicaId}=ResultId, _LeftId, _RightId,
+    {ext_type_aworset_intermediate, {intermediate, BORSetL}},
+    {ext_type_aworset_input, {input, BORSetR}}) ->
+    ResultBORSet = internal_product(ResultId, undefined, undefined, BORSetL, BORSetR),
+    {ext_type_aworset_intermediate, {intermediate, ResultBORSet}};
+product(
+    {_ObjectId, _ReplicaId}=ResultId, _LeftId, _RightId,
+    {ext_type_aworset_intermediate, {intermediate, BORSetL}},
+    {ext_type_aworset_intermediate, {intermediate, BORSetR}}) ->
+    ResultBORSet = internal_product(ResultId, undefined, undefined, BORSetL, BORSetR),
+    {ext_type_aworset_intermediate, {intermediate, ResultBORSet}};
+product(
+    {_ObjectId, _ReplicaId}=ResultId, _LeftId, _RightId,
+    {ext_type_aggresult_intermediate, {intermediate, BORSetL}},
+    {ext_type_lwwregister_input, {input, BORSetR}}) ->
+    ResultBORSet = internal_product(ResultId, undefined, undefined, BORSetL, BORSetR),
+    {ext_type_aworset_intermediate, {intermediate, ResultBORSet}};
+product(
+    {_ObjectId, _ReplicaId}=ResultId, _LeftId, _RightId,
+    {ext_type_aggresult_intermediate, {intermediate, BORSetL}},
+    {ext_type_aworset_intermediate, {intermediate, BORSetR}}) ->
+    ResultBORSet = internal_product(ResultId, undefined, undefined, BORSetL, BORSetR),
+    {ext_type_aworset_intermediate, {intermediate, ResultBORSet}};
 product(
     {ObjectId, _ReplicaId}=ResultId,
     _LeftId,
@@ -129,6 +182,13 @@ product(
         internal_product(ResultId, ResultAllPathInfoList, ResultPathInfo, BORSetL, BORSetR),
     {ext_type_aworset_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}}.
 
+set_count({_ObjectId, _ReplicaId}=ResultId, {ext_type_aworset_input, {input, BORSet}}) ->
+    ResultBORSet = internal_set_count(ResultId, undefined, undefined, BORSet),
+    {ext_type_aggresult_intermediate, {intermediate, ResultBORSet}};
+set_count(
+    {_ObjectId, _ReplicaId}=ResultId, {ext_type_aworset_intermediate, {intermediate, BORSet}}) ->
+    ResultBORSet = internal_set_count(ResultId, undefined, undefined, BORSet),
+    {ext_type_aggresult_intermediate, {intermediate, ResultBORSet}};
 set_count(
     {ObjectId, _ReplicaId}=ResultId,
     {ext_type_aworset_input, {input, [H | _T]=AllPathInfoList, BORSet}}) ->
@@ -146,6 +206,16 @@ set_count(
     ResultBORSet = internal_set_count(ResultId, ResultAllPathInfoList, ResultPathInfo, BORSet),
     {ext_type_aggresult_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}}.
 
+group_by_sum(
+    {_ObjectId, _ReplicaId}=ResultId, SumFunction, {ext_type_aworset_input, {input, BORSet}}) ->
+    ResultBORSet = internal_group_by_sum(ResultId, SumFunction, undefined, undefined, BORSet),
+    {ext_type_aggresult_intermediate, {intermediate, ResultBORSet}};
+group_by_sum(
+    {_ObjectId, _ReplicaId}=ResultId,
+    SumFunction,
+    {ext_type_aworset_intermediate, {intermediate, BORSet}}) ->
+    ResultBORSet = internal_group_by_sum(ResultId, SumFunction, undefined, undefined, BORSet),
+    {ext_type_aggresult_intermediate, {intermediate, ResultBORSet}};
 group_by_sum(
     {ObjectId, _ReplicaId}=ResultId,
     SumFunction,
@@ -167,6 +237,22 @@ group_by_sum(
         internal_group_by_sum(ResultId, SumFunction, ResultAllPathInfoList, ResultPathInfo, BORSet),
     {ext_type_aggresult_intermediate, {intermediate, ResultAllPathInfoList, ResultBORSet}}.
 
+order_by(
+    {_ObjectId, _ReplicaId}=ResultId, CompareFunction, {ext_type_aworset_input, {input, BORSet}}) ->
+    ResultBORSet = internal_order_by(ResultId, CompareFunction, undefined, undefined, BORSet),
+    {ext_type_aggresult_intermediate, {intermediate, ResultBORSet}};
+order_by(
+    {_ObjectId, _ReplicaId}=ResultId,
+    CompareFunction,
+    {ext_type_aworset_intermediate, {intermediate, BORSet}}) ->
+    ResultBORSet = internal_order_by(ResultId, CompareFunction, undefined, undefined, BORSet),
+    {ext_type_aggresult_intermediate, {intermediate, ResultBORSet}};
+order_by(
+    {_ObjectId, _ReplicaId}=ResultId,
+    CompareFunction,
+    {ext_type_aggresult_intermediate, {intermediate, BORSet}}) ->
+    ResultBORSet = internal_order_by(ResultId, CompareFunction, undefined, undefined, BORSet),
+    {ext_type_aggresult_intermediate, {intermediate, ResultBORSet}};
 order_by(
     {ObjectId, _ReplicaId}=ResultId,
     CompareFunction,

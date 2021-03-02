@@ -43,6 +43,9 @@
     {
         ext_type_orset_base:ext_node_type(),
         ext_type_path:ext_path_info_list(),
+        ext_type_orset_base:ext_type_orset_base()} |
+    {
+        ext_type_orset_base:ext_node_type(),
         ext_type_orset_base:ext_type_orset_base()}.
 -type element() :: term().
 -type ext_type_lwwregister_input_op() ::
@@ -53,6 +56,8 @@ new() ->
     erlang:error(not_implemented).
 
 -spec new([term()]) -> ext_type_lwwregister_input().
+new([_NodeId]) ->
+    {?TYPE, {input, do(new, [undefined])}};
 new([AllPathInfoList, {undefined, undefined}=PrevNodeIdPair, NodeId]) ->
     CurPathInfo = ext_type_path:new_path_info(NodeId, PrevNodeIdPair),
     NewAllPathInfoList = [CurPathInfo] ++ AllPathInfoList,
@@ -61,6 +66,14 @@ new([AllPathInfoList, {undefined, undefined}=PrevNodeIdPair, NodeId]) ->
 -spec mutate(
     ext_type_lwwregister_input_op(), type:id(), ext_type_lwwregister_input()) ->
     {ok, ext_type_lwwregister_input()}.
+mutate(
+    {write, Elem}, {NodeId, ReplicaId}=_Actor, {?TYPE, {input, ORSetBase}=_LWWRegisterPayload}) ->
+    NextEventHistory =
+        do(
+            next_event_history,
+            [ext_event_history_total_order, NodeId, ReplicaId, ORSetBase]),
+    NewORSetBase = do(insert, [NextEventHistory, Elem, ORSetBase]),
+    {ok, {?TYPE, {input, NewORSetBase}}};
 mutate(
     {write, Elem},
     {NodeId, ReplicaId}=_Actor,
@@ -75,11 +88,19 @@ mutate(_Op, _Actor, {?TYPE, _LWWRegisterPayload}=CRDT) ->
     {ok, CRDT}.
 
 -spec query(ext_type_lwwregister_input()) -> sets:set(element()).
+query({?TYPE, {input, ORSetBase}=_LWWRegisterPayload}) ->
+    {_Subset, Result} = do(read, [ordsets:new(), ORSetBase]),
+    Result;
 query({?TYPE, {input, _AllPathInfoList, ORSetBase}=_LWWRegisterPayload}) ->
     {_Subset, Result} = do(read, [ordsets:new(), ORSetBase]),
     Result.
 
 -spec equal(ext_type_lwwregister_input(), ext_type_lwwregister_input()) -> boolean().
+equal(
+    {?TYPE, {NodeTypeL, ORSetBaseL}=_LWWRegisterPayloadL},
+    {?TYPE, {NodeTypeR, ORSetBaseR}=_LWWRegisterPayloadR}) ->
+    NodeTypeL == NodeTypeR andalso
+        do(equal, [ORSetBaseL, ORSetBaseR]);
 equal(
     {?TYPE, {NodeTypeL, AllPathInfoListL, ORSetBaseL}=_LWWRegisterPayloadL},
     {?TYPE, {NodeTypeR, AllPathInfoListR, ORSetBaseR}=_LWWRegisterPayloadR}) ->
@@ -94,10 +115,13 @@ delta_mutate(_Op, _Actor, {?TYPE, _LWWRegisterPayload}=CRDT) ->
     {ok, CRDT}.
 
 -spec merge(ext_type_lwwregister_input(), ext_type_lwwregister_input()) -> ext_type_lwwregister_input().
-merge(
-    {?TYPE, LWWRegisterPayload},
-    {?TYPE, LWWRegisterPayload}) ->
+merge({?TYPE, LWWRegisterPayload}, {?TYPE, LWWRegisterPayload}) ->
     {?TYPE, LWWRegisterPayload};
+merge(
+    {?TYPE, {input, ORSetBaseL}=_LWWRegisterPayloadL},
+    {?TYPE, {input, ORSetBaseR}=_LWWRegisterPayloadR}) ->
+    NewORSetBase = do(join, [input, ORSetBaseL, ORSetBaseR]),
+    {?TYPE, {input, NewORSetBase}};
 merge(
     {?TYPE, {input, AllPathInfoList, ORSetBaseL}=_LWWRegisterPayloadL},
     {?TYPE, {input, AllPathInfoList, ORSetBaseR}=_LWWRegisterPayloadR}) ->
@@ -105,12 +129,16 @@ merge(
     {?TYPE, {input, AllPathInfoList, NewORSetBase}}.
 
 -spec is_bottom(ext_type_lwwregister_input()) -> boolean().
+is_bottom({?TYPE, {input, ORSetBase}=_LWWRegisterPayload}=_CRDT) ->
+    ORSetBase == do(new, [undefined]);
 is_bottom({?TYPE, {input, AllPathInfoList, ORSetBase}=_LWWRegisterPayload}=_CRDT) ->
     ORSetBase == do(new, [AllPathInfoList]);
 is_bottom(_CRDT) ->
     false.
 
 -spec is_inflation(ext_type_lwwregister_input(), ext_type_lwwregister_input()) -> boolean().
+is_inflation({?TYPE, {input, ORSetBaseL}}, {?TYPE, {input, ORSetBaseR}}) ->
+    do(is_inflation, [ORSetBaseL, ORSetBaseR]);
 is_inflation(
     {?TYPE, {input, AllPathInfoList, ORSetBaseL}}, {?TYPE, {input, AllPathInfoList, ORSetBaseR}}) ->
     do(is_inflation, [ORSetBaseL, ORSetBaseR]);
@@ -118,6 +146,8 @@ is_inflation(_CRDTL, _CRDTR) ->
     false.
 
 -spec is_strict_inflation(ext_type_lwwregister_input(), ext_type_lwwregister_input()) -> boolean().
+is_strict_inflation({?TYPE, {input, ORSetBaseL}}, {?TYPE, {input, ORSetBaseR}}) ->
+    do(is_strict_inflation, [ORSetBaseL, ORSetBaseR]);
 is_strict_inflation(
     {?TYPE, {input, AllPathInfoList, ORSetBaseL}}, {?TYPE, {input, AllPathInfoList, ORSetBaseR}}) ->
     do(is_strict_inflation, [ORSetBaseL, ORSetBaseR]);
@@ -145,6 +175,8 @@ decode(_Arg0, _Arg1) ->
 -spec query_ext(
     {ext_type_cover:ext_subset_in_cover(), ext_type_lwwregister_input()}) ->
     {ext_type_cover:ext_subset_in_cover(), sets:set(element())}.
+query_ext({PrevSubset, {?TYPE, {input, ORSetBase}}}) ->
+    do(read, [PrevSubset, ORSetBase]);
 query_ext({PrevSubset, {?TYPE, {input, _AllPathInfoList, ORSetBase}}}) ->
     do(read, [PrevSubset, ORSetBase]).
 
@@ -154,6 +186,8 @@ query_ext({PrevSubset, {?TYPE, {input, _AllPathInfoList, ORSetBase}}}) ->
         ext_type_provenance:ext_dot_set(),
         ext_type_lwwregister_input()}) ->
     {ext_type_cover:ext_subset_in_cover(), ext_type_provenance:ext_dot_set(), sets:set(element())}.
+query_ext_consistent({PrevSubset, PrevCDS, {?TYPE, {input, ORSetBase}}}) ->
+    do(consistent_read, [undefined, PrevSubset, PrevCDS, ORSetBase]);
 query_ext_consistent(
     {PrevSubset, PrevCDS, {?TYPE, {input, AllPathInfoList, ORSetBase}}}) ->
     do(consistent_read, [AllPathInfoList, PrevSubset, PrevCDS, ORSetBase]).

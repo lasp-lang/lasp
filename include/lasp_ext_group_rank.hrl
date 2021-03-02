@@ -177,3 +177,59 @@
 -define(INPUT_DATA_DIVIDER, [20, 20, 60]).
 
 -define(INPUT_INTERVAL, 10000). %% 10 seconds
+
+
+-define(S_USER_INFO, {<<"u">>, {?EXT_AWORSET_INPUT_TYPE, []}}).
+-define(S_GROUP_INFO, {<<"g">>, {?EXT_AWORSET_INPUT_TYPE, []}}).
+-define(S_DIVIDER, {<<"d">>, {?EXT_LWWREGISTER_INPUT_TYPE, []}}).
+
+% product(<<"g">>, <<"u">>)
+-define(S_GROUP_X_USER, {<<"gXu">>, {?EXT_AWORSET_INTERMEDIATE_TYPE, []}}).
+
+% filter(<<"gXu">>)
+-define(S_GROUP_X_USER_F, {<<"gXuF">>, {?EXT_AWORSET_INTERMEDIATE_TYPE, []}}).
+
+% group_by_sum(<<"gXuF">>)
+-define(S_GROUP_X_USER_F_G, {<<"gXuFG">>, {?EXT_AWORSET_AGGRESULT_TYPE, []}}).
+
+% order_by(<<"gXuFG">>)
+-define(S_GROUP_X_USER_F_G_O, {<<"gXuFGO">>, {?EXT_AWORSET_AGGRESULT_TYPE, []}}).
+
+
+% set_count(<<"g">>)
+-define(S_GROUP_C, {<<"gC">>, {?EXT_AWORSET_AGGRESULT_TYPE, []}}).
+
+% product(<<"gC">>, <<"d">>)
+-define(S_GROUP_C_X_DIVIDER, {<<"gCXd">>, {?EXT_AWORSET_INTERMEDIATE_TYPE, []}}).
+
+% map(<<"gCXd">>)
+-define(S_GROUP_C_X_DIVIDER_M, {<<"gCXdM">>, {?EXT_AWORSET_INTERMEDIATE_TYPE, []}}).
+
+
+-define(
+    S_GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M,
+    {<<"gXuFGOXgCXdM">>, {?EXT_AWORSET_INTERMEDIATE_TYPE, []}}).
+
+% map(<<"gXuFGOXgCXdM">>)
+-define(
+    S_GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M__M,
+    {<<"gXuFGOXgCXdMM">>, {?EXT_AWORSET_INTERMEDIATE_TYPE, []}}).
+
+-define(
+    S_INPUT_DATA,
+    [
+        {?S_USER_INFO, {add,{user_1,1000}}},
+        {?S_USER_INFO, {add,{user_2,2000}}},
+        {?S_GROUP_INFO, {add,{group_1,ordsets:from_list([user_1,user_2])}}},
+        {?S_USER_INFO, {add,{user_3,8000}}},
+        {?S_GROUP_INFO, {add,{group_2,ordsets:from_list([user_3])}}},
+        {?S_USER_INFO, {add,{user_2,9000}}},
+        {?S_GROUP_INFO, {add,{group_3,ordsets:from_list([user_2])}}},
+        {?S_USER_INFO, {add,{user_2,5000}}},
+        {?S_USER_INFO, {add,{user_3,3000}}},
+        {?S_USER_INFO, {add,{user_3,1000}}},
+        {?S_GROUP_INFO, {add,{group_4,ordsets:from_list([user_1,user_3])}}},
+        {?S_USER_INFO, {add,{user_1,2000}}},
+        {?S_USER_INFO, {add,{user_2,6000}}},
+        {?S_USER_INFO, {add,{user_1,3000}}},
+        {?S_GROUP_INFO, {add,{group_5,ordsets:from_list([user_1])}}}]).

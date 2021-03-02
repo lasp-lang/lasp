@@ -74,14 +74,28 @@ init([]) ->
     schedule_logging(),
 
     %% Build DAG.
-    build_dag(),
+    case lasp_config:get(ext_type_version, ext_type_orset_base_v1) of
+        ext_type_orset_base_v7 ->
+            build_dag_simple(),
+            lager:info(
+                "Current input: ~p, node: ~p",
+                [{?S_DIVIDER, {write, ?INPUT_DATA_DIVIDER}}, Actor]),
+            {ok, _} = lasp:update(?S_DIVIDER, {write, ?INPUT_DATA_DIVIDER}, Actor);
+        _ ->
+            build_dag(),
+            lager:info(
+                "Current input: ~p, node: ~p",
+                [{?DIVIDER, {write, ?INPUT_DATA_DIVIDER}}, Actor]),
+            {ok, _} = lasp:update(?DIVIDER, {write, ?INPUT_DATA_DIVIDER}, Actor)
+    end,
 
-    lager:info(
-        "Current input: ~p, node: ~p",
-        [{?DIVIDER, {write, ?INPUT_DATA_DIVIDER}}, Actor]),
-    {ok, _} = lasp:update(?DIVIDER, {write, ?INPUT_DATA_DIVIDER}, Actor),
-
-    {AggGroupRankId, AggGroupRankType} = ?GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M__M,
+    {AggGroupRankId, AggGroupRankType} =
+        case lasp_config:get(ext_type_version, ext_type_orset_base_v1) of
+            ext_type_orset_base_v7 ->
+                ?S_GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M__M;
+            _ ->
+                ?GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M__M
+        end,
     InitSubset = ordsets:new(),
     InitCDS = ordsets:new(),
     InitValue = lasp_type:new(AggGroupRankType, AggGroupRankId),
@@ -123,7 +137,13 @@ handle_info({inflated_value, Value}, #state{actor=Actor, subset=Subset, cds=CDS}
 
     lager:info("Inflated value: ~p, node: ~p", [ReadResult, Actor]),
 
-    {ResultId, _ResultType} = ?GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M__M,
+    {ResultId, _ResultType} =
+        case lasp_config:get(ext_type_version, ext_type_orset_base_v1) of
+            ext_type_orset_base_v7 ->
+                ?S_GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M__M;
+            _ ->
+                ?GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M__M
+        end,
     lasp_instrumentation:meta_size(ResultId, Value),
 
     inflation_check({strict, Value}),
@@ -383,12 +403,166 @@ build_dag() ->
     ok.
 
 %% @private
+build_dag_simple() ->
+    {InputSetUserId, InputSetUserType} = ?S_USER_INFO,
+    {ok, _} = lasp:declare(InputSetUserId, InputSetUserType),
+    {InputSetGroupId, InputSetGroupType} = ?S_GROUP_INFO,
+    {ok, _} = lasp:declare(InputSetGroupId, InputSetGroupType),
+    {InputRegisterDividerId, InputRegisterDividerType} = ?S_DIVIDER,
+    {ok, _} = lasp:declare(InputRegisterDividerId, InputRegisterDividerType),
+
+    {InterSetGroupXUserId, InterSetGroupXUserType} = ?S_GROUP_X_USER,
+    {ok, _} = lasp:declare(InterSetGroupXUserId, InterSetGroupXUserType),
+
+    ok = lasp:product(?S_GROUP_INFO, ?S_USER_INFO, ?S_GROUP_X_USER),
+
+    {InterSetGroupXUserMatchId, InterSetGroupXUserMatchType} = ?S_GROUP_X_USER_F,
+    {ok, _} = lasp:declare(InterSetGroupXUserMatchId, InterSetGroupXUserMatchType),
+
+    ok =
+        lasp:filter(
+            ?S_GROUP_X_USER,
+            fun({{_GroupId, UserIdSet}, {UserId, _UserPoints}}) ->
+                ordsets:is_element(UserId, UserIdSet)
+            end,
+            ?S_GROUP_X_USER_F),
+
+    {GroupBySumGroupXPointsId, GroupBySumGroupXPointsType} = ?S_GROUP_X_USER_F_G,
+    {ok, _} = lasp:declare(GroupBySumGroupXPointsId, GroupBySumGroupXPointsType),
+
+    ok =
+        lasp:group_by_sum(
+            ?S_GROUP_X_USER_F,
+            fun(undefined, {UserIdR, UserPointsR}) ->
+                {
+                    ordsets:add_element(UserIdR, ordsets:new()),
+                    0 + UserPointsR};
+                ({UserIdL, UserPointsL}, {UserIdR, UserPointsR}) ->
+                    {
+                        ordsets:add_element(UserIdR, UserIdL),
+                        UserPointsL + UserPointsR}
+            end,
+            ?S_GROUP_X_USER_F_G),
+
+    {OrderedGroupBySumGroupXPointsId, OrderedGroupBySumGroupXPointsType} = ?S_GROUP_X_USER_F_G_O,
+    {ok, _} = lasp:declare(OrderedGroupBySumGroupXPointsId, OrderedGroupBySumGroupXPointsType),
+
+    ok =
+        lasp:order_by(
+            ?S_GROUP_X_USER_F_G,
+            fun({{_GroupIdL, _GroupUsersL}, {_GroupUsersSumedL, GroupPointsL}}=_ElemL,
+                {{_GroupIdR, _GroupUsersR}, {_GroupUsersSumedR, GroupPointsR}}=_ElemR) ->
+                GroupPointsL >= GroupPointsR
+            end,
+            ?S_GROUP_X_USER_F_G_O),
+
+    {SetCountGroupId, SetCountGroupType} = ?S_GROUP_C,
+    {ok, _} = lasp:declare(SetCountGroupId, SetCountGroupType),
+
+    ok = lasp:set_count(?S_GROUP_INFO, ?S_GROUP_C),
+
+    {AggResultGroupCountXDividerId, AggResultGroupCountXDividerType} = ?S_GROUP_C_X_DIVIDER,
+    {ok, _} = lasp:declare(AggResultGroupCountXDividerId, AggResultGroupCountXDividerType),
+
+    ok = lasp:product(?S_GROUP_C, ?S_DIVIDER, ?S_GROUP_C_X_DIVIDER),
+
+    {AggGroupCountXDividerRankId, AggGroupCountXDividerRankType} = ?S_GROUP_C_X_DIVIDER_M,
+    {ok, _} = lasp:declare(AggGroupCountXDividerRankId, AggGroupCountXDividerRankType),
+
+    ok =
+        lasp:map(
+            ?S_GROUP_C_X_DIVIDER,
+            fun({GroupCount, Divider}) ->
+                {RankDivider, 100} =
+                    lists:foldl(
+                        fun(Border, {AccInRankDivider, AccInBorderSum}) ->
+                            NewBorderSum = AccInBorderSum + Border,
+                            Rank = GroupCount * NewBorderSum div 100,
+                            {AccInRankDivider ++ [Rank], NewBorderSum}
+                        end,
+                        {[], 0},
+                        Divider),
+                RankDivider
+            end,
+            ?S_GROUP_C_X_DIVIDER_M),
+
+    {
+        AggResultGroupPointsOrderedXRankDividerId,
+        AggResultGroupPointsOrderedXRankDividerType} =
+        ?S_GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M,
+    {ok, _} =
+        lasp:declare(
+            AggResultGroupPointsOrderedXRankDividerId,
+            AggResultGroupPointsOrderedXRankDividerType),
+
+    ok =
+        lasp:product(
+            ?S_GROUP_X_USER_F_G_O,
+            ?S_GROUP_C_X_DIVIDER_M,
+            ?S_GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M),
+
+    {
+        AggGroupRankId,
+        AggGroupRankType} = ?S_GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M__M,
+    {ok, _} = lasp:declare(AggGroupRankId, AggGroupRankType),
+
+    ok =
+        lasp:map(
+            ?S_GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M,
+            fun({GroupPointsOrdered, RankDivider}) ->
+                {_Index, GroupRanked, _CurRank, _CurRankDivider} =
+                    lists:foldl(
+                        fun({{GroupId, _UserSet}, {_SumedUsers, _Points}},
+                            {
+                                AccInIndex,
+                                AccInGroupRanked,
+                                AccInCurRank,
+                                [CurDivider | RestDividers]=AccInRankDivider}) ->
+                            {NewCurRank, NewRankDivider} =
+                                case AccInIndex == CurDivider of
+                                    true ->
+                                        {AccInCurRank + 1, RestDividers};
+                                    false ->
+                                        {AccInCurRank, AccInRankDivider}
+                                end,
+                            {
+                                AccInIndex + 1,
+                                ordsets:add_element(
+                                    {GroupId, NewCurRank},
+                                    AccInGroupRanked),
+                                NewCurRank,
+                                NewRankDivider};
+                            (
+                                {{GroupId, _UserSet}, {_SumedUsers, _Points}},
+                                {AccInIndex, AccInGroupRanked, AccInCurRank, []}) ->
+                                {
+                                    AccInIndex + 1,
+                                    ordsets:add_element(
+                                        {GroupId, AccInCurRank},
+                                        AccInGroupRanked),
+                                    AccInCurRank,
+                                    []}
+                        end,
+                        {0, ordsets:new(), 1, RankDivider},
+                        GroupPointsOrdered),
+                GroupRanked
+            end,
+            ?S_GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M__M),
+
+    ok.
+
+%% @private
 inflation_check(Threshold) ->
     Me = self(),
     spawn(
         fun() ->
             {ok, {_, _, _, Value}} =
-                lasp:read(?GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M__M, Threshold),
+                case lasp_config:get(ext_type_version, ext_type_orset_base_v1) of
+                    ext_type_orset_base_v7 ->
+                        lasp:read(?S_GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M__M, Threshold);
+                    _ ->
+                        lasp:read(?GROUP_X_USER_F_G_O__X__GROUP_C_X_DIVIDER_M__M, Threshold)
+                end,
             Me ! {inflated_value, Value}
         end).
 

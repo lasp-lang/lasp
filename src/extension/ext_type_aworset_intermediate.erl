@@ -43,6 +43,9 @@
     {
         ext_type_orset_base:ext_node_type(),
         ext_type_path:ext_path_info_list(),
+        ext_type_orset_base:ext_type_orset_base()} |
+    {
+        ext_type_orset_base:ext_node_type(),
         ext_type_orset_base:ext_type_orset_base()}.
 -type element() :: term().
 -type ext_type_aworset_intermediate_op() :: no_op.
@@ -52,6 +55,8 @@ new() ->
     erlang:error(not_implemented).
 
 -spec new([term()]) -> ext_type_aworset_intermediate().
+new([_NodeId]) ->
+    {?TYPE, {intermediate, do(new, [undefined])}};
 new([AllPathInfoList, PrevNodeIdPair, NodeId]) ->
     CurPathInfo = ext_type_path:new_path_info(NodeId, PrevNodeIdPair),
     NewAllPathInfoList = [CurPathInfo] ++ AllPathInfoList,
@@ -64,11 +69,19 @@ mutate(no_op, _Actor, {?TYPE, _AWORSetPayload}=CRDT) ->
     {ok, CRDT}.
 
 -spec query(ext_type_aworset_intermediate()) -> sets:set(element()).
+query({?TYPE, {intermediate, ORSetBase}=_AWORSetPayload}) ->
+    {_Subset, Result} = do(read, [ordsets:new(), ORSetBase]),
+    Result;
 query({?TYPE, {intermediate, _AllPathInfoList, ORSetBase}=_AWORSetPayload}) ->
     {_Subset, Result} = do(read, [ordsets:new(), ORSetBase]),
     Result.
 
 -spec equal(ext_type_aworset_intermediate(), ext_type_aworset_intermediate()) -> boolean().
+equal(
+    {?TYPE, {NodeTypeL, ORSetBaseL}=_AWORSetPayloadL},
+    {?TYPE, {NodeTypeR, ORSetBaseR}=_AWORSetPayloadR}) ->
+    NodeTypeL == NodeTypeR andalso
+        do(equal, [ORSetBaseL, ORSetBaseR]);
 equal(
     {?TYPE, {NodeTypeL, AllPathInfoListL, ORSetBaseL}=_AWORSetPayloadL},
     {?TYPE, {NodeTypeR, AllPathInfoListR, ORSetBaseR}=_AWORSetPayloadR}) ->
@@ -84,11 +97,13 @@ delta_mutate(_Op, _Actor, {?TYPE, _AWORSetPayload}=CRDT) ->
 
 -spec merge(ext_type_aworset_intermediate(), ext_type_aworset_intermediate()) ->
     ext_type_aworset_intermediate().
-merge(
-    {?TYPE, AWORSetPayload},
-    {?TYPE, AWORSetPayload}) ->
-%%    lager:info("jeff Same payload"),
+merge({?TYPE, AWORSetPayload}, {?TYPE, AWORSetPayload}) ->
     {?TYPE, AWORSetPayload};
+merge(
+    {?TYPE, {intermediate, ORSetBaseL}=_AWORSetPayloadL},
+    {?TYPE, {intermediate, ORSetBaseR}=_AWORSetPayloadR}) ->
+    NewORSetBase = do(join, [intermediate, ORSetBaseL, ORSetBaseR]),
+    {?TYPE, {intermediate, NewORSetBase}};
 merge(
     {?TYPE, {intermediate, AllPathInfoList, ORSetBaseL}=_AWORSetPayloadL},
     {?TYPE, {intermediate, AllPathInfoList, ORSetBaseR}=_AWORSetPayloadR}) ->
@@ -96,6 +111,8 @@ merge(
     {?TYPE, {intermediate, AllPathInfoList, NewORSetBase}}.
 
 -spec is_bottom(ext_type_aworset_intermediate()) -> boolean().
+is_bottom({?TYPE, {intermediate, ORSetBase}=_AWORSetPayload}=_CRDT) ->
+    ORSetBase == do(new, [undefined]);
 is_bottom(
     {?TYPE, {intermediate, AllPathInfoList, ORSetBase}=_AWORSetPayload}=_CRDT) ->
     ORSetBase == do(new, [AllPathInfoList]);
@@ -103,6 +120,10 @@ is_bottom(_CRDT) ->
     false.
 
 -spec is_inflation(ext_type_aworset_intermediate(), ext_type_aworset_intermediate()) -> boolean().
+is_inflation(
+    {?TYPE, {intermediate, ORSetBaseL}=_AWORSetPayloadL},
+    {?TYPE, {intermediate, ORSetBaseR}=_AWORSetPayloadR}) ->
+    do(is_inflation, [ORSetBaseL, ORSetBaseR]);
 is_inflation(
     {?TYPE, {intermediate, AllPathInfoList, ORSetBaseL}=_AWORSetPayloadL},
     {?TYPE, {intermediate, AllPathInfoList, ORSetBaseR}=_AWORSetPayloadR}) ->
@@ -112,6 +133,10 @@ is_inflation(_CRDTL, _CRDTR) ->
 
 -spec is_strict_inflation(ext_type_aworset_intermediate(), ext_type_aworset_intermediate()) ->
     boolean().
+is_strict_inflation(
+    {?TYPE, {intermediate, ORSetBaseL}=_AWORSetPayloadL},
+    {?TYPE, {intermediate, ORSetBaseR}=_AWORSetPayloadR}) ->
+    do(is_strict_inflation, [ORSetBaseL, ORSetBaseR]);
 is_strict_inflation(
     {?TYPE, {intermediate, AllPathInfoList, ORSetBaseL}=_AWORSetPayloadL},
     {?TYPE, {intermediate, AllPathInfoList, ORSetBaseR}=_AWORSetPayloadR}) ->
@@ -140,6 +165,8 @@ decode(_Arg0, _Arg1) ->
 -spec query_ext(
     {ext_type_cover:ext_subset_in_cover(), ext_type_aworset_intermediate()}) ->
     {ext_type_cover:ext_subset_in_cover(), sets:set(element())}.
+query_ext({PrevSubset, {?TYPE, {intermediate, ORSetBase}}}) ->
+    do(read, [PrevSubset, ORSetBase]);
 query_ext({PrevSubset, {?TYPE, {intermediate, _AllPathInfoList, ORSetBase}}}) ->
     do(read, [PrevSubset, ORSetBase]).
 
@@ -149,6 +176,8 @@ query_ext({PrevSubset, {?TYPE, {intermediate, _AllPathInfoList, ORSetBase}}}) ->
         ext_type_provenance:ext_dot_set(),
         ext_type_aworset_intermediate()}) ->
     {ext_type_cover:ext_subset_in_cover(), ext_type_provenance:ext_dot_set(), sets:set(element())}.
+query_ext_consistent({PrevSubset, PrevCDS, {?TYPE, {intermediate, ORSetBase}}}) ->
+    do(consistent_read, [undefined, PrevSubset, PrevCDS, ORSetBase]);
 query_ext_consistent(
     {PrevSubset, PrevCDS, {?TYPE, {intermediate, AllPathInfoList, ORSetBase}}}) ->
     do(consistent_read, [AllPathInfoList, PrevSubset, PrevCDS, ORSetBase]).

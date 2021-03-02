@@ -32,7 +32,8 @@
     {ext_event_history_type(), {ext_type_event:ext_event(), ext_type_path:ext_dataflow_path()}} |
     {
         ext_event_history_partial_order_group,
-        {ext_node_id(), ext_type_event_history_set:ext_event_history_set()}}.
+        {ext_node_id(), ext_type_event_history_set:ext_event_history_set()}} |
+    ext_type_event_tree:ext_event_tree().
 
 -spec next_event_history(
     ext_event_history_type(),

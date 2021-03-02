@@ -47,7 +47,7 @@
 %% ===================================================================
 
 init_per_suite(_Config) ->
-    lasp_config:set(ext_type_version, ext_type_orset_base_v5),
+    lasp_config:set(ext_type_version, ext_type_orset_base_v7),
     %% Start Lasp on the runner and enable instrumentation.
     lasp_support:start_runner(),
 
@@ -515,7 +515,7 @@ product_test(_Config) ->
             {IntermediateSet1Id, {InputSet1Id, InputSet2Id}},
             {InputSet1Id, {undefined, undefined}},
             {InputSet2Id, {undefined, undefined}}],
-    IntermediateSet2Id = <<"intermediateset1">>,
+    IntermediateSet2Id = <<"intermediateset2">>,
     {ok, {IntermediateSet2, _, _, _}} =
         lasp:declare(
             IntermediateSet2Id,

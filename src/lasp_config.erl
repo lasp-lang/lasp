@@ -55,7 +55,7 @@ web_config() ->
     Config = [
         {ip, Ip},
         {port, Port},
-        {log_dir, "priv/log"},
+        {log_dir, "logs"},
         {dispatch, dispatch()}
     ],
     Node = lasp_support:mynode(),

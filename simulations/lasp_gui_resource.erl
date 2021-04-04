@@ -60,10 +60,10 @@ content_types_provided(Req, Ctx) ->
 %% return file path
 -spec file_path(wrq:reqdata() | list()) -> string().
 file_path(Path) when is_list(Path) ->
-    filename:join([code:priv_dir(?APP)] ++ [Path]);
+    filename:join([code:lib_dir(?APP)] ++ [Path]);
 file_path(Req) ->
     Path=wrq:path_tokens(Req),
-    filename:join([code:priv_dir(?APP)] ++ Path).
+    filename:join([code:lib_dir(?APP)] ++ Path).
 
 %% loads a resource file from disk and returns it
 -spec get_file(wrq:reqdata()) -> binary().

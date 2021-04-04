@@ -243,7 +243,7 @@ start_transmission_timer() ->
 
 %% @private
 root_eval_dir() ->
-    code:priv_dir(?APP) ++ "/evaluation".
+    code:lib_dir(?APP) ++ "/evaluation".
 
 %% @private
 root_log_dir() ->
